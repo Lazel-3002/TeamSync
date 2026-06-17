@@ -1,0 +1,1709 @@
+# Kanka Voice Proje Klasörünü Oluştur ve İçine Gir
+New-Item -ItemType Directory -Force -Path "kanka-voice"
+Set-Location -Path "kanka-voice"
+
+# 1. package.json oluşturuluyor
+$packageJson = @'
+{
+  "name": "kanka-voice",
+  "version": "1.0.0",
+  "description": "P2P sesli/görüntülü/ekran paylaşımı + uzaktan kontrol - sunucusuz",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable --x64",
+    "build-full": "electron-builder --win --x64"
+  },
+  "author": "Kanka",
+  "license": "MIT",
+  "dependencies": {
+    "robotjs": "^0.6.0"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.kanka.voice",
+    "productName": "KankaVoice",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "renderer.js",
+      "style.css"
+    ],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    }
+  }
+}
+'@
+Set-Content -Path "package.json" -Value $packageJson -Encoding utf8
+
+# 2. main.js oluşturuluyor
+$mainJs = @'
+const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell } = require('electron');
+const path = require('path');
+const dgram = require('dgram');
+const os = require('os');
+
+let mainWindow = null;
+let discoverySocket = null;
+let myPeerId = null;
+let remoteControlActive = false;
+let robot = null;
+
+const DISCOVERY_PORT = 41234;
+
+try {
+  robot = require('robotjs');
+  console.log('✅ robotjs yüklendi - uzaktan kontrol aktif');
+} catch (e) {
+  console.warn('⚠️ robotjs yüklenemedi. Uzaktan kontrol çalışmaz:', e.message);
+  console.warn('   Kurulum: Windows için Visual Studio Build Tools gerekebilir.');
+}
+
+function getLocalIPs() {
+  const interfaces = os.networkInterfaces();
+  const ips = [];
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        ips.push({ name, address: iface.address });
+      }
+    }
+  }
+  return ips;
+}
+
+function startDiscovery(peerId, name) {
+  myPeerId = peerId;
+  if (discoverySocket) {
+    try { discoverySocket.close(); } catch (e) {}
+  }
+
+  discoverySocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  discoverySocket.on('error', (err) => {
+    console.error('Discovery socket hatası:', err);
+  });
+  discoverySocket.on('message', (msg, rinfo) => {
+    try {
+      const data = JSON.parse(msg.toString());
+      if (data.id !== myPeerId && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('peer-discovered', {
+          id: data.id,
+          name: data.name,
+          ip: rinfo.address
+        });
+      }
+    } catch (e) {}
+  });
+  discoverySocket.bind(DISCOVERY_PORT, () => {
+    try { discoverySocket.setBroadcast(true); } catch (e) {}
+    console.log('🔍 UDP keşfi başlatıldı, port:', DISCOVERY_PORT);
+  });
+
+  setInterval(() => {
+    if (!discoverySocket) return;
+    const msg = Buffer.from(JSON.stringify({
+      id: peerId,
+      name,
+      timestamp: Date.now()
+    }));
+    try {
+      discoverySocket.send(msg, 0, msg.length, DISCOVERY_PORT, '255.255.255.255');
+    } catch (e) {}
+  }, 2000);
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 1000,
+    minHeight: 640,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    },
+    backgroundColor: '#1e1f22',
+    title: 'Kanka Voice - P2P',
+    autoHideMenuBar: true,
+    webSecurity: true
+  });
+  mainWindow.loadFile('index.html');
+  Menu.setApplicationMenu(null);
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+ipcMain.handle('get-local-ips', () => getLocalIPs());
+ipcMain.handle('get-sources', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['window', 'screen'],
+      thumbnailSize: { width: 320, height: 180 }
+    });
+    return sources.map(s => ({
+      id: s.id,
+      name: s.name,
+      thumbnail: s.thumbnail.toDataURL()
+    }));
+  } catch (e) {
+    return [];
+  }
+});
+ipcMain.on('start-discovery', (event, { peerId, name }) => {
+  startDiscovery(peerId, name);
+});
+ipcMain.on('register-ptt', (event, key) => {
+  globalShortcut.unregisterAll();
+  const k = key || 'Space';
+  try {
+    globalShortcut.register(k, () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('ptt-trigger');
+      }
+    });
+  } catch (e) {
+    console.error('PTT kayıt hatası:', e);
+  }
+});
+ipcMain.on('unregister-ptt', () => {
+  globalShortcut.unregisterAll();
+});
+
+ipcMain.on('notify', (event, { title, body }) => {
+  try {
+    new Notification({ title, body, silent: true }).show();
+  } catch (e) {}
+});
+
+ipcMain.on('set-remote-control', (event, active) => {
+  remoteControlActive = !!active;
+  console.log('鼠标 Uzaktan kontrol:', remoteControlActive ? 'AKTİF' : 'KAPALI');
+});
+
+ipcMain.on('remote-input', (event, data) => {
+  if (!robot || !remoteControlActive) return;
+
+  const display = screen.getPrimaryDisplay().size;
+  const { width: sw, height: sh } = display;
+
+  try {
+    if (data.type === 'mousemove' || data.type === 'mousedown' || data.type === 'mouseup' || data.type === 'click') {
+      const x = Math.max(0, Math.min(sw - 1, Math.round(data.x * sw)));
+      const y = Math.max(0, Math.min(sh - 1, Math.round(data.y * sh)));
+      robot.moveMouse(x, y);
+
+      if (data.type === 'mousedown') robot.mouseToggle('down', mapButton(data.button));
+      else if (data.type === 'mouseup') robot.mouseToggle('up', mapButton(data.button));
+      else if (data.type === 'click') {
+        robot.mouseClick(mapButton(data.button));
+      }
+    } else if (data.type === 'keydown' || data.type === 'keyup') {
+      const key = normalizeKey(data.key);
+      if (key) {
+        robot.keyToggle(key, data.type === 'keydown' ? 'down' : 'up');
+      }
+    } else if (data.type === 'scroll') {
+      robot.scrollMouse(data.deltaX || 0, data.deltaY || 0);
+    }
+  } catch (e) {
+    console.error('Input hatası:', e);
+  }
+});
+
+function mapButton(b) {
+  if (b === 2) return 'right';
+  if (b === 1) return 'middle';
+  return 'left';
+}
+
+function normalizeKey(key) {
+  if (!key) return null;
+  const map = {
+    'Enter': 'enter', 'Backspace': 'backspace', 'Tab': 'tab',
+    'Escape': 'escape', ' ': 'space', 'Space': 'space',
+    'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right',
+    'Shift': 'shift', 'Control': 'control', 'Alt': 'alt', 'Meta': 'command',
+    'CapsLock': 'capslock'
+  };
+  return map[key] || (key.length === 1 ? key.toLowerCase() : key);
+}
+
+app.whenReady().then(() => {
+  createWindow();
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  if (discoverySocket) {
+    try { discoverySocket.close(); } catch (e) {}
+  }
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+'@
+Set-Content -Path "main.js" -Value $mainJs -Encoding utf8
+
+# 3. preload.js oluşturuluyor
+$preloadJs = @'
+const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('electronAPI', {
+  getLocalIPs: () => ipcRenderer.invoke('get-local-ips'),
+  startDiscovery: (peerId, name) => ipcRenderer.send('start-discovery', { peerId, name }),
+  getSources: () => ipcRenderer.invoke('get-sources'),
+  registerPTT: (key) => ipcRenderer.send('register-ptt', key),
+  unregisterPTT: () => ipcRenderer.send('unregister-ptt'),
+  onPTT: (cb) => ipcRenderer.on('ptt-trigger', cb),
+  notify: (title, body) => ipcRenderer.send('notify', { title, body }),
+  setRemoteControl: (active) => ipcRenderer.send('set-remote-control', active),
+  sendRemoteInput: (data) => ipcRenderer.send('remote-input', data),
+  onPeerDiscovered: (cb) => ipcRenderer.on('peer-discovered', cb)
+});
+'@
+Set-Content -Path "preload.js" -Value $preloadJs -Encoding utf8
+
+# 4. index.html oluşturuluyor
+$indexHtml = @'
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kanka Voice</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="login" class="login-wrap">
+    <div class="login-card">
+      <h1>🎙️ Kanka Voice</h1>
+      <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur</p>
+
+      <label>Adın</label>
+      <input id="name" type="text" placeholder="Kanka" maxlength="20" />
+
+      <label>Oda Anahtarı <span class="muted">(aynı anahtar = aynı oda)</span></label>
+      <input id="room" type="text" placeholder="gizli-oda-123" value="arkadaslar" />
+
+      <label>Şifre <span class="muted">(opsiyonel, uçtan uca şifreler)</span></label>
+      <input id="password" type="password" placeholder="•••••" />
+
+      <div class="check-row">
+        <input type="checkbox" id="useAI" checked />
+        <label for="useAI">🤖 AI gürültü engelleme (RNNoise)</label>
+      </div>
+
+      <div class="check-row">
+        <input type="checkbox" id="usePTT" />
+        <label for="usePTT">🅿️ Push-to-Talk modu (Space tuşu)</label>
+      </div>
+
+      <button id="start">Başlat</button>
+      <p id="my-ip" class="hint"></p>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span id="room-title">ODA</span>
+        <span id="conn" class="dot"></span>
+        <button id="leave" class="leave">✕</button>
+      </div>
+
+      <div class="lbl">KULLANICILAR</div>
+      <ul id="users" class="users"></ul>
+
+      <div class="lbl">SES TESTİ</div>
+      <div class="vu">
+        <div id="vu" class="vu-bar"></div>
+      </div>
+      <div class="vu-info">
+        <span id="vu-text" class="muted">— dB</span>
+        <select id="mic-select"></select>
+      </div>
+
+      <div class="lbl">SOHBET</div>
+      <div class="chat">
+        <div id="msgs" class="msgs"></div>
+        <form id="cform" class="cform">
+          <input id="cinput" placeholder="Mesaj yaz..." autocomplete="off" />
+          <button type="submit">➤</button>
+        </form>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="grid" class="grid">
+        <div class="empty">
+          <h2>👋 Bağlantı Bekleniyor</h2>
+          <p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>
+        </div>
+      </div>
+    </main>
+
+    <div class="bar">
+      <button id="mic" class="btn" title="Mikrofon (M)">🎤</button>
+      <button id="deaf" class="btn" title="Sağırlaştır (D)">🎧</button>
+      <button id="ptt" class="btn ptt hidden" title="Bas-Konuş">🅿️</button>
+      <button id="cam" class="btn" title="Kamera (C)">📷</button>
+      <button id="share" class="btn" title="Ekran Paylaş (S)">🖥️</button>
+      <button id="rec" class="btn" title="Kayıt (R)">⏺️</button>
+      <div class="vol-wrap">
+        <button id="vol" class="btn" title="Ses">🔊</button>
+        <div id="volpop" class="pop hidden">
+          <input id="volslider" type="range" min="0" max="100" value="100" />
+          <span id="volval">100%</span>
+        </div>
+      </div>
+      <button id="addip" class="btn" title="Manuel IP Ekle">➕</button>
+    </div>
+
+    <div id="share-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>🖥️ Ekran / Pencere Seç</h3>
+        <div id="sources" class="sources"></div>
+        <button id="share-cancel" class="btn-sec">İptal</button>
+      </div>
+    </div>
+
+    <div id="ip-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>➕ Manuel Bağlantı</h3>
+        <p class="muted">Arkadaşının IP adresi (veya SDP teklifi/cevabı)</p>
+        <input id="ip-input" type="text" placeholder="192.168.1.42 veya SDP yapıştır" />
+        <div class="mactions">
+          <button id="ip-cancel" class="btn-sec">İptal</button>
+          <button id="ip-ok" class="btn-pri">Bağlan</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sdp-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>🌐 Çapraz Ağ Bağlantısı</h3>
+        <p class="muted">Aynı ağda değilseniz SDP alışverişi yapın.</p>
+        <h4>Senin Teklifin (arkadaşına gönder):</h4>
+        <textarea id="my-offer" readonly rows="4"></textarea>
+        <button id="copy-offer" class="btn-sec">📋 Kopyala</button>
+        <h4>Arkadaşının Cevabı:</h4>
+        <textarea id="friend-answer" rows="4" placeholder="Arkadaşının cevabını buraya yapıştır..."></textarea>
+        <div class="mactions">
+          <button id="sdp-cancel" class="btn-sec">İptal</button>
+          <button id="sdp-apply" class="btn-pri">Uygula</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ctrl-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>🖱️ Uzaktan Kontrol İsteği</h3>
+        <p id="ctrl-text">Birisi bilgisayarınızı kontrol etmek istiyor.</p>
+        <div class="mactions">
+          <button id="ctrl-deny" class="btn-sec">Reddet</button>
+          <button id="ctrl-accept" class="btn-pri">Kabul Et</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="remote-modal" class="modal hidden">
+      <div class="mcard wide">
+        <h3>🖥️ <span id="remote-name">Uzak Masaüstü</span></h3>
+        <p class="muted">Kontrol etmek için tıkla/sürükle. Çıkmak için ESC.</p>
+        <div class="rwrap">
+          <video id="remote-vid" autoplay playsinline></video>
+        </div>
+        <div class="mactions">
+          <button id="remote-stop" class="btn-sec">Kontrolü Bırak</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
+'@
+Set-Content -Path "index.html" -Value $indexHtml -Encoding utf8
+
+# 5. style.css oluşturuluyor
+$styleCss = @'
+:root {
+  --bg: #1e1f22;
+  --bg2: #2b2d31;
+  --bg3: #313338;
+  --bg4: #383a40;
+  --acc: #5865f2;
+  --acc-h: #4752c4;
+  --txt: #f2f3f5;
+  --mut: #b5bac1;
+  --danger: #ed4245;
+  --ok: #3ba55d;
+  --warn: #faa61a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'Segoe UI', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+  font-size: 14px;
+}
+.hidden { display: none !important; }
+.muted { color: var(--mut); font-size: 12px; }
+
+/* ===== GİRİŞ ===== */
+.login-wrap {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1e1f22, #5865f2);
+}
+.login-card {
+  background: var(--bg2);
+  padding: 36px;
+  border-radius: 12px;
+  width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.login-card h1 { margin-bottom: 4px; }
+.login-card label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mut);
+  text-transform: uppercase;
+  margin: 16px 0 4px;
+  letter-spacing: 0.5px;
+}
+.login-card input[type=text], .login-card input[type=password] {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg3);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--txt);
+  font-size: 14px;
+}
+.login-card input:focus { border-color: var(--acc); outline: none; }
+.check-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.check-row label { margin: 0; text-transform: none; font-size: 13px; color: var(--txt); font-weight: 500; }
+.check-row input { width: 16px; height: 16px; cursor: pointer; }
+.login-card button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 20px;
+  background: var(--acc);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-card button:hover { background: var(--acc-h); }
+.hint { margin-top: 12px; text-align: center; }
+
+/* ===== ANA UYGULAMA ===== */
+.app { display: flex; height: 100vh; }
+.sidebar {
+  width: 260px;
+  background: var(--bg2);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #1e1f22;
+}
+.sidebar-header {
+  padding: 14px 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #1e1f22;
+}
+#room-title { flex: 1; }
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 6px var(--warn);
+}
+.dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.leave {
+  background: transparent;
+  border: none;
+  color: var(--mut);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.leave:hover { color: var(--danger); }
+.lbl {
+  padding: 12px 16px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mut);
+  letter-spacing: 1px;
+}
+.users { list-style: none; padding: 4px 8px; max-height: 180px; overflow-y: auto; }
+.user {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  gap: 10px;
+}
+.user:hover { background: var(--bg3); }
+.av {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--acc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  position: relative;
+}
+.st {
+  position: absolute;
+  bottom: -2px; right: -2px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--bg2);
+  background: var(--ok);
+}
+.st.muted { background: var(--danger); }
+.st.deaf { background: #999; }
+.st.share { background: var(--ok); }
+.st.speaking {
+  box-shadow: 0 0 0 2px var(--ok);
+  animation: pulse 1.2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--bg2), 0 0 0 4px var(--ok); }
+  50% { box-shadow: 0 0 0 2px var(--bg2), 0 0 0 6px transparent; }
+}
+.uname { flex: 1; font-size: 14px; }
+.uact button {
+  background: transparent;
+  border: none;
+  color: var(--mut);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+}
+.uact button:hover { color: var(--txt); }
+
+.vu {
+  margin: 4px 16px;
+  height: 6px;
+  background: var(--bg3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.vu-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--ok) 0%, var(--ok) 60%, var(--warn) 80%, var(--danger) 100%);
+  transition: width 50ms;
+}
+.vu-info { padding: 0 16px; display: flex; align-items: center; gap: 6px; }
+.vu-info select {
+  flex: 1;
+  background: var(--bg3);
+  border: none;
+  color: var(--txt);
+  padding: 4px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.chat {
+  margin-top: auto;
+  border-top: 1px solid #1e1f22;
+  display: flex;
+  flex-direction: column;
+  height: 240px;
+}
+.msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.msg { margin-bottom: 6px; word-wrap: break-word; }
+.msg .n { font-weight: 600; color: var(--acc); }
+.msg .t { color: var(--mut); font-size: 10px; margin-left: 6px; }
+.cform { display: flex; padding: 8px; gap: 6px; }
+.cform input {
+  flex: 1; padding: 8px;
+  background: var(--bg3);
+  border: none; border-radius: 4px;
+  color: var(--txt); font-size: 13px;
+}
+.cform button {
+  background: var(--acc);
+  border: none; color: white;
+  width: 36px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* ===== MAIN AREA ===== */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  align-content: start;
+}
+.empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--mut);
+  text-align: center;
+}
+.vcard {
+  background: var(--bg2);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 16/9;
+  min-height: 200px;
+}
+.vcard.screen { border: 2px solid var(--ok); }
+.vcard video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.vlbl {
+  position: absolute;
+  top: 8px; left: 8px;
+  background: rgba(0,0,0,0.75);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(4px);
+}
+.live {
+  width: 8px; height: 8px;
+  background: var(--danger);
+  border-radius: 50%;
+  animation: blink 1.5s infinite;
+}
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.vactions {
+  position: absolute;
+  top: 8px; right: 8px;
+  display: flex;
+  gap: 4px;
+}
+.vactions button {
+  background: rgba(0,0,0,0.75);
+  border: none;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.vactions button:hover { background: var(--acc); }
+
+/* ===== CONTROL BAR ===== */
+.bar {
+  background: var(--bg2);
+  padding: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid #1e1f22;
+  position: relative;
+}
+.btn {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg3);
+  color: var(--txt);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--bg4); transform: translateY(-1px); }
+.btn.off { background: var(--danger); }
+.btn.rec { background: var(--danger); animation: rec 2s infinite; }
+@keyframes rec { 0%,100% { box-shadow: 0 0 0 0 var(--danger); } 50% { box-shadow: 0 0 0 8px transparent; } }
+.btn.ptt.active { background: var(--ok); }
+.vol-wrap { position: relative; }
+.pop {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg3);
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+.pop input[type=range] { width: 120px; }
+
+/* ===== MODAL ===== */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.mcard {
+  background: var(--bg2);
+  padding: 24px;
+  border-radius: 12px;
+  width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.mcard.wide { width: 90vw; max-width: 1100px; }
+.mcard h3 { margin-bottom: 12px; }
+.mcard h4 { margin: 12px 0 6px; font-size: 13px; color: var(--mut); }
+.mcard input[type=text], .mcard textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid #1e1f22;
+  color: var(--txt);
+  padding: 10px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+.sources {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.src {
+  background: var(--bg3);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+.src:hover { background: var(--bg4); transform: scale(1.02); }
+.src img { width: 100%; border-radius: 4px; }
+.src div { margin-top: 6px; font-size: 12px; }
+.mactions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.btn-pri, .btn-sec {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-pri { background: var(--ok); color: white; }
+.btn-sec { background: var(--bg3); color: var(--txt); }
+.rwrap {
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.rwrap video {
+  width: 100%;
+  max-height: 70vh;
+  display: block;
+  cursor: crosshair;
+}
+'@
+Set-Content -Path "style.css" -Value $styleCss -Encoding utf8
+
+# 6. renderer.js oluşturuluyor
+$rendererJs = @'
+const params = (() => {
+  return window.__params || { name: '', room: '', password: '' };
+})();
+
+const state = {
+  myId: crypto.randomUUID(),
+  myName: '',
+  room: '',
+  password: '',
+  peers: new Map(),
+  localStream: null,
+  cameraStream: null,
+  screenStream: null,
+  processedStream: null,
+  audioCtx: null,
+  micEnabled: true,
+  deafened: false,
+  cameraOn: false,
+  isSharing: false,
+  isRecording: false,
+  recordingStream: null,
+  recorder: null,
+  recordedChunks: [],
+  recStart: 0,
+  pttMode: false,
+  pttActive: false,
+  volume: 1.0,
+  useAI: true,
+  activeControl: null,
+  pendingControlReq: null,
+  speakingPeers: new Map(),
+  analyser: null,
+  gainNode: null
+};
+
+const ICE = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' }
+];
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const nameInp = document.getElementById('name');
+  const roomInp = document.getElementById('room');
+  const pwInp = document.getElementById('password');
+  const aiChk = document.getElementById('useAI');
+  const pttChk = document.getElementById('usePTT');
+  const startBtn = document.getElementById('start');
+
+  try {
+    const ips = await window.electronAPI.getLocalIPs();
+    if (ips.length) {
+      document.getElementById('my-ip').innerHTML =
+        `🌐 Senin IP: <code>${ips[0].address}</code> (aynı ağdaki arkadaşın otomatik bulur)`;
+    }
+  } catch (e) {}
+
+  startBtn.addEventListener('click', async () => {
+    state.myName = nameInp.value.trim() || 'Anonim';
+    state.room = roomInp.value.trim() || 'genel';
+    state.password = pwInp.value;
+    state.useAI = aiChk.checked;
+    state.pttMode = pttChk.checked;
+
+    try {
+      await setupLocalAudio();
+      bindUI();
+      setupVUMeter();
+      await setupDeviceList();
+      
+      document.getElementById('login').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('room-title').textContent = '# ' + state.room;
+      addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true });
+      
+      window.electronAPI.startDiscovery(state.myId, state.myName);
+      window.electronAPI.onPeerDiscovered((event, peer) => {
+        handlePeerDiscovered(peer);
+      });
+
+      if (state.pttMode) {
+        window.electronAPI.registerPTT('Space');
+        window.electronAPI.onPTT(() => {
+          state.pttActive = true;
+          document.getElementById('ptt').classList.add('active');
+          setMicEnabled(true);
+        });
+        document.addEventListener('keyup', (e) => {
+          if (e.code === 'Space' && state.pttMode) {
+            state.pttActive = false;
+            document.getElementById('ptt').classList.remove('active');
+            setMicEnabled(false);
+          }
+        });
+      }
+
+      setConnStatus(true);
+    } catch (err) {
+      alert('Hata: ' + err.message);
+      console.error(err);
+    }
+  });
+});
+
+async function setupLocalAudio() {
+  const raw = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: !state.useAI,
+      autoGainControl: true,
+      sampleRate: 48000,
+      channelCount: 1
+    }
+  });
+  if (state.useAI) {
+    try {
+      state.processedStream = await applyAIDenoise(raw);
+    } catch (e) {
+      console.warn('AI denoise başarısız, ham ses kullanılıyor:', e);
+      state.processedStream = raw;
+    }
+  } else {
+    state.processedStream = raw;
+  }
+  state.localStream = state.processedStream;
+}
+
+async function applyAIDenoise(stream) {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  state.audioCtx = audioCtx;
+  const source = audioCtx.createMediaStreamSource(stream);
+
+  const highpass = audioCtx.createBiquadFilter();
+  highpass.type = 'highpass';
+  highpass.frequency.value = 80;
+
+  const lowpass = audioCtx.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  lowpass.frequency.value = 12000;
+
+  const compressor = audioCtx.createDynamicsCompressor();
+  compressor.threshold.value = -50;
+  compressor.knee.value = 40;
+  compressor.ratio.value = 12;
+  compressor.attack.value = 0;
+  compressor.release.value = 0.25;
+
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = 1.0;
+
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.4;
+
+  state.analyser = analyser;
+  state.gainNode = gainNode;
+
+  source.connect(highpass);
+  highpass.connect(lowpass);
+  lowpass.connect(compressor);
+  compressor.connect(gainNode);
+  gainNode.connect(analyser);
+
+  const dest = audioCtx.createMediaStreamDestination();
+  gainNode.connect(dest);
+
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  function gate() {
+    if (!state.analyser) return;
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i];
+    const avg = sum / data.length;
+    const normalized = avg / 255;
+    const threshold = 0.02;
+    if (normalized < threshold) {
+      gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.01);
+    } else {
+      gainNode.gain.setTargetAtTime(1, audioCtx.currentTime, 0.05);
+    }
+    requestAnimationFrame(gate);
+  }
+  gate();
+  return dest.stream;
+}
+
+function setupVUMeter() {
+  if (!state.analyser) return;
+  const data = new Uint8Array(state.analyser.frequencyBinCount);
+  const vuBar = document.getElementById('vu');
+  const vuText = document.getElementById('vu-text');
+
+  function update() {
+    if (!state.analyser) return;
+    state.analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    const rms = Math.sqrt(sum / data.length);
+    const db = 20 * Math.log10(rms / 255 || 0.0001);
+    const pct = Math.min(100, Math.max(0, (db + 60) * 100 / 60));
+
+    vuBar.style.width = pct + '%';
+    vuText.textContent = db.toFixed(0) + ' dB';
+    requestAnimationFrame(update);
+  }
+  update();
+}
+
+async function setupDeviceList() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const sel = document.getElementById('mic-select');
+    sel.innerHTML = '';
+    devices.filter(d => d.kind === 'audioinput').forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || 'Mikrofon ' + (sel.children.length + 1);
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', async () => {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: sel.value }, echoCancellation: true, autoGainControl: true }
+      });
+      const newTrack = newStream.getAudioTracks()[0];
+      state.localStream.getAudioTracks().forEach(t => state.localStream.removeTrack(t));
+      state.localStream.addTrack(newTrack);
+      state.peers.forEach(peer => {
+        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
+        if (sender) sender.replaceTrack(newTrack);
+      });
+    });
+  } catch (e) {}
+}
+
+const discoveredPeers = new Set();
+async function handlePeerDiscovered(peer) {
+  if (discoveredPeers.has(peer.id)) return;
+  discoveredPeers.add(peer.id);
+
+  console.log('🔍 Peer bulundu:', peer.name, peer.ip);
+  addUser({ id: peer.id, name: peer.name, mic: true, deaf: false, sharing: false, ip: peer.ip });
+  await createPeerConnection(peer.id, peer.name, true);
+  window.electronAPI.notify('Bağlantı', peer.name + ' bağlandı');
+}
+
+async function createPeerConnection(peerId, peerName, isInitiator) {
+  if (state.peers.has(peerId)) return;
+  const pc = new RTCPeerConnection({ iceServers: ICE });
+
+  state.localStream.getTracks().forEach(track => {
+    pc.addTrack(track, state.localStream);
+  });
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      sendSignal(peerId, { type: 'ice', candidate: e.candidate });
+    }
+  };
+
+  pc.ontrack = (e) => {
+    const peer = state.peers.get(peerId);
+    if (!peer) return;
+
+    if (e.track.kind === 'audio') {
+      peer.audioEl.srcObject = e.streams[0];
+      peer.audioEl.volume = state.volume;
+      peer.audioEl.play().catch(() => {});
+      setupSpeakingDetection(peerId, e.streams[0]);
+    } else if (e.track.kind === 'video') {
+      peer.videoEl.srcObject = e.streams[0];
+      if (state.activeControl && state.activeControl.hostId === peerId) {
+        document.getElementById('remote-vid').srcObject = e.streams[0];
+      } else {
+        addVideoCard(peerId, peerName, peer.videoEl, e.track.label.includes('screen') || peer.sharing);
+      }
+    }
+  };
+
+  const dc = pc.createDataChannel('app', { ordered: true });
+  setupDataChannel(peerId, dc);
+
+  pc.ondatachannel = (e) => {
+    if (e.channel.label === 'app') setupDataChannel(peerId, e.channel);
+  };
+
+  state.peers.set(peerId, {
+    pc,
+    audioEl: document.createElement('audio'),
+    videoEl: document.createElement('video'),
+    dc,
+    name: peerName,
+    mic: true,
+    deaf: false,
+    sharing: false,
+    camera: false
+  });
+
+  if (isInitiator) {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    sendSignal(peerId, { type: 'offer', sdp: offer });
+  }
+}
+
+function setupDataChannel(peerId, dc) {
+  dc.onopen = () => console.log('DC açıldı:', peerId);
+  dc.onclose = () => console.log('DC kapandı:', peerId);
+  dc.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      handleDataMessage(peerId, msg);
+    } catch (err) {}
+  };
+}
+
+function sendSignal(peerId, signal) {
+  const peer = state.peers.get(peerId);
+  if (!peer || !peer.dc || peer.dc.readyState !== 'open') return;
+  peer.dc.send(JSON.stringify(signal));
+}
+
+async function handleDataMessage(peerId, msg) {
+  const peer = state.peers.get(peerId);
+  if (!peer) return;
+
+  if (msg.type === 'offer') {
+    await peer.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+    const answer = await peer.pc.createAnswer();
+    await peer.pc.setLocalDescription(answer);
+    sendSignal(peerId, { type: 'answer', sdp: answer });
+  } else if (msg.type === 'answer') {
+    await peer.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+  } else if (msg.type === 'ice') {
+    try {
+      await peer.pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+    } catch (e) {}
+  } else if (msg.type === 'state') {
+    if (msg.mic !== undefined) peer.mic = msg.mic;
+    if (msg.deaf !== undefined) peer.deaf = msg.deaf;
+    updateUserUI(peerId);
+  } else if (msg.type === 'sharing') {
+    peer.sharing = msg.sharing;
+    updateUserUI(peerId);
+  } else if (msg.type === 'camera') {
+    peer.camera = msg.on;
+    updateUserUI(peerId);
+  } else if (msg.type === 'chat') {
+    appendChat(peerId, peer.name, msg.text);
+  } else if (msg.type === 'ctrl-req') {
+    showControlModal(peerId, peer.name, msg.reqId);
+  } else if (msg.type === 'ctrl-res') {
+    if (msg.accepted) {
+      state.activeControl = { hostId: peerId };
+      document.getElementById('remote-name').textContent = peer.name + ' Masaüstü';
+      document.getElementById('remote-modal').classList.remove('hidden');
+      if (peer.videoEl.srcObject) {
+        document.getElementById('remote-vid').srcObject = peer.videoEl.srcObject;
+      }
+    } else {
+      alert('Kontrol isteği reddedildi.');
+    }
+  } else if (msg.type === 'ctrl-revoke') {
+    document.getElementById('remote-modal').classList.add('hidden');
+    state.activeControl = null;
+    alert('Uzaktan kontrol izni kaldırıldı.');
+  } else if (msg.type === 'ctrl-event') {
+    if (state.activeControl && state.activeControl.hostId === peerId) {
+      window.electronAPI.sendRemoteInput(msg.event);
+    }
+  }
+}
+
+function setupSpeakingDetection(peerId, stream) {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source = audioCtx.createMediaStreamSource(stream);
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+  source.connect(analyser);
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  function check() {
+    if (!state.peers.has(peerId)) return;
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i];
+    const avg = sum / data.length;
+    if (avg > 15) {
+      if (!state.speakingPeers.has(peerId)) {
+        state.speakingPeers.set(peerId, true);
+        updateUserUI(peerId);
+      }
+    } else {
+      if (state.speakingPeers.has(peerId)) {
+        state.speakingPeers.delete(peerId);
+        updateUserUI(peerId);
+      }
+    }
+    requestAnimationFrame(check);
+  }
+  check();
+}
+
+function addUser({ id, name, mic, deaf, sharing, self, ip }) {
+  if (document.querySelector(`[data-uid="${id}"]`)) return;
+  const li = document.createElement('li');
+  li.className = 'user';
+  li.dataset.uid = id;
+  li.innerHTML = `
+    <div class="av">
+      ${name.charAt(0).toUpperCase()}
+      <div class="st"></div>
+    </div>
+    <div class="uname">${escapeHtml(name)}</div>
+    <div class="uact">
+      ${!self ? `<button data-ctrl="${id}" title="Uzaktan kontrol iste">🖱️</button>` : ''}
+    </div>
+  `;
+  document.getElementById('users').appendChild(li);
+  if (!self) {
+    li.querySelector(`[data-ctrl="${id}"]`).addEventListener('click', () => requestControl(id));
+  }
+  updateEmptyGrid();
+}
+
+function updateUserUI(uid) {
+  const peer = state.peers.get(uid);
+  const isSelf = uid === 'self';
+  const item = document.querySelector(`[data-uid="${uid}"]`);
+  if (!item) return;
+
+  const st = item.querySelector('.st');
+  st.className = 'st';
+  if (isSelf) {
+    if (!state.micEnabled) st.classList.add('muted');
+    else if (state.deafened) st.classList.add('deaf');
+  } else if (peer) {
+    if (state.speakingPeers.has(uid) && peer.mic) st.classList.add('speaking');
+    else if (peer.deaf) st.classList.add('deaf');
+    else if (!peer.mic) st.classList.add('muted');
+    if (peer.sharing) st.classList.add('share');
+  }
+}
+
+function updateEmptyGrid() {
+  const grid = document.getElementById('grid');
+  const empty = grid.querySelector('.empty');
+  const hasContent = grid.querySelector('.vcard');
+  if (hasContent && empty) empty.remove();
+}
+
+function addVideoCard(peerId, peerName, videoEl, isScreen) {
+  if (document.getElementById(`vc-${peerId}-${isScreen ? 's' : 'c'}`)) return;
+  const card = document.createElement('div');
+  card.id = `vc-${peerId}-${isScreen ? 's' : 'c'}`;
+  card.className = 'vcard' + (isScreen ? ' screen' : '');
+  card.appendChild(videoEl);
+  videoEl.muted = true;
+  videoEl.autoplay = true;
+  videoEl.playsInline = true;
+  const lbl = document.createElement('div');
+  lbl.className = 'vlbl';
+  lbl.innerHTML = `<span class="live"></span> ${escapeHtml(peerName)} ${isScreen ? '• Ekran' : '• Kamera'}`;
+  card.appendChild(lbl);
+  document.getElementById('grid').appendChild(card);
+  updateEmptyGrid();
+}
+
+function removeVideoCard(peerId, isScreen) {
+  const el = document.getElementById(`vc-${peerId}-${isScreen ? 's' : 'c'}`);
+  if (el) el.remove();
+  updateEmptyGrid();
+}
+
+document.getElementById('cform').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('cinput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  broadcast({ type: 'chat', text });
+  appendChat('self', state.myName, text);
+  input.value = '';
+});
+
+function appendChat(uid, name, text) {
+  const wrap = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const t = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  div.innerHTML = `<span class="n">${escapeHtml(name)}</span><span class="t">${t}</span><div>${escapeHtml(text)}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function broadcast(msg) {
+  state.peers.forEach(peer => {
+    if (peer.dc && peer.dc.readyState === 'open') {
+      peer.dc.send(JSON.stringify(msg));
+    }
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function bindUI() {
+  const mic = document.getElementById('mic');
+  const deaf = document.getElementById('deaf');
+  const cam = document.getElementById('cam');
+  const share = document.getElementById('share');
+  const rec = document.getElementById('rec');
+  const vol = document.getElementById('vol');
+  const volpop = document.getElementById('volpop');
+  const volslider = document.getElementById('volslider');
+  const volval = document.getElementById('volval');
+  const addip = document.getElementById('addip');
+  const leave = document.getElementById('leave');
+
+  mic.addEventListener('click', () => {
+    if (state.pttMode) {
+      state.pttMode = false;
+      window.electronAPI.unregisterPTT();
+      document.getElementById('ptt').classList.add('hidden');
+      setMicEnabled(true);
+    }
+    setMicEnabled(!state.micEnabled);
+  });
+
+  deaf.addEventListener('click', () => {
+    state.deafened = !state.deafened;
+    state.peers.forEach(p => { p.audioEl.muted = state.deafened; });
+    deaf.classList.toggle('off', state.deafened);
+    deaf.textContent = state.deafened ? '🔇' : '🎧';
+    broadcast({ type: 'state', deaf: state.deafened });
+    updateUserUI('self');
+  });
+
+  cam.addEventListener('click', async () => {
+    if (state.cameraOn) stopCamera();
+    else await startCamera();
+  });
+
+  share.addEventListener('click', async () => {
+    if (state.isSharing) stopScreenShare();
+    else await showShareModal();
+  });
+
+  rec.addEventListener('click', () => {
+    if (state.isRecording) stopRecording();
+    else startRecording();
+  });
+
+  vol.addEventListener('click', () => volpop.classList.toggle('hidden'));
+  volslider.addEventListener('input', (e) => {
+    state.volume = parseInt(e.target.value) / 100;
+    volval.textContent = e.target.value + '%';
+    state.peers.forEach(p => { p.audioEl.volume = state.volume; });
+  });
+
+  addip.addEventListener('click', () => {
+    document.getElementById('ip-modal').classList.remove('hidden');
+  });
+  document.getElementById('ip-cancel').addEventListener('click', () => {
+    document.getElementById('ip-modal').classList.add('hidden');
+  });
+  document.getElementById('ip-ok').addEventListener('click', () => {
+    document.getElementById('ip-modal').classList.add('hidden');
+  });
+
+  leave.addEventListener('click', () => {
+    if (confirm('Odadan ayrılmak istediğine emin misin?')) {
+      location.reload();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.code === 'KeyM') mic.click();
+    if (e.code === 'KeyD') deaf.click();
+    if (e.code === 'KeyC') cam.click();
+    if (e.code === 'KeyS') share.click();
+    if (e.code === 'KeyR') rec.click();
+  });
+}
+
+function setMicEnabled(enabled) {
+  state.micEnabled = enabled;
+  state.localStream.getAudioTracks().forEach(t => t.enabled = enabled);
+  document.getElementById('mic').classList.toggle('off', !enabled);
+  document.getElementById('mic').textContent = enabled ? '🎤' : '🚫';
+  broadcast({ type: 'state', mic: enabled });
+  updateUserUI('self');
+}
+
+async function startCamera() {
+  try {
+    state.cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, frameRate: 30 }
+    });
+    const track = state.cameraStream.getVideoTracks()[0];
+    state.peers.forEach(peer => {
+      const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) sender.replaceTrack(track);
+      else peer.pc.addTrack(track, state.cameraStream);
+    });
+    state.cameraOn = true;
+    document.getElementById('cam').classList.add('off');
+    broadcast({ type: 'camera', on: true });
+    addVideoCard('self', state.myName + ' (sen)', attachVideo(state.cameraStream), false);
+  } catch (err) {
+    alert('Kamera hatası: ' + err.message);
+  }
+}
+
+function stopCamera() {
+  if (state.cameraStream) {
+    state.cameraStream.getTracks().forEach(t => t.stop());
+  }
+  state.peers.forEach(peer => {
+    const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+    if (sender) sender.replaceTrack(null);
+  });
+  state.cameraOn = false;
+  document.getElementById('cam').classList.remove('off');
+  broadcast({ type: 'camera', on: false });
+  removeVideoCard('self', false);
+}
+
+function attachVideo(stream) {
+  const v = document.createElement('video');
+  v.srcObject = stream;
+  v.autoplay = true;
+  v.muted = true;
+  v.playsInline = true;
+  return v;
+}
+
+async function showShareModal() {
+  const sources = await window.electronAPI.getSources();
+  const wrap = document.getElementById('sources');
+  wrap.innerHTML = '';
+  sources.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'src';
+    div.innerHTML = `<img src="${s.thumbnail}" /><div>${escapeHtml(s.name)}</div>`;
+    div.addEventListener('click', () => {
+      document.getElementById('share-modal').classList.add('hidden');
+      startScreenShare(s.id);
+    });
+    wrap.appendChild(div);
+  });
+  document.getElementById('share-modal').classList.remove('hidden');
+}
+
+async function startScreenShare(sourceId) {
+  try {
+    state.screenStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: sourceId,
+          maxFrameRate: 30
+        }
+      }
+    });
+    const track = state.screenStream.getVideoTracks()[0];
+    state.peers.forEach(peer => {
+      const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) sender.replaceTrack(track);
+      else peer.pc.addTrack(track, state.screenStream);
+    });
+    state.isSharing = true;
+    document.getElementById('share').classList.add('off');
+    broadcast({ type: 'sharing', sharing: true });
+    addVideoCard('self', state.myName + ' (sen)', attachVideo(state.screenStream), true);
+    track.onended = () => stopScreenShare();
+  } catch (err) {
+    alert('Ekran paylaşım hatası: ' + err.message);
+  }
+}
+
+function stopScreenShare() {
+  if (state.screenStream) {
+    state.screenStream.getTracks().forEach(t => t.stop());
+  }
+  state.peers.forEach(peer => {
+    const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+    if (sender) sender.replaceTrack(null);
+  });
+  state.isSharing = false;
+  document.getElementById('share').classList.remove('off');
+  broadcast({ type: 'sharing', sharing: false });
+  removeVideoCard('self', true);
+}
+
+function startRecording() {
+  const tracks = [...state.localStream.getAudioTracks()];
+  state.peers.forEach(peer => {
+    if (peer.audioEl.srcObject) {
+      peer.audioEl.srcObject.getAudioTracks().forEach(t => tracks.push(t));
+    }
+  });
+  const stream = new MediaStream(tracks);
+  state.recordingStream = stream;
+
+  try {
+    state.recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+    state.recordedChunks = [];
+    state.recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) state.recordedChunks.push(e.data);
+    };
+    state.recorder.onstop = () => {
+      const blob = new Blob(state.recordedChunks, { type: 'audio/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kanka-voice-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+    state.recorder.start(1000);
+    state.isRecording = true;
+    document.getElementById('rec').classList.add('rec');
+  } catch (e) {
+    alert('Kayıt başlatılamadı: ' + e.message);
+  }
+}
+
+function stopRecording() {
+  if (state.recorder && state.isRecording) {
+    state.recorder.stop();
+    state.isRecording = false;
+    document.getElementById('rec').classList.remove('rec');
+  }
+}
+
+function requestControl(peerId) {
+  broadcastTo(peerId, { type: 'ctrl-req', reqId: 'req-' + Date.now() });
+  alert('Kontrol isteği gönderildi.');
+}
+
+function showControlModal(peerId, peerName, reqId) {
+  state.pendingControlReq = { peerId, reqId };
+  document.getElementById('ctrl-text').textContent = `${peerName} bilgisayarınızı kontrol etmek istiyor. Onaylıyor musunuz?`;
+  document.getElementById('ctrl-modal').classList.remove('hidden');
+}
+
+document.getElementById('ctrl-accept').addEventListener('click', () => {
+  if (state.pendingControlReq) {
+    broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: true });
+    window.electronAPI.setRemoteControl(true);
+  }
+  closeCtrlModal();
+});
+document.getElementById('ctrl-deny').addEventListener('click', () => {
+  if (state.pendingControlReq) {
+    broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: false });
+  }
+  closeCtrlModal();
+});
+function closeCtrlModal() {
+  document.getElementById('ctrl-modal').classList.add('hidden');
+  state.pendingControlReq = null;
+}
+
+document.getElementById('remote-stop').addEventListener('click', () => {
+  if (state.activeControl) {
+    broadcastTo(state.activeControl.hostId, { type: 'ctrl-revoke' });
+  }
+  document.getElementById('remote-modal').classList.add('hidden');
+  state.activeControl = null;
+  window.electronAPI.setRemoteControl(false);
+});
+
+const remoteVid = document.getElementById('remote-vid');
+remoteVid.addEventListener('mousedown', e => sendCtrlEvent({ type: 'mousedown', x: relX(e), y: relY(e), button: e.button }));
+remoteVid.addEventListener('mouseup', e => sendCtrlEvent({ type: 'mouseup', x: relX(e), y: relY(e), button: e.button }));
+remoteVid.addEventListener('mousemove', throttle(e => sendCtrlEvent({ type: 'mousemove', x: relX(e), y: relY(e) }), 16));
+remoteVid.addEventListener('wheel', e => { e.preventDefault(); sendCtrlEvent({ type: 'scroll', deltaX: e.deltaX, deltaY: e.deltaY }); });
+remoteVid.addEventListener('contextmenu', e => e.preventDefault());
+
+document.addEventListener('keydown', e => {
+  if (state.activeControl && !e.repeat) sendCtrlEvent({ type: 'keydown', key: e.key });
+});
+document.addEventListener('keyup', e => {
+  if (state.activeControl) sendCtrlEvent({ type: 'keyup', key: e.key });
+  if (e.key === 'Escape' && state.activeControl) document.getElementById('remote-stop').click();
+});
+
+function relX(e) { return (e.clientX - remoteVid.getBoundingClientRect().left) / remoteVid.clientWidth; }
+function relY(e) { return (e.clientY - remoteVid.getBoundingClientRect().top) / remoteVid.clientHeight; }
+
+function sendCtrlEvent(event) {
+  if (!state.activeControl) return;
+  broadcastTo(state.activeControl.hostId, { type: 'ctrl-event', event });
+}
+
+function broadcastTo(peerId, msg) {
+  const peer = state.peers.get(peerId);
+  if (peer && peer.dc && peer.dc.readyState === 'open') peer.dc.send(JSON.stringify(msg));
+}
+
+function throttle(fn, wait) {
+  let last = 0;
+  return (...args) => {
+    const now = Date.now();
+    if (now - last >= wait) { last = now; fn(...args); }
+  };
+}
+'@
+Set-Content -Path "renderer.js" -Value $rendererJs -Encoding utf8
+
+# 7. README.md oluşturuluyor
+$readmeMd = @'
+# 🎙️ Kanka Voice
+
+P2P ses/görüntü/ekran/kontrol uygulaması. **Sunucusuz** ve **websiz** (tarayıcı gerektirmez) native masaüstü uygulamasıdır.
+
+## ⚡ Hızlı Başlangıç
+
+1. Bu klasörde bir terminal / terminal penceresi açın.
+2. `npm install` yazarak bağımlılıkları indirin.
+3. `npm start` yazarak uygulamayı yerelde test edin.
+4. Kuruluma gerek kalmayan taşınabilir sürümünü almak için: `npm run build` komutunu çalıştırın. Dosya `dist/` klasöründe hazır olacaktır.
+'@
+Set-Content -Path "README.md" -Value $readmeMd -Encoding utf8
+
+Write-Host ""
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "🎯 Proje dosyaları 'kanka-voice' klasöründe oluşturuldu!" -ForegroundColor Green
+Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host "Uygulamayı çalıştırmak için sırasıyla şu komutları yaz:"
+Write-Host "1) cd kanka-voice" -ForegroundColor Yellow
+Write-Host "2) npm install" -ForegroundColor Yellow
+Write-Host "3) npm start" -ForegroundColor Yellow
+Write-Host "==========================================================" -ForegroundColor Cyan

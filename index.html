@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Kanka Voice</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="login" class="login-wrap">
+    <div class="login-card">
+      <h1>🎙️ Kanka Voice</h1>
+      <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur</p>
+
+      <label>Adın</label>
+      <input id="name" type="text" placeholder="Kanka" maxlength="20" />
+
+      <label>Oda Anahtarı <span class="muted">(aynı anahtar = aynı oda)</span></label>
+      <input id="room" type="text" placeholder="gizli-oda-123" value="arkadaslar" />
+
+      <label>Şifre <span class="muted">(opsiyonel, uçtan uca şifreler)</span></label>
+      <input id="password" type="password" placeholder="•••••" />
+
+      <div class="check-row">
+        <input type="checkbox" id="useAI" checked />
+        <label for="useAI">🤖 Gelişmiş Gürültü Engelleyici (Noise Gate)</label>
+      </div>
+
+      <div class="check-row">
+        <input type="checkbox" id="usePTT" />
+        <label for="usePTT">🅿️ Push-to-Talk modu (Space tuşu)</label>
+      </div>
+
+      <button id="start">Başlat</button>
+      <p id="my-ip" class="hint"></p>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span id="room-title">ODA</span>
+        <span id="conn" class="dot"></span>
+        <button id="leave" class="leave">✕</button>
+      </div>
+
+      <div class="lbl">KULLANICILAR</div>
+      <ul id="users" class="users"></ul>
+
+      <div class="lbl">SES TESTİ</div>
+      <div class="vu">
+        <div id="vu" class="vu-bar"></div>
+      </div>
+      <div class="vu-info">
+        <span id="vu-text" class="muted">-∞ dB</span>
+        <select id="mic-select"></select>
+      </div>
+      <div class="thresh-wrap" style="position: relative; margin: 12px 20px 4px;">
+        <input type="range" id="mic-thresh" min="0" max="100" value="20" title="Ses İletim Eşiği" style="width: 100%; accent-color: var(--acc); cursor: pointer;" />
+        <div style="display: flex; justify-content: space-between; font-size: 10px; color: rgba(255,255,255,0.5); padding: 0 2px;">
+          <span>0 (Hep Açık)</span>
+          <span>Ses Eşiği</span>
+          <span>100</span>
+        </div>
+      </div>
+
+      <div class="lbl">SOHBET</div>
+      <div class="chat">
+        <div id="msgs" class="msgs"></div>
+        <form id="cform" class="cform">
+          <input type="file" id="finput" class="hidden" />
+          <button type="button" id="fbtn" title="Dosya Gönder">📎</button>
+          <input id="cinput" placeholder="Mesaj yaz..." autocomplete="off" />
+          <button type="submit" id="csubmit">➤</button>
+        </form>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="focus-area" class="focus-container hidden"></div>
+      <div id="grid" class="grid">
+        <div id="empty-state" class="empty">
+          <h2>👋 Bağlantı Bekleniyor</h2>
+          <p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>
+        </div>
+        
+        <div id="wb-card" class="vcard hidden">
+          <div class="wb-container">
+            <div class="wb-tools card-actions">
+              <select id="wb-tool" class="wb-tool-sel">
+                <option value="pen">✏️ Fırça</option>
+                <option value="rect">⬜ Dikdörtgen</option>
+                <option value="circle">⭕ Çember</option>
+                <option value="text">🔤 Yazı</option>
+              </select>
+              <input type="color" id="wb-color" value="#10b981" />
+              <input type="range" id="wb-size" min="2" max="20" value="4" />
+              <button id="wb-clear" class="btn-sec btn-sm">Temizle</button>
+              <button id="wb-close" class="btn-pri btn-sm">Kapat</button>
+            </div>
+            <canvas id="wb-canvas"></canvas>
+          </div>
+        </div>
+        
+        <div id="wt-card" class="vcard hidden" style="background: #000; display: flex; flex-direction: column;">
+          <div class="wt-tools card-actions">
+            <input type="text" id="wt-url" placeholder="YouTube Linki" style="padding:4px 8px; border-radius:4px; border:none; width: 250px; background: rgba(255,255,255,0.8); color: #000;" />
+            <button id="wt-load" class="btn-pri btn-sm">Aç</button>
+            <button id="wt-close" class="btn-sec btn-sm">Kapat</button>
+          </div>
+          <div id="wt-player-container" style="flex: 1; width: 100%; position: relative;">
+            <div id="wt-player"></div>
+          </div>
+        </div>
+
+        <div id="sb-card" class="vcard hidden" style="background: #ffffff; display: flex; flex-direction: column; overflow: hidden; position: relative;">
+          <div class="sb-tools" style="background: #e5e7eb; border-bottom: 1px solid #d1d5db; display: flex; gap: 8px; align-items: center; padding: 8px; z-index: 10;">
+            <button id="sb-back" class="btn-sec btn-sm" style="color: #000; font-weight: bold; background: transparent; border: none; font-size: 16px;" title="Geri">⬅️</button>
+            <button id="sb-forward" class="btn-sec btn-sm" style="color: #000; font-weight: bold; background: transparent; border: none; font-size: 16px;" title="İleri">➡️</button>
+            <button id="sb-refresh" class="btn-sec btn-sm" style="color: #000; font-weight: bold; background: transparent; border: none; font-size: 16px;" title="Yenile">🔄</button>
+            <input type="text" id="sb-url" placeholder="https://..." style="pointer-events: auto; user-select: text; -webkit-user-select: text; position: relative; z-index: 1000; flex: 1; padding: 6px 12px; border-radius: 16px; border: 1px solid #9ca3af; background: #fff; color: #000; outline: none; font-size: 14px;" />
+            <button id="sb-go" class="btn-pri btn-sm" style="background: #3b82f6;">Git</button>
+            <button id="sb-close" class="btn-sec btn-sm" style="background: #ef4444; color: white;">Kapat</button>
+          </div>
+          <div id="sb-player-container" style="flex: 1; width: 100%; position: relative; background: #fff;">
+            <webview id="sb-webview" src="https://www.google.com" style="width: 100%; height: 100%; border: none; display: flex;"></webview>
+            <div id="sb-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.1); z-index: 100; cursor: not-allowed; display: none;" title="Etkileşim izniniz yok."></div>
+          </div>
+        </div>
+
+        <div id="uno-card" class="vcard hidden" style="background: radial-gradient(circle, #2d6a4f, #081c15); display: flex; flex-direction: column;">
+          <div class="uno-tools card-actions">
+            <button id="uno-close" class="btn-sec btn-sm" style="background: rgba(0,0,0,0.5);">Odadan Çık</button>
+          </div>
+          <div id="uno-lobby" class="uno-view" style="padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+            <h3 style="font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">🔴 UNO Bekleme Salonu</h3>
+            <div class="uno-settings" id="uno-host-settings" style="display:none; margin: 15px 0; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+              <label style="display:block; margin-bottom:8px;">Maks Oyuncu: <select id="uno-max-players" style="background:#fff; color:#000; border-radius:4px; padding:2px;"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option></select></label>
+              <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" id="uno-fill-bots" style="width:16px; height:16px; accent-color:var(--acc);" /> Boşlukları Botla Doldur</label>
+            </div>
+            <div id="uno-players" class="uno-player-list" style="margin: 20px 0; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;"></div>
+            <div class="mactions" style="justify-content: center; margin-top: 20px;">
+              <button id="uno-ready-btn" class="btn-pri" style="background: var(--warn); padding: 12px 24px; font-size: 16px;">Hazır Değilim</button>
+              <button id="uno-start-btn" class="btn-ok hidden" style="background: var(--ok); color: white; padding: 12px 24px; border-radius: 8px; border:none; font-weight:bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.3);">Başlat (Kurucu)</button>
+            </div>
+          </div>
+          <div id="uno-game" class="uno-view hidden" style="flex:1; position: relative; overflow: hidden;">
+            <div id="uno-table" class="uno-table">
+              <div id="uno-center">
+                <div id="uno-deck" class="uno-card-ui back" title="Kart Çek">UNO</div>
+                <div id="uno-discard" class="uno-card-ui empty"></div>
+                <div id="uno-turn-indicator" style="position: absolute; top: -40px; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 20px; white-space: nowrap; font-weight: bold;">Sıra: <span id="uno-turn-name">...</span></div>
+                <div id="uno-dir-indicator" style="position: absolute; bottom: -30px; font-size: 20px;">🔃</div>
+              </div>
+            </div>
+            <div style="position: absolute; bottom: 160px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 60;">
+              <button id="uno-sort-color" style="background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">🎨 Renklere Göre</button>
+              <button id="uno-sort-num" style="background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">🔢 Sayıya Göre</button>
+            </div>
+            <div id="uno-emojis" style="position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 70;">
+              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">😂</button>
+              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">😡</button>
+              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">🎉</button>
+              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">😱</button>
+            </div>
+            <div id="uno-my-hand" class="uno-hand"></div>
+            <div id="uno-color-picker" class="hidden">
+              <h4>Renk Seç</h4>
+              <div class="uc-colors">
+                <div class="ucc red" data-color="red"></div>
+                <div class="ucc blue" data-color="blue"></div>
+                <div class="ucc green" data-color="green"></div>
+                <div class="ucc yellow" data-color="yellow"></div>
+              </div>
+            </div>
+            <div id="uno-uno-btn" class="hidden" style="position: absolute; right: 20px; bottom: 120px; background: red; color: white; font-weight: 900; font-size: 20px; padding: 10px 20px; border-radius: 50%; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 2px solid white; transform: rotate(-10deg);">UNO!</div>
+          </div>
+        </div>
+      </div>
+    <div class="bar">
+      <div class="bar-group">
+        <button id="mic" class="btn" title="Mikrofon (M)"><span class="icon">🎤</span><span class="lbl">Ses</span></button>
+        <button id="deaf" class="btn" title="Sağırlaştır (D)"><span class="icon">🎧</span><span class="lbl">Sağır</span></button>
+        <button id="ptt" class="btn ptt hidden" title="Bas-Konuş"><span class="icon">🅿️</span><span class="lbl">Bas</span></button>
+      </div>
+
+      <div class="bar-group center-group">
+        <button id="cam" class="btn" title="Kamera (C)"><span class="icon">📷</span><span class="lbl">Kamera</span></button>
+        <button id="share" class="btn" title="Ekran Paylaş (S)"><span class="icon">🖥️</span><span class="lbl">Ekran</span></button>
+        <button id="wb-btn" class="btn" title="Beyaz Tahta (W)"><span class="icon">🖌️</span><span class="lbl">Tahta</span></button>
+        <button id="act-btn" class="btn" title="Etkinlikler (E)"><span class="icon">🚀</span><span class="lbl">Etkinlik</span></button>
+        <button id="rec" class="btn" title="Kayıt (R)"><span class="icon">⏺️</span><span class="lbl">Kayıt</span></button>
+      </div>
+
+      <div class="bar-group">
+        <div class="vol-wrap">
+          <button id="vol" class="btn" title="Ses Seviyesi"><span class="icon">🔊</span><span class="lbl">Düzey</span></button>
+          <div id="volpop" class="pop hidden">
+            <input id="volslider" type="range" min="0" max="100" value="100" />
+            <span id="volval">100%</span>
+          </div>
+        </div>
+        <button id="addip" class="btn" title="Manuel IP Ekle"><span class="icon">➕</span><span class="lbl">Manuel</span></button>
+        <button id="addsdp" class="btn" title="Çapraz Ağ (SDP)"><span class="icon">🌐</span><span class="lbl">Uzak Ağ</span></button>
+        <button id="settings" class="btn" title="Ayarlar"><span class="icon">⚙️</span><span class="lbl">Ayar</span></button>
+      </div>
+    </div>
+    </main>
+
+    <div id="share-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>🖥️ Ekran / Pencere Seç</h3>
+        <div id="sources" class="sources"></div>
+        <div class="check-row" style="margin-bottom: 16px;">
+          <input type="checkbox" id="share-audio" checked />
+          <label for="share-audio">Sistem Sesini de Paylaş</label>
+        </div>
+        <div class="mactions">
+          <button id="share-cancel" class="btn-sec">İptal</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ip-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>➕ Manuel Bağlantı</h3>
+        <p class="muted">Arkadaşının IP adresi (veya SDP teklifi/cevabı)</p>
+        <input id="ip-input" type="text" placeholder="192.168.1.42 veya SDP yapıştır" />
+        <div class="mactions">
+          <button id="ip-cancel" class="btn-sec">İptal</button>
+          <button id="ip-ok" class="btn-pri">Bağlan</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sdp-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>🌐 Çapraz Ağ Bağlantısı</h3>
+        <p class="muted">Aynı ağda değilseniz SDP alışverişi yapın.</p>
+        <h4>Senin Teklifin (arkadaşına gönder):</h4>
+        <textarea id="my-offer" readonly rows="4"></textarea>
+        <button id="copy-offer" class="btn-sec">📋 Kopyala</button>
+        <h4>Arkadaşının Cevabı:</h4>
+        <textarea id="friend-answer" rows="4" placeholder="Arkadaşının cevabını buraya yapıştır..."></textarea>
+        <div class="mactions">
+          <button id="sdp-cancel" class="btn-sec">İptal</button>
+          <button id="sdp-apply" class="btn-pri">Uygula</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ctrl-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>🖱️ Uzaktan Kontrol İsteği</h3>
+        <p id="ctrl-text">Birisi bilgisayarınızı kontrol etmek istiyor.</p>
+        <div class="mactions">
+          <button id="ctrl-deny" class="btn-sec">Reddet</button>
+          <button id="ctrl-accept" class="btn-pri">Kabul Et</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="remote-modal" class="modal hidden">
+      <div class="mcard wide">
+        <h3>🖥️ <span id="remote-name">Uzak Masaüstü</span></h3>
+        <p class="muted">Kontrol etmek için tıkla/sürükle. Çıkmak için ESC.</p>
+        <div class="rwrap">
+          <video id="remote-vid" autoplay playsinline></video>
+        </div>
+        <div class="mactions">
+          <button id="remote-stop" class="btn-sec">Kontrolü Bırak</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="settings-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>⚙️ Ayarlar</h3>
+        <label class="lbl-block">Kamera / Ekran Kalitesi</label>
+        <select id="quality-select" class="sel-block">
+          <option value="high">Yüksek (1080p, 60 FPS)</option>
+          <option value="medium" selected>Orta (720p, 30 FPS)</option>
+          <option value="low">Düşük (480p, 15 FPS)</option>
+        </select>
+        <div class="mactions">
+          <button id="settings-close" class="btn-pri">Kapat</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="activities-modal" class="modal hidden">
+      <div class="mcard">
+        <h3>🚀 Etkinlikler</h3>
+        <p class="muted">Arkadaşlarınızla beraber yapabileceğiniz etkinlikler.</p>
+        <div class="sources" style="grid-template-columns: 1fr; gap: 16px;">
+          <div class="src act-src" id="act-wt" style="display: flex; align-items: center; text-align: left; padding: 16px;">
+            <div style="font-size: 40px; margin-right: 20px;">📺</div>
+            <div>
+              <div style="font-size: 18px; font-weight: bold; color: var(--acc-light);">WatchTogether</div>
+              <p class="muted" style="margin:4px 0 0 0;">Ortak YouTube izleyin. Biri durdurduğunda herkeste durur.</p>
+            </div>
+          </div>
+          <div class="src act-src" id="act-uno" style="display: flex; align-items: center; text-align: left; padding: 16px;">
+            <div style="font-size: 40px; margin-right: 20px;">🃏</div>
+            <div>
+              <div style="font-size: 18px; font-weight: bold; color: var(--ok);">UNO</div>
+              <p class="muted" style="margin:4px 0 0 0;">Arkadaşlarınızla P2P üzerinden UNO oynayın.</p>
+            </div>
+          </div>
+          <div class="src act-src" id="act-sb" style="display: flex; align-items: center; text-align: left; padding: 16px;">
+            <div style="font-size: 40px; margin-right: 20px;">🌐</div>
+            <div>
+              <div style="font-size: 18px; font-weight: bold; color: #3b82f6;">Ortak Tarayıcı</div>
+              <p class="muted" style="margin:4px 0 0 0;">Senkronize bir şekilde internette beraber sörf yapın.</p>
+            </div>
+          </div>
+        </div>
+        <div class="mactions">
+          <button id="act-close" class="btn-sec">Kapat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="drop-overlay" class="drop-overlay hidden">
+    <h2>📁 Dosyayı Bırak</h2>
+    <p>Arkadaşlarına göndermek için buraya bırak.</p>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

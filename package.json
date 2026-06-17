@@ -1,0 +1,41 @@
+{
+  "name": "kanka-voice",
+  "version": "1.0.0",
+  "description": "P2P sesli/görüntülü/ekran paylaşımı + uzaktan kontrol - sunucusuz",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-packager . KankaVoice --platform=win32 --arch=x64 --out=dist --asar --overwrite"
+  },
+  "author": "Kanka",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "electron-packager": "^17.1.2"
+  },
+  "build": {
+    "appId": "com.kanka.voice",
+    "productName": "KankaVoice",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "renderer.js",
+      "style.css"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
+}
