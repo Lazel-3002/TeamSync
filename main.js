@@ -190,7 +190,8 @@ ipcMain.on('direct-connect', (event, ip) => {
   if (!discoverySocket || !myPeerId) return;
   const msg = Buffer.from(JSON.stringify({
     id: myPeerId,
-    name: 'direct', // Signal to receiver that this is a direct connection attempt
+    name: currentName,
+    room: currentRoom,
     timestamp: Date.now()
   }));
   try {

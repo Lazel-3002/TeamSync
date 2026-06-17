@@ -101,8 +101,16 @@ async function handleSignal(id, ip, signal) {
   if (!peer.ip) peer.ip = ip;
   if (!peer.iceQueue) peer.iceQueue = [];
 
+  console.log(`📨 Signal received from ${peer.name}: ${signal.type}, ip=${ip}`);
+
   try {
     if (signal.type === 'offer') {
+      // Update peer IP to the one the signal came from
+      peer.ip = ip;
+      if (peer.pc.signalingState !== 'stable') {
+        console.warn('Received offer but signaling state is:', peer.pc.signalingState, '- rolling back');
+        await peer.pc.setLocalDescription({ type: 'rollback' });
+      }
       await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
       const answer = await peer.pc.createAnswer();
       await peer.pc.setLocalDescription(answer);
@@ -116,10 +124,14 @@ async function handleSignal(id, ip, signal) {
         await peer.pc.addIceCandidate(peer.iceQueue.shift());
       }
     } else if (signal.type === 'answer') {
-      await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-      // Process queued candidates
-      while (peer.iceQueue.length) {
-        await peer.pc.addIceCandidate(peer.iceQueue.shift());
+      if (peer.pc.signalingState === 'have-local-offer') {
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        // Process queued candidates
+        while (peer.iceQueue.length) {
+          await peer.pc.addIceCandidate(peer.iceQueue.shift());
+        }
+      } else {
+        console.warn('Received answer but signaling state is:', peer.pc.signalingState);
       }
     } else if (signal.type === 'ice') {
       if (peer.pc.remoteDescription && peer.pc.remoteDescription.type) {
@@ -166,6 +178,9 @@ async function decryptMsg(data, key) {
 const ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
@@ -549,28 +564,38 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   });
   pc.onicecandidate = (e) => {
     if (e.candidate) {
-      if (peerIp === 'internet') {
+      const peer = state.peers.get(peerId);
+      const ip = peer ? peer.ip : peerIp;
+      if (ip === 'internet') {
         sendInternetSignal(peerId, { type: 'ice', candidate: e.candidate });
-      } else if (peerIp) {
-        window.electronAPI.sendUDPSignal(peerIp, { type: 'ice', candidate: e.candidate });
+      } else if (ip) {
+        window.electronAPI.sendUDPSignal(ip, { type: 'ice', candidate: e.candidate });
       }
     }
   };
 
   pc.oniceconnectionstatechange = () => {
+    console.log(`ICE state [${peerName}]:`, pc.iceConnectionState);
     if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
       removePeer(peerId);
+    } else if (pc.iceConnectionState === 'connected') {
+      console.log(`✅ WebRTC connected to ${peerName}`);
     }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log(`Connection state [${peerName}]:`, pc.connectionState);
   };
 
   pc.ontrack = (e) => {
     const peer = state.peers.get(peerId);
     if (!peer) return;
+    console.log(`🎵 Track received from ${peerName}:`, e.track.kind);
 
     if (e.track.kind === 'audio') {
       peer.audioEl.srcObject = e.streams[0];
       peer.audioEl.volume = state.volume;
-      peer.audioEl.play().catch(() => {});
+      peer.audioEl.play().catch((err) => console.warn('Audio play failed:', err));
       setupSpeakingDetection(peerId, e.streams[0]);
     } else if (e.track.kind === 'video') {
       peer.videoEl.srcObject = e.streams[0];
@@ -582,11 +607,23 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     }
   };
 
-  const dc = pc.createDataChannel('app', { ordered: true });
-  setupDataChannel(peerId, dc);
+  // Only the initiator creates the data channel.
+  // The non-initiator receives it via ondatachannel.
+  let dc = null;
+  if (isInitiator) {
+    dc = pc.createDataChannel('app', { ordered: true });
+    setupDataChannel(peerId, dc);
+  }
 
   pc.ondatachannel = (e) => {
-    if (e.channel.label === 'app') setupDataChannel(peerId, e.channel);
+    if (e.channel.label === 'app') {
+      console.log(`📡 Data channel received from ${peerName}`);
+      const peer = state.peers.get(peerId);
+      if (peer) {
+        peer.dc = e.channel;
+      }
+      setupDataChannel(peerId, e.channel);
+    }
   };
 
   state.peers.set(peerId, {
@@ -615,7 +652,18 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 }
 
 function setupDataChannel(peerId, dc) {
-  dc.onopen = () => console.log('DC açıldı:', peerId);
+  dc.onopen = () => {
+    console.log('✅ DC açıldı:', peerId);
+    // Make sure peer.dc points to this open channel
+    const peer = state.peers.get(peerId);
+    if (peer) {
+      peer.dc = dc;
+      // Send initial state so the peer knows our mic/deaf status
+      try {
+        dc.send(JSON.stringify({ type: 'state', mic: state.micEnabled, deaf: state.deafened }));
+      } catch (e) {}
+    }
+  };
   dc.onclose = () => console.log('DC kapandı:', peerId);
   dc.onmessage = async (e) => {
     if (typeof e.data === 'string') {
@@ -963,9 +1011,16 @@ function appendChat(uid, name, text) {
 }
 
 function broadcast(msg) {
-  state.peers.forEach(peer => {
+  const msgStr = JSON.stringify(msg);
+  state.peers.forEach((peer, id) => {
     if (peer.dc && peer.dc.readyState === 'open') {
-      peer.dc.send(JSON.stringify(msg));
+      try {
+        peer.dc.send(msgStr);
+      } catch (e) {
+        console.warn('Broadcast send error to', id, e);
+      }
+    } else {
+      console.warn('DC not open for peer:', id, 'state:', peer.dc ? peer.dc.readyState : 'null');
     }
   });
 }
