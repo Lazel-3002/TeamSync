@@ -5,10 +5,14 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-packager . KankaVoice --platform=win32 --arch=x64 --out=dist --asar --overwrite"
+    "build": "electron-builder --win portable --x64",
+    "build-full": "electron-builder --win --x64"
   },
   "author": "Kanka",
   "license": "MIT",
+  "dependencies": {
+    "robotjs": "^0.6.0"
+  },
   "devDependencies": {
     "electron": "^28.2.0",
     "electron-builder": "^24.9.1",

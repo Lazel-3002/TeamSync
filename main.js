@@ -98,6 +98,7 @@ function startDiscovery(peerId, name) {
   });
 
   discoveryInterval = setInterval(() => {
+    return; // <--- SADECE TEST İÇİN BUNU EKLEYİN (UDP KEŞFİ KAPATILDI)
     if (!discoverySocket) return;
     const msg = Buffer.from(JSON.stringify({
       id: myPeerId,
@@ -105,6 +106,7 @@ function startDiscovery(peerId, name) {
       room: currentRoom,
       timestamp: Date.now()
     }));
+
     
     const addresses = getBroadcastAddresses();
     addresses.forEach(addr => {

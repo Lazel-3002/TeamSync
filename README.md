@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-# TeamSync
-🚀 TeamSync Discord arayüzü tanıdıklığında, tamamen merkeziyetsiz (P2P) çalışan sunucusuz bir sesli ve yazılı iletişim uygulaması. Ortada verilerinizi saklayan şirketler veya sunucu maliyetleri yok; kullanıcılar doğrudan birbirine bağlanır. Güvenli, hafif ve tamamen gizlilik odaklı modern bir alternatif!
-=======
-﻿# 🎙️ Kanka Voice
+# 🎙️ Kanka Voice / TeamSync
 
-P2P ses/görüntü/ekran/kontrol uygulaması. **Sunucusuz** ve **websiz** (tarayıcı gerektirmez) native masaüstü uygulamasıdır.
+🚀 Discord arayüzü tanıdıklığında, tamamen merkeziyetsiz (P2P) çalışan sunucusuz bir sesli/görüntülü/ekran paylaşımı ve uzaktan kontrol uygulaması. Ortada verilerinizi saklayan şirketler veya sunucu maliyetleri yok; kullanıcılar doğrudan birbirine bağlanır. Güvenli, hafif ve tamamen gizlilik odaklı modern bir alternatif! Sunucusuz ve websiz (tarayıcı gerektirmez) native masaüstü uygulamasıdır.
 
 ## ⚡ Hızlı Başlangıç
 
@@ -12,4 +8,3 @@ P2P ses/görüntü/ekran/kontrol uygulaması. **Sunucusuz** ve **websiz** (taray
 2. `npm install` yazarak bağımlılıkları indirin.
 3. `npm start` yazarak uygulamayı yerelde test edin.
 4. Kuruluma gerek kalmayan taşınabilir sürümünü almak için: `npm run build` komutunu çalıştırın. Dosya `dist/` klasöründe hazır olacaktır.
->>>>>>> b240325 (İlk commit - Electron projesi hazır)

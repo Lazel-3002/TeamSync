@@ -61,7 +61,7 @@ function setupInternetSignaling(roomId, myId, myName) {
     }, 3000);
   });
 
-  mqttClient.on('message', (topic, message) => {
+  mqttClient.on('message', async (topic, message) => {
     try {
       const data = JSON.parse(message.toString());
       if (data.id === myId) return;
@@ -71,7 +71,7 @@ function setupInternetSignaling(roomId, myId, myName) {
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
         if (!peer) {
-          handlePeerDiscovered({ id: data.id, name: data.name || 'Bilinmeyen', ip: 'internet' });
+          await handlePeerDiscovered({ id: data.id, name: data.name || 'Bilinmeyen', ip: 'internet' });
           peer = state.peers.get(data.id);
         }
         if (peer) {
@@ -180,7 +180,7 @@ const ICE = [
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
   { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' },
+  { urls: 'turn:0.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
@@ -1766,9 +1766,9 @@ async function sendFile(file) {
 }
 
 // ====== WATCH TOGETHER ======
-function onYouTubeIframeAPIReady() {
+window.onYouTubeIframeAPIReady = function() {
   state.wt.isReady = true;
-}
+};
 
 function loadWTVideo(vid) {
   if (!state.wt.player) {
