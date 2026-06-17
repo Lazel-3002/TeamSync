@@ -69,7 +69,11 @@ function setupInternetSignaling(roomId, myId, myName) {
       if (data.type === 'hello') {
         handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet' });
       } else if (data.type === 'signal' && data.target === myId) {
-        const peer = state.peers.get(data.id);
+        let peer = state.peers.get(data.id);
+        if (!peer) {
+          handlePeerDiscovered({ id: data.id, name: data.name || 'Bilinmeyen', ip: 'internet' });
+          peer = state.peers.get(data.id);
+        }
         if (peer) {
           peer.ip = 'internet';
           handleSignal(data.id, 'internet', data.signal);
@@ -84,6 +88,7 @@ function sendInternetSignal(targetId, signal) {
     mqttClient.publish(`kanka-voice/room/${state.room}/${targetId}`, JSON.stringify({
       type: 'signal',
       id: state.myId,
+      name: state.myName,
       target: targetId,
       signal: signal
     }));
@@ -146,7 +151,10 @@ async function decryptMsg(data, key) {
 
 const ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' }
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
