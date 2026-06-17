@@ -40,6 +40,80 @@ const state = {
 const CHUNK_SIZE = 64 * 1024;
 const fileBuffer = new Map();
 
+let mqttClient = null;
+let internetAnnounceInterval = null;
+
+function setupInternetSignaling(roomId, myId, myName) {
+  if (mqttClient) mqttClient.end();
+  mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+  
+  mqttClient.on('connect', () => {
+    console.log('🌐 İnternet sunucusuna bağlanıldı (MQTT)');
+    mqttClient.subscribe(`kanka-voice/room/${roomId}/#`);
+    
+    if (internetAnnounceInterval) clearInterval(internetAnnounceInterval);
+    internetAnnounceInterval = setInterval(() => {
+      mqttClient.publish(`kanka-voice/room/${roomId}/${myId}`, JSON.stringify({
+        type: 'hello',
+        id: myId,
+        name: myName
+      }));
+    }, 3000);
+  });
+
+  mqttClient.on('message', (topic, message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      if (data.id === myId) return;
+      
+      if (data.type === 'hello') {
+        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet' });
+      } else if (data.type === 'signal' && data.target === myId) {
+        const peer = state.peers.get(data.id);
+        if (peer) {
+          peer.ip = 'internet';
+          handleSignal(data.id, 'internet', data.signal);
+        }
+      }
+    } catch(e) {}
+  });
+}
+
+function sendInternetSignal(targetId, signal) {
+  if (mqttClient && mqttClient.connected) {
+    mqttClient.publish(`kanka-voice/room/${state.room}/${targetId}`, JSON.stringify({
+      type: 'signal',
+      id: state.myId,
+      target: targetId,
+      signal: signal
+    }));
+  }
+}
+
+async function handleSignal(id, ip, signal) {
+  const peer = state.peers.get(id);
+  if (!peer) return;
+  if (!peer.ip) peer.ip = ip;
+  try {
+    if (signal.type === 'offer') {
+      await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      const answer = await peer.pc.createAnswer();
+      await peer.pc.setLocalDescription(answer);
+      if (ip === 'internet') {
+        sendInternetSignal(id, { type: 'answer', sdp: answer });
+      } else {
+        window.electronAPI.sendUDPSignal(ip, { type: 'answer', sdp: answer });
+      }
+    } else if (signal.type === 'answer') {
+      await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+    } else if (signal.type === 'ice') {
+      await peer.pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+    }
+  } catch (e) {
+    console.error('Signal handle error:', e);
+  }
+}
+
 async function setupCrypto(password) {
   if (!password) return null;
   const enc = new TextEncoder();
@@ -160,28 +234,14 @@ window.addEventListener('DOMContentLoaded', async () => {
       addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true });
       
       window.electronAPI.startDiscovery(state.myId, state.myName, state.room);
+      setupInternetSignaling(state.room, state.myId, state.myName);
+      
       if (!state.ipcAttached) {
         window.electronAPI.onPeerDiscovered((event, peer) => {
           handlePeerDiscovered(peer);
         });
         window.electronAPI.onUDPSignal(async (event, { id, ip, signal }) => {
-          const peer = state.peers.get(id);
-          if (!peer) return;
-          if (!peer.ip) peer.ip = ip;
-          try {
-            if (signal.type === 'offer') {
-              await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-              const answer = await peer.pc.createAnswer();
-              await peer.pc.setLocalDescription(answer);
-              window.electronAPI.sendUDPSignal(ip, { type: 'answer', sdp: answer });
-            } else if (signal.type === 'answer') {
-              await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-            } else if (signal.type === 'ice') {
-              await peer.pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            }
-          } catch (e) {
-            console.error('Signal handle error:', e);
-          }
+          handleSignal(id, ip, signal);
         });
         state.ipcAttached = true;
       }
@@ -466,8 +526,12 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     pc.addTrack(track, state.localStream);
   });
   pc.onicecandidate = (e) => {
-    if (e.candidate && peerIp) {
-      window.electronAPI.sendUDPSignal(peerIp, { type: 'ice', candidate: e.candidate });
+    if (e.candidate) {
+      if (peerIp === 'internet') {
+        sendInternetSignal(peerId, { type: 'ice', candidate: e.candidate });
+      } else if (peerIp) {
+        window.electronAPI.sendUDPSignal(peerIp, { type: 'ice', candidate: e.candidate });
+      }
     }
   };
 
@@ -520,7 +584,9 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (isInitiator) {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    if (peerIp) {
+    if (peerIp === 'internet') {
+      sendInternetSignal(peerId, { type: 'offer', sdp: offer });
+    } else if (peerIp) {
       window.electronAPI.sendUDPSignal(peerIp, { type: 'offer', sdp: offer });
     }
   }

@@ -10,7 +10,7 @@
   <div id="login" class="login-wrap">
     <div class="login-card">
       <h1>🎙️ Kanka Voice</h1>
-      <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur</p>
+      <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur, internetten bağlanılabilir</p>
 
       <!-- Adım 1: İsim -->
       <div id="step-name">
@@ -70,6 +70,7 @@
         <button id="btn-create">Oluştur</button>
       </div>
       <p id="my-ip" class="hint"></p>
+      <p class="hint" style="color:var(--ok); margin-top:0;">🌐 İnternet üzerinden bağlantı aktif</p>
     </div>
   </div>
 
@@ -372,6 +373,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
