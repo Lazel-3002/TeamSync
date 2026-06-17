@@ -99,6 +99,8 @@ async function handleSignal(id, ip, signal) {
   const peer = state.peers.get(id);
   if (!peer) return;
   if (!peer.ip) peer.ip = ip;
+  if (!peer.iceQueue) peer.iceQueue = [];
+
   try {
     if (signal.type === 'offer') {
       await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
@@ -109,10 +111,22 @@ async function handleSignal(id, ip, signal) {
       } else {
         window.electronAPI.sendUDPSignal(ip, { type: 'answer', sdp: answer });
       }
+      // Process queued candidates
+      while (peer.iceQueue.length) {
+        await peer.pc.addIceCandidate(peer.iceQueue.shift());
+      }
     } else if (signal.type === 'answer') {
       await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      // Process queued candidates
+      while (peer.iceQueue.length) {
+        await peer.pc.addIceCandidate(peer.iceQueue.shift());
+      }
     } else if (signal.type === 'ice') {
-      await peer.pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      if (peer.pc.remoteDescription && peer.pc.remoteDescription.type) {
+        await peer.pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      } else {
+        peer.iceQueue.push(new RTCIceCandidate(signal.candidate));
+      }
     }
   } catch (e) {
     console.error('Signal handle error:', e);
@@ -152,9 +166,9 @@ async function decryptMsg(data, key) {
 const ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
