@@ -135,13 +135,19 @@ function createWindow() {
     autoHideMenuBar: true,
     webSecurity: true
   });
-  mainWindow.loadFile('index.html');
-  Menu.setApplicationMenu(null);
-
+  
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer ${level}] ${message} (${line})`);
+  });
+
+  mainWindow.loadFile('index.html');
+  Menu.setApplicationMenu(null);
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

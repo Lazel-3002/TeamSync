@@ -434,6 +434,21 @@ body {
 }
 .vcard.screen video { object-fit: contain; } /* screen share should be contained */
 
+/* Make UNO and Whiteboard look like thumbnails when minimized in the grid */
+.main.focus-mode .grid .vcard .uno-view,
+.main.focus-mode .grid .vcard .wb-container {
+  transform: scale(0.3);
+  transform-origin: top left;
+  width: 333%;
+  height: 333%;
+  pointer-events: none !important;
+}
+
+/* Ensure the card actions like Odadan Çık remain clickable */
+.main.focus-mode .grid .vcard .card-actions {
+  pointer-events: all;
+}
+
 .vlbl {
   position: absolute;
   bottom: 12px; left: 12px;
@@ -943,4 +958,5 @@ body {
   pointer-events: none;
   animation: emojiRise 2s ease-out forwards;
   z-index: 200;
+  font-size: 48px;
 }

@@ -402,6 +402,13 @@ async function setupLocalAudio() {
   } else {
     state.processedStream = gatedStream;
   }
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = 1;
+  const blankVideoTrack = canvas.captureStream().getVideoTracks()[0];
+  blankVideoTrack.enabled = false;
+  state.processedStream.addTrack(blankVideoTrack);
+  
   state.localStream = state.processedStream;
 }
 
@@ -562,6 +569,16 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   state.localStream.getTracks().forEach(track => {
     pc.addTrack(track, state.localStream);
   });
+
+  const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+  if (sender) {
+    if (state.isSharing && state.screenStream) {
+      sender.replaceTrack(state.screenStream.getVideoTracks()[0]);
+    } else if (state.cameraOn && state.cameraStream) {
+      sender.replaceTrack(state.cameraStream.getVideoTracks()[0]);
+    }
+  }
+
   pc.onicecandidate = (e) => {
     if (e.candidate) {
       const peer = state.peers.get(peerId);
@@ -601,8 +618,6 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
       peer.videoEl.srcObject = e.streams[0];
       if (state.activeControl && state.activeControl.hostId === peerId) {
         document.getElementById('remote-vid').srcObject = e.streams[0];
-      } else {
-        addVideoCard(peerId, peerName, peer.videoEl, e.track.label.includes('screen') || peer.sharing);
       }
     }
   };
@@ -658,9 +673,41 @@ function setupDataChannel(peerId, dc) {
     const peer = state.peers.get(peerId);
     if (peer) {
       peer.dc = dc;
-      // Send initial state so the peer knows our mic/deaf status
+      // Send initial state so the peer knows our mic/deaf/camera/share status
       try {
         dc.send(JSON.stringify({ type: 'state', mic: state.micEnabled, deaf: state.deafened }));
+        if (state.isSharing) dc.send(JSON.stringify({ type: 'sharing', sharing: true }));
+        if (state.cameraOn) dc.send(JSON.stringify({ type: 'camera', on: true }));
+        
+        // Sync Hosted Activities
+        if (state.uno.host === state.myId && !state.uno.started) {
+          dc.send(JSON.stringify({ type: 'uno-lobby', host: state.myId }));
+          dc.send(JSON.stringify({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) }));
+        } else if (state.uno.host === state.myId && state.uno.started) {
+          dc.send(JSON.stringify({ 
+            type: 'uno-sync', 
+            host: state.myId,
+            players: Array.from(state.uno.players.entries()),
+            turnOrder: state.uno.turnOrder,
+            turnIndex: state.uno.turnIndex,
+            direction: state.uno.direction,
+            discard: state.uno.discard,
+            currentColor: state.uno.currentColor,
+            handsCount: Array.from(state.uno.players.entries()).map(([id, p]) => ({ id, count: p.cardCount }))
+          }));
+        }
+        if (state.sb.host === state.myId) {
+          dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: state.sb.interactive }));
+          dc.send(JSON.stringify({ type: 'sb-nav', url: document.getElementById('sb-url').value }));
+        }
+        if (state.act.wt && state.wt.player) {
+           const vid = document.getElementById('wt-input').value;
+           if (vid) dc.send(JSON.stringify({ type: 'wt-load', vid }));
+        }
+        if (state.myId < peerId && !document.getElementById('wb-card').classList.contains('hidden')) {
+           const wbData = document.getElementById('wb-canvas').toDataURL('image/jpeg', 0.5);
+           dc.send(JSON.stringify({ type: 'wb-sync', data: wbData }));
+        }
       } catch (e) {}
     }
   };
@@ -703,9 +750,21 @@ async function handleDataMessage(peerId, msg) {
     updateUserUI(peerId);
   } else if (msg.type === 'sharing') {
     peer.sharing = msg.sharing;
+    if (msg.sharing) {
+      removeVideoCard(peerId, false);
+      addVideoCard(peerId, peer.name, peer.videoEl, true);
+    } else {
+      removeVideoCard(peerId, true);
+      if (peer.camera) addVideoCard(peerId, peer.name, peer.videoEl, false);
+    }
     updateUserUI(peerId);
   } else if (msg.type === 'camera') {
     peer.camera = msg.on;
+    if (msg.on) {
+      if (!peer.sharing) addVideoCard(peerId, peer.name, peer.videoEl, false);
+    } else {
+      removeVideoCard(peerId, false);
+    }
     updateUserUI(peerId);
   } else if (msg.type === 'chat') {
     appendChat(peerId, peer.name, msg.text);
@@ -722,10 +781,18 @@ async function handleDataMessage(peerId, msg) {
       drawWb(msg.tool, msg.x0 * 1920, msg.y0 * 1080, msg.x1 * 1920, msg.y1 * 1080, msg.color, msg.size, msg.text);
     }
   } else if (msg.type === 'wb-clear') {
-    if (state.wbContext) {
-      state.wbContext.fillStyle = '#ffffff';
-      state.wbContext.fillRect(0,0,1920,1080);
-    }
+    state.wbContext.fillStyle = '#ffffff';
+    state.wbContext.fillRect(0,0,1920,1080);
+  } else if (msg.type === 'wb-sync') {
+    const img = new Image();
+    img.onload = () => {
+      state.wbContext.drawImage(img, 0, 0);
+      const wbCard = document.getElementById('wb-card');
+      wbCard.classList.remove('hidden');
+      makeCardFocusable(wbCard);
+      updateEmptyGrid();
+    };
+    img.src = msg.data;
   } else if (msg.type === 'file-meta') {
     fileBuffer.set(msg.id, { meta: msg, chunks: [], received: 0 });
     appendFileMsg(msg.id, msg.name, msg.size, true);
@@ -931,7 +998,7 @@ function toggleFocus(card) {
 
 function makeCardFocusable(card) {
   if (card.dataset.focusable) return;
-  card.dataset.focusable = "true";
+  card.dataset.focusable = 'true';
   card.addEventListener('click', (e) => {
     if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .uno-card-ui, .ucc, .uno-player-list, .act-src, #uno-table, .uno-remote-player, #wt-player-container, .wt-tools')) return;
     if (e.target.tagName === 'CANVAS' && focusedCard === card) return;
@@ -972,6 +1039,10 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
   makeCardFocusable(card);
   document.getElementById('grid').appendChild(card);
   updateEmptyGrid();
+  
+  if (isScreen && !focusedCard && peerId !== 'self') {
+    toggleFocus(card);
+  }
 }
 
 function removeVideoCard(peerId, isScreen) {
@@ -1119,7 +1190,7 @@ function bindUI() {
     document.getElementById('ip-modal').classList.remove('hidden');
   });
   document.getElementById('ip-cancel').addEventListener('click', () => {
-    document.getElementById('ip-modal').classList.add('hidden');
+    document.getElementById('ip-modal').classList.remove('hidden');
   });
   document.getElementById('ip-ok').addEventListener('click', () => {
     const ip = document.getElementById('ip-input').value.trim();
@@ -1127,7 +1198,7 @@ function bindUI() {
       window.electronAPI.directConnect(ip);
       showToast(ip + ' adresine ping gönderildi.', 'info');
     }
-    document.getElementById('ip-modal').classList.add('hidden');
+    document.getElementById('ip-modal').classList.remove('hidden');
     document.getElementById('ip-input').value = '';
   });
 
@@ -2092,13 +2163,81 @@ function handleUnoMessage(peerId, msg) {
     }
   } else if (msg.type === 'uno-join') {
     state.uno.players.set(peerId, { name: msg.name, ready: msg.ready, cardCount: 0 });
+    if (state.uno.host === state.myId) {
+      broadcast({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
+    }
     renderUnoLobby();
   } else if (msg.type === 'uno-ready') {
     const p = state.uno.players.get(peerId);
-    if (p) { p.ready = msg.ready; renderUnoLobby(); }
+    if (p) {
+      p.ready = msg.ready;
+      if (state.uno.host === state.myId) {
+        broadcast({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
+      }
+      renderUnoLobby();
+    }
   } else if (msg.type === 'uno-lobby-sync') {
     state.uno.players = new Map(msg.players);
     renderUnoLobby();
+  } else if (msg.type === 'uno-sync') {
+    state.uno.host = msg.host;
+    state.uno.started = true;
+    state.uno.players = new Map(msg.players);
+    state.uno.turnOrder = msg.turnOrder;
+    state.uno.turnIndex = msg.turnIndex;
+    state.uno.direction = msg.direction;
+    if (msg.myHand) state.uno.myHand = msg.myHand;
+    state.uno.discard = msg.discard;
+    state.uno.currentColor = msg.currentColor;
+    msg.handsCount.forEach(h => {
+      if (state.uno.players.has(h.id)) state.uno.players.get(h.id).cardCount = h.count;
+    });
+    
+    document.getElementById('uno-card').classList.remove('hidden');
+    document.getElementById('uno-lobby').classList.add('hidden');
+    document.getElementById('uno-game').classList.remove('hidden');
+    makeCardFocusable(document.getElementById('uno-card'));
+    if (!focusedCard) toggleFocus(document.getElementById('uno-card'));
+    
+    renderUnoGame();
+  } else if (msg.type === 'uno-req-draw') {
+    if (state.uno.host === state.myId) {
+      if (state.uno.deck.length === 0) {
+        const top = state.uno.discard.pop();
+        state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
+        state.uno.discard = [top];
+      }
+      const c = state.uno.deck.pop();
+      const p = state.peers.get(peerId);
+      if (p && p.dc && p.dc.readyState === 'open') {
+        p.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c }));
+      }
+      if (state.uno.players.has(peerId)) state.uno.players.get(peerId).cardCount++;
+      state.uno.turnIndex = getNextTurn();
+      
+      animateCardDraw(peerId);
+      broadcast({ type: 'uno-draw-anim', pid: peerId });
+      
+      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
+      broadcast({
+        type: 'uno-sync',
+        host: state.uno.host,
+        players: Array.from(state.uno.players.entries()),
+        turnOrder: state.uno.turnOrder,
+        turnIndex: state.uno.turnIndex,
+        direction: state.uno.direction,
+        discard: state.uno.discard,
+        currentColor: state.uno.currentColor,
+        handsCount
+      });
+      renderUnoGame();
+    }
+  } else if (msg.type === 'uno-draw-result') {
+    msg.card._new = true;
+    state.uno.myHand.push(msg.card);
+    renderUnoGame();
+  } else if (msg.type === 'uno-draw-anim') {
+    animateCardDraw(msg.pid);
   } else if (msg.type === 'uno-leave') {
     if (state.uno.host === peerId) {
       alert("Kurucu odadan çıktı. UNO iptal edildi.");
@@ -2216,6 +2355,8 @@ function startUnoGame() {
     hands, firstCard
   };
   
+  console.log("startUnoGame: myId=", state.myId, "turnOrder=", turnOrder, "hands length for me=", hands[state.myId]?.length);
+
   state.uno.started = true;
   state.uno.deck = deck;
   state.uno.turnOrder = turnOrder;
@@ -2236,10 +2377,10 @@ function startUnoGame() {
 }
 
 function renderUnoGame() {
-  if (document.startViewTransition) {
-    document.startViewTransition(() => doRenderUnoGame());
-  } else {
+  try {
     doRenderUnoGame();
+  } catch (err) {
+    console.error("UNO Render Error:", err);
   }
 }
 
@@ -2261,7 +2402,22 @@ function doRenderUnoGame() {
   document.getElementById('uno-dir-indicator').textContent = state.uno.direction === 1 ? '🔃' : '🔄';
   
   const topCard = state.uno.discard[state.uno.discard.length - 1];
-  const discardDiv = document.getElementById('uno-discard');
+  
+  console.log("DEBUG: body contains uno-discard?", document.body.innerHTML.includes('uno-discard'));
+  console.log("DEBUG: getElementById('uno-center')", document.getElementById('uno-center'));
+  console.log("DEBUG: getElementById('uno-discard')", document.getElementById('uno-discard'));
+  
+  let discardDiv = document.getElementById('uno-discard');
+  if (!discardDiv) {
+    console.error("FATAL: uno-discard is MISSING from the DOM! Recreating it...");
+    discardDiv = document.createElement('div');
+    discardDiv.id = 'uno-discard';
+    discardDiv.className = 'uno-card-ui empty';
+    const center = document.getElementById('uno-center');
+    if (center) center.appendChild(discardDiv);
+    else return;
+  }
+  
   discardDiv.className = `uno-card-ui ${state.uno.currentColor}`;
   if (state.uno.triggerDiscardAnim) {
     discardDiv.style.transform = 'scale(1.2)';
@@ -2319,6 +2475,8 @@ function doRenderUnoGame() {
     table.appendChild(rp);
   });
 
+  console.log("doRenderUnoGame: myHand size=", state.uno.myHand?.length);
+
   const handDiv = document.getElementById('uno-my-hand');
   handDiv.innerHTML = '';
   state.uno.myHand.forEach((c, cIdx) => {
@@ -2354,20 +2512,40 @@ function doRenderUnoGame() {
 
   document.getElementById('uno-deck').onclick = () => {
     if (currentTurnId === state.myId) {
+      const deckDiv = document.getElementById('uno-deck');
+      deckDiv.style.transform = 'scale(0.9)';
+      setTimeout(() => { deckDiv.style.transform = 'scale(1)'; }, 150);
+
       if (state.uno.host === state.myId) {
         if (state.uno.deck.length === 0) {
-          showToast("Deste Bitti!", "warn");
-          return;
+          const top = state.uno.discard.pop();
+          state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
+          state.uno.discard = [top];
         }
         const newCard = state.uno.deck.pop();
         state.uno.myHand.push({ ...newCard, _new: true });
         const p = state.uno.players.get(state.myId);
         if(p) p.cardCount++;
         state.uno.turnIndex = getNextTurn();
-        broadcast({ type: 'uno-draw', count: 1, nextTurnIndex: state.uno.turnIndex });
+        
+        animateCardDraw(state.myId);
+        broadcast({ type: 'uno-draw-anim', pid: state.myId });
+        
+        const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
+        broadcast({
+          type: 'uno-sync',
+          host: state.uno.host,
+          players: Array.from(state.uno.players.entries()),
+          turnOrder: state.uno.turnOrder,
+          turnIndex: state.uno.turnIndex,
+          direction: state.uno.direction,
+          discard: state.uno.discard,
+          currentColor: state.uno.currentColor,
+          handsCount
+        });
         renderUnoGame();
       } else {
-        showToast("Host deste dağıtımı özelliği eklenmeli, şu an sadelik için kısıtlı.", "info");
+        broadcast({ type: 'uno-req-draw' });
       }
     }
   };
@@ -2385,6 +2563,59 @@ function getNextTurn(skip = 1) {
   let next = (state.uno.turnIndex + state.uno.direction * skip) % len;
   if (next < 0) next += len;
   return next;
+}
+
+function animateCardDraw(pid) {
+  const table = document.getElementById('uno-table');
+  const deck = document.getElementById('uno-deck');
+  if (!table || !deck) return;
+  
+  const deckRect = deck.getBoundingClientRect();
+  const tableRect = table.getBoundingClientRect();
+  
+  const startX = deckRect.left - tableRect.left + (deckRect.width / 2);
+  const startY = deckRect.top - tableRect.top + (deckRect.height / 2);
+  
+  let endX = startX;
+  let endY = startY + 150; 
+  
+  if (pid === state.myId) {
+    const hand = document.getElementById('uno-my-hand');
+    if (hand) {
+      const handRect = hand.getBoundingClientRect();
+      endX = handRect.left - tableRect.left + (handRect.width / 2);
+      endY = handRect.top - tableRect.top + (handRect.height / 2);
+    }
+  } else {
+    const rp = Array.from(document.querySelectorAll('.uno-remote-player')).find(el => el.dataset.pid === pid);
+    if (rp) {
+      const rpRect = rp.getBoundingClientRect();
+      endX = rpRect.left - tableRect.left + (rpRect.width / 2);
+      endY = rpRect.top - tableRect.top + (rpRect.height / 2);
+    }
+  }
+  
+  const animCard = document.createElement('div');
+  animCard.className = 'uno-card-ui back';
+  animCard.textContent = 'UNO';
+  animCard.style.position = 'absolute';
+  animCard.style.left = `${startX}px`;
+  animCard.style.top = `${startY}px`;
+  animCard.style.transform = `translate(-50%, -50%) scale(0.8)`;
+  animCard.style.transition = 'all 0.3s ease-out';
+  animCard.style.zIndex = 150;
+  
+  table.appendChild(animCard);
+  playSound('draw');
+  
+  animCard.getBoundingClientRect();
+  
+  animCard.style.left = `${endX}px`;
+  animCard.style.top = `${endY}px`;
+  animCard.style.transform = `translate(-50%, -50%) scale(0.3) rotate(180deg)`;
+  animCard.style.opacity = '0';
+  
+  setTimeout(() => animCard.remove(), 350);
 }
 
 function playCard(index, chosenColor = null) {
@@ -2475,7 +2706,22 @@ function botPlay(botId) {
       const p = state.uno.players.get(botId);
       if(p) p.cardCount++;
       state.uno.turnIndex = getNextTurn();
-      broadcast({ type: 'uno-draw', count: 1, nextTurnIndex: state.uno.turnIndex, botId });
+      
+      animateCardDraw(botId);
+      broadcast({ type: 'uno-draw-anim', pid: botId });
+      
+      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
+      broadcast({
+        type: 'uno-sync',
+        host: state.uno.host,
+        players: Array.from(state.uno.players.entries()),
+        turnOrder: state.uno.turnOrder,
+        turnIndex: state.uno.turnIndex,
+        direction: state.uno.direction,
+        discard: state.uno.discard,
+        currentColor: state.uno.currentColor,
+        handsCount
+      });
       renderUnoGame();
     } else {
       state.uno.turnIndex = getNextTurn();
@@ -2483,6 +2729,35 @@ function botPlay(botId) {
       renderUnoGame();
     }
   }
+}
+
+function playSound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    if (type === 'uno') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    } else if (type === 'draw') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    }
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+  } catch (e) {}
 }
 
 function playPopSound() {
