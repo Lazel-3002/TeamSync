@@ -76,12 +76,37 @@ const ICE = [
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
+  const stepName = document.getElementById('step-name');
+  const stepAction = document.getElementById('step-action');
+  const stepJoin = document.getElementById('step-join');
+  const stepCreate = document.getElementById('step-create');
+
   const nameInp = document.getElementById('name');
-  const roomInp = document.getElementById('room');
-  const pwInp = document.getElementById('password');
-  const aiChk = document.getElementById('useAI');
-  const pttChk = document.getElementById('usePTT');
-  const startBtn = document.getElementById('start');
+  const btnNextName = document.getElementById('btn-next-name');
+  const displayName = document.getElementById('display-name');
+
+  const btnShowJoin = document.getElementById('btn-show-join');
+  const btnShowCreate = document.getElementById('btn-show-create');
+  
+  document.querySelectorAll('.btn-back').forEach(btn => {
+    btn.addEventListener('click', () => {
+      stepJoin.classList.add('hidden');
+      stepCreate.classList.add('hidden');
+      stepAction.classList.remove('hidden');
+    });
+  });
+
+  const btnJoin = document.getElementById('btn-join');
+  const joinId = document.getElementById('join-id');
+  const joinPw = document.getElementById('join-password');
+  const joinAi = document.getElementById('join-useAI');
+  const joinPtt = document.getElementById('join-usePTT');
+
+  const btnCreate = document.getElementById('btn-create');
+  const createName = document.getElementById('create-name');
+  const createPw = document.getElementById('create-password');
+  const createAi = document.getElementById('create-useAI');
+  const createPtt = document.getElementById('create-usePTT');
 
   try {
     const ips = await window.electronAPI.getLocalIPs();
@@ -91,12 +116,29 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) {}
 
-  startBtn.addEventListener('click', async () => {
-    state.myName = nameInp.value.trim() || 'Anonim';
-    state.room = roomInp.value.trim() || 'genel';
-    state.password = pwInp.value;
-    state.useAI = aiChk.checked;
-    state.pttMode = pttChk.checked;
+  btnNextName.addEventListener('click', () => {
+    const n = nameInp.value.trim() || 'Anonim';
+    state.myName = n;
+    displayName.textContent = n;
+    stepName.classList.add('hidden');
+    stepAction.classList.remove('hidden');
+  });
+
+  btnShowJoin.addEventListener('click', () => {
+    stepAction.classList.add('hidden');
+    stepJoin.classList.remove('hidden');
+  });
+
+  btnShowCreate.addEventListener('click', () => {
+    stepAction.classList.add('hidden');
+    stepCreate.classList.remove('hidden');
+  });
+
+  const startApp = async (roomId, pw, useAI, pttMode, serverName) => {
+    state.room = roomId;
+    state.password = pw;
+    state.useAI = useAI;
+    state.pttMode = pttMode;
 
     try {
       state.cryptoKey = await setupCrypto(state.password);
@@ -112,7 +154,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       
       document.getElementById('login').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
-      document.getElementById('room-title').textContent = '# ' + state.room + (state.cryptoKey ? ' 🔒' : '');
+      document.getElementById('room-title').textContent = '# ' + serverName + (state.cryptoKey ? ' 🔒' : '');
+      document.getElementById('display-server-id').textContent = roomId;
+      
       addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true });
       
       window.electronAPI.startDiscovery(state.myId, state.myName, state.room);
@@ -167,6 +211,25 @@ window.addEventListener('DOMContentLoaded', async () => {
       alert('Hata: ' + err.message);
       console.error(err);
     }
+  };
+
+  btnJoin.addEventListener('click', () => {
+    const roomId = joinId.value.trim().toUpperCase();
+    if (!roomId) return alert("Lütfen bir Sunucu ID girin!");
+    startApp(roomId, joinPw.value, joinAi.checked, joinPtt.checked, "Sunucu " + roomId);
+  });
+
+  btnCreate.addEventListener('click', () => {
+    const sName = createName.value.trim() || 'Oyun Odası';
+    const newRoomId = Math.random().toString(36).substr(2, 6).toUpperCase();
+    startApp(newRoomId, createPw.value, createAi.checked, createPtt.checked, sName);
+  });
+
+  document.getElementById('btn-copy-id').addEventListener('click', () => {
+    const idText = document.getElementById('display-server-id').textContent;
+    navigator.clipboard.writeText(idText).then(() => {
+      showToast('ID Kopyalandı: ' + idText, 'ok');
+    });
   });
 });
 

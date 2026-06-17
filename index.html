@@ -12,26 +12,63 @@
       <h1>🎙️ Kanka Voice</h1>
       <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur</p>
 
-      <label>Adın</label>
-      <input id="name" type="text" placeholder="Kanka" maxlength="20" />
-
-      <label>Oda Anahtarı <span class="muted">(aynı anahtar = aynı oda)</span></label>
-      <input id="room" type="text" placeholder="gizli-oda-123" value="arkadaslar" />
-
-      <label>Şifre <span class="muted">(opsiyonel, uçtan uca şifreler)</span></label>
-      <input id="password" type="password" placeholder="•••••" />
-
-      <div class="check-row">
-        <input type="checkbox" id="useAI" checked />
-        <label for="useAI">🤖 Gelişmiş Gürültü Engelleyici (Noise Gate)</label>
+      <!-- Adım 1: İsim -->
+      <div id="step-name">
+        <label>Adın</label>
+        <input id="name" type="text" placeholder="Kanka" maxlength="20" />
+        <button id="btn-next-name">İleri</button>
       </div>
 
-      <div class="check-row">
-        <input type="checkbox" id="usePTT" />
-        <label for="usePTT">🅿️ Push-to-Talk modu (Space tuşu)</label>
+      <!-- Adım 2: Seçim -->
+      <div id="step-action" class="hidden">
+        <p style="text-align:center; margin: 20px 0; font-size: 16px;">Hoş geldin, <span id="display-name" style="font-weight:bold; color:var(--acc-light)"></span>!</p>
+        <div style="display:flex; gap: 16px; margin-top: 20px;">
+          <button id="btn-show-join" class="btn-sec" style="flex:1;">Sunucuya Katıl</button>
+          <button id="btn-show-create" class="btn-pri" style="flex:1;">Sunucu Oluştur</button>
+        </div>
       </div>
 
-      <button id="start">Başlat</button>
+      <!-- Adım 3A: Katıl -->
+      <div id="step-join" class="hidden">
+        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1);">⬅ Geri</button>
+        <label>Sunucu ID</label>
+        <input id="join-id" type="text" placeholder="Örn: A7X9B2" />
+        
+        <label>Şifre <span class="muted">(opsiyonel)</span></label>
+        <input id="join-password" type="password" placeholder="•••••" />
+        
+        <div class="check-row">
+          <input type="checkbox" id="join-useAI" checked />
+          <label for="join-useAI">🤖 Gelişmiş Gürültü Engelleyici</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="join-usePTT" />
+          <label for="join-usePTT">🅿️ Push-to-Talk (Space tuşu)</label>
+        </div>
+        
+        <button id="btn-join">Katıl</button>
+      </div>
+
+      <!-- Adım 3B: Oluştur -->
+      <div id="step-create" class="hidden">
+        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1);">⬅ Geri</button>
+        <label>Sunucu Adı</label>
+        <input id="create-name" type="text" placeholder="Benim Sunucum" value="Oyun Odası" />
+        
+        <label>Şifre <span class="muted">(opsiyonel)</span></label>
+        <input id="create-password" type="password" placeholder="•••••" />
+        
+        <div class="check-row">
+          <input type="checkbox" id="create-useAI" checked />
+          <label for="create-useAI">🤖 Gelişmiş Gürültü Engelleyici</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="create-usePTT" />
+          <label for="create-usePTT">🅿️ Push-to-Talk (Space tuşu)</label>
+        </div>
+        
+        <button id="btn-create">Oluştur</button>
+      </div>
       <p id="my-ip" class="hint"></p>
     </div>
   </div>
@@ -77,6 +114,11 @@
     </aside>
 
     <main class="main">
+      <div class="top-bar" style="position: absolute; top: 16px; right: 120px; z-index: 100; display: flex; gap: 8px; align-items: center; background: var(--bg-panel); padding: 6px 12px; border-radius: 20px; border: var(--border); box-shadow: var(--shadow-sm); backdrop-filter: var(--blur); max-width: 90%;">
+        <span style="font-size: 12px; color: var(--txt-mut); font-weight: 600;">SUNUCU ID:</span>
+        <span id="display-server-id" style="font-family: monospace; font-size: 15px; font-weight: bold; letter-spacing: 1px; color: var(--acc-light); user-select: all;">------</span>
+        <button id="btn-copy-id" class="btn-sec btn-sm" style="padding: 4px 8px; font-size: 12px; margin-left: 4px; border-radius: 8px; background: rgba(255,255,255,0.1);" title="ID'yi Kopyala">📋</button>
+      </div>
       <div id="focus-area" class="focus-container hidden"></div>
       <div id="grid" class="grid">
         <div id="empty-state" class="empty">
