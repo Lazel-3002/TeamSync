@@ -1359,7 +1359,7 @@ function showInactiveOverlay(cardId, title, onJoin) {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.className = 'inactive-overlay';
-    overlay.style.cssText = 'position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter: grayscale(100%); z-index: 50; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius: 12px;';
+    overlay.style.cssText = 'position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index: 50; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius: 12px;';
     
     const btn = document.createElement('button');
     btn.className = 'btn-pri';
@@ -1423,12 +1423,10 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
     if (!state.screenShares[peerId]) state.screenShares[peerId] = { joined: false };
     
     if (!state.screenShares[peerId].joined) {
-      videoEl.pause();
       videoEl.muted = true;
       showInactiveOverlay(card.id, 'Ekran Paylaşımı', () => {
          state.screenShares[peerId].joined = true;
          removeInactiveOverlay(card.id);
-         videoEl.play();
          videoEl.muted = false;
          if (!focusedCard) toggleFocus(card);
       });
@@ -1800,7 +1798,10 @@ function stopScreenShare() {
   }
   state.peers.forEach(peer => {
     const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-    if (sender) sender.replaceTrack(null);
+    if (sender) {
+      const blankTrack = state.localStream ? state.localStream.getVideoTracks()[0] : null;
+      sender.replaceTrack(blankTrack || null);
+    }
   });
   state.screenStream = null;
   state.isSharing = false;
@@ -2333,11 +2334,20 @@ state.uno = {
 
 function initActivitiesUI() {
   document.getElementById('act-wt').addEventListener('click', () => {
-    state.wt.joinedActivity = true;
     document.getElementById('activities-modal').classList.add('hidden');
-    document.getElementById('wt-card').classList.remove('hidden');
-    makeCardFocusable(document.getElementById('wt-card'));
-    if (!focusedCard) toggleFocus(document.getElementById('wt-card'));
+    const wtCard = document.getElementById('wt-card');
+    
+    if (!wtCard.classList.contains('hidden') && !state.wt.joinedActivity) {
+      const btn = wtCard.querySelector('.inactive-overlay button');
+      if (btn) btn.click();
+      else if (!focusedCard) toggleFocus(wtCard);
+      return;
+    }
+    
+    state.wt.joinedActivity = true;
+    wtCard.classList.remove('hidden');
+    makeCardFocusable(wtCard);
+    if (!focusedCard) toggleFocus(wtCard);
   });
   
   document.getElementById('wt-close').addEventListener('click', (e) => {
@@ -2361,11 +2371,20 @@ function initActivitiesUI() {
   });
 
   document.getElementById('act-sb').addEventListener('click', () => {
-    state.sb.joinedActivity = true;
     document.getElementById('activities-modal').classList.add('hidden');
-    document.getElementById('sb-card').classList.remove('hidden');
-    makeCardFocusable(document.getElementById('sb-card'));
-    if (!focusedCard) toggleFocus(document.getElementById('sb-card'));
+    const sbCard = document.getElementById('sb-card');
+    
+    if (state.sb.host && state.sb.host !== state.myId) {
+      const btn = sbCard.querySelector('.inactive-overlay button');
+      if (btn) btn.click();
+      else if (!focusedCard) toggleFocus(sbCard);
+      return;
+    }
+
+    state.sb.joinedActivity = true;
+    sbCard.classList.remove('hidden');
+    makeCardFocusable(sbCard);
+    if (!focusedCard) toggleFocus(sbCard);
     
     if (confirm("Ortak Tarayıcıyı başlatıyorsunuz. Diğer kullanıcılar tarayıcıyla etkileşime girebilsin mi (tıklama, sayfa değiştirme)?\n\nTamam = Evet (Herkes Tıklayabilir)\nİptal = Hayır (Sadece Kurucu Tıklayabilir)")) {
       state.sb.interactive = true;
@@ -2452,11 +2471,21 @@ function initActivitiesUI() {
 
   document.getElementById('act-uno').addEventListener('click', () => {
     document.getElementById('activities-modal').classList.add('hidden');
-    document.getElementById('uno-card').classList.remove('hidden');
-    makeCardFocusable(document.getElementById('uno-card'));
-    if (!focusedCard) toggleFocus(document.getElementById('uno-card'));
+    const unoCard = document.getElementById('uno-card');
+    
+    if (state.uno.host && state.uno.host !== state.myId) {
+      const btn = unoCard.querySelector('.inactive-overlay button');
+      if (btn) btn.click();
+      else if (!focusedCard) toggleFocus(unoCard);
+      return;
+    }
+
+    unoCard.classList.remove('hidden');
+    makeCardFocusable(unoCard);
+    if (!focusedCard) toggleFocus(unoCard);
     
     state.uno.host = state.myId;
+    state.uno.joinedActivity = true;
     state.uno.players.set(state.myId, { name: state.myName, ready: true, cardCount: 0 });
     document.getElementById('uno-host-settings').style.display = 'block';
     document.getElementById('uno-ready-btn').classList.add('hidden');
