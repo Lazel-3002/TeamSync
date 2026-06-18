@@ -241,11 +241,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnShowCreate.addEventListener('click', () => {
+    document.getElementById('error-modal').classList.add('hidden');
     stepAction.classList.add('hidden');
     stepCreate.classList.remove('hidden');
   });
 
-  const startApp = async (roomId, pw, useAI, pttMode, serverName) => {
+  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false) => {
     state.room = roomId;
     state.password = pw;
     state.useAI = useAI;
@@ -263,8 +264,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         state.uiBound = true;
       }
       
-      document.getElementById('login').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
+      if (!isJoining) {
+        document.getElementById('login').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+      }
+      
       document.getElementById('room-title').textContent = '# ' + serverName + (state.cryptoKey ? ' 🔒' : '');
       document.getElementById('display-server-id').textContent = roomId;
       
@@ -311,15 +315,41 @@ window.addEventListener('DOMContentLoaded', async () => {
   };
 
   btnJoin.addEventListener('click', () => {
+    document.getElementById('error-modal').classList.add('hidden');
     const roomId = joinId.value.trim().toUpperCase();
     if (!roomId) return alert("Lütfen bir Sunucu ID girin!");
-    startApp(roomId, joinPw.value, joinAi.checked, joinPtt.checked, "Sunucu " + roomId);
+    
+    const originalText = btnJoin.textContent;
+    btnJoin.textContent = "Aranıyor...";
+    btnJoin.disabled = true;
+
+    state.isJoining = true;
+    startApp(roomId, joinPw.value, joinAi.checked, joinPtt.checked, "Sunucu " + roomId, true);
+
+    // Sunucu var mı kontrolü (4 saniye içinde kimse bulunamazsa iptal et)
+    if (state.joinTimeout) clearTimeout(state.joinTimeout);
+    state.joinTimeout = setTimeout(() => {
+      btnJoin.textContent = originalText;
+      btnJoin.disabled = false;
+      
+      if (!state.isJoining || state.room !== roomId) return;
+
+      // Eğer hiç peer yoksa, sunucu yok demektir (veya boş)
+      if (state.peers.size === 0) {
+        disconnectApp();
+        document.getElementById('error-text').textContent = "Böyle bir sunucu bulunamadı. Lütfen ID'yi kontrol edin.";
+        document.getElementById('error-modal').classList.remove('hidden');
+      }
+    }, 4000);
   });
 
   btnCreate.addEventListener('click', () => {
+    document.getElementById('error-modal').classList.add('hidden');
+    if (state.joinTimeout) clearTimeout(state.joinTimeout);
+    state.isJoining = false;
     const sName = createName.value.trim() || 'Oyun Odası';
     const newRoomId = Math.random().toString(36).substr(2, 6).toUpperCase();
-    startApp(newRoomId, createPw.value, createAi.checked, createPtt.checked, sName);
+    startApp(newRoomId, createPw.value, createAi.checked, createPtt.checked, sName, false);
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -529,6 +559,22 @@ async function handlePeerDiscovered(peer) {
 
   console.log('🔍 Peer bulundu:', peer.name, peer.ip);
   addUser({ id: peer.id, name: peer.name, mic: true, deaf: false, sharing: false, ip: peer.ip });
+  
+  if (state.isJoining) {
+    state.isJoining = false;
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    if (state.joinTimeout) {
+      clearTimeout(state.joinTimeout);
+      state.joinTimeout = null;
+    }
+    const btnJoin = document.getElementById('btn-join');
+    if (btnJoin) {
+      btnJoin.textContent = 'Katıl';
+      btnJoin.disabled = false;
+    }
+  }
+
   const isInitiator = state.myId > peer.id;
   await createPeerConnection(peer.id, peer.name, isInitiator, peer.ip);
   showToast(peer.name + ' bulundu', 'info');
@@ -1299,47 +1345,22 @@ function bindUI() {
   });
 
   leave.addEventListener('click', () => {
-    if (confirm('Odadan ayrılmak istediğine emin misin?')) {
-      if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
-      if (state.cameraStream) state.cameraStream.getTracks().forEach(t => t.stop());
-      if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
-      if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
-      if (state.audioCtx && state.audioCtx.state !== 'closed') state.audioCtx.close();
-      if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') state.gateAudioCtx.close();
-      
-      if (window.electronAPI.stopDiscovery) {
-        window.electronAPI.stopDiscovery();
-      }
-      
-      for (const id of state.peers.keys()) {
-        removePeer(id);
-      }
-      state.peers.clear();
-      state.speakingPeers.clear();
-      
-      document.getElementById('users').innerHTML = '';
-      document.getElementById('msgs').innerHTML = '';
-      
-      const grid = document.getElementById('grid');
-      document.querySelectorAll('.vcard').forEach(el => {
-        if (el.id !== 'wb-card') el.remove();
-      });
-      if (!document.getElementById('empty-state')) {
-        const empty = document.createElement('div');
-        empty.id = 'empty-state';
-        empty.className = 'empty';
-        empty.innerHTML = '<h2>👋 Bağlantı Bekleniyor</h2><p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>';
-        grid.prepend(empty);
-      }
-      
-      if (state.pttMode) {
-        window.electronAPI.unregisterPTT();
-      }
-      
-      document.getElementById('app').classList.add('hidden');
-      document.getElementById('login').classList.remove('hidden');
-    }
+    document.getElementById('leave-modal').classList.remove('hidden');
   });
+
+  document.getElementById('leave-cancel').addEventListener('click', () => {
+    document.getElementById('leave-modal').classList.add('hidden');
+  });
+
+  document.getElementById('leave-confirm').addEventListener('click', () => {
+    document.getElementById('leave-modal').classList.add('hidden');
+    disconnectApp();
+  });
+
+  document.getElementById('error-ok').addEventListener('click', () => {
+    document.getElementById('error-modal').classList.add('hidden');
+  });
+
 
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -1610,6 +1631,56 @@ function getVideoConstraints() {
   if (q === 'high') return { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } };
   if (q === 'low') return { width: { ideal: 854 }, height: { ideal: 480 }, frameRate: { ideal: 15 } };
   return { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+}
+
+function disconnectApp() {
+  if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
+  if (state.cameraStream) state.cameraStream.getTracks().forEach(t => t.stop());
+  if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
+  if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
+  if (state.audioCtx && state.audioCtx.state !== 'closed') state.audioCtx.close();
+  if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') state.gateAudioCtx.close();
+  
+  if (window.electronAPI.stopDiscovery) {
+    window.electronAPI.stopDiscovery();
+  }
+  
+  for (const id of state.peers.keys()) {
+    removePeer(id);
+  }
+  state.peers.clear();
+  state.speakingPeers.clear();
+  
+  document.getElementById('users').innerHTML = '';
+  document.getElementById('msgs').innerHTML = '';
+  
+  const grid = document.getElementById('grid');
+  document.querySelectorAll('.vcard').forEach(el => {
+    if (el.id !== 'wb-card') el.remove();
+  });
+  if (!document.getElementById('empty-state')) {
+    const empty = document.createElement('div');
+    empty.id = 'empty-state';
+    empty.className = 'empty';
+    empty.innerHTML = '<h2>👋 Bağlantı Bekleniyor</h2><p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>';
+    grid.prepend(empty);
+  }
+  
+  if (state.pttMode) {
+    window.electronAPI.unregisterPTT();
+  }
+  
+  if (mqttClient) {
+    mqttClient.end();
+    mqttClient = null;
+  }
+  if (internetAnnounceInterval) {
+    clearInterval(internetAnnounceInterval);
+    internetAnnounceInterval = null;
+  }
+
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
 }
 
 function initWhiteboard() {

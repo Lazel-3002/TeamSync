@@ -363,6 +363,29 @@
         </div>
       </div>
     </div>
+
+    <div id="leave-modal" class="modal hidden">
+      <div class="mcard" style="text-align: center; border-top: 4px solid var(--danger);">
+        <div style="font-size: 48px; margin-bottom: 16px; animation: pulse 2s infinite;">🚪</div>
+        <h3 style="justify-content: center; font-size: 24px;">Odadan Ayrıl</h3>
+        <p class="muted" style="font-size: 16px; margin-bottom: 24px;">Kankaboys'tan ayrılmak istermisiniz?</p>
+        <div class="mactions" style="justify-content: center; gap: 16px;">
+          <button id="leave-cancel" class="btn-sec" style="padding: 12px 24px; font-size: 15px;">Kankaları Bırakmam!</button>
+          <button id="leave-confirm" class="btn-pri" style="background: var(--danger); padding: 12px 24px; font-size: 15px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);">Evet, Ayrıl</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="error-modal" class="modal hidden">
+      <div class="mcard" style="text-align: center; border-top: 4px solid var(--warn);">
+        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+        <h3 style="justify-content: center; font-size: 24px; color: var(--warn);">Hata</h3>
+        <p id="error-text" class="muted" style="font-size: 16px; margin-bottom: 24px;">Böyle bir sunucu yok.</p>
+        <div class="mactions" style="justify-content: center;">
+          <button id="error-ok" class="btn-pri" style="background: var(--warn); padding: 12px 32px; font-size: 15px; color: #000;">Tamam</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="drop-overlay" class="drop-overlay hidden">
