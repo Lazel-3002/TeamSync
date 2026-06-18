@@ -1931,6 +1931,49 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
+function endUnoGame() {
+  if (state.uno.host !== state.myId) return;
+  state.uno.started = false;
+
+  const rankings = [];
+  Array.from(state.uno.players.entries()).forEach(([id, p]) => {
+    let count = p.cardCount;
+    if (id === state.myId) count = state.uno.myHand.length;
+    else if (id.startsWith('bot-')) count = state.uno.botHands[id]?.length || 0;
+    rankings.push({ id, name: p.name, count });
+  });
+
+  rankings.sort((a, b) => a.count - b.count);
+  broadcast({ type: 'uno-game-over', rankings });
+  showUnoGameOver(rankings);
+}
+
+function showUnoGameOver(rankings) {
+  state.uno.started = false;
+  document.getElementById('uno-game').classList.add('hidden');
+  document.getElementById('uno-game-over').classList.remove('hidden');
+  
+  const container = document.getElementById('uno-rankings');
+  container.innerHTML = '';
+  rankings.forEach((r, idx) => {
+    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👏';
+    container.innerHTML += `
+      <div style="background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 8px; display: flex; justify-content: space-between; font-size: 18px; border: 1px solid rgba(255,255,255,0.2);">
+        <span>${medal} ${escapeHtml(r.name)}</span>
+        <span>${r.count} Kart</span>
+      </div>
+    `;
+  });
+
+  if (state.uno.host === state.myId) {
+    document.getElementById('uno-replay-btn').classList.remove('hidden');
+    document.getElementById('uno-replay-wait').classList.add('hidden');
+  } else {
+    document.getElementById('uno-replay-btn').classList.add('hidden');
+    document.getElementById('uno-replay-wait').classList.remove('hidden');
+  }
+}
+
 function throttle(fn, wait) {
   let last = 0;
   return (...args) => {
@@ -2604,12 +2647,18 @@ function initActivitiesUI() {
     renderUnoGame();
   });
 
-  document.querySelectorAll('.uno-emoji-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const emoji = e.target.textContent;
-      showFloatingEmoji(state.myId, emoji);
-      broadcast({ type: 'uno-emoji', emoji });
-    });
+  document.getElementById('uno-emojis').addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') return;
+    const emoji = e.target.textContent;
+    showFloatingEmoji(state.myId, emoji);
+    broadcast({ type: 'uno-emoji', emoji });
+  });
+
+  document.getElementById('uno-replay-btn').addEventListener('click', () => {
+    broadcast({ type: 'uno-lobby', host: state.myId });
+    document.getElementById('uno-game-over').classList.add('hidden');
+    document.getElementById('uno-lobby').classList.remove('hidden');
+    state.uno.started = false;
   });
 }
 
@@ -2620,6 +2669,7 @@ function handleUnoMessage(peerId, msg) {
       document.getElementById('uno-card').classList.remove('hidden');
       document.getElementById('uno-lobby').classList.remove('hidden');
       document.getElementById('uno-game').classList.add('hidden');
+      document.getElementById('uno-game-over').classList.add('hidden');
       makeCardFocusable(document.getElementById('uno-card'));
       
       if (!state.uno.joinedActivity) {
@@ -2689,6 +2739,7 @@ function handleUnoMessage(peerId, msg) {
     document.getElementById('uno-card').classList.remove('hidden');
     document.getElementById('uno-lobby').classList.add('hidden');
     document.getElementById('uno-game').classList.remove('hidden');
+    document.getElementById('uno-game-over').classList.add('hidden');
     makeCardFocusable(document.getElementById('uno-card'));
     if (!focusedCard) toggleFocus(document.getElementById('uno-card'));
     
@@ -2794,6 +2845,7 @@ function handleUnoMessage(peerId, msg) {
     
     document.getElementById('uno-lobby').classList.add('hidden');
     document.getElementById('uno-game').classList.remove('hidden');
+    document.getElementById('uno-game-over').classList.add('hidden');
     renderUnoGame();
   } else if (msg.type === 'uno-play') {
     playPopSound();
@@ -2826,12 +2878,18 @@ function handleUnoMessage(peerId, msg) {
 
     setTimeout(() => renderUnoGame(), 300);
 
-    if (state.uno.host === state.myId && msg.drawCount > 0) {
-      setTimeout(() => {
-        const victimIndex = getNextTurn(1, msg.oldTurnIndex, msg.direction);
-        const victimId = state.uno.turnOrder[victimIndex];
-        forceDrawCards(victimId, msg.drawCount);
-      }, 500);
+    if (state.uno.host === state.myId) {
+      if (p && p.cardCount === 0) {
+        setTimeout(() => endUnoGame(), 800);
+        return;
+      }
+      if (msg.drawCount > 0) {
+        setTimeout(() => {
+          const victimIndex = getNextTurn(1, msg.oldTurnIndex, msg.direction);
+          const victimId = state.uno.turnOrder[victimIndex];
+          forceDrawCards(victimId, msg.drawCount);
+        }, 500);
+      }
     }
 
   } else if (msg.type === 'uno-draw') {
@@ -2863,6 +2921,8 @@ function handleUnoMessage(peerId, msg) {
     clearTimeout(state.uno.catchTimeout);
     document.getElementById('uno-catch-btn').classList.add('hidden');
     showToast(state.uno.players.get(msg.targetId)?.name + " UNO demeyi unuttuğu için YAKALANDI!", "warn");
+  } else if (msg.type === 'uno-game-over') {
+    showUnoGameOver(msg.rankings);
   }
 }
 
@@ -3144,6 +3204,7 @@ function doRenderUnoGame() {
   });
 
   document.getElementById('uno-deck').onclick = () => {
+    if (!state.uno.started) return;
     if (currentTurnId === state.myId) {
       if (state.uno.waitingForKeepOrPlay) return;
       const deckDiv = document.getElementById('uno-deck');
@@ -3319,7 +3380,10 @@ function playCard(index, chosenColor = null) {
     }
     
     if (state.uno.myHand.length === 0) {
-      showToast("KAZANDIN!", "ok");
+      if (state.uno.host === state.myId) {
+        setTimeout(() => endUnoGame(), 800);
+      }
+      return;
     }
   }, 250);
 }
@@ -3388,7 +3452,8 @@ function botPlay(botId) {
     }
     
     if (botHand.length === 0) {
-      showToast(p.name + " KAZANDI!", "ok");
+      setTimeout(() => endUnoGame(), 800);
+      return;
     }
   } else {
     if (state.uno.deck.length > 0) {

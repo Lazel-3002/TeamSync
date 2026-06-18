@@ -262,6 +262,14 @@
                </div>
             </div>
           </div>
+          <div id="uno-game-over" class="uno-view hidden" style="flex:1; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative;">
+            <h2 style="font-size: 32px; color: gold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 20px;">🏆 OYUN BİTTİ 🏆</h2>
+            <div id="uno-rankings" style="display: flex; flex-direction: column; gap: 10px; width: 80%; max-width: 400px; margin-bottom: 30px;">
+               <!-- Rankings will be injected here -->
+            </div>
+            <button id="uno-replay-btn" class="btn-ok hidden" style="background: var(--ok); color: white; padding: 15px 30px; border-radius: 50px; font-weight: 900; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.5); border: 2px solid white;">Tekrar Oyna</button>
+            <div id="uno-replay-wait" style="font-size: 16px; color: #aaa; font-style: italic;">Kurucunun oyunu yeniden başlatması bekleniyor...</div>
+          </div>
         </div>
       </div>
     <div class="bar">
@@ -464,7 +472,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="./mqtt.min.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
