@@ -920,7 +920,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   pc.oniceconnectionstatechange = () => {
     console.log(`ICE state [${peerName}]:`, pc.iceConnectionState);
-    if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
       removePeer(peerId);
     } else if (pc.iceConnectionState === 'connected') {
       console.log(`✅ WebRTC connected to ${peerName}`);
@@ -2398,6 +2398,8 @@ function initActivitiesUI() {
     document.getElementById('uno-host-settings').style.display = 'block';
     document.getElementById('uno-ready-btn').classList.add('hidden');
     document.getElementById('uno-start-btn').classList.remove('hidden');
+    document.getElementById('uno-max-players').disabled = false;
+    document.getElementById('uno-fill-bots').disabled = false;
     
     broadcast({ type: 'uno-lobby', host: state.myId });
     renderUnoLobby();
@@ -2449,6 +2451,23 @@ function initActivitiesUI() {
   document.getElementById('uno-max-players').addEventListener('change', (e) => {
     state.uno.maxPlayers = parseInt(e.target.value);
     broadcast({ type: 'uno-max', max: state.uno.maxPlayers });
+  });
+
+  document.getElementById('uno-fill-bots').addEventListener('change', (e) => {
+    broadcast({ type: 'uno-fill', fill: e.target.checked });
+  });
+
+  document.getElementById('uno-uno-btn').addEventListener('click', () => {
+    state.uno.saidUno = true;
+    document.getElementById('uno-uno-btn').classList.add('hidden');
+    broadcast({ type: 'uno-said' });
+  });
+
+  document.getElementById('uno-catch-btn').addEventListener('click', () => {
+    if (state.uno.catchTarget) {
+      broadcast({ type: 'uno-catch', targetId: state.uno.catchTarget });
+      document.getElementById('uno-catch-btn').classList.add('hidden');
+    }
   });
 
   document.getElementById('uno-sort-color').addEventListener('click', () => {
@@ -2505,7 +2524,9 @@ function handleUnoMessage(peerId, msg) {
       
       if (!state.uno.players.has(state.myId)) {
         state.uno.players.set(state.myId, { name: state.myName, ready: false, cardCount: 0 });
-        document.getElementById('uno-host-settings').style.display = 'none';
+        document.getElementById('uno-host-settings').style.display = 'block';
+        document.getElementById('uno-max-players').disabled = true;
+        document.getElementById('uno-fill-bots').disabled = true;
         document.getElementById('uno-ready-btn').classList.remove('hidden');
         document.getElementById('uno-start-btn').classList.add('hidden');
         document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
@@ -2600,6 +2621,9 @@ function handleUnoMessage(peerId, msg) {
     }
   } else if (msg.type === 'uno-max') {
     state.uno.maxPlayers = msg.max;
+    if (state.uno.host !== state.myId) document.getElementById('uno-max-players').value = msg.max;
+  } else if (msg.type === 'uno-fill') {
+    if (state.uno.host !== state.myId) document.getElementById('uno-fill-bots').checked = msg.fill;
   } else if (msg.type === 'uno-start') {
     state.uno.started = true;
     state.uno.turnOrder = msg.turnOrder;
@@ -2630,7 +2654,29 @@ function handleUnoMessage(peerId, msg) {
     state.uno.direction = msg.direction;
     if (state.uno.host === state.myId && state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
     state.uno.triggerDiscardAnim = true;
+
+    if (p && p.cardCount === 1 && !msg.saidUno) {
+      if (pId === state.myId) {
+        document.getElementById('uno-uno-btn').classList.remove('hidden');
+      } else {
+        if (state.uno.catchTimeout) clearTimeout(state.uno.catchTimeout);
+        state.uno.catchTimeout = setTimeout(() => {
+          state.uno.catchTarget = pId;
+          document.getElementById('uno-catch-btn').classList.remove('hidden');
+        }, 500);
+      }
+    }
+
     setTimeout(() => renderUnoGame(), 300);
+
+    if (state.uno.host === state.myId && msg.drawCount > 0) {
+      setTimeout(() => {
+        const victimIndex = getNextTurn(1, msg.oldTurnIndex, msg.direction);
+        const victimId = state.uno.turnOrder[victimIndex];
+        forceDrawCards(victimId, msg.drawCount);
+      }, 500);
+    }
+
   } else if (msg.type === 'uno-draw') {
     const pId = msg.botId || peerId;
     const p = state.uno.players.get(pId);
@@ -2640,7 +2686,69 @@ function handleUnoMessage(peerId, msg) {
     renderUnoGame();
   } else if (msg.type === 'uno-emoji') {
     showFloatingEmoji(peerId, msg.emoji);
+  } else if (msg.type === 'uno-said') {
+    if (state.uno.catchTarget === peerId) {
+      clearTimeout(state.uno.catchTimeout);
+      document.getElementById('uno-catch-btn').classList.add('hidden');
+      state.uno.catchTarget = null;
+    }
+    showToast(state.uno.players.get(peerId)?.name + " UNO dedi!", "ok");
+  } else if (msg.type === 'uno-catch') {
+    if (state.uno.host === state.myId && state.uno.catchTarget === msg.targetId) {
+      state.uno.catchTarget = null;
+      broadcast({ type: 'uno-catch-success', targetId: msg.targetId, catcherId: peerId });
+      showToast(state.uno.players.get(msg.targetId)?.name + " YAKALANDI!", "warn");
+      setTimeout(() => forceDrawCards(msg.targetId, 2), 500);
+    }
+  } else if (msg.type === 'uno-catch-success') {
+    state.uno.catchTarget = null;
+    clearTimeout(state.uno.catchTimeout);
+    document.getElementById('uno-catch-btn').classList.add('hidden');
+    showToast(state.uno.players.get(msg.targetId)?.name + " UNO demeyi unuttuğu için YAKALANDI!", "warn");
   }
+}
+
+function forceDrawCards(victimId, count) {
+  if (state.uno.host !== state.myId) return;
+  for (let i = 0; i < count; i++) {
+    if (state.uno.deck.length === 0) {
+      const top = state.uno.discard.pop();
+      state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
+      state.uno.discard = [top];
+    }
+    const c = state.uno.deck.pop();
+    const p = state.uno.players.get(victimId);
+    if (!p) continue;
+    p.cardCount++;
+    
+    if (victimId === state.myId) {
+      state.uno.myHand.push({ ...c, _new: true });
+    } else if (victimId.startsWith('bot-')) {
+      state.uno.botHands[victimId].push(c);
+    } else {
+      const peer = state.peers.get(victimId);
+      if (peer && peer.dc && peer.dc.readyState === 'open') {
+        peer.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c }));
+      }
+    }
+    
+    animateCardDraw(victimId);
+    broadcast({ type: 'uno-draw-anim', pid: victimId });
+  }
+
+  const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
+  broadcast({
+    type: 'uno-sync',
+    host: state.uno.host,
+    players: Array.from(state.uno.players.entries()),
+    turnOrder: state.uno.turnOrder,
+    turnIndex: state.uno.turnIndex,
+    direction: state.uno.direction,
+    discard: state.uno.discard,
+    currentColor: state.uno.currentColor,
+    handsCount
+  });
+  renderUnoGame();
 }
 
 function renderUnoLobby() {
@@ -2910,9 +3018,9 @@ function canPlay(card, topCard) {
   return false;
 }
 
-function getNextTurn(skip = 1) {
+function getNextTurn(skip = 1, currentIdx = state.uno.turnIndex, currentDir = state.uno.direction) {
   let len = state.uno.turnOrder.length;
-  let next = (state.uno.turnIndex + state.uno.direction * skip) % len;
+  let next = (currentIdx + currentDir * skip) % len;
   if (next < 0) next += len;
   return next;
 }
@@ -2988,22 +3096,34 @@ function playCard(index, chosenColor = null) {
     
     if (card.val === 'Rev') state.uno.direction *= -1;
     let skip = 1;
+    let drawCount = 0;
     if (card.val === 'Skip') skip = 2;
+    if (card.val === '+2') { skip = 2; drawCount = 2; }
+    if (card.val === '+4') { skip = 2; drawCount = 4; }
     
+    const oldTurnIndex = state.uno.turnIndex;
     state.uno.turnIndex = getNextTurn(skip);
     
     state.uno.triggerDiscardAnim = true;
-    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex });
+    
+    let saidUno = false;
+    if (state.uno.saidUno) {
+      saidUno = true;
+      state.uno.saidUno = false;
+      document.getElementById('uno-uno-btn').classList.add('hidden');
+    }
+    
+    if (state.uno.myHand.length === 1 && !saidUno) {
+      document.getElementById('uno-uno-btn').classList.remove('hidden');
+    } else {
+      document.getElementById('uno-uno-btn').classList.add('hidden');
+    }
+    
+    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno });
     renderUnoGame();
     
     if (state.uno.myHand.length === 0) {
       showToast("KAZANDIN!", "ok");
-    } else if (state.uno.myHand.length === 1) {
-      const ub = document.getElementById('uno-uno-btn');
-      if (ub) {
-        ub.classList.remove('hidden');
-        setTimeout(() => ub.classList.add('hidden'), 3000);
-      }
     }
   }, 250);
 }
@@ -3039,14 +3159,31 @@ function botPlay(botId) {
     
     if (card.val === 'Rev') state.uno.direction *= -1;
     let skip = 1;
+    let drawCount = 0;
     if (card.val === 'Skip') skip = 2;
+    if (card.val === '+2') { skip = 2; drawCount = 2; }
+    if (card.val === '+4') { skip = 2; drawCount = 4; }
+    
+    const oldTurnIndex = state.uno.turnIndex;
     state.uno.turnIndex = getNextTurn(skip);
     
-    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, botId });
+    let saidUno = false;
+    if (botHand.length === 1) saidUno = Math.random() > 0.3; // Bot %70 ihtimalle UNO der
+    if (saidUno) broadcast({ type: 'uno-said' });
+    
+    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, botId, oldTurnIndex, drawCount, saidUno });
     playPopSound();
     animateRemotePlay(botId, card);
     state.uno.triggerDiscardAnim = true;
     setTimeout(() => renderUnoGame(), 300);
+    
+    if (drawCount > 0) {
+      setTimeout(() => {
+        const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
+        const victimId = state.uno.turnOrder[victimIndex];
+        forceDrawCards(victimId, drawCount);
+      }, 500);
+    }
     
     if (botHand.length === 0) {
       showToast(p.name + " KAZANDI!", "ok");
