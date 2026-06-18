@@ -2416,12 +2416,21 @@ function initActivitiesUI() {
     state.uno.saidUno = true;
     document.getElementById('uno-uno-btn').classList.add('hidden');
     broadcast({ type: 'uno-said' });
+    showFloatingEmoji(state.myId, "UNO!");
   });
 
   document.getElementById('uno-catch-btn').addEventListener('click', () => {
     if (state.uno.catchTarget) {
-      broadcast({ type: 'uno-catch', targetId: state.uno.catchTarget });
+      const targetId = state.uno.catchTarget;
+      broadcast({ type: 'uno-catch', targetId: targetId });
       document.getElementById('uno-catch-btn').classList.add('hidden');
+      
+      if (state.uno.host === state.myId) {
+        state.uno.catchTarget = null;
+        broadcast({ type: 'uno-catch-success', targetId: targetId, catcherId: state.myId });
+        showToast(state.uno.players.get(targetId)?.name + " YAKALANDI!", "warn");
+        setTimeout(() => forceDrawCards(targetId, 2), 500);
+      }
     }
   });
 
@@ -2541,7 +2550,11 @@ function handleUnoMessage(peerId, msg) {
         p.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c }));
       }
       if (state.uno.players.has(peerId)) state.uno.players.get(peerId).cardCount++;
-      state.uno.turnIndex = getNextTurn();
+      
+      const topCard = state.uno.discard[state.uno.discard.length - 1];
+      if (!canPlay(c, topCard)) {
+        state.uno.turnIndex = getNextTurn();
+      }
       
       animateCardDraw(peerId);
       broadcast({ type: 'uno-draw-anim', pid: peerId });
@@ -2564,6 +2577,18 @@ function handleUnoMessage(peerId, msg) {
     msg.card._new = true;
     state.uno.myHand.push(msg.card);
     renderUnoGame();
+    const topCard = state.uno.discard[state.uno.discard.length - 1];
+    if (canPlay(msg.card, topCard)) {
+      showDrawModal(msg.card, state.uno.myHand.length - 1);
+    }
+  } else if (msg.type === 'uno-keep') {
+    if (state.uno.host === state.myId) {
+      state.uno.turnIndex = getNextTurn();
+      if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
+      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
+      broadcast({ type: 'uno-sync', host: state.uno.host, players: Array.from(state.uno.players.entries()), turnOrder: state.uno.turnOrder, turnIndex: state.uno.turnIndex, direction: state.uno.direction, discard: state.uno.discard, currentColor: state.uno.currentColor, handsCount });
+      renderUnoGame();
+    }
   } else if (msg.type === 'uno-draw-anim') {
     animateCardDraw(msg.pid);
   } else if (msg.type === 'uno-leave') {
@@ -2647,6 +2672,7 @@ function handleUnoMessage(peerId, msg) {
       document.getElementById('uno-catch-btn').classList.add('hidden');
       state.uno.catchTarget = null;
     }
+    showFloatingEmoji(peerId, "UNO!");
     showToast(state.uno.players.get(peerId)?.name + " UNO dedi!", "ok");
   } else if (msg.type === 'uno-catch') {
     if (state.uno.host === state.myId && state.uno.catchTarget === msg.targetId) {
@@ -2941,7 +2967,12 @@ function doRenderUnoGame() {
         state.uno.myHand.push({ ...newCard, _new: true });
         const p = state.uno.players.get(state.myId);
         if(p) p.cardCount++;
-        state.uno.turnIndex = getNextTurn();
+        
+        const topCard = state.uno.discard[state.uno.discard.length - 1];
+        let canPlayDrawn = canPlay(newCard, topCard);
+        if (!canPlayDrawn) {
+          state.uno.turnIndex = getNextTurn();
+        }
         
         animateCardDraw(state.myId);
         broadcast({ type: 'uno-draw-anim', pid: state.myId });
@@ -2959,6 +2990,10 @@ function doRenderUnoGame() {
           handsCount
         });
         renderUnoGame();
+        
+        if (canPlayDrawn) {
+          showDrawModal(newCard, state.uno.myHand.length - 1);
+        }
       } else {
         broadcast({ type: 'uno-req-draw' });
       }
@@ -3049,8 +3084,11 @@ function playCard(index, chosenColor = null) {
     state.uno.discard.push(card);
     state.uno.currentColor = chosenColor || card.color;
     
-    if (card.val === 'Rev') state.uno.direction *= -1;
     let skip = 1;
+    if (card.val === 'Rev') {
+      state.uno.direction *= -1;
+      if (state.uno.turnOrder.length === 2) skip = 2;
+    }
     let drawCount = 0;
     if (card.val === 'Skip') skip = 2;
     if (card.val === '+2') { skip = 2; drawCount = 2; }
@@ -3076,6 +3114,14 @@ function playCard(index, chosenColor = null) {
     
     broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno });
     renderUnoGame();
+    
+    if (state.uno.host === state.myId && drawCount > 0) {
+      setTimeout(() => {
+        const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
+        const victimId = state.uno.turnOrder[victimIndex];
+        forceDrawCards(victimId, drawCount);
+      }, 500);
+    }
     
     if (state.uno.myHand.length === 0) {
       showToast("KAZANDIN!", "ok");
@@ -3112,8 +3158,11 @@ function botPlay(botId) {
     }
     state.uno.currentColor = chosenColor;
     
-    if (card.val === 'Rev') state.uno.direction *= -1;
     let skip = 1;
+    if (card.val === 'Rev') {
+      state.uno.direction *= -1;
+      if (state.uno.turnOrder.length === 2) skip = 2;
+    }
     let drawCount = 0;
     if (card.val === 'Skip') skip = 2;
     if (card.val === '+2') { skip = 2; drawCount = 2; }
@@ -3124,7 +3173,10 @@ function botPlay(botId) {
     
     let saidUno = false;
     if (botHand.length === 1) saidUno = Math.random() > 0.3; // Bot %70 ihtimalle UNO der
-    if (saidUno) broadcast({ type: 'uno-said' });
+    if (saidUno) {
+      broadcast({ type: 'uno-said' });
+      showFloatingEmoji(botId, "UNO!");
+    }
     
     broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, botId, oldTurnIndex, drawCount, saidUno });
     playPopSound();
@@ -3149,7 +3201,12 @@ function botPlay(botId) {
       botHand.push(newCard);
       const p = state.uno.players.get(botId);
       if(p) p.cardCount++;
-      state.uno.turnIndex = getNextTurn();
+      
+      const topCard = state.uno.discard[state.uno.discard.length - 1];
+      const botCanPlay = canPlay(newCard, topCard);
+      if (!botCanPlay) {
+        state.uno.turnIndex = getNextTurn();
+      }
       
       animateCardDraw(botId);
       broadcast({ type: 'uno-draw-anim', pid: botId });
@@ -3167,6 +3224,10 @@ function botPlay(botId) {
         handsCount
       });
       renderUnoGame();
+      
+      if (botCanPlay) {
+        setTimeout(() => botPlay(botId), 1000);
+      }
     } else {
       state.uno.turnIndex = getNextTurn();
       broadcast({ type: 'uno-draw', count: 0, nextTurnIndex: state.uno.turnIndex, botId }); 
@@ -3292,4 +3353,48 @@ function animateRemotePlay(pId, card) {
   }, 10);
   
   setTimeout(() => dummy.remove(), 300);
+}
+
+function showDrawModal(card, index) {
+  const modal = document.getElementById('uno-draw-modal');
+  const container = document.getElementById('uno-drawn-card-container');
+  container.innerHTML = '';
+  
+  const cDiv = document.createElement('div');
+  cDiv.className = `uno-card-ui ${card.color}`;
+  cDiv.innerHTML = `<span class="mini tl">${card.val}</span> ${card.val} <span class="mini br">${card.val}</span>`;
+  cDiv.style.transform = 'scale(1.5)';
+  cDiv.style.margin = '20px';
+  container.appendChild(cDiv);
+  
+  modal.classList.remove('hidden');
+  
+  document.getElementById('uno-keep-btn').onclick = () => {
+    modal.classList.add('hidden');
+    if (state.uno.host === state.myId) {
+      state.uno.turnIndex = getNextTurn();
+      if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
+      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
+      broadcast({ type: 'uno-sync', host: state.uno.host, players: Array.from(state.uno.players.entries()), turnOrder: state.uno.turnOrder, turnIndex: state.uno.turnIndex, direction: state.uno.direction, discard: state.uno.discard, currentColor: state.uno.currentColor, handsCount });
+      renderUnoGame();
+    } else {
+      broadcast({ type: 'uno-keep' });
+    }
+  };
+  
+  document.getElementById('uno-play-drawn-btn').onclick = () => {
+    modal.classList.add('hidden');
+    if (card.color === 'black') {
+      document.getElementById('uno-color-picker').classList.remove('hidden');
+      document.querySelectorAll('.ucc').forEach(btn => {
+        btn.onclick = () => {
+          const selectedColor = btn.dataset.color;
+          document.getElementById('uno-color-picker').classList.add('hidden');
+          playCard(index, selectedColor);
+        };
+      });
+    } else {
+      playCard(index);
+    }
+  };
 }

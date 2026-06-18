@@ -250,6 +250,15 @@
             </div>
             <div id="uno-uno-btn" class="hidden" style="position: absolute; right: 80px; bottom: 120px; background: red; color: white; font-weight: 900; font-size: 20px; padding: 15px 30px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.8); border: 3px solid white; transform: rotate(-5deg); z-index: 100; transition: transform 0.1s;">UNO DE!</div>
             <div id="uno-catch-btn" class="hidden" style="position: absolute; right: 80px; top: 120px; background: #f97316; color: white; font-weight: 900; font-size: 20px; padding: 15px 30px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.8); border: 3px solid white; transform: rotate(5deg); z-index: 100; transition: transform 0.1s; display: flex; flex-direction: column; align-items: center;"><span style="font-size:12px;">Biri UNO demeyi unuttu!</span>YAKALA!</div>
+            
+            <div id="uno-draw-modal" class="hidden" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:200; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(5px);">
+               <div style="color:white; font-size:24px; margin-bottom:20px; font-weight:bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">Kart Çekildi!</div>
+               <div id="uno-drawn-card-container" style="margin-bottom: 30px; display:flex; justify-content:center; align-items:center;"></div>
+               <div style="display:flex; gap: 20px;">
+                  <button id="uno-keep-btn" class="btn-sec" style="font-size: 16px; padding: 12px 24px; background: rgba(255,255,255,0.1); border: 2px solid white; color: white; border-radius: 8px; cursor: pointer;">Beklet</button>
+                  <button id="uno-play-drawn-btn" class="btn-ok" style="background: var(--ok); color: white; border: none; font-size: 16px; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.4);">Oyna</button>
+               </div>
+            </div>
           </div>
         </div>
       </div>
