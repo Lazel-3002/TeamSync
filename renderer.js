@@ -621,7 +621,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('error-text').textContent = "Böyle bir sunucu bulunamadı. Lütfen ID'yi kontrol edin.";
         document.getElementById('error-modal').classList.remove('hidden');
       }
-    }, 4000);
+    }, 2000);
   });
 
   btnCreate.addEventListener('click', () => {
@@ -1423,6 +1423,22 @@ function broadcast(msg) {
   });
 }
 
+async function renegotiateAll() {
+  for (const [id, peer] of state.peers) {
+    try {
+      const offer = await peer.pc.createOffer();
+      await peer.pc.setLocalDescription(offer);
+      if (peer.ip === 'internet') {
+        sendInternetSignal(id, { type: 'offer', sdp: offer });
+      } else {
+        window.electronAPI.sendUDPSignal(peer.ip, { type: 'offer', sdp: offer });
+      }
+    } catch (e) {
+      console.error('Renegotiate err:', id, e);
+    }
+  }
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
@@ -1687,6 +1703,7 @@ async function startCamera() {
     document.getElementById('cam').classList.add('off');
     broadcast({ type: 'camera', on: true });
     addVideoCard('self', state.myName + ' (sen)', attachVideo(state.cameraStream), false);
+    renegotiateAll();
   } catch (err) {
     alert('Kamera hatası: ' + err.message);
   }
@@ -1704,6 +1721,7 @@ function stopCamera() {
   document.getElementById('cam').classList.remove('off');
   broadcast({ type: 'camera', on: false });
   removeVideoCard('self', false);
+  renegotiateAll();
 }
 
 function attachVideo(stream) {
@@ -1759,6 +1777,7 @@ async function startScreenShare(sourceId) {
     broadcast({ type: 'sharing', sharing: true });
     addVideoCard('self', state.myName + ' (sen)', attachVideo(state.screenStream), true);
     track.onended = () => stopScreenShare();
+    renegotiateAll();
   } catch (err) {
     alert('Ekran paylaşım hatası: ' + err.message);
   }
@@ -1776,6 +1795,7 @@ function stopScreenShare() {
   document.getElementById('share').classList.remove('off');
   broadcast({ type: 'sharing', sharing: false });
   removeVideoCard('self', true);
+  renegotiateAll();
 }
 
 function startRecording() {
