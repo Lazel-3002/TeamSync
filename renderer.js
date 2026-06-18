@@ -712,6 +712,12 @@ async function setupLocalAudio() {
     state.processedStream = gatedStream;
   }
   
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = 1;
+  const blankVideoTrack = canvas.captureStream().getVideoTracks()[0];
+  blankVideoTrack.enabled = false;
+  state.processedStream.addTrack(blankVideoTrack);
+  
   state.localStream = state.processedStream;
 }
 
@@ -893,29 +899,8 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (sender) {
     if (state.isSharing && state.screenStream) {
       sender.replaceTrack(state.screenStream.getVideoTracks()[0]);
-      limitVideoBitrate(sender);
-    }
-  } else {
-    if (state.isSharing && state.screenStream) {
-      pc.addTrack(state.screenStream.getVideoTracks()[0], state.screenStream);
     }
   }
-
-  pc.onnegotiationneeded = async () => {
-    try {
-      if (pc.signalingState !== 'stable') return;
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      const ip = peerIp || (state.peers.get(peerId) ? state.peers.get(peerId).ip : null);
-      if (ip === 'internet') {
-        sendInternetSignal(peerId, { type: 'offer', sdp: pc.localDescription });
-      } else if (ip) {
-        window.electronAPI.sendUDPSignal(ip, { type: 'offer', sdp: pc.localDescription });
-      }
-    } catch (e) {
-      console.warn('onnegotiationneeded error:', e);
-    }
-  };
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
@@ -1422,22 +1407,6 @@ function broadcast(msg) {
   });
 }
 
-async function renegotiateAll() {
-  for (const [id, peer] of state.peers) {
-    try {
-      const offer = await peer.pc.createOffer();
-      await peer.pc.setLocalDescription(offer);
-      if (peer.ip === 'internet') {
-        sendInternetSignal(id, { type: 'offer', sdp: offer });
-      } else {
-        window.electronAPI.sendUDPSignal(peer.ip, { type: 'offer', sdp: offer });
-      }
-    } catch (e) {
-      console.error('Renegotiate err:', id, e);
-    }
-  }
-}
-
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
@@ -1721,12 +1690,7 @@ async function startScreenShare(sourceId) {
     const track = state.screenStream.getVideoTracks()[0];
     state.peers.forEach(peer => {
       const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) {
-        sender.replaceTrack(track);
-        limitVideoBitrate(sender);
-      } else {
-        peer.pc.addTrack(track, state.screenStream);
-      }
+      if (sender) sender.replaceTrack(track);
     });
     state.isSharing = true;
     document.getElementById('share').classList.add('off');
@@ -1744,7 +1708,7 @@ function stopScreenShare() {
   }
   state.peers.forEach(peer => {
     const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-    if (sender) peer.pc.removeTrack(sender);
+    if (sender) sender.replaceTrack(null);
   });
   state.screenStream = null;
   state.isSharing = false;
