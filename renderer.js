@@ -715,8 +715,10 @@ async function setupLocalAudio() {
   }
   
   const canvas = document.createElement('canvas');
-  canvas.width = 1; canvas.height = 1;
-  const blankVideoTrack = canvas.captureStream().getVideoTracks()[0];
+  canvas.width = 640; canvas.height = 480;
+  const ctx = canvas.getContext('2d');
+  ctx.fillRect(0, 0, 640, 480);
+  const blankVideoTrack = canvas.captureStream(15).getVideoTracks()[0];
   blankVideoTrack.enabled = false;
   state.processedStream.addTrack(blankVideoTrack);
   
@@ -1696,14 +1698,17 @@ async function startCamera() {
     const track = state.cameraStream.getVideoTracks()[0];
     state.peers.forEach(peer => {
       const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) sender.replaceTrack(track);
-      else peer.pc.addTrack(track, state.cameraStream);
+      if (sender) {
+        sender.replaceTrack(track);
+        limitVideoBitrate(sender);
+      } else {
+        peer.pc.addTrack(track, state.cameraStream);
+      }
     });
     state.cameraOn = true;
     document.getElementById('cam').classList.add('off');
     broadcast({ type: 'camera', on: true });
     addVideoCard('self', state.myName + ' (sen)', attachVideo(state.cameraStream), false);
-    renegotiateAll();
   } catch (err) {
     alert('Kamera hatası: ' + err.message);
   }
@@ -1721,7 +1726,6 @@ function stopCamera() {
   document.getElementById('cam').classList.remove('off');
   broadcast({ type: 'camera', on: false });
   removeVideoCard('self', false);
-  renegotiateAll();
 }
 
 function attachVideo(stream) {
@@ -1769,15 +1773,18 @@ async function startScreenShare(sourceId) {
     const track = state.screenStream.getVideoTracks()[0];
     state.peers.forEach(peer => {
       const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) sender.replaceTrack(track);
-      else peer.pc.addTrack(track, state.screenStream);
+      if (sender) {
+        sender.replaceTrack(track);
+        limitVideoBitrate(sender);
+      } else {
+        peer.pc.addTrack(track, state.screenStream);
+      }
     });
     state.isSharing = true;
     document.getElementById('share').classList.add('off');
     broadcast({ type: 'sharing', sharing: true });
     addVideoCard('self', state.myName + ' (sen)', attachVideo(state.screenStream), true);
     track.onended = () => stopScreenShare();
-    renegotiateAll();
   } catch (err) {
     alert('Ekran paylaşım hatası: ' + err.message);
   }
@@ -1795,7 +1802,6 @@ function stopScreenShare() {
   document.getElementById('share').classList.remove('off');
   broadcast({ type: 'sharing', sharing: false });
   removeVideoCard('self', true);
-  renegotiateAll();
 }
 
 function startRecording() {
@@ -1932,6 +1938,23 @@ function getVideoConstraints() {
   if (q === 'high') return { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } };
   if (q === 'low') return { width: { ideal: 854 }, height: { ideal: 480 }, frameRate: { ideal: 15 } };
   return { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+}
+
+function limitVideoBitrate(sender) {
+  try {
+    const params = sender.getParameters();
+    if (!params.encodings) params.encodings = [{}];
+    
+    const q = document.getElementById('quality-select').value;
+    let maxBitrate = 1500000; // default 1.5 Mbps
+    if (q === 'high') maxBitrate = 4000000; // 4 Mbps
+    if (q === 'low') maxBitrate = 500000; // 500 kbps
+    
+    params.encodings[0].maxBitrate = maxBitrate;
+    sender.setParameters(params);
+  } catch (e) {
+    console.warn("Bitrate limit error:", e);
+  }
 }
 
 function disconnectApp() {
