@@ -9,13 +9,11 @@ const state = {
   password: '',
   peers: new Map(),
   localStream: null,
-  cameraStream: null,
   screenStream: null,
   processedStream: null,
   audioCtx: null,
   micEnabled: true,
   deafened: false,
-  cameraOn: false,
   isSharing: false,
   isRecording: false,
   recordingStream: null,
@@ -896,15 +894,10 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     if (state.isSharing && state.screenStream) {
       sender.replaceTrack(state.screenStream.getVideoTracks()[0]);
       limitVideoBitrate(sender);
-    } else if (state.cameraOn && state.cameraStream) {
-      sender.replaceTrack(state.cameraStream.getVideoTracks()[0]);
-      limitVideoBitrate(sender);
     }
   } else {
     if (state.isSharing && state.screenStream) {
       pc.addTrack(state.screenStream.getVideoTracks()[0], state.screenStream);
-    } else if (state.cameraOn && state.cameraStream) {
-      pc.addTrack(state.cameraStream.getVideoTracks()[0], state.cameraStream);
     }
   }
 
@@ -995,7 +988,6 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     mic: true,
     deaf: false,
     sharing: false,
-    camera: false,
     ip: peerIp,
     lastSeen: Date.now()
   });
@@ -1018,11 +1010,10 @@ function setupDataChannel(peerId, dc) {
     const peer = state.peers.get(peerId);
     if (peer) {
       peer.dc = dc;
-      // Send initial state so the peer knows our mic/deaf/camera/share status
+      // Send initial state so the peer knows our mic/deaf/share status
       try {
         dc.send(JSON.stringify({ type: 'state', mic: state.micEnabled, deaf: state.deafened }));
         if (state.isSharing) dc.send(JSON.stringify({ type: 'sharing', sharing: true }));
-        if (state.cameraOn) dc.send(JSON.stringify({ type: 'camera', on: true }));
         
         // Sync Hosted Activities
         if (state.uno.host === state.myId && !state.uno.started) {
@@ -1096,19 +1087,9 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'sharing') {
     peer.sharing = msg.sharing;
     if (msg.sharing) {
-      removeVideoCard(peerId, false);
       addVideoCard(peerId, peer.name, peer.videoEl, true);
     } else {
       removeVideoCard(peerId, true);
-      if (peer.camera) addVideoCard(peerId, peer.name, peer.videoEl, false);
-    }
-    updateUserUI(peerId);
-  } else if (msg.type === 'camera') {
-    peer.camera = msg.on;
-    if (msg.on) {
-      if (!peer.sharing) addVideoCard(peerId, peer.name, peer.videoEl, false);
-    } else {
-      removeVideoCard(peerId, false);
     }
     updateUserUI(peerId);
   } else if (msg.type === 'chat') {
@@ -1365,7 +1346,7 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
 
   const lbl = document.createElement('div');
   lbl.className = 'vlbl';
-  lbl.innerHTML = `<span class="live"></span> ${escapeHtml(peerName)} ${isScreen ? '• Ekran' : '• Kamera'}`;
+  lbl.innerHTML = `<span class="live"></span> ${escapeHtml(peerName)} ${isScreen ? '• Ekran' : ''}`;
   card.appendChild(lbl);
   
   if (peerId !== 'self') {
@@ -1464,7 +1445,6 @@ function escapeHtml(s) {
 function bindUI() {
   const mic = document.getElementById('mic');
   const deaf = document.getElementById('deaf');
-  const cam = document.getElementById('cam');
   const share = document.getElementById('share');
   const rec = document.getElementById('rec');
   const vol = document.getElementById('vol');
@@ -1501,16 +1481,6 @@ function bindUI() {
     broadcast({ type: 'state', deaf: state.deafened });
     updateUserUI('self');
     playSound(state.deafened ? 'off' : 'on');
-  });
-
-  cam.addEventListener('click', async () => {
-    if (state.cameraOn) {
-      stopCamera();
-      playSound('off');
-    } else {
-      await startCamera();
-      playSound('on');
-    }
   });
 
   share.addEventListener('click', async () => {
@@ -1704,45 +1674,6 @@ function setMicEnabled(enabled) {
   micBtn.querySelector('.icon').textContent = enabled ? '🎤' : '🚫';
   broadcast({ type: 'state', mic: enabled });
   updateUserUI('self');
-}
-
-async function startCamera() {
-  try {
-    state.cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: getVideoConstraints()
-    });
-    const track = state.cameraStream.getVideoTracks()[0];
-    state.peers.forEach(peer => {
-      const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) {
-        sender.replaceTrack(track);
-        limitVideoBitrate(sender);
-      } else {
-        peer.pc.addTrack(track, state.cameraStream);
-      }
-    });
-    state.cameraOn = true;
-    document.getElementById('cam').classList.add('off');
-    broadcast({ type: 'camera', on: true });
-    addVideoCard('self', state.myName + ' (sen)', attachVideo(state.cameraStream), false);
-  } catch (err) {
-    alert('Kamera hatası: ' + err.message);
-  }
-}
-
-function stopCamera() {
-  if (state.cameraStream) {
-    state.cameraStream.getTracks().forEach(t => t.stop());
-  }
-  state.peers.forEach(peer => {
-    const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-    if (sender) peer.pc.removeTrack(sender);
-  });
-  state.cameraStream = null;
-  state.cameraOn = false;
-  document.getElementById('cam').classList.remove('off');
-  broadcast({ type: 'camera', on: false });
-  removeVideoCard('self', false);
 }
 
 function attachVideo(stream) {
@@ -1977,7 +1908,6 @@ function limitVideoBitrate(sender) {
 
 function disconnectApp() {
   if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
-  if (state.cameraStream) state.cameraStream.getTracks().forEach(t => t.stop());
   if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
   if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
   if (state.audioCtx && state.audioCtx.state !== 'closed') state.audioCtx.close();
