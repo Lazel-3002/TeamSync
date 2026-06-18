@@ -621,7 +621,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('error-text').textContent = "Böyle bir sunucu bulunamadı. Lütfen ID'yi kontrol edin.";
         document.getElementById('error-modal').classList.remove('hidden');
       }
-    }, 2000);
+    }, 4000);
   });
 
   btnCreate.addEventListener('click', () => {
@@ -713,14 +713,6 @@ async function setupLocalAudio() {
   } else {
     state.processedStream = gatedStream;
   }
-  
-  const canvas = document.createElement('canvas');
-  canvas.width = 640; canvas.height = 480;
-  const ctx = canvas.getContext('2d');
-  ctx.fillRect(0, 0, 640, 480);
-  const blankVideoTrack = canvas.captureStream(15).getVideoTracks()[0];
-  blankVideoTrack.enabled = false;
-  state.processedStream.addTrack(blankVideoTrack);
   
   state.localStream = state.processedStream;
 }
@@ -903,10 +895,34 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (sender) {
     if (state.isSharing && state.screenStream) {
       sender.replaceTrack(state.screenStream.getVideoTracks()[0]);
+      limitVideoBitrate(sender);
     } else if (state.cameraOn && state.cameraStream) {
       sender.replaceTrack(state.cameraStream.getVideoTracks()[0]);
+      limitVideoBitrate(sender);
+    }
+  } else {
+    if (state.isSharing && state.screenStream) {
+      pc.addTrack(state.screenStream.getVideoTracks()[0], state.screenStream);
+    } else if (state.cameraOn && state.cameraStream) {
+      pc.addTrack(state.cameraStream.getVideoTracks()[0], state.cameraStream);
     }
   }
+
+  pc.onnegotiationneeded = async () => {
+    try {
+      if (pc.signalingState !== 'stable') return;
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const ip = peerIp || (state.peers.get(peerId) ? state.peers.get(peerId).ip : null);
+      if (ip === 'internet') {
+        sendInternetSignal(peerId, { type: 'offer', sdp: pc.localDescription });
+      } else if (ip) {
+        window.electronAPI.sendUDPSignal(ip, { type: 'offer', sdp: pc.localDescription });
+      }
+    } catch (e) {
+      console.warn('onnegotiationneeded error:', e);
+    }
+  };
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
@@ -1720,8 +1736,9 @@ function stopCamera() {
   }
   state.peers.forEach(peer => {
     const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-    if (sender) sender.replaceTrack(null);
+    if (sender) peer.pc.removeTrack(sender);
   });
+  state.cameraStream = null;
   state.cameraOn = false;
   document.getElementById('cam').classList.remove('off');
   broadcast({ type: 'camera', on: false });
@@ -1796,8 +1813,9 @@ function stopScreenShare() {
   }
   state.peers.forEach(peer => {
     const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
-    if (sender) sender.replaceTrack(null);
+    if (sender) peer.pc.removeTrack(sender);
   });
+  state.screenStream = null;
   state.isSharing = false;
   document.getElementById('share').classList.remove('off');
   broadcast({ type: 'sharing', sharing: false });
