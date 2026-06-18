@@ -23,6 +23,10 @@ const state = {
   recordedChunks: [],
   recStart: 0,
   pttMode: false,
+  friendId: '',
+  friends: {},
+  friendRequests: [],
+  globalMqtt: null,
   pttActive: false,
   volume: 1.0,
   useAI: true,
@@ -175,6 +179,174 @@ async function decryptMsg(data, key) {
   } catch (e) { return null; }
 }
 
+function saveProfile() {
+  localStorage.setItem('kanka_profile', JSON.stringify({
+    name: state.myName,
+    id: state.friendId,
+    friends: state.friends,
+    requests: state.friendRequests
+  }));
+  renderFriends();
+}
+
+function renderFriends() {
+  const flist = document.getElementById('friends-list');
+  const invitesBadge = document.getElementById('invite-badge');
+  const invitesList = document.getElementById('invites-list');
+  
+  if (!flist || !invitesBadge || !invitesList) return;
+
+  if (state.friendRequests.length > 0) {
+    invitesBadge.style.display = 'flex';
+    invitesBadge.textContent = state.friendRequests.length;
+  } else {
+    invitesBadge.style.display = 'none';
+  }
+  
+  // Render Invites
+  invitesList.innerHTML = '';
+  if (state.friendRequests.length === 0) {
+    invitesList.innerHTML = '<li class="muted" style="text-align: center;">Bekleyen davet yok.</li>';
+  } else {
+    state.friendRequests.forEach((req, idx) => {
+      const li = document.createElement('li');
+      li.className = 'invite-item';
+      li.innerHTML = `
+        <div style="font-size: 13px;"><b>${escapeHtml(req.name)}</b><br><span class="muted">${escapeHtml(req.id)}</span></div>
+        <div class="invite-actions">
+          <button class="btn-ok btn-sm" style="background:var(--ok); color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="acceptInvite(${idx})">✓</button>
+          <button class="btn-sec btn-sm" style="border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="rejectInvite(${idx})">✕</button>
+        </div>
+      `;
+      invitesList.appendChild(li);
+    });
+  }
+  
+  // Render Friends
+  flist.innerHTML = '';
+  const friendKeys = Object.keys(state.friends);
+  if (friendKeys.length === 0) {
+    flist.innerHTML = '<li class="muted" style="text-align: center; padding: 10px;">Henüz hiç arkadaşın yok.</li>';
+  } else {
+    friendKeys.forEach(fId => {
+      const f = state.friends[fId];
+      const isOnline = f.online ? 'online' : '';
+      const li = document.createElement('li');
+      li.className = 'friend-item';
+      li.innerHTML = `
+        <div class="friend-info">
+          <div class="friend-status ${isOnline}" id="status-${fId}"></div>
+          <div><b>${escapeHtml(f.name)}</b></div>
+        </div>
+        <div class="friend-actions">
+          <button class="btn-sec btn-sm" style="font-size: 11px; padding: 4px 6px; border:none; background:rgba(255,255,255,0.1); border-radius:4px; cursor:pointer;" onclick="removeFriend('${fId}')" title="Arkadaşlıktan Çıkar">Çıkar</button>
+        </div>
+      `;
+      flist.appendChild(li);
+    });
+  }
+}
+
+window.acceptInvite = (idx) => {
+  const req = state.friendRequests[idx];
+  state.friends[req.id] = { name: req.name, online: false };
+  state.friendRequests.splice(idx, 1);
+  saveProfile();
+  
+  if (state.globalMqtt && state.globalMqtt.connected) {
+    state.globalMqtt.publish(`kanka-voice/user/${req.id}/events`, JSON.stringify({
+      type: 'friend_accepted',
+      id: state.friendId,
+      name: state.myName
+    }));
+    state.globalMqtt.subscribe(`kanka-voice/user/${req.id}/presence`);
+  }
+  showToast(`${req.name} ile arkadaş oldunuz!`, 'ok');
+};
+
+window.rejectInvite = (idx) => {
+  state.friendRequests.splice(idx, 1);
+  saveProfile();
+};
+
+window.removeFriend = (id) => {
+  if (confirm('Bu kişiyi arkadaşlıktan çıkarmak istediğine emin misin?')) {
+    delete state.friends[id];
+    saveProfile();
+    if (state.globalMqtt) {
+      state.globalMqtt.unsubscribe(`kanka-voice/user/${id}/presence`);
+    }
+  }
+};
+
+let presenceInterval = null;
+
+function setupGlobalMQTT() {
+  if (state.globalMqtt) return;
+  state.globalMqtt = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+  
+  state.globalMqtt.on('connect', () => {
+    console.log('🔗 Global MQTT (Arkadaşlık) bağlandı');
+    state.globalMqtt.subscribe(`kanka-voice/user/${state.friendId}/events`);
+    
+    Object.keys(state.friends).forEach(fId => {
+      state.globalMqtt.subscribe(`kanka-voice/user/${fId}/presence`);
+    });
+    
+    if (presenceInterval) clearInterval(presenceInterval);
+    presenceInterval = setInterval(() => {
+      state.globalMqtt.publish(`kanka-voice/user/${state.friendId}/presence`, JSON.stringify({
+        online: true,
+        id: state.friendId,
+        name: state.myName
+      }));
+    }, 5000);
+  });
+  
+  state.globalMqtt.on('message', (topic, message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      if (topic.endsWith('/presence')) {
+        if (state.friends[data.id]) {
+          state.friends[data.id].online = true;
+          state.friends[data.id].lastSeen = Date.now();
+          const dot = document.getElementById(`status-${data.id}`);
+          if (dot) dot.classList.add('online');
+        }
+      } else if (topic.endsWith('/events')) {
+        if (data.type === 'friend_request') {
+          if (!state.friends[data.id] && !state.friendRequests.find(r => r.id === data.id)) {
+            state.friendRequests.push({ id: data.id, name: data.name });
+            saveProfile();
+            showToast(`${data.name} sana arkadaşlık isteği gönderdi!`, 'info');
+          }
+        } else if (data.type === 'friend_accepted') {
+          if (!state.friends[data.id]) {
+            state.friends[data.id] = { name: data.name, online: false };
+            saveProfile();
+            showToast(`${data.name} arkadaşlık isteğini kabul etti!`, 'ok');
+            state.globalMqtt.subscribe(`kanka-voice/user/${data.id}/presence`);
+          }
+        }
+      }
+    } catch(e) {}
+  });
+}
+
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  Object.keys(state.friends).forEach(fId => {
+    if (state.friends[fId].online && now - (state.friends[fId].lastSeen || 0) > 15000) {
+      state.friends[fId].online = false;
+      const dot = document.getElementById(`status-${fId}`);
+      if (dot) dot.classList.remove('online');
+      changed = true;
+    }
+  });
+}, 10000);
+
+
 const ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
@@ -227,12 +399,121 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) {}
 
+  const savedProfile = localStorage.getItem('kanka_profile');
+  if (savedProfile) {
+    try {
+      const data = JSON.parse(savedProfile);
+      state.myName = data.name || 'Kanka';
+      state.friendId = data.id || `KNK-${Math.random().toString(36).substr(2, 6).toUpperCase()}${Math.floor(1000 + Math.random() * 9000)}`;
+      state.friends = data.friends || {};
+      state.friendRequests = data.requests || [];
+      
+      displayName.textContent = state.myName;
+      document.getElementById('my-friend-id').textContent = state.friendId;
+      
+      stepName.classList.add('hidden');
+      stepAction.classList.remove('hidden');
+      
+      renderFriends();
+      setupGlobalMQTT();
+    } catch(e) {}
+  }
+
   btnNextName.addEventListener('click', () => {
     const n = nameInp.value.trim() || 'Anonim';
     state.myName = n;
+    
+    if (!state.friendId) {
+      const randomHex = Math.random().toString(36).substr(2, 6).toUpperCase();
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      state.friendId = `KNK-${randomHex}${randomNum}`;
+    }
+    
     displayName.textContent = n;
+    document.getElementById('my-friend-id').textContent = state.friendId;
+    
+    saveProfile();
+    
     stepName.classList.add('hidden');
     stepAction.classList.remove('hidden');
+    
+    setupGlobalMQTT();
+  });
+
+  document.getElementById('my-friend-id').addEventListener('click', () => {
+    navigator.clipboard.writeText(state.friendId).then(() => {
+      showToast('ID kopyalandı!', 'ok');
+    });
+  });
+
+  document.getElementById('btn-copy-friend-id').addEventListener('click', () => {
+    navigator.clipboard.writeText(state.friendId).then(() => {
+      showToast('ID kopyalandı!', 'ok');
+    });
+  });
+
+  document.getElementById('btn-edit-name').addEventListener('click', () => {
+    document.getElementById('edit-name-input').value = state.myName;
+    document.getElementById('edit-name-modal').classList.remove('hidden');
+    document.getElementById('edit-name-input').focus();
+  });
+
+  document.getElementById('edit-name-cancel').addEventListener('click', () => {
+    document.getElementById('edit-name-modal').classList.add('hidden');
+  });
+
+  document.getElementById('edit-name-save').addEventListener('click', () => {
+    const newName = document.getElementById('edit-name-input').value.trim();
+    if (newName.length > 0) {
+      state.myName = newName;
+      document.getElementById('display-name').textContent = state.myName;
+      saveProfile();
+      showToast('Adınız güncellendi!', 'ok');
+      document.getElementById('edit-name-modal').classList.add('hidden');
+    }
+  });
+
+  document.getElementById('btn-show-add-friend').addEventListener('click', () => {
+    document.getElementById('step-action').classList.add('hidden');
+    document.getElementById('step-add-friend').classList.remove('hidden');
+  });
+
+  document.getElementById('btn-show-invites').addEventListener('click', () => {
+    document.getElementById('invites-modal').classList.remove('hidden');
+  });
+
+  document.getElementById('invites-close').addEventListener('click', () => {
+    document.getElementById('invites-modal').classList.add('hidden');
+  });
+
+  document.getElementById('btn-add-friend').addEventListener('click', () => {
+    const targetId = document.getElementById('friend-id-input').value.trim().toUpperCase();
+    if (!targetId || targetId === state.friendId) return alert("Geçerli bir ID girin.");
+    
+    if (state.friends[targetId]) return alert("Bu kişi zaten arkadaşın!");
+    
+    if (state.globalMqtt && state.globalMqtt.connected) {
+      state.globalMqtt.publish(`kanka-voice/user/${targetId}/events`, JSON.stringify({
+        type: 'friend_request',
+        id: state.friendId,
+        name: state.myName
+      }));
+      showToast("Arkadaşlık isteği gönderildi!", "ok");
+      document.getElementById('friend-id-input').value = '';
+      document.getElementById('step-add-friend').classList.add('hidden');
+      document.getElementById('step-action').classList.remove('hidden');
+    } else {
+      showToast("Bağlantı bekleniyor...", "warn");
+    }
+  });
+
+  document.querySelectorAll('.btn-back').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('step-join').classList.add('hidden');
+      document.getElementById('step-create').classList.add('hidden');
+      document.getElementById('step-add-friend').classList.add('hidden');
+      document.getElementById('step-action').classList.remove('hidden');
+    });
   });
 
   btnShowJoin.addEventListener('click', () => {

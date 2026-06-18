@@ -135,6 +135,45 @@ body {
 }
 .hint { margin-top: 16px; text-align: center; }
 
+/* Friend List Items */
+.friend-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: 0.2s;
+}
+.friend-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.friend-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.friend-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--txt-mut);
+}
+.friend-status.online { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.friend-actions { display: flex; gap: 4px; }
+.invite-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+.invite-actions { display: flex; gap: 6px; }
+
 /* ===== ANA UYGULAMA ===== */
 .app { display: flex; height: 100vh; }
 .sidebar {

@@ -19,13 +19,45 @@
         <button id="btn-next-name">İleri</button>
       </div>
 
-      <!-- Adım 2: Seçim -->
+      <!-- Adım 2: Seçim & Arkadaşlık -->
       <div id="step-action" class="hidden">
-        <p style="text-align:center; margin: 20px 0; font-size: 16px;">Hoş geldin, <span id="display-name" style="font-weight:bold; color:var(--acc-light)"></span>!</p>
-        <div style="display:flex; gap: 16px; margin-top: 20px;">
+        <p style="text-align:center; margin: 10px 0 5px; font-size: 16px;">
+          Hoş geldin, <span id="display-name" style="font-weight:bold; color:var(--acc-light)"></span>!
+          <button id="btn-edit-name" class="btn-sec btn-sm" style="padding: 2px 6px; font-size: 11px; border-radius: 4px; background: transparent; border:none; cursor: pointer;" title="Adı Değiştir">✏️</button>
+        </p>
+        <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom: 20px; font-size: 13px; color: var(--txt-mut);">
+          Senin ID: <span id="my-friend-id" style="font-family: monospace; font-weight: bold; color: var(--acc); user-select: all; cursor: pointer;" title="Kopyala">------</span>
+          <button id="btn-copy-friend-id" class="btn-sec btn-sm" style="padding: 2px 6px; font-size: 11px; border-radius: 4px; background: rgba(255,255,255,0.1); border:none;" title="ID'yi Kopyala">📋</button>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="font-size: 14px; margin: 0;">👥 Arkadaşlarım</h3>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-show-invites" class="btn-sec btn-sm" style="font-size: 12px; padding: 4px 8px; position: relative;">
+                Davetler <span id="invite-badge" style="display:none; position: absolute; top: -5px; right: -5px; background: var(--warn); color: #000; font-size: 10px; font-weight: bold; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">0</span>
+              </button>
+              <button id="btn-show-add-friend" class="btn-pri btn-sm" style="font-size: 12px; padding: 4px 8px;">+ Ekle</button>
+            </div>
+          </div>
+          <ul id="friends-list" style="list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; font-size: 13px;">
+            <!-- Dinamik Eklenecek -->
+            <li class="muted" style="text-align: center; padding: 10px;">Henüz hiç arkadaşın yok.</li>
+          </ul>
+        </div>
+
+        <div style="display:flex; gap: 16px;">
           <button id="btn-show-join" class="btn-sec" style="flex:1;">Sunucuya Katıl</button>
           <button id="btn-show-create" class="btn-pri" style="flex:1;">Sunucu Oluştur</button>
         </div>
+      </div>
+
+      <!-- Adım 2A: Arkadaş Ekle -->
+      <div id="step-add-friend" class="hidden">
+        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1);">⬅ Geri</button>
+        <label>Arkadaşının ID'si</label>
+        <input id="friend-id-input" type="text" placeholder="Örn: KNK-A1B2C3D4" />
+        <button id="btn-add-friend" class="btn-pri" style="margin-top: 10px;">Arkadaşlık İsteği Gönder</button>
       </div>
 
       <!-- Adım 3A: Katıl -->
@@ -383,6 +415,31 @@
         <p id="error-text" class="muted" style="font-size: 16px; margin-bottom: 24px;">Böyle bir sunucu yok.</p>
         <div class="mactions" style="justify-content: center;">
           <button id="error-ok" class="btn-pri" style="background: var(--warn); padding: 12px 32px; font-size: 15px; color: #000;">Tamam</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Davetler Modali -->
+    <div id="invites-modal" class="modal hidden">
+      <div class="mcard" style="width: 350px;">
+        <h3>Gelen İstekler</h3>
+        <ul id="invites-list" style="list-style: none; padding: 0; margin: 15px 0; max-height: 200px; overflow-y: auto;">
+          <li class="muted" style="text-align: center;">Bekleyen davet yok.</li>
+        </ul>
+        <div class="mactions">
+          <button id="invites-close" class="btn-sec" style="width: 100%;">Kapat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ad Değiştirme Modali -->
+    <div id="edit-name-modal" class="modal hidden">
+      <div class="mcard" style="width: 350px; text-align: center;">
+        <h3 style="margin-bottom: 15px;">Adını Değiştir</h3>
+        <input id="edit-name-input" type="text" placeholder="Yeni adın..." style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: #fff;" maxlength="20" />
+        <div class="mactions" style="display: flex; gap: 10px;">
+          <button id="edit-name-cancel" class="btn-sec" style="flex: 1;">İptal</button>
+          <button id="edit-name-save" class="btn-pri" style="flex: 1;">Kaydet</button>
         </div>
       </div>
     </div>
