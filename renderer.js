@@ -1089,6 +1089,15 @@ async function handleDataMessage(peerId, msg) {
     }
   } else if (msg.type === 'draw') {
     if (state.wbContext) {
+      document.getElementById('wb-card').classList.remove('hidden');
+      makeCardFocusable(document.getElementById('wb-card'));
+      if (!state.wbJoined) {
+         showInactiveOverlay('wb-card', 'Beyaz Tahta', () => {
+             state.wbJoined = true;
+             removeInactiveOverlay('wb-card');
+             if (!focusedCard) toggleFocus(document.getElementById('wb-card'));
+         });
+      }
       drawWb(msg.tool, msg.x0 * 1920, msg.y0 * 1080, msg.x1 * 1920, msg.y1 * 1080, msg.color, msg.size, msg.text);
     }
   } else if (msg.type === 'wb-clear') {
@@ -1101,6 +1110,13 @@ async function handleDataMessage(peerId, msg) {
       const wbCard = document.getElementById('wb-card');
       wbCard.classList.remove('hidden');
       makeCardFocusable(wbCard);
+      if (!state.wbJoined) {
+         showInactiveOverlay('wb-card', 'Beyaz Tahta', () => {
+             state.wbJoined = true;
+             removeInactiveOverlay('wb-card');
+             if (!focusedCard) toggleFocus(wbCard);
+         });
+      }
       updateEmptyGrid();
     };
     img.src = msg.data;
@@ -1192,6 +1208,19 @@ function handleSBMessage(peerId, msg) {
     document.getElementById('sb-card').classList.remove('hidden');
     makeCardFocusable(document.getElementById('sb-card'));
     
+    if (!state.sb.joinedActivity) {
+      showInactiveOverlay('sb-card', 'Ortak Tarayıcı', () => {
+         state.sb.joinedActivity = true;
+         removeInactiveOverlay('sb-card');
+         if (!focusedCard) toggleFocus(document.getElementById('sb-card'));
+         if (state.sb.lastUrl) {
+           state.sb.ignoreNextNav = true;
+           document.getElementById('sb-webview').src = state.sb.lastUrl;
+           document.getElementById('sb-url').value = state.sb.lastUrl;
+         }
+      });
+    }
+    
     const sUrl = document.getElementById('sb-url');
     const sOverlay = document.getElementById('sb-overlay');
     if (!state.sb.interactive && state.sb.host !== state.myId) {
@@ -1202,6 +1231,8 @@ function handleSBMessage(peerId, msg) {
       sOverlay.style.display = 'none';
     }
   } else if (msg.type === 'sb-nav') {
+    state.sb.lastUrl = msg.url;
+    if (!state.sb.joinedActivity) return;
     state.sb.ignoreNextNav = true;
     document.getElementById('sb-webview').src = msg.url;
     document.getElementById('sb-url').value = msg.url;
@@ -1289,6 +1320,7 @@ function updateEmptyGrid() {
 let focusedCard = null;
 
 function toggleFocus(card) {
+  if (state.focusLocked) return;
   const main = document.querySelector('.main');
   const focusArea = document.getElementById('focus-area');
   const grid = document.getElementById('grid');
@@ -1298,12 +1330,14 @@ function toggleFocus(card) {
     focusedCard = null;
     main.classList.remove('focus-mode');
     focusArea.classList.add('hidden');
+    document.getElementById('focus-lock-btn').classList.add('hidden');
   } else {
     if (focusedCard) grid.appendChild(focusedCard);
     focusArea.appendChild(card);
     focusedCard = card;
     main.classList.add('focus-mode');
     focusArea.classList.remove('hidden');
+    document.getElementById('focus-lock-btn').classList.remove('hidden');
   }
 }
 
@@ -1311,10 +1345,43 @@ function makeCardFocusable(card) {
   if (card.dataset.focusable) return;
   card.dataset.focusable = 'true';
   card.addEventListener('click', (e) => {
-    if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .uno-card-ui, .ucc, .uno-player-list, .act-src, #uno-table, .uno-remote-player, #wt-player-container, .wt-tools')) return;
+    if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .uno-card-ui, .ucc, .uno-player-list, .act-src, #uno-table, .uno-remote-player, #wt-player-container, .wt-tools, #focus-lock-btn, .inactive-overlay')) return;
     if (e.target.tagName === 'CANVAS' && focusedCard === card) return;
     toggleFocus(card);
   });
+}
+
+function showInactiveOverlay(cardId, title, onJoin) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  
+  let overlay = card.querySelector('.inactive-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'inactive-overlay';
+    overlay.style.cssText = 'position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter: grayscale(100%); z-index: 50; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius: 12px;';
+    
+    const btn = document.createElement('button');
+    btn.className = 'btn-pri';
+    btn.innerHTML = `<span style="font-size:24px; font-weight:bold;">+</span><br/>Katıl: ${title}`;
+    btn.style.cssText = 'padding: 10px 20px; border-radius: 12px; display:flex; flex-direction:column; align-items:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer; border: none; background: var(--acc); color: white;';
+    
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      onJoin();
+    };
+    
+    overlay.appendChild(btn);
+    card.appendChild(overlay);
+  }
+}
+
+function removeInactiveOverlay(cardId) {
+  const card = document.getElementById(cardId);
+  if (card) {
+    const overlay = card.querySelector('.inactive-overlay');
+    if (overlay) overlay.remove();
+  }
 }
 
 function addVideoCard(peerId, peerName, videoEl, isScreen) {
@@ -1351,8 +1418,23 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
   document.getElementById('grid').appendChild(card);
   updateEmptyGrid();
   
-  if (isScreen && !focusedCard && peerId !== 'self') {
-    toggleFocus(card);
+  if (isScreen && peerId !== 'self') {
+    if (!state.screenShares) state.screenShares = {};
+    if (!state.screenShares[peerId]) state.screenShares[peerId] = { joined: false };
+    
+    if (!state.screenShares[peerId].joined) {
+      videoEl.pause();
+      videoEl.muted = true;
+      showInactiveOverlay(card.id, 'Ekran Paylaşımı', () => {
+         state.screenShares[peerId].joined = true;
+         removeInactiveOverlay(card.id);
+         videoEl.play();
+         videoEl.muted = false;
+         if (!focusedCard) toggleFocus(card);
+      });
+    } else {
+      if (!focusedCard) toggleFocus(card);
+    }
   }
 }
 
@@ -1630,6 +1712,16 @@ function bindUI() {
   });
   document.getElementById('act-close').addEventListener('click', () => {
     document.getElementById('activities-modal').classList.add('hidden');
+  });
+  
+  document.getElementById('focus-lock-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.focusLocked = !state.focusLocked;
+    const btn = document.getElementById('focus-lock-btn');
+    btn.textContent = state.focusLocked ? '🔒' : '🔓';
+    btn.style.background = state.focusLocked ? 'rgba(220, 38, 38, 0.8)' : 'rgba(0,0,0,0.6)';
+    btn.style.borderColor = state.focusLocked ? 'rgba(239, 68, 68, 1)' : 'rgba(255,255,255,0.2)';
+    showToast(state.focusLocked ? 'Odak Kilitlendi' : 'Odak Kilidi Açıldı', 'info');
   });
   
   initActivitiesUI();
@@ -1996,7 +2088,10 @@ function initWhiteboard() {
   makeCardFocusable(wbCard);
 
   document.getElementById('wb-btn').addEventListener('click', () => {
+    state.wbJoined = true;
     wbCard.classList.toggle('hidden');
+    makeCardFocusable(document.getElementById('wb-card'));
+    if (!wbCard.classList.contains('hidden') && !focusedCard) toggleFocus(wbCard);
   });
 
   document.getElementById('wb-close').addEventListener('click', (e) => {
@@ -2187,7 +2282,18 @@ function handleWTMessage(peerId, msg) {
   if (msg.type === 'wt-load') {
     document.getElementById('activities-modal').classList.add('hidden');
     document.getElementById('wt-card').classList.remove('hidden');
-    loadWTVideo(msg.vid);
+    makeCardFocusable(document.getElementById('wt-card'));
+    
+    if (!state.wt.joinedActivity) {
+      showInactiveOverlay('wt-card', 'YouTube', () => {
+         state.wt.joinedActivity = true;
+         removeInactiveOverlay('wt-card');
+         if (!focusedCard) toggleFocus(document.getElementById('wt-card'));
+         loadWTVideo(msg.vid);
+      });
+    } else {
+      loadWTVideo(msg.vid);
+    }
   } else if (msg.type === 'wt-play') {
     if (state.wt.player && state.wt.player.playVideo) {
       state.wt.ignoreNextEvent = true;
@@ -2227,6 +2333,7 @@ state.uno = {
 
 function initActivitiesUI() {
   document.getElementById('act-wt').addEventListener('click', () => {
+    state.wt.joinedActivity = true;
     document.getElementById('activities-modal').classList.add('hidden');
     document.getElementById('wt-card').classList.remove('hidden');
     makeCardFocusable(document.getElementById('wt-card'));
@@ -2254,6 +2361,7 @@ function initActivitiesUI() {
   });
 
   document.getElementById('act-sb').addEventListener('click', () => {
+    state.sb.joinedActivity = true;
     document.getElementById('activities-modal').classList.add('hidden');
     document.getElementById('sb-card').classList.remove('hidden');
     makeCardFocusable(document.getElementById('sb-card'));
@@ -2484,19 +2592,38 @@ function handleUnoMessage(peerId, msg) {
       document.getElementById('uno-lobby').classList.remove('hidden');
       document.getElementById('uno-game').classList.add('hidden');
       makeCardFocusable(document.getElementById('uno-card'));
-      if (!focusedCard) toggleFocus(document.getElementById('uno-card'));
       
-      if (!state.uno.players.has(state.myId)) {
-        state.uno.players.set(state.myId, { name: state.myName, ready: false, cardCount: 0 });
-        document.getElementById('uno-host-settings').style.display = 'block';
-        document.getElementById('uno-max-players').disabled = true;
-        document.getElementById('uno-fill-bots').disabled = true;
-        document.getElementById('uno-ready-btn').classList.remove('hidden');
-        document.getElementById('uno-start-btn').classList.add('hidden');
-        document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
-        document.getElementById('uno-ready-btn').style.background = 'var(--warn)';
+      if (!state.uno.joinedActivity) {
+         showInactiveOverlay('uno-card', 'UNO', () => {
+             state.uno.joinedActivity = true;
+             removeInactiveOverlay('uno-card');
+             if (!focusedCard) toggleFocus(document.getElementById('uno-card'));
+             
+             if (!state.uno.players.has(state.myId)) {
+               state.uno.players.set(state.myId, { name: state.myName, ready: false, cardCount: 0 });
+               document.getElementById('uno-host-settings').style.display = 'block';
+               document.getElementById('uno-max-players').disabled = true;
+               document.getElementById('uno-fill-bots').disabled = true;
+               document.getElementById('uno-ready-btn').classList.remove('hidden');
+               document.getElementById('uno-start-btn').classList.add('hidden');
+               document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
+               document.getElementById('uno-ready-btn').style.background = 'var(--warn)';
+             }
+             broadcast({ type: 'uno-join', name: state.myName, ready: state.uno.players.get(state.myId)?.ready || false });
+         });
+      } else {
+        if (!state.uno.players.has(state.myId)) {
+          state.uno.players.set(state.myId, { name: state.myName, ready: false, cardCount: 0 });
+          document.getElementById('uno-host-settings').style.display = 'block';
+          document.getElementById('uno-max-players').disabled = true;
+          document.getElementById('uno-fill-bots').disabled = true;
+          document.getElementById('uno-ready-btn').classList.remove('hidden');
+          document.getElementById('uno-start-btn').classList.add('hidden');
+          document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
+          document.getElementById('uno-ready-btn').style.background = 'var(--warn)';
+        }
+        broadcast({ type: 'uno-join', name: state.myName, ready: state.uno.players.get(state.myId)?.ready || false });
       }
-      broadcast({ type: 'uno-join', name: state.myName, ready: state.uno.players.get(state.myId)?.ready || false });
     }
   } else if (msg.type === 'uno-join') {
     state.uno.players.set(peerId, { name: msg.name, ready: msg.ready, cardCount: 0 });
@@ -2539,6 +2666,10 @@ function handleUnoMessage(peerId, msg) {
     renderUnoGame();
   } else if (msg.type === 'uno-req-draw') {
     if (state.uno.host === state.myId) {
+      if (state.uno.waitingForKeepOrPlay) return;
+      const currentTurnId = state.uno.turnOrder[state.uno.turnIndex];
+      if (currentTurnId !== peerId) return;
+      
       if (state.uno.deck.length === 0) {
         const top = state.uno.discard.pop();
         state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
@@ -2547,13 +2678,15 @@ function handleUnoMessage(peerId, msg) {
       const c = state.uno.deck.pop();
       const p = state.peers.get(peerId);
       if (p && p.dc && p.dc.readyState === 'open') {
-        p.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c }));
+        p.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c, forced: false }));
       }
       if (state.uno.players.has(peerId)) state.uno.players.get(peerId).cardCount++;
       
       const topCard = state.uno.discard[state.uno.discard.length - 1];
       if (!canPlay(c, topCard)) {
         state.uno.turnIndex = getNextTurn();
+      } else {
+        state.uno.waitingForKeepOrPlay = peerId;
       }
       
       animateCardDraw(peerId);
@@ -2577,12 +2710,15 @@ function handleUnoMessage(peerId, msg) {
     msg.card._new = true;
     state.uno.myHand.push(msg.card);
     renderUnoGame();
-    const topCard = state.uno.discard[state.uno.discard.length - 1];
-    if (canPlay(msg.card, topCard)) {
-      showDrawModal(msg.card, state.uno.myHand.length - 1);
+    if (!msg.forced) {
+      const topCard = state.uno.discard[state.uno.discard.length - 1];
+      if (canPlay(msg.card, topCard)) {
+        showDrawModal(msg.card, state.uno.myHand.length - 1);
+      }
     }
   } else if (msg.type === 'uno-keep') {
     if (state.uno.host === state.myId) {
+      state.uno.waitingForKeepOrPlay = null;
       state.uno.turnIndex = getNextTurn();
       if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
       const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
@@ -2598,6 +2734,15 @@ function handleUnoMessage(peerId, msg) {
     } else {
       state.uno.players.delete(peerId);
       renderUnoLobby();
+    }
+  } else if (msg.type === 'uno-kicked') {
+    if (msg.targetId === state.myId) {
+       alert("Kurucu tarafından UNO'dan atıldınız!");
+       document.getElementById('uno-close').click();
+       state.uno.joinedActivity = false;
+    } else {
+       state.uno.players.delete(msg.targetId);
+       renderUnoLobby();
     }
   } else if (msg.type === 'uno-max') {
     state.uno.maxPlayers = msg.max;
@@ -2632,7 +2777,10 @@ function handleUnoMessage(peerId, msg) {
     state.uno.currentColor = msg.color || msg.card.color;
     state.uno.turnIndex = msg.nextTurnIndex;
     state.uno.direction = msg.direction;
-    if (state.uno.host === state.myId && state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
+    if (state.uno.host === state.myId) {
+      state.uno.waitingForKeepOrPlay = null;
+      if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
+    }
     state.uno.triggerDiscardAnim = true;
 
     if (p && p.cardCount === 1 && !msg.saidUno) {
@@ -2709,7 +2857,7 @@ function forceDrawCards(victimId, count) {
     } else {
       const peer = state.peers.get(victimId);
       if (peer && peer.dc && peer.dc.readyState === 'open') {
-        peer.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c }));
+        peer.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c, forced: true }));
       }
     }
     
@@ -2738,10 +2886,25 @@ function renderUnoLobby() {
   for (const [id, p] of state.uno.players) {
     const div = document.createElement('div');
     div.className = 'uno-p-item' + (p.ready ? ' ready' : '');
-    div.innerHTML = `<div class="st ${p.ready ? '' : 'muted'}"></div> <span>${escapeHtml(p.name)}</span> ${id === state.uno.host ? '👑' : ''}`;
+    
+    let kickBtn = '';
+    if (state.uno.host === state.myId && id !== state.myId && !id.startsWith('bot-')) {
+      kickBtn = `<button class="btn-sec btn-sm" style="margin-left: 10px; padding: 2px 6px; font-size: 10px; background: rgba(255,0,0,0.5); color: white; border: none;" onclick="kickUnoPlayer('${id}', event)">X</button>`;
+    }
+    
+    div.innerHTML = `<div class="st ${p.ready ? '' : 'muted'}"></div> <span>${escapeHtml(p.name)}</span> ${id === state.uno.host ? '👑' : ''} ${kickBtn}`;
     wrap.appendChild(div);
   }
 }
+
+window.kickUnoPlayer = (id, e) => {
+  e.stopPropagation();
+  if (confirm("Bu oyuncuyu atmak istediğinize emin misiniz?")) {
+    broadcast({ type: 'uno-kicked', targetId: id });
+    state.uno.players.delete(id);
+    renderUnoLobby();
+  }
+};
 
 function getUnoDeck() {
   const colors = ['red', 'blue', 'green', 'yellow'];
@@ -2953,6 +3116,7 @@ function doRenderUnoGame() {
 
   document.getElementById('uno-deck').onclick = () => {
     if (currentTurnId === state.myId) {
+      if (state.uno.waitingForKeepOrPlay) return;
       const deckDiv = document.getElementById('uno-deck');
       deckDiv.style.transform = 'scale(0.9)';
       setTimeout(() => { deckDiv.style.transform = 'scale(1)'; }, 150);
@@ -2972,6 +3136,8 @@ function doRenderUnoGame() {
         let canPlayDrawn = canPlay(newCard, topCard);
         if (!canPlayDrawn) {
           state.uno.turnIndex = getNextTurn();
+        } else {
+          state.uno.waitingForKeepOrPlay = state.myId;
         }
         
         animateCardDraw(state.myId);
