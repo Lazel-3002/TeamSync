@@ -200,12 +200,12 @@ body {
 .invite-actions { display: flex; gap: 6px; }
 
 /* ===== ANA MENÜ (step-action) ===== */
-.login-card:has(#step-action:not(.hidden)) {
-  width: 720px;
+.login-card.expanded {
+  width: 780px;
   max-width: 95vw;
 }
-.login-card:has(#step-action.dm-open:not(.hidden)) {
-  width: 1050px;
+.login-card.expanded.dm-open {
+  width: 1100px;
 }
 
 .menu-layout {
@@ -236,6 +236,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .menu-middle {
@@ -271,6 +272,7 @@ body {
   gap: 16px;
   box-shadow: var(--shadow-sm);
   backdrop-filter: var(--blur);
+  min-width: 0;
 }
 .profile-avatar {
   font-size: 36px;
@@ -348,6 +350,7 @@ body {
   padding: 4px 8px;
   border-radius: 6px;
   max-width: 100%;
+  min-width: 0;
 }
 
 /* DM Styles */
@@ -1720,3 +1723,4 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-20px); }
 }
+

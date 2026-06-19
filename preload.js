@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+﻿const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   startCloudflared: (port) => ipcRenderer.invoke('start-cloudflared', port),
   stopCloudflared: () => ipcRenderer.send('stop-cloudflared'),
@@ -17,3 +17,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendRemoteInput: (data) => ipcRenderer.send('remote-input', data),
   onPeerDiscovered: (cb) => ipcRenderer.on('peer-discovered', cb)
 });
+

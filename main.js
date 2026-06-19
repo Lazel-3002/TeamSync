@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell } = require('electron');
+﻿const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell } = require('electron');
 const path = require('path');
 const dgram = require('dgram');
 const os = require('os');
@@ -133,7 +133,7 @@ function createWindow() {
       webviewTag: true
     },
     backgroundColor: '#1e1f22',
-    title: 'Kanka Voice - P2P',
+    title: 'TeamSync - P2P',
     autoHideMenuBar: true,
     webSecurity: true
   });
@@ -397,3 +397,4 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+

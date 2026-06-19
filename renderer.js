@@ -60,12 +60,12 @@ function setupInternetSignaling(roomId, myId, myName) {
   mqttClient.on('connect', () => {
     if (!mqttClient) return; // Prevent crash if disconnected during connection phase
     console.log('🌐 İnternet sunucusuna bağlanıldı (MQTT)');
-    mqttClient.subscribe(`kanka-voice/room/${roomId}/#`);
+    mqttClient.subscribe(`teamsync/room/${roomId}/#`);
     
     if (internetAnnounceInterval) clearInterval(internetAnnounceInterval);
     internetAnnounceInterval = setInterval(() => {
       if (mqttClient) {
-        mqttClient.publish(`kanka-voice/room/${roomId}/${myId}`, JSON.stringify({
+        mqttClient.publish(`teamsync/room/${roomId}/${myId}`, JSON.stringify({
           type: 'hello',
           id: myId,
           name: myName,
@@ -99,7 +99,7 @@ function setupInternetSignaling(roomId, myId, myName) {
 
 function sendInternetSignal(targetId, signal) {
   if (mqttClient && mqttClient.connected) {
-    mqttClient.publish(`kanka-voice/room/${state.room}/${targetId}`, JSON.stringify({
+    mqttClient.publish(`teamsync/room/${state.room}/${targetId}`, JSON.stringify({
       type: 'signal',
       id: state.myId,
       name: state.myName,
@@ -166,7 +166,7 @@ async function setupCrypto(password) {
     'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveBits', 'deriveKey']
   );
   return window.crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: enc.encode('kanka-salt'), iterations: 100000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: enc.encode('teamsync-salt'), iterations: 100000, hash: 'SHA-256' },
     keyMaterial, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
   );
 }
@@ -200,7 +200,7 @@ function getAvatarHash(base64Str) {
 }
 
 function saveProfile() {
-  localStorage.setItem('kanka_profile', JSON.stringify({
+  localStorage.setItem('teamsync_profile', JSON.stringify({
     name: state.myName,
     id: state.friendId,
     avatar: state.myAvatar,
@@ -212,14 +212,14 @@ function saveProfile() {
 }
 
 function loadDMs() {
-  const savedDMs = localStorage.getItem('kanka_dms');
+  const savedDMs = localStorage.getItem('teamsync_dms');
   if (savedDMs) {
     try { state.dms = JSON.parse(savedDMs); } catch(e) {}
   }
 }
 
 function saveDMs() {
-  localStorage.setItem('kanka_dms', JSON.stringify(state.dms));
+  localStorage.setItem('teamsync_dms', JSON.stringify(state.dms));
 }
 
 function renderFriends() {
@@ -296,7 +296,7 @@ function renderFriends() {
 
 window.requestJoinRoom = (fId) => {
   if (state.globalMqtt && state.globalMqtt.connected) {
-    state.globalMqtt.publish(`kanka-voice/user/${fId}/events`, JSON.stringify({
+    state.globalMqtt.publish(`teamsync/user/${fId}/events`, JSON.stringify({
       type: 'room_join_request',
       id: state.friendId,
       name: state.myName
@@ -314,12 +314,12 @@ window.acceptInvite = (idx) => {
   saveProfile();
   
   if (state.globalMqtt && state.globalMqtt.connected) {
-    state.globalMqtt.publish(`kanka-voice/user/${req.id}/events`, JSON.stringify({
+    state.globalMqtt.publish(`teamsync/user/${req.id}/events`, JSON.stringify({
       type: 'friend_accepted',
       id: state.friendId,
       name: state.myName
     }));
-    state.globalMqtt.subscribe(`kanka-voice/user/${req.id}/presence`);
+    state.globalMqtt.subscribe(`teamsync/user/${req.id}/presence`);
   }
   showToast(`${req.name} ile arkadaş oldunuz!`, 'ok');
 };
@@ -334,7 +334,7 @@ window.removeFriend = (id) => {
     delete state.friends[id];
     saveProfile();
     if (state.globalMqtt) {
-      state.globalMqtt.unsubscribe(`kanka-voice/user/${id}/presence`);
+      state.globalMqtt.unsubscribe(`teamsync/user/${id}/presence`);
     }
   }
 };
@@ -347,15 +347,15 @@ function setupGlobalMQTT() {
   
   state.globalMqtt.on('connect', () => {
     console.log('🔗 Global MQTT (Arkadaşlık) bağlandı');
-    state.globalMqtt.subscribe(`kanka-voice/user/${state.friendId}/events`);
+    state.globalMqtt.subscribe(`teamsync/user/${state.friendId}/events`);
     
     Object.keys(state.friends).forEach(fId => {
-      state.globalMqtt.subscribe(`kanka-voice/user/${fId}/presence`);
+      state.globalMqtt.subscribe(`teamsync/user/${fId}/presence`);
     });
     
     if (presenceInterval) clearInterval(presenceInterval);
     presenceInterval = setInterval(() => {
-      state.globalMqtt.publish(`kanka-voice/user/${state.friendId}/presence`, JSON.stringify({
+      state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
         online: true,
         id: state.friendId,
         name: state.myName,
@@ -366,7 +366,7 @@ function setupGlobalMQTT() {
 
     setInterval(() => {
       if (state.globalMqtt && state.globalMqtt.connected) {
-        state.globalMqtt.publish(`kanka-voice/user/${state.friendId}/events`, JSON.stringify({
+        state.globalMqtt.publish(`teamsync/user/${state.friendId}/events`, JSON.stringify({
           type: 'ping_latency_req',
           ts: Date.now()
         }));
@@ -389,7 +389,7 @@ function setupGlobalMQTT() {
           state.friends[data.id].avatarHash = data.avatarHash;
           
           if (data.avatarHash && oldAvatarHash !== data.avatarHash) {
-            state.globalMqtt.publish(`kanka-voice/user/${data.id}/events`, JSON.stringify({
+            state.globalMqtt.publish(`teamsync/user/${data.id}/events`, JSON.stringify({
               type: 'req_avatar',
               fromId: state.friendId
             }));
@@ -431,7 +431,7 @@ function setupGlobalMQTT() {
             state.friends[data.id] = { name: data.name, online: false };
             saveProfile();
             showToast(`${data.name} arkadaşlık isteğini kabul etti!`, 'ok');
-            state.globalMqtt.subscribe(`kanka-voice/user/${data.id}/presence`);
+            state.globalMqtt.subscribe(`teamsync/user/${data.id}/presence`);
             renderFriends();
           }
         } else if (data.type === 'room_join_request') {
@@ -440,7 +440,7 @@ function setupGlobalMQTT() {
             document.getElementById('join-req-name').textContent = data.name;
             document.getElementById('join-request-modal').classList.remove('hidden');
           } else {
-            state.globalMqtt.publish(`kanka-voice/user/${data.id}/events`, JSON.stringify({
+            state.globalMqtt.publish(`teamsync/user/${data.id}/events`, JSON.stringify({
               type: 'room_join_declined',
               id: state.friendId,
               name: state.myName
@@ -448,7 +448,7 @@ function setupGlobalMQTT() {
           }
         } else if (data.type === 'room_join_accepted') {
           showToast(`${data.name} isteğini kabul etti, bağlanılıyor...`, 'ok');
-          document.getElementById('step-action').classList.add('hidden');
+          document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
           const ai = document.getElementById('join-useAI') ? document.getElementById('join-useAI').checked : true;
           const ptt = document.getElementById('join-usePTT') ? document.getElementById('join-usePTT').checked : false;
           // startApp'i direk cagiramayabiliriz eger degiskense ama event listener'in altinda veya global
@@ -470,7 +470,7 @@ function setupGlobalMQTT() {
           document.getElementById('server-invite-received-modal').classList.remove('hidden');
         } else if (data.type === 'req_avatar') {
           if (state.myAvatar) {
-            state.globalMqtt.publish(`kanka-voice/user/${data.fromId}/events`, JSON.stringify({
+            state.globalMqtt.publish(`teamsync/user/${data.fromId}/events`, JSON.stringify({
               type: 'res_avatar',
               fromId: state.friendId,
               avatar: state.myAvatar
@@ -507,10 +507,10 @@ const ICE = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:global.stun.twilio.com:3478' },
-  { urls: 'stun:stun.miwifi.com:3478' },
-  { urls: 'stun:stun.qq.com:3478' },
-  { urls: 'turn:0.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' }
+  // Açık kaynaklı ve public TURN sunucusu (Symmetric NAT aşmak için)
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -530,7 +530,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     btn.addEventListener('click', () => {
       stepJoin.classList.add('hidden');
       stepCreate.classList.add('hidden');
-      stepAction.classList.remove('hidden');
+      stepAction.classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
     });
   });
 
@@ -554,11 +554,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) {}
 
-  const savedProfile = localStorage.getItem('kanka_profile');
+  const savedProfile = localStorage.getItem('teamsync_profile');
   if (savedProfile) {
     try {
       const data = JSON.parse(savedProfile);
-      state.myName = data.name || 'Kanka';
+      state.myName = data.name || 'TeamSync';
       state.friendId = data.id || `KNK-${crypto.randomUUID().toUpperCase()}`;
       state.myAvatar = data.avatar || null;
       state.myAvatarHash = data.avatarHash || null;
@@ -575,7 +575,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
       
       stepName.classList.add('hidden');
-      stepAction.classList.remove('hidden');
+      stepAction.classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
       
       renderFriends();
       setupGlobalMQTT();
@@ -596,7 +596,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     saveProfile();
     
     stepName.classList.add('hidden');
-    stepAction.classList.remove('hidden');
+    stepAction.classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
     
     setupGlobalMQTT();
   });
@@ -635,7 +635,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btn-show-add-friend').addEventListener('click', () => {
-    document.getElementById('step-action').classList.add('hidden');
+    document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
     document.getElementById('step-add-friend').classList.remove('hidden');
   });
 
@@ -654,7 +654,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (state.friends[targetId]) return alert("Bu kişi zaten arkadaşın!");
     
     if (state.globalMqtt && state.globalMqtt.connected) {
-      state.globalMqtt.publish(`kanka-voice/user/${targetId}/events`, JSON.stringify({
+      state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
         type: 'friend_request',
         id: state.friendId,
         name: state.myName
@@ -662,7 +662,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       showToast("Arkadaşlık isteği gönderildi!", "ok");
       document.getElementById('friend-id-input').value = '';
       document.getElementById('step-add-friend').classList.add('hidden');
-      document.getElementById('step-action').classList.remove('hidden');
+      document.getElementById('step-action').classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
     } else {
       showToast("Bağlantı bekleniyor...", "warn");
     }
@@ -673,18 +673,18 @@ window.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('step-join').classList.add('hidden');
       document.getElementById('step-create').classList.add('hidden');
       document.getElementById('step-add-friend').classList.add('hidden');
-      document.getElementById('step-action').classList.remove('hidden');
+      document.getElementById('step-action').classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
     });
   });
 
   btnShowJoin.addEventListener('click', () => {
-    stepAction.classList.add('hidden');
+    stepAction.classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
     stepJoin.classList.remove('hidden');
   });
 
   btnShowCreate.addEventListener('click', () => {
     document.getElementById('error-modal').classList.add('hidden');
-    stepAction.classList.add('hidden');
+    stepAction.classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
     stepCreate.classList.remove('hidden');
   });
 
@@ -694,7 +694,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (joinReqAcceptBtn) {
     joinReqAcceptBtn.addEventListener('click', () => {
       if (state.pendingJoinReq && state.room && state.globalMqtt) {
-        state.globalMqtt.publish(`kanka-voice/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
+        state.globalMqtt.publish(`teamsync/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
           type: 'room_join_accepted',
           id: state.friendId,
           name: state.myName,
@@ -710,7 +710,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (joinReqDenyBtn) {
     joinReqDenyBtn.addEventListener('click', () => {
       if (state.pendingJoinReq && state.globalMqtt) {
-        state.globalMqtt.publish(`kanka-voice/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
+        state.globalMqtt.publish(`teamsync/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
           type: 'room_join_declined',
           id: state.friendId,
           name: state.myName
@@ -723,7 +723,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   window.sendServerInvite = (fId) => {
     if (state.globalMqtt && state.globalMqtt.connected) {
-      state.globalMqtt.publish(`kanka-voice/user/${fId}/events`, JSON.stringify({
+      state.globalMqtt.publish(`teamsync/user/${fId}/events`, JSON.stringify({
         type: 'server_invite_received',
         id: state.friendId,
         name: state.myName,
@@ -793,7 +793,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (state.pendingServerInvite) {
         if (state.room) disconnectApp();
         
-        document.getElementById('step-action').classList.add('hidden');
+        document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
         
         const joinIdInput = document.getElementById('join-id');
         const joinPwInput = document.getElementById('join-password');
@@ -920,23 +920,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.isJoining = false;
     const sName = createName.value.trim() || 'Oyun Odası';
     
-    const originalText = btnCreate.textContent;
-    btnCreate.textContent = "Tünel Açılıyor...";
-    btnCreate.disabled = true;
-
-    try {
-      const KULLANDIGIMIZ_PORT = 8884; 
-      const odaId = await window.electronAPI.startCloudflared(KULLANDIGIMIZ_PORT);
-      
-      btnCreate.textContent = originalText;
-      btnCreate.disabled = false;
-
-      startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false);
-    } catch (err) {
-      btnCreate.textContent = originalText;
-      btnCreate.disabled = false;
-      alert("Sunucu başlatılamadı: " + err.message);
-    }
+    // Gerçek P2P ID mantığı: Cloudflared tüneline gerek kalmadan eşsiz bir ID üretiyoruz
+    const odaId = "teamsync-" + Math.random().toString(36).substring(2, 10) + "-" + Math.random().toString(36).substring(2, 6);
+    
+    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false);
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -1399,6 +1386,10 @@ function setupDataChannel(peerId, dc) {
 async function handleDataMessage(peerId, msg) {
   const peer = state.peers.get(peerId);
   if (!peer) return;
+  
+  // Data Channel'dan gelen her veri (ping dahil) bu bağlantının hala çok sağlıklı olduğunu gösterir.
+  // Bu yüzden MQTT sunucusu geçici olarak yavaşlasa/kopsa bile WebRTC bağlantımız kopmayacak!
+  peer.lastSeen = Date.now();
 
   if (msg.type === 'ping-req') {
     try {
@@ -2202,7 +2193,7 @@ function startRecording() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `kanka-voice-${Date.now()}.webm`;
+      a.download = `teamsync-${Date.now()}.webm`;
       a.click();
       URL.revokeObjectURL(url);
     };
@@ -2437,7 +2428,7 @@ function disconnectApp() {
   document.getElementById('step-join').classList.add('hidden');
   document.getElementById('step-create').classList.add('hidden');
   document.getElementById('step-add-friend').classList.add('hidden');
-  document.getElementById('step-action').classList.remove('hidden');
+  document.getElementById('step-action').classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
   
   // Arkadaş listesini güncelle (sunucudan çıktığımızı bildir)
   renderFriends();
@@ -4071,7 +4062,7 @@ window.openDM = (friendId) => {
   state.activeDM = friendId;
   
   // Show DM panel in main menu
-  document.getElementById('step-action').classList.add('dm-open');
+  document.getElementById('step-action').classList.add('dm-open'); document.querySelector('.login-card').classList.add('dm-open');
   
   // Also update server DM modal active name
   document.getElementById('dm-active-name').textContent = state.friends[friendId].name;
@@ -4088,7 +4079,7 @@ window.openDM = (friendId) => {
 
 window.closeDM = () => {
   state.activeDM = null;
-  document.getElementById('step-action').classList.remove('dm-open');
+  document.getElementById('step-action').classList.remove('dm-open'); document.querySelector('.login-card').classList.remove('dm-open');
   
   document.getElementById('server-dm-active-name').textContent = 'Arkadaş Seçin';
   const serverInputArea = document.getElementById('server-dm-input-area');
@@ -4164,7 +4155,7 @@ window.sendDMText = (text) => {
   renderDMs();
   
   // MQTT send
-  state.globalMqtt.publish(`kanka-voice/user/${friendId}/events`, JSON.stringify({
+  state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
     type: 'dm_msg',
     fromId: state.friendId,
     msgType: 'text',
@@ -4197,7 +4188,7 @@ window.sendDMFile = (file) => {
     const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
     const fileId = crypto.randomUUID();
     
-    state.globalMqtt.publish(`kanka-voice/user/${friendId}/events`, JSON.stringify({
+    state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
       type: 'dm_file_start',
       fromId: state.friendId,
       fileId: fileId,
@@ -4208,7 +4199,7 @@ window.sendDMFile = (file) => {
     
     for (let i = 0; i < totalChunks; i++) {
       const chunk = base64Data.substr(i * CHUNK_SIZE, CHUNK_SIZE);
-      state.globalMqtt.publish(`kanka-voice/user/${friendId}/events`, JSON.stringify({
+      state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
         type: 'dm_file_chunk',
         fromId: state.friendId,
         fileId: fileId,
@@ -4344,7 +4335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveProfile();
         // Send a ping immediately to update friends
         if (state.globalMqtt && state.globalMqtt.connected) {
-          state.globalMqtt.publish(`kanka-voice/user/${state.friendId}/presence`, JSON.stringify({
+          state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
             online: true,
             id: state.friendId,
             name: state.myName,

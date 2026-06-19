@@ -1,5 +1,5 @@
 {
-  "name": "kanka-voice",
+  "name": "teamsync",
   "version": "1.0.0",
   "description": "P2P sesli/görüntülü/ekran paylaşımı + uzaktan kontrol - sunucusuz",
   "main": "main.js",
@@ -8,10 +8,9 @@
     "build": "electron-builder --win portable --x64",
     "build-full": "electron-builder --win --x64"
   },
-  "author": "Kanka",
+  "author": "TeamSync",
   "license": "MIT",
   "dependencies": {
-    "robotjs": "^0.6.0"
   },
   "devDependencies": {
     "electron": "^28.2.0",
@@ -19,8 +18,8 @@
     "electron-packager": "^17.1.2"
   },
   "build": {
-    "appId": "com.kanka.voice",
-    "productName": "KankaVoice",
+    "appId": "com.TeamSync.voice",
+    "productName": "TeamSync",
     "directories": {
       "output": "dist"
     },
@@ -43,3 +42,4 @@
     }
   }
 }
+
