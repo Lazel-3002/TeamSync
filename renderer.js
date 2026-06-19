@@ -843,6 +843,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (!isJoining) {
         document.getElementById('login').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
+        const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'flex';
       }
       
       document.getElementById('room-title').textContent = '# ' + serverName + (state.cryptoKey ? ' 🔒' : '');
@@ -892,7 +893,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   btnJoin.addEventListener('click', () => {
     document.getElementById('error-modal').classList.add('hidden');
-    const roomId = joinId.value.trim().toUpperCase();
+    const roomId = joinId.value.trim().toLowerCase();
     if (!roomId) return alert("Lütfen bir Sunucu ID girin!");
     
     const originalText = btnJoin.textContent;
@@ -1156,6 +1157,7 @@ async function handlePeerDiscovered(peer) {
     state.isJoining = false;
     document.getElementById('login').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
+    const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'flex';
     if (state.joinTimeout) {
       clearTimeout(state.joinTimeout);
       state.joinTimeout = null;
@@ -2386,6 +2388,7 @@ function limitVideoBitrate(sender) {
 function disconnectApp() {
   if (window.electronAPI && window.electronAPI.stopCloudflared) window.electronAPI.stopCloudflared();
   if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
+  const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'none';
   if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
   if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
   if (state.audioCtx && state.audioCtx.state !== 'closed') state.audioCtx.close();
