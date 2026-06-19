@@ -192,19 +192,30 @@
     </aside>
 
     <main class="main">
-      <div class="top-bar" style="position: absolute; top: 16px; right: 24px; z-index: 100; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; background: var(--bg-panel); padding: 6px 12px; border-radius: 20px; border: var(--border); box-shadow: var(--shadow-sm); backdrop-filter: var(--blur); max-width: calc(100% - 48px);">
-        <span style="font-size: 12px; color: var(--txt-mut); font-weight: 600;">SUNUCU ID:</span>
-        <span id="display-server-id" style="font-family: monospace; font-size: 15px; font-weight: bold; letter-spacing: 1px; color: var(--acc-light); user-select: all;">------</span>
-        <button id="btn-copy-id" class="btn-sec btn-sm" style="padding: 4px 8px; font-size: 12px; margin-left: 4px; border-radius: 8px; background: rgba(255,255,255,0.1);" title="ID'yi Kopyala">📋</button>
-        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.2); margin: 0 4px;"></div>
-        <button id="btn-show-server-dms" class="btn-pri btn-sm" style="padding: 4px 12px; font-size: 13px; border-radius: 8px; background: #8b5cf6;">💬 Mesajlar</button>
-        <button id="btn-show-server-invites" class="btn-pri btn-sm" style="padding: 4px 12px; font-size: 13px; border-radius: 8px;">👥 Davet Et</button>
+      <div class="top-bar" style="position: absolute; top: 16px; right: 24px; z-index: 100; display: none; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; background: var(--bg-panel); padding: 6px 12px; border-radius: 20px; border: var(--border); box-shadow: var(--shadow-sm); backdrop-filter: var(--blur); max-width: calc(100% - 48px);">\r
+        <span style="font-size: 12px; color: var(--txt-mut); font-weight: 600;">SUNUCU ID:</span>\r
+        <span id="display-server-id" style="font-family: monospace; font-size: 15px; font-weight: bold; letter-spacing: 1px; color: var(--acc-light); user-select: all;">------</span>\r
+        <button id="btn-copy-id" class="btn-sec btn-sm" style="padding: 4px 8px; font-size: 12px; margin-left: 4px; border-radius: 8px; background: rgba(255,255,255,0.1);" title="ID'yi Kopyala">📋</button>\r
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.2); margin: 0 4px;"></div>\r
+        <button id="btn-show-server-dms" class="btn-pri btn-sm" style="padding: 4px 12px; font-size: 13px; border-radius: 8px; background: #8b5cf6;">💬 Mesajlar</button>\r
+        <button id="btn-show-server-invites" class="btn-pri btn-sm" style="padding: 4px 12px; font-size: 13px; border-radius: 8px;">👥 Davet Et</button>\r
       </div>
       <div id="focus-area" class="focus-container hidden">
          <button id="focus-lock-btn" class="hidden" style="position: absolute; top: 20px; left: 20px; z-index: 9999; padding: 10px; font-size: 24px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(5px); transition: transform 0.2s, background 0.2s;" title="Odak Kilidi">🔓</button>
       </div>
       <div id="grid" class="grid">
-        <div id="empty-state" class="empty">
+        <div id="custom-confirm" class="modal hidden" style="z-index: 10000; align-items: center; justify-content: center;">
+      <div class="mcard" style="width: 400px; padding: 24px; text-align: center;">
+        <h3 style="margin-bottom: 15px;">🌐 Ortak Tarayıcı</h3>
+        <p style="margin-bottom: 20px; color: #ccc;">Ortak Tarayıcıyı başlatıyorsunuz. Diğer kullanıcılar tarayıcıyla etkileşime girebilsin mi (tıklama, klavye)?</p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button id="btn-confirm-yes" class="btn-pri" style="flex: 1;">Evet (Herkes)</button>
+          <button id="btn-confirm-no" class="btn-sec" style="flex: 1;">Hayır (Sadece Ben)</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="empty-state" class="empty">
           <h2>👋 Bağlantı Bekleniyor</h2>
           <p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>
         </div>
@@ -317,6 +328,75 @@
             </div>
             <button id="uno-replay-btn" class="btn-ok hidden" style="background: var(--ok); color: white; padding: 15px 30px; border-radius: 50px; font-weight: 900; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.5); border: 2px solid white;">Tekrar Oyna</button>
             <div id="uno-replay-wait" style="font-size: 16px; color: #aaa; font-style: italic;">Kurucunun oyunu yeniden başlatması bekleniyor...</div>
+          </div>
+        </div>
+
+        <div id="poll-card" class="vcard hidden" style="background: #1e293b; display: flex; flex-direction: column; padding: 20px;">
+          <div class="card-actions" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; color: #fff;">📊 Canlı Anket</h3>
+            <button id="poll-close" class="btn-sec btn-sm">Kapat</button>
+          </div>
+          <div id="poll-setup" style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+            <input type="text" id="poll-q" placeholder="Soru: Örn. Akşam ne oynayalım?" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
+            <input type="text" id="poll-opt1" placeholder="Seçenek 1" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
+            <input type="text" id="poll-opt2" placeholder="Seçenek 2" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
+            <input type="text" id="poll-opt3" placeholder="Seçenek 3 (Opsiyonel)" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
+            <input type="text" id="poll-opt4" placeholder="Seçenek 4 (Opsiyonel)" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
+            <button id="poll-create" class="btn-pri" style="margin-top: 10px;">Anketi Başlat</button>
+          </div>
+          <div id="poll-view" class="hidden" style="flex: 1; display: flex; flex-direction: column;">
+            <h3 id="poll-view-q" style="margin-bottom: 20px; text-align: center;">...</h3>
+            <div id="poll-opts-container" style="display: flex; flex-direction: column; gap: 15px; flex: 1;"></div>
+            <p id="poll-total-votes" class="muted" style="text-align: center; margin-top: 20px;">0 Oy</p>
+            <button id="poll-end" class="btn-sec hidden" style="margin-top: 10px; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);">Anketi Bitir (Kurucu)</button>
+          </div>
+        </div>
+
+        <div id="lvs-card" class="vcard hidden" style="background: #000; display: flex; flex-direction: column;">
+          <div class="card-actions lvs-tools">
+            <input type="file" id="lvs-file" accept="video/mp4,video/mkv,video/webm" style="color: #fff; max-width: 200px;" />
+            <button id="lvs-load" class="btn-pri btn-sm">Seçili Videoyu Aç</button>
+            <div style="flex: 1;"></div>
+            <span class="muted" style="font-size: 11px; margin-right: 10px;">(Sadece play/pause/süre senkronize olur)</span>
+            <button id="lvs-close" class="btn-sec btn-sm">Kapat</button>
+          </div>
+          <div style="flex: 1; width: 100%; position: relative; display: flex; align-items: center; justify-content: center;">
+            <video id="lvs-player" controls style="max-width: 100%; max-height: 100%; display: none;"></video>
+            <div id="lvs-empty" class="muted" style="text-align: center;">Lütfen bilgisayarınızdan aynı filmi seçin.</div>
+          </div>
+        </div>
+
+        <div id="wheel-card" class="vcard hidden" style="background: #1e1e24; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+          <div class="card-actions" style="position: absolute; top: 0; left: 0; right: 0; justify-content: space-between; padding: 10px 20px;">
+            <h3 style="margin: 0;">🎡 Şans Çarkı</h3>
+            <button id="wheel-close" class="btn-sec btn-sm">Kapat</button>
+          </div>
+          
+          <div id="wheel-setup" style="display: flex; flex-direction: column; gap: 10px; z-index: 10; background: rgba(0,0,0,0.6); padding: 20px; border-radius: 12px; backdrop-filter: blur(5px);">
+            <h4 style="margin: 0; text-align: center;">Çark Öğeleri (Max 15)</h4>
+            <div id="wheel-items-list" style="display: flex; flex-direction: column; gap: 5px; max-height: 200px; overflow-y: auto;">
+              <!-- Items here -->
+            </div>
+            <div style="display: flex; gap: 5px;">
+              <input type="text" id="wheel-new-item" placeholder="Örn. Film İzle" maxlength="15" style="flex: 1; padding: 6px; border-radius: 4px; border: none;" />
+              <button id="wheel-add-item" class="btn-sec btn-sm">Ekle</button>
+            </div>
+            <button id="wheel-ready" class="btn-pri" style="margin-top: 10px;">Hazır</button>
+          </div>
+
+          <div id="wheel-play" class="hidden" style="display: flex; flex-direction: column; align-items: center; z-index: 5;">
+            <div style="position: relative; width: 350px; height: 350px; margin-bottom: 30px;">
+              <div id="wheel-pointer" style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #ef4444; z-index: 20;"></div>
+              <canvas id="wheel-canvas" width="350" height="350" style="border-radius: 50%; box-shadow: 0 0 20px rgba(0,0,0,0.5); transition: transform 4s cubic-bezier(0.1, 0, 0.1, 1);"></canvas>
+            </div>
+            <button id="wheel-spin-btn" class="btn-pri" style="font-size: 20px; padding: 12px 30px; font-weight: bold; border-radius: 50px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);">🎡 ÇEVİR!</button>
+          </div>
+
+          <!-- Winner Overlay -->
+          <div id="wheel-winner-overlay" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; flex-direction: column; animation: fadeIn 0.3s forwards;">
+            <div style="font-size: 60px; animation: bounce 1s infinite;">🎉</div>
+            <h1 id="wheel-winner-text" style="font-size: 48px; color: gold; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); text-align: center; margin: 20px 0; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">...</h1>
+            <button id="wheel-winner-close" class="btn-sec" style="font-size: 18px; padding: 10px 24px;">Tamam</button>
           </div>
         </div>
       </div>
@@ -454,6 +534,27 @@
             <div>
               <div style="font-size: 18px; font-weight: bold; color: #3b82f6;">Ortak Tarayıcı</div>
               <p class="muted" style="margin:4px 0 0 0;">Senkronize bir şekilde internette beraber sörf yapın.</p>
+            </div>
+          </div>
+          <div class="src act-src" id="act-poll" style="display: flex; align-items: center; text-align: left; padding: 16px;">
+            <div style="font-size: 40px; margin-right: 20px;">📊</div>
+            <div>
+              <div style="font-size: 18px; font-weight: bold; color: #f59e0b;">Hızlı Anket</div>
+              <p class="muted" style="margin:4px 0 0 0;">Grupla ortak karar vermek için anketler oluşturun.</p>
+            </div>
+          </div>
+          <div class="src act-src" id="act-lvs" style="display: flex; align-items: center; text-align: left; padding: 16px;">
+            <div style="font-size: 40px; margin-right: 20px;">🍿</div>
+            <div>
+              <div style="font-size: 18px; font-weight: bold; color: #ec4899;">Yerel Film İzle</div>
+              <p class="muted" style="margin:4px 0 0 0;">Sıfır kalite kaybıyla kendi filmlerinizi senkronize izleyin.</p>
+            </div>
+          </div>
+          <div class="src act-src" id="act-wheel" style="display: flex; align-items: center; text-align: left; padding: 16px;">
+            <div style="font-size: 40px; margin-right: 20px;">🎡</div>
+            <div>
+              <div style="font-size: 18px; font-weight: bold; color: #10b981;">Şans Çarkı</div>
+              <p class="muted" style="margin:4px 0 0 0;">Kendi öğelerinizi ekleyin, çarkı çevirin ve kazananı bulun!</p>
             </div>
           </div>
         </div>

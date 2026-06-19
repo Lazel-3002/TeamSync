@@ -239,7 +239,57 @@ ipcMain.on('set-remote-control', (event, active) => {
 });
 
 ipcMain.on('remote-input', (event, data) => {
-  if (!robot || !remoteControlActive) return;
+  if (!remoteControlActive) return;
+
+  if (!robot) {
+    // Fallback to Electron's native webContents.sendInputEvent if robotjs is missing
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (data.type === 'keydown' || data.type === 'keyup') {
+        let keyCode = data.key;
+        if (keyCode === 'Space') keyCode = 'Space';
+        else if (keyCode === ' ') keyCode = 'Space';
+        
+        mainWindow.webContents.sendInputEvent({
+          type: data.type === 'keydown' ? 'keyDown' : 'keyUp',
+          keyCode: keyCode
+        });
+        
+        if (data.type === 'keydown' && data.key.length === 1) {
+          mainWindow.webContents.sendInputEvent({
+            type: 'char',
+            keyCode: data.key
+          });
+        }
+      } else if (data.type === 'mousemove' || data.type === 'mousedown' || data.type === 'mouseup') {
+        const bounds = mainWindow.getContentBounds();
+        const x = Math.round(data.x * bounds.width);
+        const y = Math.round(data.y * bounds.height);
+        let evType = 'mouseMove';
+        if (data.type === 'mousedown') evType = 'mouseDown';
+        if (data.type === 'mouseup') evType = 'mouseUp';
+        
+        let button = 'left';
+        if (data.button === 2) button = 'right';
+        else if (data.button === 1) button = 'middle';
+        
+        mainWindow.webContents.sendInputEvent({
+          type: evType,
+          x: x,
+          y: y,
+          button: button,
+          clickCount: 1
+        });
+      } else if (data.type === 'scroll') {
+        mainWindow.webContents.sendInputEvent({
+          type: 'mouseWheel',
+          x: 0, y: 0,
+          deltaX: data.deltaX || 0,
+          deltaY: data.deltaY || 0
+        });
+      }
+    }
+    return;
+  }
 
   const display = screen.getPrimaryDisplay().size;
   const { width: sw, height: sh } = display;
