@@ -1,5 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
+  startCloudflared: (port) => ipcRenderer.invoke('start-cloudflared', port),
+  stopCloudflared: () => ipcRenderer.send('stop-cloudflared'),
   getLocalIPs: () => ipcRenderer.invoke('get-local-ips'),
   startDiscovery: (peerId, name, room) => ipcRenderer.send('start-discovery', { peerId, name, room }),
   stopDiscovery: () => ipcRenderer.send('stop-discovery'),

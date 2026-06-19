@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Noti
 const path = require('path');
 const dgram = require('dgram');
 const os = require('os');
+const { spawn } = require('child_process');
+let cloudflaredProcess = null;
 
 let mainWindow = null;
 let discoverySocket = null;
@@ -154,6 +156,36 @@ function createWindow() {
 }
 
 ipcMain.handle('get-local-ips', () => getLocalIPs());
+
+ipcMain.handle('start-cloudflared', async (event, port) => {
+  return new Promise((resolve, reject) => {
+    const exePath = path.join(app.getAppPath(), 'cloudflared.exe');
+    cloudflaredProcess = spawn(exePath, ['tunnel', '--url', `localhost:${port}`]);
+
+    cloudflaredProcess.stderr.on('data', (data) => {
+      const output = data.toString();
+      const match = output.match(/https:\/\/(.*?)\.trycloudflare\.com/);
+      if (match && match[1]) {
+        resolve(match[1]);
+      }
+    });
+
+    cloudflaredProcess.on('error', (err) => {
+      reject(err);
+    });
+
+    setTimeout(() => {
+      reject(new Error("Cloudflare tünel adresi oluşturulamadı."));
+    }, 15000);
+  });
+});
+
+ipcMain.on('stop-cloudflared', () => {
+  if (cloudflaredProcess) {
+    cloudflaredProcess.kill();
+    cloudflaredProcess = null;
+  }
+});
 ipcMain.handle('get-sources', async () => {
   try {
     const sources = await desktopCapturer.getSources({
@@ -354,6 +386,7 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  if (cloudflaredProcess) cloudflaredProcess.kill();
   globalShortcut.unregisterAll();
   if (discoveryInterval) clearInterval(discoveryInterval);
   if (discoverySocket) {

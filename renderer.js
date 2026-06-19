@@ -51,7 +51,17 @@ let internetAnnounceInterval = null;
 
 function setupInternetSignaling(roomId, myId, myName) {
   if (mqttClient) mqttClient.end();
-  mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+  
+  let brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
+
+  if (state.isJoining && roomId) {
+    brokerUrl = `wss://${roomId}.trycloudflare.com`; 
+  } else if (!state.isJoining) {
+    const KULLANDIGIMIZ_PORT = 8884; 
+    brokerUrl = `ws://localhost:${KULLANDIGIMIZ_PORT}`; 
+  }
+
+  mqttClient = mqtt.connect(brokerUrl);
   
   mqttClient.on('connect', () => {
     if (!mqttClient) return; // Prevent crash if disconnected during connection phase
@@ -909,13 +919,29 @@ window.addEventListener('DOMContentLoaded', async () => {
     }, 4000);
   });
 
-  btnCreate.addEventListener('click', () => {
+  btnCreate.addEventListener('click', async () => {
     document.getElementById('error-modal').classList.add('hidden');
     if (state.joinTimeout) clearTimeout(state.joinTimeout);
     state.isJoining = false;
     const sName = createName.value.trim() || 'Oyun Odası';
-    const newRoomId = crypto.randomUUID().toUpperCase();
-    startApp(newRoomId, createPw.value, createAi.checked, createPtt.checked, sName, false);
+    
+    const originalText = btnCreate.textContent;
+    btnCreate.textContent = "Tünel Açılıyor...";
+    btnCreate.disabled = true;
+
+    try {
+      const KULLANDIGIMIZ_PORT = 8884; 
+      const odaId = await window.electronAPI.startCloudflared(KULLANDIGIMIZ_PORT);
+      
+      btnCreate.textContent = originalText;
+      btnCreate.disabled = false;
+
+      startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false);
+    } catch (err) {
+      btnCreate.textContent = originalText;
+      btnCreate.disabled = false;
+      alert("Sunucu başlatılamadı: " + err.message);
+    }
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -2358,6 +2384,7 @@ function limitVideoBitrate(sender) {
 }
 
 function disconnectApp() {
+  if (window.electronAPI && window.electronAPI.stopCloudflared) window.electronAPI.stopCloudflared();
   if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
   if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
   if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
