@@ -1919,7 +1919,7 @@ function bindUI() {
     document.getElementById('ip-modal').classList.remove('hidden');
   });
   document.getElementById('ip-cancel').addEventListener('click', () => {
-    document.getElementById('ip-modal').classList.remove('hidden');
+    document.getElementById('ip-modal').classList.add('hidden');
   });
   document.getElementById('ip-ok').addEventListener('click', () => {
     const ip = document.getElementById('ip-input').value.trim();
