@@ -1621,15 +1621,31 @@ body {
     padding: 12px;
     gap: 12px;
   }
+  .btn {
+    min-width: 48px;
+    height: 48px;
+    padding: 4px;
+  }
   .top-bar {
     position: static !important;
     margin: 8px auto;
     max-width: 95% !important;
     justify-content: center;
     padding: 6px 8px;
+    flex-wrap: wrap;
   }
-  #display-server-id { font-size: 13px !important; }
-  
+  #display-server-id {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #btn-show-server-invites {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
   .bar {
     padding: 8px;
     gap: 8px;

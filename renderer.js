@@ -52,14 +52,8 @@ let internetAnnounceInterval = null;
 function setupInternetSignaling(roomId, myId, myName) {
   if (mqttClient) mqttClient.end();
   
+  // Sinyalleşmeyi HiveMQ üzerinden Cloudflare Oda ID'si ile yapıyoruz.
   let brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
-
-  if (state.isJoining && roomId) {
-    brokerUrl = `wss://${roomId}.trycloudflare.com`; 
-  } else if (!state.isJoining) {
-    const KULLANDIGIMIZ_PORT = 8884; 
-    brokerUrl = `ws://localhost:${KULLANDIGIMIZ_PORT}`; 
-  }
 
   mqttClient = mqtt.connect(brokerUrl);
   
@@ -2075,11 +2069,11 @@ function bindUI() {
 
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    if (e.code === 'KeyM') mic.click();
-    if (e.code === 'KeyD') deaf.click();
-    if (e.code === 'KeyC') cam.click();
-    if (e.code === 'KeyS') share.click();
-    if (e.code === 'KeyR') rec.click();
+    if (e.code === 'KeyM') document.getElementById('mic')?.click();
+    if (e.code === 'KeyD') document.getElementById('deaf')?.click();
+    if (e.code === 'KeyC') document.getElementById('cam')?.click();
+    if (e.code === 'KeyS') document.getElementById('share')?.click();
+    if (e.code === 'KeyR') document.getElementById('rec')?.click();
   });
 
   document.getElementById('act-btn').addEventListener('click', () => {
