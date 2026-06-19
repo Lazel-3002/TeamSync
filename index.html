@@ -20,35 +20,79 @@
       </div>
 
       <!-- Adım 2: Seçim & Arkadaşlık -->
-      <div id="step-action" class="hidden">
-        <p style="text-align:center; margin: 10px 0 5px; font-size: 16px;">
-          Hoş geldin, <span id="display-name" style="font-weight:bold; color:var(--acc-light)"></span>!
-          <button id="btn-edit-name" class="btn-sec btn-sm" style="padding: 2px 6px; font-size: 11px; border-radius: 4px; background: transparent; border:none; cursor: pointer;" title="Adı Değiştir">✏️</button>
-        </p>
-        <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom: 20px; font-size: 13px; color: var(--txt-mut);">
-          Senin ID: <span id="my-friend-id" style="font-family: monospace; font-weight: bold; color: var(--acc); user-select: all; cursor: pointer;" title="Kopyala">------</span>
-          <button id="btn-copy-friend-id" class="btn-sec btn-sm" style="padding: 2px 6px; font-size: 11px; border-radius: 4px; background: rgba(255,255,255,0.1); border:none;" title="ID'yi Kopyala">📋</button>
+      <div id="step-action" class="hidden menu-layout">
+        <div id="global-ping-display" class="global-ping" title="İnternet Sunucusu Gecikmesi">
+          📶 <span id="global-ping-ms">--</span> ms
         </div>
-
-        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3 style="font-size: 14px; margin: 0;">👥 Arkadaşlarım</h3>
-            <div style="display: flex; gap: 8px;">
-              <button id="btn-show-invites" class="btn-sec btn-sm" style="font-size: 12px; padding: 4px 8px; position: relative;">
-                Davetler <span id="invite-badge" style="display:none; position: absolute; top: -5px; right: -5px; background: var(--warn); color: #000; font-size: 10px; font-weight: bold; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">0</span>
-              </button>
-              <button id="btn-show-add-friend" class="btn-pri btn-sm" style="font-size: 12px; padding: 4px 8px;">+ Ekle</button>
+        <div class="menu-left">
+          <div class="menu-profile-card">
+            <div class="profile-avatar-wrapper" id="btn-edit-avatar" style="position: relative; cursor: pointer;">
+              <img id="my-avatar-img" class="profile-avatar" src="" style="display: none; object-fit: cover;" />
+              <div id="my-avatar-default" class="profile-avatar">👤</div>
+              <div class="avatar-edit-overlay">📷</div>
+              <input type="file" id="my-avatar-input" class="hidden" accept="image/*" />
+            </div>
+            <div class="profile-info">
+              <div class="profile-name">
+                <span id="display-name" class="menu-username"></span>
+                <button id="btn-edit-name" class="icon-btn" title="Adı Değiştir">✏️</button>
+              </div>
+              <div class="profile-id-row">
+                <span class="muted" style="font-size:11px;">ID: </span>
+                <span id="my-friend-id" class="menu-id-value">------</span>
+                <button id="btn-copy-friend-id" class="icon-btn sm" title="ID'yi Kopyala">📋</button>
+              </div>
             </div>
           </div>
-          <ul id="friends-list" style="list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; font-size: 13px;">
-            <!-- Dinamik Eklenecek -->
-            <li class="muted" style="text-align: center; padding: 10px;">Henüz hiç arkadaşın yok.</li>
-          </ul>
+
+          <div class="menu-main-actions">
+            <button id="btn-show-join" class="action-card sec">
+              <div class="ac-icon">🔗</div>
+              <div class="ac-text">Sunucuya Katıl</div>
+              <div class="ac-sub">Bir odaya giriş yap</div>
+            </button>
+            <button id="btn-show-create" class="action-card pri">
+              <div class="ac-icon">➕</div>
+              <div class="ac-text">Sunucu Oluştur</div>
+              <div class="ac-sub">Kendi odanı kur</div>
+            </button>
+          </div>
         </div>
 
-        <div style="display:flex; gap: 16px;">
-          <button id="btn-show-join" class="btn-sec" style="flex:1;">Sunucuya Katıl</button>
-          <button id="btn-show-create" class="btn-pri" style="flex:1;">Sunucu Oluştur</button>
+        <div class="menu-middle">
+          <div class="menu-friends-section">
+            <div class="menu-friends-header">
+              <h3 class="menu-friends-title">👥 Arkadaşlar</h3>
+              <div class="menu-friends-actions">
+                <button id="btn-show-invites" class="icon-btn has-badge" title="Davetler">
+                  📩 <span id="invite-badge" class="badge">0</span>
+                </button>
+                <button id="btn-show-add-friend" class="icon-btn" title="Arkadaş Ekle">➕</button>
+              </div>
+            </div>
+            <ul id="friends-list" class="menu-friends-list">
+              <li class="muted menu-empty-friends">Henüz hiç arkadaşın yok.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="menu-right">
+          <div class="dm-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span id="dm-active-name">...</span>
+            </div>
+            <button id="dm-close-btn" class="btn-sec btn-sm" style="border:none; background:transparent;">✕</button>
+          </div>
+          <div id="dm-messages" class="dm-messages">
+            <!-- Messages go here -->
+            <div class="muted" style="text-align:center; margin-top:50px;">Mesajlaşmaya başlamak için bir arkadaş seç.</div>
+          </div>
+          <div class="dm-input-area">
+            <input type="file" id="dm-file-input" class="hidden" accept="image/*,application/pdf" />
+            <button id="dm-btn-file" title="Dosya Gönder">📎</button>
+            <input id="dm-input" type="text" placeholder="Mesaj yaz..." autocomplete="off" />
+            <button id="dm-btn-send" title="Gönder">➤</button>
+          </div>
         </div>
       </div>
 
@@ -151,6 +195,9 @@
         <span style="font-size: 12px; color: var(--txt-mut); font-weight: 600;">SUNUCU ID:</span>
         <span id="display-server-id" style="font-family: monospace; font-size: 15px; font-weight: bold; letter-spacing: 1px; color: var(--acc-light); user-select: all;">------</span>
         <button id="btn-copy-id" class="btn-sec btn-sm" style="padding: 4px 8px; font-size: 12px; margin-left: 4px; border-radius: 8px; background: rgba(255,255,255,0.1);" title="ID'yi Kopyala">📋</button>
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.2); margin: 0 4px;"></div>
+        <button id="btn-show-server-dms" class="btn-pri btn-sm" style="padding: 4px 12px; font-size: 13px; border-radius: 8px; background: #8b5cf6;">💬 Mesajlar</button>
+        <button id="btn-show-server-invites" class="btn-pri btn-sm" style="padding: 4px 12px; font-size: 13px; border-radius: 8px;">👥 Davet Et</button>
       </div>
       <div id="focus-area" class="focus-container hidden">
          <button id="focus-lock-btn" class="hidden" style="position: absolute; top: 20px; left: 20px; z-index: 9999; padding: 10px; font-size: 24px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(5px); transition: transform 0.2s, background 0.2s;" title="Odak Kilidi">🔓</button>
@@ -437,28 +484,95 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Davetler Modali -->
-    <div id="invites-modal" class="modal hidden">
-      <div class="mcard" style="width: 350px;">
-        <h3>Gelen İstekler</h3>
-        <ul id="invites-list" style="list-style: none; padding: 0; margin: 15px 0; max-height: 200px; overflow-y: auto;">
-          <li class="muted" style="text-align: center;">Bekleyen davet yok.</li>
-        </ul>
-        <div class="mactions">
-          <button id="invites-close" class="btn-sec" style="width: 100%;">Kapat</button>
-        </div>
+  <!-- Davetler Modali (body seviyesi - hem login hem app'ten erişilebilir) -->
+  <div id="invites-modal" class="modal hidden">
+    <div class="mcard" style="width: 400px;">
+      <h3>📩 Gelen Arkadaşlık Davetleri</h3>
+      <p class="muted">Sana gelen arkadaşlık istekleri burada görünür.</p>
+      <ul id="invites-list" style="list-style: none; padding: 0; margin: 15px 0; max-height: 250px; overflow-y: auto;">
+        <li class="muted" style="text-align: center; padding: 16px;">Bekleyen davet yok.</li>
+      </ul>
+      <div class="mactions" style="justify-content: center;">
+        <button id="invites-close" class="btn-sec" style="width: 100%; padding: 12px;">Kapat</button>
       </div>
     </div>
+  </div>
 
-    <!-- Ad Değiştirme Modali -->
-    <div id="edit-name-modal" class="modal hidden">
-      <div class="mcard" style="width: 350px; text-align: center;">
-        <h3 style="margin-bottom: 15px;">Adını Değiştir</h3>
-        <input id="edit-name-input" type="text" placeholder="Yeni adın..." style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.5); color: #fff;" maxlength="20" />
-        <div class="mactions" style="display: flex; gap: 10px;">
-          <button id="edit-name-cancel" class="btn-sec" style="flex: 1;">İptal</button>
-          <button id="edit-name-save" class="btn-pri" style="flex: 1;">Kaydet</button>
+  <!-- Ad Değiştirme Modali (body seviyesi - hem login hem app'ten erişilebilir) -->
+  <div id="edit-name-modal" class="modal hidden">
+    <div class="mcard" style="width: 380px; text-align: center;">
+      <h3 style="margin-bottom: 8px;">✏️ Adını Değiştir</h3>
+      <p class="muted" style="margin-bottom: 16px;">Yeni adını gir ve kaydet.</p>
+      <input id="edit-name-input" type="text" placeholder="Yeni adın..." style="width: 100%; padding: 12px 16px; margin-bottom: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.4); color: #fff; font-size: 16px; font-family: 'Inter', sans-serif; text-align: center;" maxlength="20" />
+      <div class="mactions" style="display: flex; gap: 12px;">
+        <button id="edit-name-cancel" class="btn-sec" style="flex: 1; padding: 12px;">İptal</button>
+        <button id="edit-name-save" class="btn-pri" style="flex: 1; padding: 12px;">💾 Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sunucu Katılma İsteği Modali -->
+  <div id="join-request-modal" class="modal hidden">
+    <div class="mcard" style="width: 380px; text-align: center;">
+      <h3 style="margin-bottom: 8px;">🎮 Sunucu Katılma İsteği</h3>
+      <p class="muted" style="margin-bottom: 16px;"><span id="join-req-name" style="font-weight:bold; color:#fff;">Arkadaşın</span> sunucuna katılmak istiyor.</p>
+      <div class="mactions" style="display: flex; gap: 12px;">
+        <button id="join-req-deny" class="btn-sec" style="flex: 1; padding: 12px;">Reddet</button>
+        <button id="join-req-accept" class="btn-pri" style="flex: 1; padding: 12px; background: var(--ok);">Kabul Et</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sunucu İçi Arkadaş Davet Modali -->
+  <div id="server-invites-modal" class="modal hidden" style="z-index: 10000;">
+    <div class="mcard" style="width: 400px;">
+      <h3>📩 Arkadaşlarını Davet Et</h3>
+      <p class="muted">Çevrimiçi arkadaşlarını bu sunucuya davet et.</p>
+      <ul id="server-friends-list" style="list-style: none; padding: 0; margin: 15px 0; max-height: 250px; overflow-y: auto;">
+        <!-- Dinamik -->
+      </ul>
+      <div class="mactions" style="justify-content: center;">
+        <button id="server-invites-close" class="btn-sec" style="width: 100%; padding: 12px;">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gelen Sunucu Daveti Modali -->
+  <div id="server-invite-received-modal" class="modal hidden" style="z-index: 10000;">
+    <div class="mcard" style="width: 380px; text-align: center;">
+      <h3 style="margin-bottom: 8px;">🎮 Sunucu Daveti</h3>
+      <p class="muted" style="margin-bottom: 16px;"><span id="server-invite-name" style="font-weight:bold; color:#fff;">Arkadaşın</span> seni sunucusuna davet ediyor.</p>
+      <div class="mactions" style="display: flex; gap: 12px;">
+        <button id="server-invite-deny" class="btn-sec" style="flex: 1; padding: 12px;">Reddet</button>
+        <button id="server-invite-accept" class="btn-pri" style="flex: 1; padding: 12px; background: var(--ok);">Katıl</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sunucu İçi DM Modali -->
+  <div id="server-dm-modal" class="modal hidden" style="z-index: 10000;">
+    <div class="mcard" style="width: 700px; display: flex; flex-direction: row; padding: 0; overflow: hidden; height: 500px; background: rgba(15, 23, 42, 0.95);">
+      <div style="width: 250px; background: rgba(0,0,0,0.3); border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+        <div style="padding: 16px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff;">💬 Mesajlar</div>
+        <ul id="server-dm-friend-list" style="list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1;">
+          <!-- Arkadaşlar Buraya Gelecek -->
+        </ul>
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; position: relative;">
+        <div class="dm-header">
+          <span id="server-dm-active-name" style="color: #fff;">Arkadaş Seçin</span>
+          <button id="server-dm-close" class="btn-sec btn-sm" style="border:none; background:transparent;">✕</button>
+        </div>
+        <div id="server-dm-messages" class="dm-messages">
+          <div class="muted" style="text-align:center; margin-top:50px;">Mesajlaşmaya başlamak için bir arkadaş seç.</div>
+        </div>
+        <div class="dm-input-area" style="display: none;" id="server-dm-input-area">
+          <input type="file" id="server-dm-file-input" class="hidden" accept="image/*,application/pdf" />
+          <button id="server-dm-btn-file" title="Dosya Gönder">📎</button>
+          <input id="server-dm-input" type="text" placeholder="Mesaj yaz..." autocomplete="off" />
+          <button id="server-dm-btn-send" title="Gönder">➤</button>
         </div>
       </div>
     </div>

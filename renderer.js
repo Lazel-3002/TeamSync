@@ -36,7 +36,11 @@ const state = {
   cryptoKey: null,
   wbContext: null,
   drawing: false,
-  micThreshold: 20
+  micThreshold: 20,
+  dms: {}, // { friendId: [ { sender: 'me'|'them', type: 'text'|'file', content: '...', timestamp: 123 }, ... ] }
+  activeDM: null,
+  myAvatar: null,
+  myAvatarHash: null
 };
 
 const CHUNK_SIZE = 64 * 1024;
@@ -50,16 +54,20 @@ function setupInternetSignaling(roomId, myId, myName) {
   mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
   
   mqttClient.on('connect', () => {
+    if (!mqttClient) return; // Prevent crash if disconnected during connection phase
     console.log('🌐 İnternet sunucusuna bağlanıldı (MQTT)');
     mqttClient.subscribe(`kanka-voice/room/${roomId}/#`);
     
     if (internetAnnounceInterval) clearInterval(internetAnnounceInterval);
     internetAnnounceInterval = setInterval(() => {
-      mqttClient.publish(`kanka-voice/room/${roomId}/${myId}`, JSON.stringify({
-        type: 'hello',
-        id: myId,
-        name: myName
-      }));
+      if (mqttClient) {
+        mqttClient.publish(`kanka-voice/room/${roomId}/${myId}`, JSON.stringify({
+          type: 'hello',
+          id: myId,
+          name: myName,
+          avatar: state.myAvatar || null
+        }));
+      }
     }, 3000);
   });
 
@@ -69,11 +77,11 @@ function setupInternetSignaling(roomId, myId, myName) {
       if (data.id === myId) return;
       
       if (data.type === 'hello') {
-        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet' });
+        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar });
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
         if (!peer) {
-          await handlePeerDiscovered({ id: data.id, name: data.name || 'Bilinmeyen', ip: 'internet' });
+          await handlePeerDiscovered({ id: data.id, name: data.name || 'Bilinmeyen', ip: 'internet', avatar: data.avatar });
           peer = state.peers.get(data.id);
         }
         if (peer) {
@@ -177,14 +185,37 @@ async function decryptMsg(data, key) {
   } catch (e) { return null; }
 }
 
+function getAvatarHash(base64Str) {
+  if (!base64Str) return null;
+  let hash = 0;
+  for (let i = 0; i < base64Str.length; i++) {
+    hash = ((hash << 5) - hash) + base64Str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 function saveProfile() {
   localStorage.setItem('kanka_profile', JSON.stringify({
     name: state.myName,
     id: state.friendId,
+    avatar: state.myAvatar,
+    avatarHash: state.myAvatarHash,
     friends: state.friends,
     requests: state.friendRequests
   }));
   renderFriends();
+}
+
+function loadDMs() {
+  const savedDMs = localStorage.getItem('kanka_dms');
+  if (savedDMs) {
+    try { state.dms = JSON.parse(savedDMs); } catch(e) {}
+  }
+}
+
+function saveDMs() {
+  localStorage.setItem('kanka_dms', JSON.stringify(state.dms));
 }
 
 function renderFriends() {
@@ -194,6 +225,7 @@ function renderFriends() {
   
   if (!flist || !invitesBadge || !invitesList) return;
 
+  // Badge gösterimi - CSS'de default display:none
   if (state.friendRequests.length > 0) {
     invitesBadge.style.display = 'flex';
     invitesBadge.textContent = state.friendRequests.length;
@@ -204,7 +236,7 @@ function renderFriends() {
   // Render Invites
   invitesList.innerHTML = '';
   if (state.friendRequests.length === 0) {
-    invitesList.innerHTML = '<li class="muted" style="text-align: center;">Bekleyen davet yok.</li>';
+    invitesList.innerHTML = '<li class="muted" style="text-align: center; padding: 12px;">Bekleyen davet yok.</li>';
   } else {
     state.friendRequests.forEach((req, idx) => {
       const li = document.createElement('li');
@@ -212,8 +244,8 @@ function renderFriends() {
       li.innerHTML = `
         <div style="font-size: 13px;"><b>${escapeHtml(req.name)}</b><br><span class="muted">${escapeHtml(req.id)}</span></div>
         <div class="invite-actions">
-          <button class="btn-ok btn-sm" style="background:var(--ok); color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="acceptInvite(${idx})">✓</button>
-          <button class="btn-sec btn-sm" style="border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="rejectInvite(${idx})">✕</button>
+          <button class="icon-btn sm" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="acceptInvite(${idx})" title="Kabul Et">✓</button>
+          <button class="icon-btn sm" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);" onclick="rejectInvite(${idx})" title="Reddet">✕</button>
         </div>
       `;
       invitesList.appendChild(li);
@@ -224,26 +256,52 @@ function renderFriends() {
   flist.innerHTML = '';
   const friendKeys = Object.keys(state.friends);
   if (friendKeys.length === 0) {
-    flist.innerHTML = '<li class="muted" style="text-align: center; padding: 10px;">Henüz hiç arkadaşın yok.</li>';
+    flist.innerHTML = '<li class="muted menu-empty-friends">Henüz hiç arkadaşın yok.</li>';
   } else {
     friendKeys.forEach(fId => {
       const f = state.friends[fId];
       const isOnline = f.online ? 'online' : '';
+      const inRoom = f.room ? true : false;
+      const avatarHtml = f.avatar 
+        ? `<img src="${escapeHtml(f.avatar)}" class="friend-avatar" />`
+        : `<div class="friend-avatar" style="background: rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:16px;">👤</div>`;
+
       const li = document.createElement('li');
       li.className = 'friend-item';
       li.innerHTML = `
         <div class="friend-info">
-          <div class="friend-status ${isOnline}" id="status-${fId}"></div>
-          <div><b>${escapeHtml(f.name)}</b></div>
+          <div style="position:relative;">
+            ${avatarHtml}
+            <div class="friend-status ${isOnline}" id="status-${fId}" style="position:absolute; bottom:0; right:6px; border:2px solid #1e1e24; margin:0;"></div>
+          </div>
+          <div>
+            <b>${escapeHtml(f.name)}</b>
+            ${inRoom ? '<div style="font-size: 11px; color: var(--ok); margin-top: 2px;">🟢 Sunucuda</div>' : ''}
+          </div>
         </div>
         <div class="friend-actions">
-          <button class="btn-sec btn-sm" style="font-size: 11px; padding: 4px 6px; border:none; background:rgba(255,255,255,0.1); border-radius:4px; cursor:pointer;" onclick="removeFriend('${fId}')" title="Arkadaşlıktan Çıkar">Çıkar</button>
+          <button class="icon-btn sm" style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3);" onclick="openDM('${fId}')" title="Mesaj Gönder">💬</button>
+          ${inRoom ? `<button class="icon-btn sm" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom('${fId}')" title="Sunucusuna Katıl">🎮</button>` : ''}
+          <button class="icon-btn sm" style="color: #fca5a5;" onclick="removeFriend('${fId}')" title="Arkadaşlıktan Çıkar">✕</button>
         </div>
       `;
       flist.appendChild(li);
     });
   }
 }
+
+window.requestJoinRoom = (fId) => {
+  if (state.globalMqtt && state.globalMqtt.connected) {
+    state.globalMqtt.publish(`kanka-voice/user/${fId}/events`, JSON.stringify({
+      type: 'room_join_request',
+      id: state.friendId,
+      name: state.myName
+    }));
+    showToast("Katılma isteği gönderildi, bekleniyor...", "info");
+  } else {
+    showToast("Bağlantı bekleniyor...", "warn");
+  }
+};
 
 window.acceptInvite = (idx) => {
   const req = state.friendRequests[idx];
@@ -296,9 +354,20 @@ function setupGlobalMQTT() {
       state.globalMqtt.publish(`kanka-voice/user/${state.friendId}/presence`, JSON.stringify({
         online: true,
         id: state.friendId,
-        name: state.myName
+        name: state.myName,
+        room: state.room || null,
+        avatarHash: state.myAvatarHash || null
       }));
     }, 5000);
+
+    setInterval(() => {
+      if (state.globalMqtt && state.globalMqtt.connected) {
+        state.globalMqtt.publish(`kanka-voice/user/${state.friendId}/events`, JSON.stringify({
+          type: 'ping_latency_req',
+          ts: Date.now()
+        }));
+      }
+    }, 2000);
   });
   
   state.globalMqtt.on('message', (topic, message) => {
@@ -306,17 +375,52 @@ function setupGlobalMQTT() {
       const data = JSON.parse(message.toString());
       if (topic.endsWith('/presence')) {
         if (state.friends[data.id]) {
+          const wasOnline = state.friends[data.id].online;
+          const oldRoom = state.friends[data.id].room;
+          const oldAvatarHash = state.friends[data.id].avatarHash;
+          
           state.friends[data.id].online = true;
           state.friends[data.id].lastSeen = Date.now();
-          const dot = document.getElementById(`status-${data.id}`);
-          if (dot) dot.classList.add('online');
+          state.friends[data.id].room = data.room;
+          state.friends[data.id].avatarHash = data.avatarHash;
+          
+          if (data.avatarHash && oldAvatarHash !== data.avatarHash) {
+            state.globalMqtt.publish(`kanka-voice/user/${data.id}/events`, JSON.stringify({
+              type: 'req_avatar',
+              fromId: state.friendId
+            }));
+          }
+          
+          if (!wasOnline || oldRoom !== data.room || oldAvatarHash !== data.avatarHash) {
+            renderFriends();
+          } else {
+            const dot = document.getElementById(`status-${data.id}`);
+            if (dot) dot.classList.add('online');
+          }
         }
       } else if (topic.endsWith('/events')) {
+        if (data.type === 'ping_latency_req' && data.ts) {
+          const latency = Date.now() - data.ts;
+          const pingMsEl = document.getElementById('global-ping-ms');
+          const pingDisp = document.getElementById('global-ping-display');
+          if (pingMsEl && pingDisp) {
+            pingMsEl.textContent = latency;
+            pingDisp.className = 'global-ping ' + (latency < 100 ? 'ping-good' : (latency < 250 ? 'ping-ok' : 'ping-bad'));
+          }
+          const selfPingEl = document.getElementById('ping-self');
+          if (selfPingEl) {
+            selfPingEl.textContent = `${latency}ms`;
+            selfPingEl.className = 'uping ' + (latency < 100 ? 'ping-good' : (latency < 250 ? 'ping-ok' : 'ping-bad'));
+          }
+          return;
+        }
+
         if (data.type === 'friend_request') {
           if (!state.friends[data.id] && !state.friendRequests.find(r => r.id === data.id)) {
             state.friendRequests.push({ id: data.id, name: data.name });
             saveProfile();
             showToast(`${data.name} sana arkadaşlık isteği gönderdi!`, 'info');
+            renderFriends();
           }
         } else if (data.type === 'friend_accepted') {
           if (!state.friends[data.id]) {
@@ -324,7 +428,57 @@ function setupGlobalMQTT() {
             saveProfile();
             showToast(`${data.name} arkadaşlık isteğini kabul etti!`, 'ok');
             state.globalMqtt.subscribe(`kanka-voice/user/${data.id}/presence`);
+            renderFriends();
           }
+        } else if (data.type === 'room_join_request') {
+          if (state.room) {
+            state.pendingJoinReq = { id: data.id, name: data.name };
+            document.getElementById('join-req-name').textContent = data.name;
+            document.getElementById('join-request-modal').classList.remove('hidden');
+          } else {
+            state.globalMqtt.publish(`kanka-voice/user/${data.id}/events`, JSON.stringify({
+              type: 'room_join_declined',
+              id: state.friendId,
+              name: state.myName
+            }));
+          }
+        } else if (data.type === 'room_join_accepted') {
+          showToast(`${data.name} isteğini kabul etti, bağlanılıyor...`, 'ok');
+          document.getElementById('step-action').classList.add('hidden');
+          const ai = document.getElementById('join-useAI') ? document.getElementById('join-useAI').checked : true;
+          const ptt = document.getElementById('join-usePTT') ? document.getElementById('join-usePTT').checked : false;
+          // startApp'i direk cagiramayabiliriz eger degiskense ama event listener'in altinda veya global
+          // Wait, startApp is scoped inside DOMContentLoaded in this code. Let's trigger a UI update or just dispatch an event?
+          // I will fix startApp scope later. For now let's set values and click join.
+          const joinIdInput = document.getElementById('join-id');
+          const joinPwInput = document.getElementById('join-password');
+          const btnJoin = document.getElementById('btn-join');
+          if(joinIdInput && btnJoin) {
+             joinIdInput.value = data.roomId;
+             if(joinPwInput) joinPwInput.value = data.password || '';
+             btnJoin.click();
+          }
+        } else if (data.type === 'room_join_declined') {
+          showToast(`${data.name} katılma isteğini reddetti veya bir sunucuda değil.`, 'warn');
+        } else if (data.type === 'server_invite_received') {
+          state.pendingServerInvite = { id: data.id, name: data.name, roomId: data.roomId, password: data.password };
+          document.getElementById('server-invite-name').textContent = data.name;
+          document.getElementById('server-invite-received-modal').classList.remove('hidden');
+        } else if (data.type === 'req_avatar') {
+          if (state.myAvatar) {
+            state.globalMqtt.publish(`kanka-voice/user/${data.fromId}/events`, JSON.stringify({
+              type: 'res_avatar',
+              fromId: state.friendId,
+              avatar: state.myAvatar
+            }));
+          }
+        } else if (data.type === 'res_avatar') {
+          if (state.friends[data.fromId]) {
+            state.friends[data.fromId].avatar = data.avatar;
+            saveProfile();
+          }
+        } else if (data.type === 'dm_msg' || data.type === 'dm_file_start' || data.type === 'dm_file_chunk') {
+          receiveDM(data.fromId, data);
         }
       }
     } catch(e) {}
@@ -401,12 +555,20 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       const data = JSON.parse(savedProfile);
       state.myName = data.name || 'Kanka';
-      state.friendId = data.id || `KNK-${Math.random().toString(36).substr(2, 6).toUpperCase()}${Math.floor(1000 + Math.random() * 9000)}`;
+      state.friendId = data.id || `KNK-${crypto.randomUUID().toUpperCase()}`;
+      state.myAvatar = data.avatar || null;
+      state.myAvatarHash = data.avatarHash || null;
       state.friends = data.friends || {};
       state.friendRequests = data.requests || [];
       
       displayName.textContent = state.myName;
       document.getElementById('my-friend-id').textContent = state.friendId;
+
+      if (state.myAvatar) {
+        document.getElementById('my-avatar-img').src = state.myAvatar;
+        document.getElementById('my-avatar-img').style.display = 'block';
+        document.getElementById('my-avatar-default').style.display = 'none';
+      }
       
       stepName.classList.add('hidden');
       stepAction.classList.remove('hidden');
@@ -421,9 +583,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.myName = n;
     
     if (!state.friendId) {
-      const randomHex = Math.random().toString(36).substr(2, 6).toUpperCase();
-      const randomNum = Math.floor(1000 + Math.random() * 9000);
-      state.friendId = `KNK-${randomHex}${randomNum}`;
+      state.friendId = `KNK-${crypto.randomUUID().toUpperCase()}`;
     }
     
     displayName.textContent = n;
@@ -524,6 +684,134 @@ window.addEventListener('DOMContentLoaded', async () => {
     stepCreate.classList.remove('hidden');
   });
 
+  const joinReqAcceptBtn = document.getElementById('join-req-accept');
+  const joinReqDenyBtn = document.getElementById('join-req-deny');
+  
+  if (joinReqAcceptBtn) {
+    joinReqAcceptBtn.addEventListener('click', () => {
+      if (state.pendingJoinReq && state.room && state.globalMqtt) {
+        state.globalMqtt.publish(`kanka-voice/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
+          type: 'room_join_accepted',
+          id: state.friendId,
+          name: state.myName,
+          roomId: state.room,
+          password: state.password || ''
+        }));
+      }
+      document.getElementById('join-request-modal').classList.add('hidden');
+      state.pendingJoinReq = null;
+    });
+  }
+
+  if (joinReqDenyBtn) {
+    joinReqDenyBtn.addEventListener('click', () => {
+      if (state.pendingJoinReq && state.globalMqtt) {
+        state.globalMqtt.publish(`kanka-voice/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
+          type: 'room_join_declined',
+          id: state.friendId,
+          name: state.myName
+        }));
+      }
+      document.getElementById('join-request-modal').classList.add('hidden');
+      state.pendingJoinReq = null;
+    });
+  }
+
+  window.sendServerInvite = (fId) => {
+    if (state.globalMqtt && state.globalMqtt.connected) {
+      state.globalMqtt.publish(`kanka-voice/user/${fId}/events`, JSON.stringify({
+        type: 'server_invite_received',
+        id: state.friendId,
+        name: state.myName,
+        roomId: state.room,
+        password: state.password
+      }));
+      showToast("Davet gönderildi!", "ok");
+    } else {
+      showToast("Bağlantı sorunu.", "warn");
+    }
+  };
+
+  const renderServerFriends = () => {
+    const list = document.getElementById('server-friends-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const onlineFriends = Object.keys(state.friends).filter(fId => state.friends[fId].online);
+    
+    if (onlineFriends.length === 0) {
+      list.innerHTML = '<li class="muted" style="text-align: center; padding: 16px;">Şu an çevrimiçi arkadaşın yok.</li>';
+      return;
+    }
+    
+    onlineFriends.forEach(fId => {
+      const f = state.friends[fId];
+      // Aynı odada olanlara davet atma
+      if (f.room === state.room && state.room) return; 
+
+      const li = document.createElement('li');
+      li.className = 'friend-item';
+      li.innerHTML = `
+        <div class="friend-info">
+          <div class="friend-status online"></div>
+          <div><b>${escapeHtml(f.name)}</b></div>
+        </div>
+        <div class="friend-actions">
+          <button class="btn-pri btn-sm" style="padding: 6px 12px; border-radius: 6px; cursor:pointer;" onclick="sendServerInvite('${fId}')">Davet Et</button>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+    
+    if (list.innerHTML === '') {
+      list.innerHTML = '<li class="muted" style="text-align: center; padding: 16px;">Davet edilecek arkadaş bulunamadı.</li>';
+    }
+  };
+
+  const btnShowServerInvites = document.getElementById('btn-show-server-invites');
+  if (btnShowServerInvites) {
+    btnShowServerInvites.addEventListener('click', () => {
+      renderServerFriends();
+      document.getElementById('server-invites-modal').classList.remove('hidden');
+    });
+  }
+  
+  const serverInvitesClose = document.getElementById('server-invites-close');
+  if (serverInvitesClose) {
+    serverInvitesClose.addEventListener('click', () => {
+      document.getElementById('server-invites-modal').classList.add('hidden');
+    });
+  }
+
+  const serverInviteAcceptBtn = document.getElementById('server-invite-accept');
+  if (serverInviteAcceptBtn) {
+    serverInviteAcceptBtn.addEventListener('click', () => {
+      document.getElementById('server-invite-received-modal').classList.add('hidden');
+      if (state.pendingServerInvite) {
+        if (state.room) disconnectApp();
+        
+        document.getElementById('step-action').classList.add('hidden');
+        
+        const joinIdInput = document.getElementById('join-id');
+        const joinPwInput = document.getElementById('join-password');
+        const btnJoin = document.getElementById('btn-join');
+        if(joinIdInput && btnJoin) {
+           joinIdInput.value = state.pendingServerInvite.roomId;
+           if(joinPwInput) joinPwInput.value = state.pendingServerInvite.password || '';
+           btnJoin.click();
+        }
+        state.pendingServerInvite = null;
+      }
+    });
+  }
+
+  const serverInviteDenyBtn = document.getElementById('server-invite-deny');
+  if (serverInviteDenyBtn) {
+    serverInviteDenyBtn.addEventListener('click', () => {
+      document.getElementById('server-invite-received-modal').classList.add('hidden');
+      state.pendingServerInvite = null;
+    });
+  }
+
   const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false) => {
     state.room = roomId;
     state.password = pw;
@@ -550,7 +838,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('room-title').textContent = '# ' + serverName + (state.cryptoKey ? ' 🔒' : '');
       document.getElementById('display-server-id').textContent = roomId;
       
-      addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true });
+      addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true, avatar: state.myAvatar });
       
       window.electronAPI.startDiscovery(state.myId, state.myName, state.room);
       setupInternetSignaling(state.room, state.myId, state.myName);
@@ -626,7 +914,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (state.joinTimeout) clearTimeout(state.joinTimeout);
     state.isJoining = false;
     const sName = createName.value.trim() || 'Oyun Odası';
-    const newRoomId = Math.random().toString(36).substr(2, 6).toUpperCase();
+    const newRoomId = crypto.randomUUID().toUpperCase();
     startApp(newRoomId, createPw.value, createAi.checked, createPtt.checked, sName, false);
   });
 
@@ -933,7 +1221,22 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
     if (e.track.kind === 'audio') {
       peer.audioEl.srcObject = e.streams[0];
-      peer.audioEl.volume = state.volume;
+      
+      try {
+        if (!state.remoteAudioCtx) state.remoteAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!peer.gainNode) {
+          const source = state.remoteAudioCtx.createMediaStreamSource(e.streams[0]);
+          peer.gainNode = state.remoteAudioCtx.createGain();
+          peer.gainNode.gain.value = 1.0;
+          source.connect(peer.gainNode);
+          peer.gainNode.connect(state.remoteAudioCtx.destination);
+          peer.audioEl.muted = true;
+        }
+      } catch(err) {
+        peer.audioEl.volume = 1.0;
+        peer.audioEl.muted = false;
+      }
+
       peer.audioEl.play().catch((err) => console.warn('Audio play failed:', err));
       setupSpeakingDetection(peerId, e.streams[0]);
     } else if (e.track.kind === 'video') {
@@ -996,6 +1299,13 @@ function setupDataChannel(peerId, dc) {
       peer.dc = dc;
       // Send initial state so the peer knows our mic/deaf/share status
       try {
+        if (peer.pingInterval) clearInterval(peer.pingInterval);
+        peer.pingInterval = setInterval(() => {
+          if (dc.readyState === 'open') {
+            dc.send(JSON.stringify({ type: 'ping-req', ts: Date.now() }));
+          }
+        }, 2000);
+
         dc.send(JSON.stringify({ type: 'state', mic: state.micEnabled, deaf: state.deafened }));
         if (state.isSharing) dc.send(JSON.stringify({ type: 'sharing', sharing: true }));
         
@@ -1031,7 +1341,11 @@ function setupDataChannel(peerId, dc) {
       } catch (e) {}
     }
   };
-  dc.onclose = () => console.log('DC kapandı:', peerId);
+  dc.onclose = () => {
+    console.log('DC kapandı:', peerId);
+    const peer = state.peers.get(peerId);
+    if (peer && peer.pingInterval) clearInterval(peer.pingInterval);
+  };
   dc.onmessage = async (e) => {
     if (typeof e.data === 'string') {
       try {
@@ -1064,7 +1378,20 @@ async function handleDataMessage(peerId, msg) {
   const peer = state.peers.get(peerId);
   if (!peer) return;
 
-  if (msg.type === 'state') {
+  if (msg.type === 'ping-req') {
+    try {
+      if (peer.dc && peer.dc.readyState === 'open') {
+        peer.dc.send(JSON.stringify({ type: 'ping-res', ts: msg.ts }));
+      }
+    } catch(e) {}
+  } else if (msg.type === 'ping-res') {
+    const latency = Date.now() - msg.ts;
+    const pingEl = document.getElementById(`ping-${peerId}`);
+    if (pingEl) {
+      pingEl.textContent = `${latency}ms`;
+      pingEl.className = 'uping ' + (latency < 50 ? 'ping-good' : (latency < 120 ? 'ping-ok' : 'ping-bad'));
+    }
+  } else if (msg.type === 'state') {
     if (msg.mic !== undefined) peer.mic = msg.mic;
     if (msg.deaf !== undefined) peer.deaf = msg.deaf;
     updateUserUI(peerId);
@@ -1267,24 +1594,47 @@ function setupSpeakingDetection(peerId, stream) {
   check();
 }
 
-function addUser({ id, name, mic, deaf, sharing, self, ip }) {
+function addUser({ id, name, mic, deaf, sharing, self, ip, avatar }) {
   if (document.querySelector(`[data-uid="${id}"]`)) return;
   const li = document.createElement('li');
   li.className = 'user';
   li.dataset.uid = id;
+  const avatarHtml = avatar 
+    ? `<img src="${escapeHtml(avatar)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
+    : name.charAt(0).toUpperCase();
   li.innerHTML = `
     <div class="av">
-      ${name.charAt(0).toUpperCase()}
+      ${avatarHtml}
       <div class="st"></div>
     </div>
-    <div class="uname">${escapeHtml(name)}</div>
-    <div class="uact">
+    <div class="uname" style="flex:1;">
+      <div style="font-weight:bold;">${escapeHtml(name)}</div>
+      ${!self ? `
+        <div style="display:flex; align-items:center; margin-top:2px;" title="Ses Seviyesi">
+          <span style="font-size:10px; margin-right:4px;">🔉</span>
+          <input type="range" class="vol-slider" min="0" max="2" step="0.1" value="1" data-vol="${id}" style="width:60px; height:4px; accent-color:var(--ok); cursor:pointer;">
+        </div>
+      ` : ''}
+    </div>
+    <div class="uact" style="display:flex; align-items:center; gap:8px;">
+      <div id="ping-${id}" class="uping" title="Gecikme" style="font-size:11px; font-weight:bold;">--ms</div>
       ${!self ? `<button data-ctrl="${id}" title="Uzaktan kontrol iste">🖱️</button>` : ''}
     </div>
   `;
   document.getElementById('users').appendChild(li);
   if (!self) {
     li.querySelector(`[data-ctrl="${id}"]`).addEventListener('click', () => requestControl(id));
+    const volSlider = li.querySelector(`[data-vol="${id}"]`);
+    if (volSlider) {
+      volSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        const peer = state.peers.get(id);
+        if (peer) {
+          if (peer.gainNode) peer.gainNode.gain.value = val;
+          else if (peer.audioEl) peer.audioEl.volume = Math.min(val, 1.0);
+        }
+      });
+    }
   }
   updateEmptyGrid();
 }
@@ -2050,8 +2400,21 @@ function disconnectApp() {
     internetAnnounceInterval = null;
   }
 
+  state.room = null;
+  state.pendingJoinReq = null;
+
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login').classList.remove('hidden');
+  
+  // Sadece step-action'ı göster
+  document.getElementById('step-name').classList.add('hidden');
+  document.getElementById('step-join').classList.add('hidden');
+  document.getElementById('step-create').classList.add('hidden');
+  document.getElementById('step-add-friend').classList.add('hidden');
+  document.getElementById('step-action').classList.remove('hidden');
+  
+  // Arkadaş listesini güncelle (sunucudan çıktığımızı bildir)
+  renderFriends();
 }
 
 function initWhiteboard() {
@@ -3657,3 +4020,303 @@ function showDrawModal(card, index) {
     }
   };
 }
+
+// --- DIRECT MESSAGING LOGIC ---
+
+window.openDM = (friendId) => {
+  if (!state.friends[friendId]) return;
+  state.activeDM = friendId;
+  
+  // Show DM panel in main menu
+  document.getElementById('step-action').classList.add('dm-open');
+  
+  // Also update server DM modal active name
+  document.getElementById('dm-active-name').textContent = state.friends[friendId].name;
+  document.getElementById('server-dm-active-name').textContent = state.friends[friendId].name;
+  
+  // Show input area in server modal
+  const serverInputArea = document.getElementById('server-dm-input-area');
+  if (serverInputArea) serverInputArea.style.display = 'flex';
+  
+  if (!state.dms[friendId]) state.dms[friendId] = [];
+  
+  renderDMs();
+};
+
+window.closeDM = () => {
+  state.activeDM = null;
+  document.getElementById('step-action').classList.remove('dm-open');
+  
+  document.getElementById('server-dm-active-name').textContent = 'Arkadaş Seçin';
+  const serverInputArea = document.getElementById('server-dm-input-area');
+  if (serverInputArea) serverInputArea.style.display = 'none';
+  
+  document.getElementById('dm-messages').innerHTML = '<div class="muted" style="text-align:center; margin-top:50px;">Mesajlaşmaya başlamak için bir arkadaş seç.</div>';
+  document.getElementById('server-dm-messages').innerHTML = '<div class="muted" style="text-align:center; margin-top:50px;">Mesajlaşmaya başlamak için bir arkadaş seç.</div>';
+};
+
+window.renderDMs = () => {
+  if (!state.activeDM) return;
+  const friendId = state.activeDM;
+  const messages = state.dms[friendId] || [];
+  
+  const html = messages.map(m => {
+    const cls = m.sender === 'me' ? 'sent' : 'recv';
+    let contentHtml = escapeHtml(m.content);
+    
+    if (m.type === 'image') {
+      contentHtml = `<img src="${m.content}" />`;
+    } else if (m.type === 'file') {
+      contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
+    }
+    
+    return `<div class="dm-msg ${cls}">${contentHtml}</div>`;
+  }).join('');
+  
+  const container = document.getElementById('dm-messages');
+  if (container) {
+    container.innerHTML = html || '<div class="muted" style="text-align:center; margin-top:50px;">Henüz mesaj yok.</div>';
+    container.scrollTop = container.scrollHeight;
+  }
+  
+  const serverContainer = document.getElementById('server-dm-messages');
+  if (serverContainer) {
+    serverContainer.innerHTML = html || '<div class="muted" style="text-align:center; margin-top:50px;">Henüz mesaj yok.</div>';
+    serverContainer.scrollTop = serverContainer.scrollHeight;
+  }
+};
+
+window.renderServerDMFriends = () => {
+  const list = document.getElementById('server-dm-friend-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const onlineFriends = Object.keys(state.friends).filter(fId => state.friends[fId].online);
+  
+  if (onlineFriends.length === 0) {
+    list.innerHTML = '<li class="muted" style="text-align: center; padding: 16px;">Şu an çevrimiçi arkadaşın yok.</li>';
+    return;
+  }
+  
+  onlineFriends.forEach(fId => {
+    const f = state.friends[fId];
+    const isActive = state.activeDM === fId;
+    const li = document.createElement('li');
+    li.style.cssText = `padding: 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s; color: #fff; background: ${isActive ? 'rgba(255,255,255,0.1)' : 'transparent'}; display: flex; align-items: center; gap: 8px;`;
+    li.innerHTML = `<div class="friend-status online"></div> <b>${escapeHtml(f.name)}</b>`;
+    li.onmouseover = () => { if (!isActive) li.style.background = 'rgba(255,255,255,0.05)'; };
+    li.onmouseout = () => { if (!isActive) li.style.background = 'transparent'; };
+    li.onclick = () => { openDM(fId); renderServerDMFriends(); };
+    list.appendChild(li);
+  });
+};
+
+window.sendDMText = (text) => {
+  if (!state.activeDM || !text.trim() || !state.globalMqtt || !state.globalMqtt.connected) return;
+  const friendId = state.activeDM;
+  
+  // Local store
+  if (!state.dms[friendId]) state.dms[friendId] = [];
+  state.dms[friendId].push({ sender: 'me', type: 'text', content: text, timestamp: Date.now() });
+  saveDMs();
+  renderDMs();
+  
+  // MQTT send
+  state.globalMqtt.publish(`kanka-voice/user/${friendId}/events`, JSON.stringify({
+    type: 'dm_msg',
+    fromId: state.friendId,
+    msgType: 'text',
+    content: text
+  }));
+};
+
+window.sendDMFile = (file) => {
+  if (!state.activeDM || !state.globalMqtt || !state.globalMqtt.connected) return;
+  const friendId = state.activeDM;
+  
+  if (file.size > 2 * 1024 * 1024) {
+    alert("DM üzerinden en fazla 2MB boyutunda dosya gönderebilirsiniz. Lütfen daha küçük bir dosya seçin.");
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const base64Data = e.target.result;
+    const isImage = file.type.startsWith('image/');
+    const msgType = isImage ? 'image' : 'file';
+    
+    // Local store
+    if (!state.dms[friendId]) state.dms[friendId] = [];
+    state.dms[friendId].push({ sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
+    saveDMs();
+    renderDMs();
+    
+    const CHUNK_SIZE = 60000; // ~60KB
+    const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
+    const fileId = crypto.randomUUID();
+    
+    state.globalMqtt.publish(`kanka-voice/user/${friendId}/events`, JSON.stringify({
+      type: 'dm_file_start',
+      fromId: state.friendId,
+      fileId: fileId,
+      msgType: msgType,
+      fileName: file.name,
+      totalChunks: totalChunks
+    }));
+    
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = base64Data.substr(i * CHUNK_SIZE, CHUNK_SIZE);
+      state.globalMqtt.publish(`kanka-voice/user/${friendId}/events`, JSON.stringify({
+        type: 'dm_file_chunk',
+        fromId: state.friendId,
+        fileId: fileId,
+        chunkIndex: i,
+        data: chunk
+      }));
+    }
+  };
+  reader.readAsDataURL(file);
+};
+
+state.incomingDMFiles = {};
+
+window.receiveDM = (fromId, data) => {
+  if (!state.dms[fromId]) state.dms[fromId] = [];
+  
+  if (data.type === 'dm_msg') {
+    state.dms[fromId].push({ sender: 'them', type: data.msgType, content: data.content, timestamp: Date.now() });
+    saveDMs();
+    if (state.activeDM === fromId) renderDMs();
+    else showToast(`${state.friends[fromId]?.name || 'Biri'} sana mesaj gönderdi.`, 'info');
+  } 
+  else if (data.type === 'dm_file_start') {
+    state.incomingDMFiles[data.fileId] = {
+      fromId: data.fromId,
+      msgType: data.msgType,
+      fileName: data.fileName,
+      totalChunks: data.totalChunks,
+      chunks: []
+    };
+  }
+  else if (data.type === 'dm_file_chunk') {
+    const fileData = state.incomingDMFiles[data.fileId];
+    if (fileData) {
+      fileData.chunks[data.chunkIndex] = data.data;
+      if (fileData.chunks.filter(c => c).length === fileData.totalChunks) {
+        const fullBase64 = fileData.chunks.join('');
+        state.dms[fromId].push({ sender: 'them', type: fileData.msgType, content: fullBase64, fileName: fileData.fileName, timestamp: Date.now() });
+        saveDMs();
+        delete state.incomingDMFiles[data.fileId];
+        
+        if (state.activeDM === fromId) renderDMs();
+        else showToast(`${state.friends[fromId]?.name || 'Biri'} sana bir dosya gönderdi.`, 'info');
+      }
+    }
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadDMs(); // Load saved DM history
+  
+  const addEvt = (id, evt, handler) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(evt, handler);
+  };
+  
+  addEvt('dm-close-btn', 'click', closeDM);
+  addEvt('server-dm-close', 'click', () => {
+    document.getElementById('server-dm-modal').classList.add('hidden');
+    closeDM();
+  });
+  
+  addEvt('dm-btn-send', 'click', () => {
+    const inp = document.getElementById('dm-input');
+    sendDMText(inp.value);
+    inp.value = '';
+  });
+  addEvt('dm-input', 'keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendDMText(e.target.value);
+      e.target.value = '';
+    }
+  });
+
+  addEvt('server-dm-btn-send', 'click', () => {
+    const inp = document.getElementById('server-dm-input');
+    sendDMText(inp.value);
+    inp.value = '';
+  });
+  addEvt('server-dm-input', 'keypress', (e) => {
+    if (e.key === 'Enter') {
+      sendDMText(e.target.value);
+      e.target.value = '';
+    }
+  });
+
+  addEvt('dm-btn-file', 'click', () => document.getElementById('dm-file-input').click());
+  addEvt('dm-file-input', 'change', (e) => {
+    if (e.target.files.length) sendDMFile(e.target.files[0]);
+  });
+
+  addEvt('server-dm-btn-file', 'click', () => document.getElementById('server-dm-file-input').click());
+  addEvt('server-dm-file-input', 'change', (e) => {
+    if (e.target.files.length) sendDMFile(e.target.files[0]);
+  });
+
+  addEvt('btn-edit-avatar', 'click', () => {
+    document.getElementById('my-avatar-input').click();
+  });
+  
+  addEvt('my-avatar-input', 'change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 128;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        state.myAvatar = dataUrl;
+        state.myAvatarHash = getAvatarHash(dataUrl);
+        document.getElementById('my-avatar-img').src = dataUrl;
+        document.getElementById('my-avatar-img').style.display = 'block';
+        document.getElementById('my-avatar-default').style.display = 'none';
+        saveProfile();
+        // Send a ping immediately to update friends
+        if (state.globalMqtt && state.globalMqtt.connected) {
+          state.globalMqtt.publish(`kanka-voice/user/${state.friendId}/presence`, JSON.stringify({
+            online: true,
+            id: state.friendId,
+            name: state.myName,
+            room: state.room || null,
+            avatarHash: state.myAvatarHash
+          }));
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  addEvt('btn-show-server-dms', 'click', () => {
+    document.getElementById('server-dm-modal').classList.remove('hidden');
+    renderServerDMFriends();
+  });
+});
