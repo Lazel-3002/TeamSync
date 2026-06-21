@@ -40,7 +40,26 @@ const state = {
   dms: {}, // { friendId: [ { sender: 'me'|'them', type: 'text'|'file', content: '...', timestamp: 123 }, ... ] }
   activeDM: null,
   myAvatar: null,
-  myAvatarHash: null
+  myAvatarHash: null,
+  act: { wt: false, uno: false },
+  wt: { player: null, isReady: false, lastAction: 0, ignoreNextEvent: false, joinedActivity: false },
+  sb: { host: null, interactive: false, ignoreNextNav: false, joinedActivity: false, lastUrl: '', lastVideoState: null },
+  uno: {
+    host: null,
+    players: new Map(), // id -> { name, ready, cardCount }
+    maxPlayers: 4,
+    started: false,
+    myHand: [],
+    deck: [],
+    discard: [],
+    turnIndex: 0,
+    direction: 1,
+    currentColor: '',
+    turnOrder: [],
+    botHands: {},
+    botTimeout: null,
+    joinedActivity: false
+  }
 };
 
 const CHUNK_SIZE = 64 * 1024;
@@ -163,10 +182,10 @@ async function handleSignal(id, ip, signal) {
       await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
       const answer = await peer.pc.createAnswer();
       await peer.pc.setLocalDescription(answer);
-      if (ip === 'internet') {
+      if (mqttClient && mqttClient.connected) {
         sendInternetSignal(id, { type: 'answer', sdp: answer });
-      } else {
-        window.electronAPI.sendUDPSignal(ip, { type: 'answer', sdp: answer });
+      } else if (peer.ip && peer.ip !== 'internet') {
+        window.electronAPI.sendUDPSignal(peer.ip, { type: 'answer', sdp: answer });
       }
       // Process queued candidates
       while (peer.iceQueue.length) {
@@ -234,7 +253,61 @@ function getAvatarHash(base64Str) {
   return Math.abs(hash).toString(36);
 }
 
-function saveProfile() {
+// Global Functions for Account Management
+window.getAccounts = async function() {
+  try {
+    const data = await window.electronAPI.loadAccounts();
+    return data || [];
+  } catch (e) {
+    return [];
+  }
+};
+
+window.saveAccounts = async function(accounts) {
+  try {
+    await window.electronAPI.saveAccounts(accounts);
+  } catch (e) {}
+};
+
+window.updateAccountInList = async function(profile) {
+  const accounts = await getAccounts();
+  const idx = accounts.findIndex(acc => acc.id === profile.id);
+  const isDefault = idx !== -1 ? accounts[idx].isDefault : false;
+  const accData = { ...profile, isDefault };
+  if (idx !== -1) {
+    accounts[idx] = accData;
+  } else {
+    accounts.push(accData);
+  }
+  await saveAccounts(accounts);
+};
+
+window.deleteAccount = async function(id) {
+  let accounts = await getAccounts();
+  accounts = accounts.filter(acc => acc.id !== id);
+  await saveAccounts(accounts);
+  
+  // If we deleted the active profile, clear active profile
+  const activeProfileStr = localStorage.getItem('teamsync_profile');
+  if (activeProfileStr) {
+    try {
+      const activeProfile = JSON.parse(activeProfileStr);
+      if (activeProfile.id === id) {
+        localStorage.removeItem('teamsync_profile');
+      }
+    } catch(e){}
+  }
+};
+
+window.loginWithAccount = function(acc) {
+  state.myName = acc.name;
+  state.friendId = acc.id;
+  state.myAvatar = acc.avatar || null;
+  state.myAvatarHash = acc.avatarHash || null;
+  state.friends = acc.friends || {};
+  state.friendRequests = acc.requests || [];
+  
+  // Set in localStorage as active profile
   localStorage.setItem('teamsync_profile', JSON.stringify({
     name: state.myName,
     id: state.friendId,
@@ -243,6 +316,109 @@ function saveProfile() {
     friends: state.friends,
     requests: state.friendRequests
   }));
+  
+  document.getElementById('display-name').textContent = state.myName;
+  document.getElementById('my-friend-id').textContent = state.friendId;
+  
+  if (state.myAvatar) {
+    document.getElementById('my-avatar-img').src = state.myAvatar;
+    document.getElementById('my-avatar-img').style.display = 'block';
+    document.getElementById('my-avatar-default').style.display = 'none';
+  } else {
+    document.getElementById('my-avatar-img').style.display = 'none';
+    document.getElementById('my-avatar-default').style.display = 'block';
+  }
+  
+  document.getElementById('step-accounts').classList.add('hidden');
+  document.getElementById('step-name').classList.add('hidden');
+  document.getElementById('step-action').classList.remove('hidden');
+  document.querySelector('.login-card').classList.add('expanded');
+  
+  renderFriends();
+  setupGlobalMQTT();
+};
+
+window.renderAccountsList = async function() {
+  const container = document.getElementById('accounts-list');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  const accounts = await getAccounts();
+  if (accounts.length === 0) {
+    // Show step-name to create first account
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('step-name').classList.remove('hidden');
+    document.getElementById('btn-back-accounts').classList.add('hidden');
+    return;
+  }
+  
+  accounts.forEach(acc => {
+    const row = document.createElement('div');
+    row.className = 'account-row';
+    
+    let avatarHtml = `<div class="account-row-avatar">👤</div>`;
+    if (acc.avatar) {
+      avatarHtml = `<img class="account-row-avatar" src="${acc.avatar}" />`;
+    }
+    
+    row.innerHTML = `
+      ${avatarHtml}
+      <div class="account-row-info">
+        <div class="account-row-name">${escapeHtml(acc.name)}</div>
+        <div class="account-row-id">${acc.id}</div>
+      </div>
+      <div class="account-row-actions">
+        <label class="account-row-checkbox-label" onclick="event.stopPropagation();">
+          <input type="checkbox" class="default-chk" ${acc.isDefault ? 'checked' : ''} />
+          Otomatik
+        </label>
+        <button class="account-row-delete-btn" title="Hesabı Sil" onclick="event.stopPropagation();">🗑️</button>
+      </div>
+    `;
+    
+    // Checkbox toggle handler
+    const chk = row.querySelector('.default-chk');
+    chk.onchange = async (e) => {
+      e.stopPropagation();
+      const accountsList = await getAccounts();
+      accountsList.forEach(a => {
+        if (a.id === acc.id) a.isDefault = chk.checked;
+        else if (chk.checked) a.isDefault = false; // Only one default account
+      });
+      await saveAccounts(accountsList);
+      await renderAccountsList();
+    };
+    
+    // Delete button handler
+    const delBtn = row.querySelector('.account-row-delete-btn');
+    delBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm(`"${acc.name}" hesabını bu cihazdan silmek istediğinize emin misiniz?`)) {
+        await deleteAccount(acc.id);
+        await renderAccountsList();
+      }
+    };
+    
+    // Click row to login
+    row.onclick = () => {
+      loginWithAccount(acc);
+    };
+    
+    container.appendChild(row);
+  });
+};
+
+async function saveProfile() {
+  const profileData = {
+    name: state.myName,
+    id: state.friendId,
+    avatar: state.myAvatar,
+    avatarHash: state.myAvatarHash,
+    friends: state.friends,
+    requests: state.friendRequests
+  };
+  localStorage.setItem('teamsync_profile', JSON.stringify(profileData));
+  await updateAccountInList(profileData);
   renderFriends();
 }
 
@@ -375,6 +551,7 @@ window.removeFriend = (id) => {
 };
 
 let presenceInterval = null;
+let pingInterval = null;
 
 function setupGlobalMQTT() {
   if (state.globalMqtt) return;
@@ -390,16 +567,19 @@ function setupGlobalMQTT() {
     
     if (presenceInterval) clearInterval(presenceInterval);
     presenceInterval = setInterval(() => {
-      state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
-        online: true,
-        id: state.friendId,
-        name: state.myName,
-        room: state.room || null,
-        avatarHash: state.myAvatarHash || null
-      }));
+      if (state.globalMqtt && state.globalMqtt.connected) {
+        state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
+          online: true,
+          id: state.friendId,
+          name: state.myName,
+          room: state.room || null,
+          avatarHash: state.myAvatarHash || null
+        }));
+      }
     }, 5000);
 
-    setInterval(() => {
+    if (pingInterval) clearInterval(pingInterval);
+    pingInterval = setInterval(() => {
       if (state.globalMqtt && state.globalMqtt.connected) {
         state.globalMqtt.publish(`teamsync/user/${state.friendId}/events`, JSON.stringify({
           type: 'ping_latency_req',
@@ -609,42 +789,45 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) {}
 
-  const savedProfile = localStorage.getItem('teamsync_profile');
-  if (savedProfile) {
-    try {
-      const data = JSON.parse(savedProfile);
-      state.myName = data.name || 'TeamSync';
-      state.friendId = data.id || `KNK-${crypto.randomUUID().toUpperCase()}`;
-      state.myAvatar = data.avatar || null;
-      state.myAvatarHash = data.avatarHash || null;
-      state.friends = data.friends || {};
-      state.friendRequests = data.requests || [];
-      
-      displayName.textContent = state.myName;
-      document.getElementById('my-friend-id').textContent = state.friendId;
-
-      if (state.myAvatar) {
-        document.getElementById('my-avatar-img').src = state.myAvatar;
-        document.getElementById('my-avatar-img').style.display = 'block';
-        document.getElementById('my-avatar-default').style.display = 'none';
+  const isSecond = await window.electronAPI.isSecondInstance();
+  const accountsList = await getAccounts();
+  const defaultAcc = !isSecond ? accountsList.find(acc => acc.isDefault) : null;
+  
+  if (defaultAcc) {
+    loginWithAccount(defaultAcc);
+  } else {
+    const savedProfile = localStorage.getItem('teamsync_profile');
+    if (savedProfile) {
+      try {
+        const data = JSON.parse(savedProfile);
+        const existing = accountsList.find(a => a.id === data.id);
+        if (existing) {
+          loginWithAccount(existing);
+        } else {
+          loginWithAccount(data);
+        }
+      } catch(e) {
+        await showAccountsOrNameSetup();
       }
-      
-      stepName.classList.add('hidden');
-      stepAction.classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
-      
-      renderFriends();
-      setupGlobalMQTT();
-    } catch(e) {}
+    } else {
+      await showAccountsOrNameSetup();
+    }
+  }
+
+  async function showAccountsOrNameSetup() {
+    const accList = await getAccounts();
+    if (accList.length > 0) {
+      document.getElementById('step-accounts').classList.remove('hidden');
+      await renderAccountsList();
+    } else {
+      document.getElementById('step-name').classList.remove('hidden');
+    }
   }
 
   btnNextName.addEventListener('click', () => {
     const n = nameInp.value.trim() || 'Anonim';
     state.myName = n;
-    
-    if (!state.friendId) {
-      state.friendId = `KNK-${crypto.randomUUID().toUpperCase()}`;
-    }
-    
+    state.friendId = `KNK-${crypto.randomUUID().toUpperCase()}`;
     displayName.textContent = n;
     document.getElementById('my-friend-id').textContent = state.friendId;
     
@@ -652,8 +835,61 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     stepName.classList.add('hidden');
     stepAction.classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
+  });
+
+  document.getElementById('btn-new-account').addEventListener('click', () => {
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('step-name').classList.remove('hidden');
+    document.getElementById('btn-back-accounts').classList.remove('hidden');
+  });
+
+  document.getElementById('btn-back-accounts').addEventListener('click', async () => {
+    document.getElementById('step-name').classList.add('hidden');
+    document.getElementById('step-accounts').classList.remove('hidden');
+    await renderAccountsList();
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    if (mqttClient) {
+      mqttClient.end();
+      mqttClient = null;
+    }
+    if (internetAnnounceInterval) {
+      clearInterval(internetAnnounceInterval);
+      internetAnnounceInterval = null;
+    }
+    if (presenceInterval) {
+      clearInterval(presenceInterval);
+      presenceInterval = null;
+    }
+    if (pingInterval) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
+    if (state.globalMqtt) {
+      try {
+        state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
+          online: false,
+          id: state.friendId
+        }));
+      } catch (e) {}
+      state.globalMqtt.end();
+      state.globalMqtt = null;
+    }
     
-    setupGlobalMQTT();
+    localStorage.removeItem('teamsync_profile');
+    
+    state.myName = '';
+    state.friendId = '';
+    state.myAvatar = null;
+    state.myAvatarHash = null;
+    state.friends = {};
+    state.friendRequests = [];
+    
+    document.getElementById('step-action').classList.add('hidden');
+    document.querySelector('.login-card').classList.remove('expanded');
+    document.getElementById('step-accounts').classList.remove('hidden');
+    await renderAccountsList();
   });
 
   document.getElementById('my-friend-id').addEventListener('click', () => {
@@ -1255,12 +1491,14 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
-      const peer = state.peers.get(peerId);
-      const ip = peer ? peer.ip : peerIp;
-      if (ip === 'internet') {
+      if (mqttClient && mqttClient.connected) {
         sendInternetSignal(peerId, { type: 'ice', candidate: e.candidate });
-      } else if (ip) {
-        window.electronAPI.sendUDPSignal(ip, { type: 'ice', candidate: e.candidate });
+      } else {
+        const peer = state.peers.get(peerId);
+        const ip = peer ? peer.ip : peerIp;
+        if (ip && ip !== 'internet') {
+          window.electronAPI.sendUDPSignal(ip, { type: 'ice', candidate: e.candidate });
+        }
       }
     }
   };
@@ -1291,6 +1529,9 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
       
       try {
         if (!state.remoteAudioCtx) state.remoteAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (state.remoteAudioCtx.state === 'suspended') {
+          state.remoteAudioCtx.resume().catch(() => {});
+        }
         if (!peer.gainNode) {
           const source = state.remoteAudioCtx.createMediaStreamSource(e.streams[0]);
           peer.gainNode = state.remoteAudioCtx.createGain();
@@ -1352,15 +1593,27 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (isInitiator) {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    if (peerIp === 'internet') {
+    if (mqttClient && mqttClient.connected) {
       sendInternetSignal(peerId, { type: 'offer', sdp: offer });
-    } else if (peerIp) {
+    } else if (peerIp && peerIp !== 'internet') {
       window.electronAPI.sendUDPSignal(peerIp, { type: 'offer', sdp: offer });
     }
   }
 }
 
+function getActiveActivity() {
+  if (!document.getElementById('wt-card').classList.contains('hidden')) return 'wt';
+  if (!document.getElementById('uno-card').classList.contains('hidden')) return 'uno';
+  if (!document.getElementById('sb-card').classList.contains('hidden')) return 'sb';
+  if (!document.getElementById('poll-card').classList.contains('hidden')) return 'poll';
+  if (!document.getElementById('lvs-card').classList.contains('hidden')) return 'lvs';
+  if (!document.getElementById('wheel-card').classList.contains('hidden')) return 'wheel';
+  if (!document.getElementById('wb-card').classList.contains('hidden')) return 'wb';
+  return null;
+}
+
 function setupDataChannel(peerId, dc) {
+  dc.binaryType = 'arraybuffer';
   dc.onopen = () => {
     console.log('✅ DC açıldı:', peerId);
     // Make sure peer.dc points to this open channel
@@ -1379,34 +1632,71 @@ function setupDataChannel(peerId, dc) {
         dc.send(JSON.stringify({ type: 'state', mic: state.micEnabled, deaf: state.deafened }));
         if (state.isSharing) dc.send(JSON.stringify({ type: 'sharing', sharing: true }));
         
-        // Sync Hosted Activities
-        if (state.uno.host === state.myId && !state.uno.started) {
-          dc.send(JSON.stringify({ type: 'uno-lobby', host: state.myId }));
-          dc.send(JSON.stringify({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) }));
-        } else if (state.uno.host === state.myId && state.uno.started) {
-          dc.send(JSON.stringify({ 
-            type: 'uno-sync', 
-            host: state.myId,
-            players: Array.from(state.uno.players.entries()),
-            turnOrder: state.uno.turnOrder,
-            turnIndex: state.uno.turnIndex,
-            direction: state.uno.direction,
-            discard: state.uno.discard,
-            currentColor: state.uno.currentColor,
-            handsCount: Array.from(state.uno.players.entries()).map(([id, p]) => ({ id, count: p.cardCount }))
-          }));
-        }
-        if (state.sb.host === state.myId) {
-          dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: state.sb.interactive }));
-          dc.send(JSON.stringify({ type: 'sb-nav', url: document.getElementById('sb-url').value }));
-        }
-        if (state.act.wt && state.wt.player) {
-           const vid = document.getElementById('wt-input').value;
-           if (vid) dc.send(JSON.stringify({ type: 'wt-load', vid }));
-        }
-        if (state.myId < peerId && !document.getElementById('wb-card').classList.contains('hidden')) {
-           const wbData = document.getElementById('wb-canvas').toDataURL('image/jpeg', 0.5);
-           dc.send(JSON.stringify({ type: 'wb-sync', data: wbData }));
+        // Sync Hosted / Active Activities for late joiners
+        const activeAct = getActiveActivity();
+        if (activeAct) {
+          if (activeAct === 'wt') {
+            const url = document.getElementById('wt-url')?.value || '';
+            const match = url.match(/(?:v=|youtu\.be\/)([^&]+)/);
+            if (match) {
+              dc.send(JSON.stringify({ type: 'wt-load', vid: match[1] }));
+            }
+          } else if (activeAct === 'sb' && state.sb.host === state.myId) {
+            dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: state.sb.interactive }));
+            const currentUrl = document.getElementById('sb-url')?.value || '';
+            if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl }));
+          } else if (activeAct === 'uno' && state.uno.host === state.myId) {
+            if (!state.uno.started) {
+              dc.send(JSON.stringify({ type: 'uno-lobby', host: state.myId }));
+              dc.send(JSON.stringify({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) }));
+            } else {
+              dc.send(JSON.stringify({ 
+                type: 'uno-sync', 
+                host: state.myId,
+                players: Array.from(state.uno.players.entries()),
+                turnOrder: state.uno.turnOrder,
+                turnIndex: state.uno.turnIndex,
+                direction: state.uno.direction,
+                discard: state.uno.discard,
+                currentColor: state.uno.currentColor,
+                handsCount: Array.from(state.uno.players.entries()).map(([id, p]) => ({ id, count: p.cardCount }))
+              }));
+            }
+          } else if (activeAct === 'poll') {
+            if (window.pollState) {
+              dc.send(JSON.stringify({ 
+                type: 'poll_start', 
+                q: window.pollState.q, 
+                opts: window.pollState.opts, 
+                id: window.pollState.id 
+              }));
+              // Also send current votes
+              Object.keys(window.pollState.votes).forEach(opt => {
+                const count = window.pollState.votes[opt] || 0;
+                for (let i = 0; i < count; i++) {
+                  dc.send(JSON.stringify({ type: 'poll_vote', pollId: window.pollState.id, opt }));
+                }
+              });
+            }
+          } else if (activeAct === 'wheel') {
+            if (window.wheelItems && window.wheelItems.length > 0) {
+              dc.send(JSON.stringify({ type: 'wheel_items', items: window.wheelItems }));
+              dc.send(JSON.stringify({ type: 'wheel_ready' }));
+            }
+          } else if (activeAct === 'lvs') {
+            const lvsPlayer = document.getElementById('lvs-player');
+            if (lvsPlayer && !lvsPlayer.paused) {
+              dc.send(JSON.stringify({
+                type: 'lvs_sync',
+                ev: 'play',
+                time: lvsPlayer.currentTime,
+                paused: false
+              }));
+            }
+          } else if (activeAct === 'wb' && state.myId < peerId) {
+            const wbData = document.getElementById('wb-canvas').toDataURL('image/jpeg', 0.5);
+            dc.send(JSON.stringify({ type: 'wb-sync', data: wbData }));
+          }
         }
       } catch (e) {}
     }
@@ -1598,71 +1888,12 @@ async function handleDataMessage(peerId, msg) {
     handleUnoMessage(peerId, msg);
   } else if (msg.type.startsWith('sb-')) {
     handleSBMessage(peerId, msg);
-  } else if (['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_spin'].includes(msg.type)) {
+  } else if (['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
     if (window.activityHandler) window.activityHandler(msg);
   }
 }
 
-function handleSBMessage(peerId, msg) {
-  if (msg.type === 'sb-start') {
-    state.sb.host = msg.host;
-    state.sb.interactive = msg.interactive;
-    document.getElementById('sb-card').classList.remove('hidden');
-    makeCardFocusable(document.getElementById('sb-card'));
-    
-    if (!state.sb.joinedActivity) {
-      showInactiveOverlay('sb-card', 'Ortak Tarayıcı', () => {
-         state.sb.joinedActivity = true;
-         removeInactiveOverlay('sb-card');
-         if (!focusedCard) toggleFocus(document.getElementById('sb-card'));
-         if (state.sb.lastUrl) {
-            state.sb.ignoreNextNav = true;
-            document.getElementById('sb-webview').src = state.sb.lastUrl;
-            document.getElementById('sb-url').value = state.sb.lastUrl;
-         }
-      });
-    }
-    
-    const sUrl = document.getElementById('sb-url');
-    const sOverlay = document.getElementById('sb-overlay');
-    if (!state.sb.interactive && state.sb.host !== state.myId) {
-      sUrl.disabled = true;
-      sOverlay.style.display = 'block';
-    } else {
-      sUrl.disabled = false;
-      sOverlay.style.display = 'none';
-    }
-  } else if (msg.type === 'sb-nav') {
-    state.sb.lastUrl = msg.url;
-    if (!state.sb.joinedActivity) return;
-    state.sb.ignoreNextNav = true;
-    document.getElementById('sb-webview').src = msg.url;
-    document.getElementById('sb-url').value = msg.url;
-  } else if (msg.type === 'sb-video-sync') {
-    if (state.sb.host !== state.myId && state.sb.joinedActivity) {
-      const sbWebview = document.getElementById('sb-webview');
-      if (sbWebview) {
-        const syncScript = `(() => {
-          const v = document.querySelector('video');
-          if (!v) return;
-          const targetTime = ${msg.currentTime} + (Date.now() - ${msg.ts}) / 1000;
-          if (Math.abs(v.currentTime - targetTime) > 2) {
-            v.currentTime = targetTime;
-          }
-          if (${msg.paused} && !v.paused) v.pause();
-          if (!${msg.paused} && v.paused) v.play().catch(e => {});
-        })()`;
-        sbWebview.executeJavaScript(syncScript).catch(e => {});
-      }
-    }
-  } else if (msg.type === 'sb-close') {
-    document.getElementById('sb-card').classList.add('hidden');
-    if (focusedCard === document.getElementById('sb-card')) toggleFocus(document.getElementById('sb-card'));
-    state.sb.joinedActivity = false;
-    const sbWebview = document.getElementById('sb-webview');
-    if (sbWebview) sbWebview.src = 'https://www.google.com';
-  }
-}
+
 
 function setupSpeakingDetection(peerId, stream) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2421,47 +2652,39 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
-function endUnoGame() {
-  if (state.uno.host !== state.myId) return;
-  state.uno.started = false;
-
-  const rankings = [];
-  Array.from(state.uno.players.entries()).forEach(([id, p]) => {
-    let count = p.cardCount;
-    if (id === state.myId) count = state.uno.myHand.length;
-    else if (id.startsWith('bot-')) count = state.uno.botHands[id]?.length || 0;
-    rankings.push({ id, name: p.name, count });
+function closeAllCards() {
+  ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+    if (focusedCard && focusedCard.id === id) {
+      toggleFocus(focusedCard);
+    }
   });
 
-  rankings.sort((a, b) => a.count - b.count);
-  broadcast({ type: 'uno-game-over', rankings });
-  showUnoGameOver(rankings);
-}
-
-function showUnoGameOver(rankings) {
-  state.uno.started = false;
-  document.getElementById('uno-game').classList.add('hidden');
-  document.getElementById('uno-game-over').classList.remove('hidden');
-  
-  const container = document.getElementById('uno-rankings');
-  container.innerHTML = '';
-  rankings.forEach((r, idx) => {
-    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👏';
-    container.innerHTML += `
-      <div style="background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 8px; display: flex; justify-content: space-between; font-size: 18px; border: 1px solid rgba(255,255,255,0.2);">
-        <span>${medal} ${escapeHtml(r.name)}</span>
-        <span>${r.count} Kart</span>
-      </div>
-    `;
-  });
-
-  if (state.uno.host === state.myId) {
-    document.getElementById('uno-replay-btn').classList.remove('hidden');
-    document.getElementById('uno-replay-wait').classList.add('hidden');
-  } else {
-    document.getElementById('uno-replay-btn').classList.add('hidden');
-    document.getElementById('uno-replay-wait').classList.remove('hidden');
+  if (state.wt) {
+    if (state.wt.player && state.wt.player.stopVideo) {
+      try { state.wt.player.stopVideo(); } catch(e){}
+    }
+    state.wt.joinedActivity = false;
   }
+  if (state.sb) {
+    state.sb.joinedActivity = false;
+    const sbWebview = document.getElementById('sb-webview');
+    if (sbWebview) sbWebview.src = 'https://www.google.com';
+  }
+  if (state.uno) {
+    state.uno.joinedActivity = false;
+    state.uno.host = null;
+    state.uno.players.clear();
+    state.uno.started = false;
+    const lobby = document.getElementById('uno-lobby');
+    if (lobby) lobby.classList.remove('hidden');
+    const ugame = document.getElementById('uno-game');
+    if (ugame) ugame.classList.add('hidden');
+  }
+
+  const empty = document.getElementById('empty-state');
+  if (empty) empty.classList.add('hidden');
 }
 
 function throttle(fn, wait) {
@@ -2560,128 +2783,7 @@ function disconnectApp() {
   renderFriends();
 }
 
-function initWhiteboard() {
-  const canvas = document.getElementById('wb-canvas');
-  state.wbContext = canvas.getContext('2d');
-  
-  canvas.width = 1920;
-  canvas.height = 1080;
-  state.wbContext.fillStyle = '#ffffff';
-  state.wbContext.fillRect(0,0,1920,1080);
 
-  function getPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.offsetX * (1920 / rect.width),
-      y: e.offsetY * (1080 / rect.height)
-    };
-  }
-
-  let startX = 0, startY = 0;
-  let isDrawingShape = false;
-  let tempCanvasData = null;
-  const wbCard = document.getElementById('wb-card');
-  
-  canvas.addEventListener('mousedown', e => {
-    if (focusedCard !== wbCard) return;
-    state.drawing = true;
-    const pos = getPos(e);
-    startX = pos.x; startY = pos.y;
-    const tool = document.getElementById('wb-tool').value;
-    if (tool !== 'pen') {
-      isDrawingShape = true;
-      tempCanvasData = state.wbContext.getImageData(0,0,1920, 1080);
-    }
-  });
-  
-  canvas.addEventListener('mousemove', e => {
-    if (!state.drawing) return;
-    const pos = getPos(e);
-    const tool = document.getElementById('wb-tool').value;
-    const color = document.getElementById('wb-color').value;
-    const size = document.getElementById('wb-size').value;
-    
-    if (tool === 'pen') {
-      drawWb(tool, startX, startY, pos.x, pos.y, color, size);
-      broadcast({ type: 'draw', tool, x0: startX/1920, y0: startY/1080, x1: pos.x/1920, y1: pos.y/1080, color, size });
-      startX = pos.x; startY = pos.y;
-    } else if (isDrawingShape) {
-      state.wbContext.putImageData(tempCanvasData, 0, 0);
-      drawWb(tool, startX, startY, pos.x, pos.y, color, size);
-    }
-  });
-  
-  window.addEventListener('mouseup', e => {
-    if (state.drawing && isDrawingShape && e.target === canvas) {
-      const pos = getPos(e);
-      const tool = document.getElementById('wb-tool').value;
-      const color = document.getElementById('wb-color').value;
-      const size = document.getElementById('wb-size').value;
-      
-      if (tool === 'text') {
-        const text = prompt('Yazılacak metin:');
-        if (text) {
-          drawWb('text', startX, startY, pos.x, pos.y, color, size, text);
-          broadcast({ type: 'draw', tool: 'text', x0: startX/1920, y0: startY/1080, color, size, text });
-        } else {
-          state.wbContext.putImageData(tempCanvasData, 0, 0);
-        }
-      } else {
-        broadcast({ type: 'draw', tool, x0: startX/1920, y0: startY/1080, x1: pos.x/1920, y1: pos.y/1080, color, size });
-      }
-    }
-    state.drawing = false;
-    isDrawingShape = false;
-  });
-  
-  makeCardFocusable(wbCard);
-
-  document.getElementById('wb-btn').addEventListener('click', () => {
-    state.wbJoined = true;
-    wbCard.classList.toggle('hidden');
-    makeCardFocusable(document.getElementById('wb-card'));
-    if (!wbCard.classList.contains('hidden') && !focusedCard) toggleFocus(wbCard);
-  });
-
-  document.getElementById('wb-close').addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (focusedCard === wbCard) toggleFocus(wbCard);
-    wbCard.classList.add('hidden');
-    state.wbJoined = false;
-  });
-  
-  document.getElementById('wb-clear').addEventListener('click', (e) => {
-    e.stopPropagation();
-    state.wbContext.fillStyle = '#ffffff';
-    state.wbContext.fillRect(0,0,1920,1080);
-    broadcast({ type: 'wb-clear' });
-  });
-}
-
-function drawWb(tool, x0, y0, x1, y1, color, size, text='') {
-  const ctx = state.wbContext;
-  ctx.beginPath();
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = size * 2;
-  ctx.lineCap = 'round';
-  
-  if (tool === 'pen') {
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
-    ctx.stroke();
-  } else if (tool === 'rect') {
-    ctx.rect(x0, y0, x1 - x0, y1 - y0);
-    ctx.stroke();
-  } else if (tool === 'circle') {
-    ctx.ellipse(x0, y0, Math.abs(x1 - x0), Math.abs(y1 - y0), 0, 0, 2 * Math.PI);
-    ctx.stroke();
-  } else if (tool === 'text') {
-    ctx.font = `${size * 6}px Inter`;
-    ctx.fillText(text, x0, y0);
-  }
-  ctx.closePath();
-}
 
 function initFileTransfer() {
   const dropOverlay = document.getElementById('drop-overlay');
@@ -2719,25 +2821,26 @@ function appendFileMsg(fileId, name, size, incoming) {
 async function sendFile(file) {
   const fileId = crypto.randomUUID();
   appendFileMsg(fileId, file.name, file.size, false);
-  broadcast({ type: 'file-meta', id: fileId, name: file.name, size: file.size, mime: file.type });
+
+  const activePeers = Array.from(state.peers.values()).filter(p => p.dc && p.dc.readyState === 'open');
   
-  let offset = 0;
-  while (offset < file.size) {
-    const slice = file.slice(offset, offset + CHUNK_SIZE);
-    const chunk = new Uint8Array(await slice.arrayBuffer());
-    const header = new TextEncoder().encode(JSON.stringify({ id: fileId }) + '|');
-    const msgBuf = new Uint8Array(header.length + chunk.length);
-    msgBuf.set(header);
-    msgBuf.set(chunk, header.length);
-    
-    if (mqttClient && mqttClient.connected && state.room) {
-      try {
-        mqttClient.publish(`teamsync/room/${state.room}/file`, mqtt.Buffer.from(msgBuf));
-      } catch (e) {
-        console.warn('MQTT file send failed:', e);
-      }
-    } else {
-      for (const [_, peer] of state.peers) {
+  if (activePeers.length > 0) {
+    // Send via WebRTC Data Channels
+    const metaMsg = JSON.stringify({ type: 'file-meta', id: fileId, name: file.name, size: file.size, mime: file.type });
+    activePeers.forEach(peer => {
+      try { peer.dc.send(metaMsg); } catch(e) {}
+    });
+
+    let offset = 0;
+    while (offset < file.size) {
+      const slice = file.slice(offset, offset + CHUNK_SIZE);
+      const chunk = new Uint8Array(await slice.arrayBuffer());
+      const header = new TextEncoder().encode(JSON.stringify({ id: fileId }) + '|');
+      const msgBuf = new Uint8Array(header.length + chunk.length);
+      msgBuf.set(header);
+      msgBuf.set(chunk, header.length);
+
+      for (const peer of activePeers) {
         if (peer.dc && peer.dc.readyState === 'open') {
           while (peer.dc.bufferedAmount > 2 * 1024 * 1024) {
             await new Promise(r => setTimeout(r, 50));
@@ -2745,13 +2848,46 @@ async function sendFile(file) {
           try { peer.dc.send(msgBuf); } catch(e){}
         }
       }
+      
+      offset += chunk.length;
+      const prog = document.getElementById(`prog-${fileId}`);
+      if (prog) prog.style.width = (offset / file.size * 100) + '%';
     }
-    
-    offset += chunk.length;
-    const prog = document.getElementById(`prog-${fileId}`);
-    if (prog) prog.style.width = (offset / file.size * 100) + '%';
+
+    const doneMsg = JSON.stringify({ type: 'file-done', id: fileId });
+    activePeers.forEach(peer => {
+      try { peer.dc.send(doneMsg); } catch(e) {}
+    });
+  } else if (mqttClient && mqttClient.connected && state.room) {
+    // Fallback to MQTT (safe for small files, warning printed for larger files)
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("Büyük dosyaları MQTT üzerinden göndermek yavaştır ve kopabilir. WebRTC bağlantısı kurulmasını bekleyin.", "warn");
+    }
+    broadcast({ type: 'file-meta', id: fileId, name: file.name, size: file.size, mime: file.type });
+
+    let offset = 0;
+    while (offset < file.size) {
+      const slice = file.slice(offset, offset + CHUNK_SIZE);
+      const chunk = new Uint8Array(await slice.arrayBuffer());
+      const header = new TextEncoder().encode(JSON.stringify({ id: fileId }) + '|');
+      const msgBuf = new Uint8Array(header.length + chunk.length);
+      msgBuf.set(header);
+      msgBuf.set(chunk, header.length);
+
+      try {
+        mqttClient.publish(`teamsync/room/${state.room}/file`, msgBuf);
+      } catch (e) {
+        console.warn('MQTT file send failed:', e);
+      }
+      
+      offset += chunk.length;
+      const prog = document.getElementById(`prog-${fileId}`);
+      if (prog) prog.style.width = (offset / file.size * 100) + '%';
+      
+      await new Promise(r => setTimeout(r, 15)); // avoid flooding
+    }
+    broadcast({ type: 'file-done', id: fileId });
   }
-  broadcast({ type: 'file-done', id: fileId });
 
   const div = document.getElementById('file-' + fileId);
   if (div) {
@@ -2796,1470 +2932,16 @@ async function sendFile(file) {
   }
 }
 
-// ====== WATCH TOGETHER ======
-window.onYouTubeIframeAPIReady = function() {
-  state.wt.isReady = true;
-};
 
-function loadWTVideo(vid) {
-  if (!state.wt.player) {
-    state.wt.player = new YT.Player('wt-player', {
-      height: '100%',
-      width: '100%',
-      videoId: vid,
-      playerVars: { 'autoplay': 1, 'controls': 1, 'origin': 'https://www.youtube.com' },
-      events: {
-        'onStateChange': onWTStateChange
-      }
-    });
-  } else {
-    state.wt.player.loadVideoById(vid);
-  }
-}
-
-function onWTStateChange(event) {
-  if (state.wt.ignoreNextEvent) {
-    state.wt.ignoreNextEvent = false;
-    return;
-  }
-  const now = Date.now();
-  if (now - state.wt.lastAction < 500) return;
-  
-  if (event.data == YT.PlayerState.PLAYING) {
-    const time = state.wt.player.getCurrentTime();
-    broadcast({ type: 'wt-play', time });
-    state.wt.lastAction = now;
-  } else if (event.data == YT.PlayerState.PAUSED) {
-    const time = state.wt.player.getCurrentTime();
-    broadcast({ type: 'wt-pause', time });
-    state.wt.lastAction = now;
-  }
-}
-
-function handleWTMessage(peerId, msg) {
-  if (msg.type === 'wt-load') {
-    document.getElementById('activities-modal').classList.add('hidden');
-    document.getElementById('wt-card').classList.remove('hidden');
-    makeCardFocusable(document.getElementById('wt-card'));
-    
-    if (!state.wt.joinedActivity) {
-      showInactiveOverlay('wt-card', 'YouTube', () => {
-         state.wt.joinedActivity = true;
-         removeInactiveOverlay('wt-card');
-         if (!focusedCard) toggleFocus(document.getElementById('wt-card'));
-         loadWTVideo(msg.vid);
-      });
-    } else {
-      loadWTVideo(msg.vid);
-    }
-  } else if (msg.type === 'wt-play') {
-    if (state.wt.player && state.wt.player.playVideo) {
-      state.wt.ignoreNextEvent = true;
-      if (Math.abs(state.wt.player.getCurrentTime() - msg.time) > 2) {
-        state.wt.player.seekTo(msg.time);
-      }
-      state.wt.player.playVideo();
-    }
-  } else if (msg.type === 'wt-pause') {
-    if (state.wt.player && state.wt.player.pauseVideo) {
-      state.wt.ignoreNextEvent = true;
-      state.wt.player.seekTo(msg.time);
-      state.wt.player.pauseVideo();
-    }
-  } else if (msg.type === 'wt-close') {
-    document.getElementById('wt-card').classList.add('hidden');
-    if (focusedCard === document.getElementById('wt-card')) toggleFocus(document.getElementById('wt-card'));
-    state.wt.joinedActivity = false;
-    if (state.wt.player && state.wt.player.stopVideo) state.wt.player.stopVideo();
-  }
-}
-
-// ====== UNO GAME ======
-state.act = { wt: false, uno: false };
-state.wt = { player: null, isReady: false, lastAction: 0, ignoreNextEvent: false };
-state.sb = { host: null, interactive: false, ignoreNextNav: false };
-state.uno = {
-  host: null,
-  players: new Map(), // id -> { name, ready, cardCount }
-  maxPlayers: 4,
-  started: false,
-  myHand: [],
-  deck: [],
-  discard: [],
-  turnIndex: 0,
-  direction: 1,
-  currentColor: '',
-  turnOrder: [],
-  botHands: {},
-  botTimeout: null
-};
 
 function initActivitiesUI() {
-  document.getElementById('act-wt').addEventListener('click', () => {
-    document.getElementById('activities-modal').classList.add('hidden');
-    const wtCard = document.getElementById('wt-card');
-    
-    if (!wtCard.classList.contains('hidden') && !state.wt.joinedActivity) {
-      const btn = wtCard.querySelector('.inactive-overlay button');
-      if (btn) btn.click();
-      else if (!focusedCard) toggleFocus(wtCard);
-      return;
-    }
-    
-    state.wt.joinedActivity = true;
-    wtCard.classList.remove('hidden');
-    makeCardFocusable(wtCard);
-    if (!focusedCard) toggleFocus(wtCard);
-  });
-  
-  document.getElementById('wt-close').addEventListener('click', (e) => {
-    e.stopPropagation();
-    document.getElementById('wt-card').classList.add('hidden');
-    if (focusedCard === document.getElementById('wt-card')) toggleFocus(document.getElementById('wt-card'));
-    if (state.wt.player && state.wt.player.stopVideo) state.wt.player.stopVideo();
-    state.wt.joinedActivity = false;
-    broadcast({ type: 'wt-close' });
-  });
-  
-  document.getElementById('wt-load').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const url = document.getElementById('wt-url').value;
-    const match = url.match(/(?:v=|youtu\.be\/)([^&]+)/);
-    if (match) {
-      const vid = match[1];
-      broadcast({ type: 'wt-load', vid });
-      loadWTVideo(vid);
-    } else {
-      showToast('Geçerli bir YouTube linki girin', 'warn');
-    }
-  });
-
-  document.getElementById('act-sb').addEventListener('click', () => {
-    document.getElementById('activities-modal').classList.add('hidden');
-    const sbCard = document.getElementById('sb-card');
-    
-    if (state.sb.host && state.sb.host !== state.myId) {
-      const btn = sbCard.querySelector('.inactive-overlay button');
-      if (btn) btn.click();
-      else if (!focusedCard) toggleFocus(sbCard);
-      return;
-    }
-
-    state.sb.joinedActivity = true;
-    sbCard.classList.remove('hidden');
-    makeCardFocusable(sbCard);
-    if (!focusedCard) toggleFocus(sbCard);
-    
-    const confirmModal = document.getElementById('custom-confirm');
-    confirmModal.classList.remove('hidden');
-    confirmModal.style.display = 'flex';
-    
-    const finishSbSetup = (interactive) => {
-      confirmModal.classList.add('hidden');
-      confirmModal.style.display = 'none';
-      state.sb.interactive = interactive;
-      state.sb.host = state.myId;
-      document.getElementById('sb-overlay').style.display = 'none';
-      document.getElementById('sb-url').disabled = false;
-      broadcast({ type: 'sb-start', host: state.myId, interactive: state.sb.interactive });
-    };
-
-    document.getElementById('btn-confirm-yes').onclick = () => finishSbSetup(true);
-    document.getElementById('btn-confirm-no').onclick = () => finishSbSetup(false);
-  });
-
-  const sbWebview = document.getElementById('sb-webview');
-  const sbUrl = document.getElementById('sb-url');
-  
-  document.getElementById('sb-close').addEventListener('click', (e) => {
-    e.stopPropagation();
-    broadcast({ type: 'sb-close' });
-    document.getElementById('sb-card').classList.add('hidden');
-    if (focusedCard === document.getElementById('sb-card')) toggleFocus(document.getElementById('sb-card'));
-    sbWebview.src = 'https://www.google.com';
-    state.sb.joinedActivity = false;
-  });
-
-  document.getElementById('sb-go').addEventListener('click', (e) => {
-    e.stopPropagation();
-    let url = sbUrl.value.trim();
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) {
-      url = 'https://' + url;
-    }
-    if (/youtube\.com|youtu\.be/i.test(url)) {
-      showToast("💡 İpucu: YouTube videolarını senkronize izlemek için 'WatchTogether' etkinliğini kullanabilirsiniz!", "info");
-    }
-    sbWebview.src = url;
-  });
-  sbUrl.addEventListener('click', () => {
-    document.getElementById('sb-webview').blur();
-    sbUrl.focus();
-  });
-
-  sbUrl.addEventListener('focus', () => {
-    document.getElementById('sb-webview').blur();
-  });
-
-  sbUrl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('sb-go').click();
-  });
-
-  document.getElementById('sb-back').addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (sbWebview.canGoBack()) sbWebview.goBack();
-  });
-  document.getElementById('sb-forward').addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (sbWebview.canGoForward()) sbWebview.goForward();
-  });
-  document.getElementById('sb-refresh').addEventListener('click', (e) => {
-    e.stopPropagation();
-    sbWebview.reload();
-  });
-
-  // Webview'e tıklandığında focus'u ver
-  sbWebview.addEventListener('focus', () => {
-    sbWebview.focus();
-  });
-  
-  // Webview DOM hazır olduğunda keyboard input'u aktif et
-  sbWebview.addEventListener('dom-ready', () => {
-    sbWebview.focus();
-  });
-
-  sbWebview.addEventListener('did-navigate', (e) => {
-    state.sb.lastVideoState = null;
-    if (document.activeElement !== sbUrl) {
-      sbUrl.value = e.url;
-    }
-    if (state.sb.ignoreNextNav) {
-      state.sb.ignoreNextNav = false;
-      return;
-    }
-    if (state.sb.host === state.myId || state.sb.interactive) {
-      broadcast({ type: 'sb-nav', url: e.url });
-    }
-  });
-
-  sbWebview.addEventListener('did-navigate-in-page', (e) => {
-    state.sb.lastVideoState = null;
-    if (document.activeElement !== sbUrl) {
-      sbUrl.value = e.url;
-    }
-    if (state.sb.ignoreNextNav) {
-      state.sb.ignoreNextNav = false;
-      return;
-    }
-    if (state.sb.host === state.myId || state.sb.interactive) {
-      broadcast({ type: 'sb-nav', url: e.url });
-    }
-  });
-
-  // Shared Browser Video Synchronization & Auto Ad-Skipper
-  setInterval(async () => {
-    const sbCard = document.getElementById('sb-card');
-    if (!sbCard || sbCard.classList.contains('hidden')) return;
-    const sbWebview = document.getElementById('sb-webview');
-    if (!sbWebview) return;
-
-    // 1. Automatic Ad-Skipping (Applies to both host and guest)
-    try {
-      await sbWebview.executeJavaScript(`(() => {
-        // Dismiss standard YouTube ad skip button
-        const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button');
-        if (skipBtn) {
-          skipBtn.click();
-        }
-        
-        // Dismiss YouTube overlay ads (non-video ads)
-        const overlayAd = document.querySelector('.ytp-ad-overlay-close-button');
-        if (overlayAd) {
-          overlayAd.click();
-        }
-
-        // Speed up and skip video ads immediately
-        const ad = document.querySelector('.ad-showing, .ad-interrupting');
-        const v = document.querySelector('video');
-        if (ad && v) {
-          v.playbackRate = 16.0;
-          v.currentTime = v.duration - 0.1;
-        }
-      })()`);
-    } catch (e) {}
-
-    // 2. Video Playback Synchronization (Host broadcasts state)
-    if (state.sb.host === state.myId) {
-      try {
-        const vState = await sbWebview.executeJavaScript(`(() => {
-          const v = document.querySelector('video');
-          if (!v) return null;
-          return {
-            paused: v.paused,
-            currentTime: v.currentTime,
-            url: window.location.href
-          };
-        })()`);
-
-        if (vState) {
-          if (!state.sb.lastVideoState ||
-              state.sb.lastVideoState.paused !== vState.paused ||
-              Math.abs(state.sb.lastVideoState.currentTime - vState.currentTime) > 2) {
-            
-            state.sb.lastVideoState = vState;
-            broadcast({
-              type: 'sb-video-sync',
-              paused: vState.paused,
-              currentTime: vState.currentTime,
-              ts: Date.now()
-            });
-          }
-        }
-      } catch (e) {}
-    }
-  }, 1000);
-
-  document.getElementById('act-uno').addEventListener('click', () => {
-    document.getElementById('activities-modal').classList.add('hidden');
-    const unoCard = document.getElementById('uno-card');
-    
-    if (state.uno.host && state.uno.host !== state.myId) {
-      const btn = unoCard.querySelector('.inactive-overlay button');
-      if (btn) btn.click();
-      else if (!focusedCard) toggleFocus(unoCard);
-      return;
-    }
-
-    unoCard.classList.remove('hidden');
-    makeCardFocusable(unoCard);
-    if (!focusedCard) toggleFocus(unoCard);
-    
-    state.uno.host = state.myId;
-    state.uno.joinedActivity = true;
-    state.uno.players.set(state.myId, { name: state.myName, ready: true, cardCount: 0 });
-    document.getElementById('uno-host-settings').style.display = 'block';
-    document.getElementById('uno-ready-btn').classList.add('hidden');
-    document.getElementById('uno-start-btn').classList.remove('hidden');
-    document.getElementById('uno-max-players').disabled = false;
-    document.getElementById('uno-fill-bots').disabled = false;
-    
-    broadcast({ type: 'uno-lobby', host: state.myId });
-    renderUnoLobby();
-  });
-
-  document.getElementById('uno-close').addEventListener('click', (e) => {
-    e.stopPropagation();
-    document.getElementById('uno-card').classList.add('hidden');
-    if (focusedCard === document.getElementById('uno-card')) toggleFocus(document.getElementById('uno-card'));
-    state.uno.host = null;
-    state.uno.players.clear();
-    state.uno.started = false;
-    document.getElementById('uno-lobby').classList.remove('hidden');
-    document.getElementById('uno-game').classList.add('hidden');
-    state.uno.joinedActivity = false;
-    broadcast({ type: 'uno-leave' });
-  });
-
-  document.getElementById('uno-ready-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const p = state.uno.players.get(state.myId);
-    if (p) {
-      p.ready = !p.ready;
-      document.getElementById('uno-ready-btn').textContent = p.ready ? 'Hazırım' : 'Hazır Değilim';
-      document.getElementById('uno-ready-btn').style.background = p.ready ? 'var(--ok)' : 'var(--warn)';
-      broadcast({ type: 'uno-ready', ready: p.ready });
-      renderUnoLobby();
-    }
-  });
-
-  document.getElementById('uno-start-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const fillBots = document.getElementById('uno-fill-bots').checked;
-    const totalPlayers = fillBots ? state.uno.maxPlayers : state.uno.players.size;
-    if (totalPlayers < 2) {
-      alert("En az 2 kişi olmalı!");
-      return;
-    }
-    let allReady = true;
-    for (const [id, p] of state.uno.players) {
-      if (!p.ready) allReady = false;
-    }
-    if (!allReady) {
-      alert("Herkes hazır değil!");
-      return;
-    }
-    startUnoGame();
-  });
-
-  document.getElementById('uno-max-players').addEventListener('change', (e) => {
-    state.uno.maxPlayers = parseInt(e.target.value);
-    broadcast({ type: 'uno-max', max: state.uno.maxPlayers });
-  });
-
-  document.getElementById('uno-fill-bots').addEventListener('change', (e) => {
-    broadcast({ type: 'uno-fill', fill: e.target.checked });
-  });
-
-  document.getElementById('uno-uno-btn').addEventListener('click', () => {
-    state.uno.saidUno = true;
-    document.getElementById('uno-uno-btn').classList.add('hidden');
-    broadcast({ type: 'uno-said' });
-    showFloatingEmoji(state.myId, "UNO!");
-  });
-
-  document.getElementById('uno-catch-btn').addEventListener('click', () => {
-    if (state.uno.catchTarget) {
-      const targetId = state.uno.catchTarget;
-      broadcast({ type: 'uno-catch', targetId: targetId });
-      document.getElementById('uno-catch-btn').classList.add('hidden');
-      
-      if (state.uno.host === state.myId) {
-        state.uno.catchTarget = null;
-        broadcast({ type: 'uno-catch-success', targetId: targetId, catcherId: state.myId });
-        showToast(state.uno.players.get(targetId)?.name + " YAKALANDI!", "warn");
-        setTimeout(() => forceDrawCards(targetId, 2), 500);
-      }
-    }
-  });
-
-  document.getElementById('uno-sort-color').addEventListener('click', () => {
-    state.uno.myHand.sort((a, b) => {
-      if (a.color === 'black' && b.color !== 'black') return 1;
-      if (b.color === 'black' && a.color !== 'black') return -1;
-      if (a.color === b.color) return a.val.localeCompare(b.val);
-      return a.color.localeCompare(b.color);
-    });
-    renderUnoGame();
-  });
-
-  document.getElementById('uno-sort-num').addEventListener('click', () => {
-    state.uno.myHand.sort((a, b) => {
-      const aIsNum = !isNaN(parseInt(a.val));
-      const bIsNum = !isNaN(parseInt(b.val));
-      
-      if (!aIsNum && bIsNum) return 1;
-      if (!bIsNum && aIsNum) return -1;
-      
-      if (aIsNum && bIsNum) {
-        if (a.val === b.val) return a.color.localeCompare(b.color);
-        return parseInt(a.val) - parseInt(b.val);
-      }
-      
-      const order = { 'Skip': 1, 'Rev': 2, '+2': 3, 'Color': 4, '+4': 5 };
-      const aO = order[a.val] || 0;
-      const bO = order[b.val] || 0;
-      if (aO !== bO) return aO - bO;
-      
-      return a.color.localeCompare(b.color);
-    });
-    renderUnoGame();
-  });
-
-  document.getElementById('uno-emojis').addEventListener('click', (e) => {
-    if (e.target.tagName !== 'BUTTON') return;
-    const emoji = e.target.textContent;
-    showFloatingEmoji(state.myId, emoji);
-    broadcast({ type: 'uno-emoji', emoji });
-  });
-
-  document.getElementById('uno-replay-btn').addEventListener('click', () => {
-    broadcast({ type: 'uno-lobby', host: state.myId });
-    document.getElementById('uno-game-over').classList.add('hidden');
-    document.getElementById('uno-lobby').classList.remove('hidden');
-    state.uno.started = false;
-  });
+  if (typeof initWhiteboard === 'function') initWhiteboard();
+  if (typeof initWatchTogether === 'function') initWatchTogether();
+  if (typeof initSharedBrowser === 'function') initSharedBrowser();
+  if (typeof initUno === 'function') initUno();
+  if (typeof initLuckyWheel === 'function') initLuckyWheel();
 }
 
-function handleUnoMessage(peerId, msg) {
-  if (msg.type === 'uno-lobby') {
-    if (!state.uno.host || state.uno.host === peerId) {
-      state.uno.host = peerId;
-      document.getElementById('uno-card').classList.remove('hidden');
-      document.getElementById('uno-lobby').classList.remove('hidden');
-      document.getElementById('uno-game').classList.add('hidden');
-      document.getElementById('uno-game-over').classList.add('hidden');
-      makeCardFocusable(document.getElementById('uno-card'));
-      
-      if (!state.uno.joinedActivity) {
-         showInactiveOverlay('uno-card', 'UNO', () => {
-             state.uno.joinedActivity = true;
-             removeInactiveOverlay('uno-card');
-             if (!focusedCard) toggleFocus(document.getElementById('uno-card'));
-             
-             if (!state.uno.players.has(state.myId)) {
-               state.uno.players.set(state.myId, { name: state.myName, ready: false, cardCount: 0 });
-               document.getElementById('uno-host-settings').style.display = 'block';
-               document.getElementById('uno-max-players').disabled = true;
-               document.getElementById('uno-fill-bots').disabled = true;
-               document.getElementById('uno-ready-btn').classList.remove('hidden');
-               document.getElementById('uno-start-btn').classList.add('hidden');
-               document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
-               document.getElementById('uno-ready-btn').style.background = 'var(--warn)';
-             }
-             broadcast({ type: 'uno-join', name: state.myName, ready: state.uno.players.get(state.myId)?.ready || false });
-         });
-      } else {
-        if (!state.uno.players.has(state.myId)) {
-          state.uno.players.set(state.myId, { name: state.myName, ready: false, cardCount: 0 });
-          document.getElementById('uno-host-settings').style.display = 'block';
-          document.getElementById('uno-max-players').disabled = true;
-          document.getElementById('uno-fill-bots').disabled = true;
-          document.getElementById('uno-ready-btn').classList.remove('hidden');
-          document.getElementById('uno-start-btn').classList.add('hidden');
-          document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
-          document.getElementById('uno-ready-btn').style.background = 'var(--warn)';
-        }
-        broadcast({ type: 'uno-join', name: state.myName, ready: state.uno.players.get(state.myId)?.ready || false });
-      }
-    }
-  } else if (msg.type === 'uno-join') {
-    state.uno.players.set(peerId, { name: msg.name, ready: msg.ready, cardCount: 0 });
-    if (state.uno.host === state.myId) {
-      broadcast({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
-    }
-    renderUnoLobby();
-  } else if (msg.type === 'uno-ready') {
-    const p = state.uno.players.get(peerId);
-    if (p) {
-      p.ready = msg.ready;
-      if (state.uno.host === state.myId) {
-        broadcast({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
-      }
-      renderUnoLobby();
-    }
-  } else if (msg.type === 'uno-lobby-sync') {
-    state.uno.players = new Map(msg.players);
-    renderUnoLobby();
-  } else if (msg.type === 'uno-sync') {
-    state.uno.host = msg.host;
-    state.uno.started = true;
-    state.uno.players = new Map(msg.players);
-    state.uno.turnOrder = msg.turnOrder;
-    state.uno.turnIndex = msg.turnIndex;
-    state.uno.direction = msg.direction;
-    if (msg.myHand) state.uno.myHand = msg.myHand;
-    state.uno.discard = msg.discard;
-    state.uno.currentColor = msg.currentColor;
-    msg.handsCount.forEach(h => {
-      if (state.uno.players.has(h.id)) state.uno.players.get(h.id).cardCount = h.count;
-    });
-    
-    document.getElementById('uno-card').classList.remove('hidden');
-    document.getElementById('uno-lobby').classList.add('hidden');
-    document.getElementById('uno-game').classList.remove('hidden');
-    document.getElementById('uno-game-over').classList.add('hidden');
-    makeCardFocusable(document.getElementById('uno-card'));
-    if (!focusedCard) toggleFocus(document.getElementById('uno-card'));
-    
-    renderUnoGame();
-  } else if (msg.type === 'uno-req-draw') {
-    if (state.uno.host === state.myId) {
-      if (state.uno.waitingForKeepOrPlay) return;
-      const currentTurnId = state.uno.turnOrder[state.uno.turnIndex];
-      if (currentTurnId !== peerId) return;
-      
-      if (state.uno.deck.length === 0) {
-        const top = state.uno.discard.pop();
-        state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
-        state.uno.discard = [top];
-      }
-      const c = state.uno.deck.pop();
-      broadcastTo(peerId, { type: 'uno-draw-result', card: c, forced: false });
-      if (state.uno.players.has(peerId)) state.uno.players.get(peerId).cardCount++;
-      
-      const topCard = state.uno.discard[state.uno.discard.length - 1];
-      if (!canPlay(c, topCard)) {
-        state.uno.turnIndex = getNextTurn();
-      } else {
-        state.uno.waitingForKeepOrPlay = peerId;
-      }
-      
-      animateCardDraw(peerId);
-      broadcast({ type: 'uno-draw-anim', pid: peerId });
-      
-      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
-      broadcast({
-        type: 'uno-sync',
-        host: state.uno.host,
-        players: Array.from(state.uno.players.entries()),
-        turnOrder: state.uno.turnOrder,
-        turnIndex: state.uno.turnIndex,
-        direction: state.uno.direction,
-        discard: state.uno.discard,
-        currentColor: state.uno.currentColor,
-        handsCount
-      });
-      renderUnoGame();
-    }
-  } else if (msg.type === 'uno-draw-result') {
-    msg.card._new = true;
-    state.uno.myHand.push(msg.card);
-    renderUnoGame();
-    if (!msg.forced) {
-      const topCard = state.uno.discard[state.uno.discard.length - 1];
-      if (canPlay(msg.card, topCard)) {
-        showDrawModal(msg.card, state.uno.myHand.length - 1);
-      }
-    }
-  } else if (msg.type === 'uno-keep') {
-    if (state.uno.host === state.myId) {
-      state.uno.waitingForKeepOrPlay = null;
-      state.uno.turnIndex = getNextTurn();
-      if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
-      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
-      broadcast({ type: 'uno-sync', host: state.uno.host, players: Array.from(state.uno.players.entries()), turnOrder: state.uno.turnOrder, turnIndex: state.uno.turnIndex, direction: state.uno.direction, discard: state.uno.discard, currentColor: state.uno.currentColor, handsCount });
-      renderUnoGame();
-    }
-  } else if (msg.type === 'uno-draw-anim') {
-    animateCardDraw(msg.pid);
-  } else if (msg.type === 'uno-leave') {
-    if (state.uno.host === peerId) {
-      alert("Kurucu odadan çıktı. UNO iptal edildi.");
-      document.getElementById('uno-close').click();
-    } else {
-      state.uno.players.delete(peerId);
-      renderUnoLobby();
-    }
-  } else if (msg.type === 'uno-kicked') {
-    if (msg.targetId === state.myId) {
-       alert("Kurucu tarafından UNO'dan atıldınız!");
-       document.getElementById('uno-close').click();
-       state.uno.joinedActivity = false;
-    } else {
-       state.uno.players.delete(msg.targetId);
-       renderUnoLobby();
-    }
-  } else if (msg.type === 'uno-max') {
-    state.uno.maxPlayers = msg.max;
-    if (state.uno.host !== state.myId) document.getElementById('uno-max-players').value = msg.max;
-  } else if (msg.type === 'uno-fill') {
-    if (state.uno.host !== state.myId) document.getElementById('uno-fill-bots').checked = msg.fill;
-  } else if (msg.type === 'uno-start') {
-    state.uno.started = true;
-    state.uno.turnOrder = msg.turnOrder;
-    state.uno.turnIndex = msg.turnIndex;
-    state.uno.direction = msg.direction;
-    state.uno.myHand = msg.hands[state.myId] || [];
-    for (const id of state.uno.turnOrder) {
-      if (state.uno.players.has(id)) {
-        state.uno.players.get(id).cardCount = msg.hands[id]?.length || 0;
-      }
-    }
-    state.uno.discard = [msg.firstCard];
-    state.uno.currentColor = msg.firstCard.color;
-    
-    document.getElementById('uno-lobby').classList.add('hidden');
-    document.getElementById('uno-game').classList.remove('hidden');
-    document.getElementById('uno-game-over').classList.add('hidden');
-    renderUnoGame();
-  } else if (msg.type === 'uno-play') {
-    playPopSound();
-    const pId = msg.botId || peerId;
-    if (pId !== state.myId) animateRemotePlay(pId, msg.card);
-    
-    const p = state.uno.players.get(pId);
-    if (p) p.cardCount--;
-    state.uno.discard.push(msg.card);
-    state.uno.currentColor = msg.color || msg.card.color;
-    state.uno.turnIndex = msg.nextTurnIndex;
-    state.uno.direction = msg.direction;
-    if (state.uno.host === state.myId) {
-      state.uno.waitingForKeepOrPlay = null;
-      if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
-    }
-    state.uno.triggerDiscardAnim = true;
-
-    if (p && p.cardCount === 1 && !msg.saidUno) {
-      if (pId === state.myId) {
-        document.getElementById('uno-uno-btn').classList.remove('hidden');
-      } else {
-        if (state.uno.catchTimeout) clearTimeout(state.uno.catchTimeout);
-        state.uno.catchTimeout = setTimeout(() => {
-          state.uno.catchTarget = pId;
-          document.getElementById('uno-catch-btn').classList.remove('hidden');
-        }, 500);
-      }
-    }
-
-    setTimeout(() => renderUnoGame(), 300);
-
-    if (state.uno.host === state.myId) {
-      if (p && p.cardCount === 0) {
-        setTimeout(() => endUnoGame(), 800);
-        return;
-      }
-      if (msg.drawCount > 0) {
-        setTimeout(() => {
-          const victimIndex = getNextTurn(1, msg.oldTurnIndex, msg.direction);
-          const victimId = state.uno.turnOrder[victimIndex];
-          forceDrawCards(victimId, msg.drawCount);
-        }, 500);
-      }
-    }
-
-  } else if (msg.type === 'uno-draw') {
-    const pId = msg.botId || peerId;
-    const p = state.uno.players.get(pId);
-    if (p) p.cardCount += msg.count;
-    state.uno.turnIndex = msg.nextTurnIndex;
-    if (state.uno.host === state.myId && state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
-    renderUnoGame();
-  } else if (msg.type === 'uno-emoji') {
-    showFloatingEmoji(peerId, msg.emoji);
-  } else if (msg.type === 'uno-said') {
-    if (state.uno.catchTarget === peerId) {
-      clearTimeout(state.uno.catchTimeout);
-      document.getElementById('uno-catch-btn').classList.add('hidden');
-      state.uno.catchTarget = null;
-    }
-    showFloatingEmoji(peerId, "UNO!");
-    showToast(state.uno.players.get(peerId)?.name + " UNO dedi!", "ok");
-  } else if (msg.type === 'uno-catch') {
-    if (state.uno.host === state.myId && state.uno.catchTarget === msg.targetId) {
-      state.uno.catchTarget = null;
-      broadcast({ type: 'uno-catch-success', targetId: msg.targetId, catcherId: peerId });
-      showToast(state.uno.players.get(msg.targetId)?.name + " YAKALANDI!", "warn");
-      setTimeout(() => forceDrawCards(msg.targetId, 2), 500);
-    }
-  } else if (msg.type === 'uno-catch-success') {
-    state.uno.catchTarget = null;
-    clearTimeout(state.uno.catchTimeout);
-    document.getElementById('uno-catch-btn').classList.add('hidden');
-    showToast(state.uno.players.get(msg.targetId)?.name + " UNO demeyi unuttuğu için YAKALANDI!", "warn");
-  } else if (msg.type === 'uno-game-over') {
-    showUnoGameOver(msg.rankings);
-  }
-}
-
-function forceDrawCards(victimId, count) {
-  if (state.uno.host !== state.myId) return;
-  for (let i = 0; i < count; i++) {
-    if (state.uno.deck.length === 0) {
-      const top = state.uno.discard.pop();
-      state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
-      state.uno.discard = [top];
-    }
-    const c = state.uno.deck.pop();
-    const p = state.uno.players.get(victimId);
-    if (!p) continue;
-    p.cardCount++;
-    
-    if (victimId === state.myId) {
-      state.uno.myHand.push({ ...c, _new: true });
-    } else if (victimId.startsWith('bot-')) {
-      state.uno.botHands[victimId].push(c);
-    } else {
-      broadcastTo(victimId, { type: 'uno-draw-result', card: c, forced: true });
-    }
-    
-    animateCardDraw(victimId);
-    broadcast({ type: 'uno-draw-anim', pid: victimId });
-  }
-
-  const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
-  broadcast({
-    type: 'uno-sync',
-    host: state.uno.host,
-    players: Array.from(state.uno.players.entries()),
-    turnOrder: state.uno.turnOrder,
-    turnIndex: state.uno.turnIndex,
-    direction: state.uno.direction,
-    discard: state.uno.discard,
-    currentColor: state.uno.currentColor,
-    handsCount
-  });
-  renderUnoGame();
-}
-
-function renderUnoLobby() {
-  const wrap = document.getElementById('uno-players');
-  wrap.innerHTML = '';
-  for (const [id, p] of state.uno.players) {
-    const div = document.createElement('div');
-    div.className = 'uno-p-item' + (p.ready ? ' ready' : '');
-    
-    let kickBtn = '';
-    if (state.uno.host === state.myId && id !== state.myId && !id.startsWith('bot-')) {
-      kickBtn = `<button class="btn-sec btn-sm" style="margin-left: 10px; padding: 2px 6px; font-size: 10px; background: rgba(255,0,0,0.5); color: white; border: none;" onclick="kickUnoPlayer('${id}', event)">X</button>`;
-    }
-    
-    div.innerHTML = `<div class="st ${p.ready ? '' : 'muted'}"></div> <span>${escapeHtml(p.name)}</span> ${id === state.uno.host ? '👑' : ''} ${kickBtn}`;
-    wrap.appendChild(div);
-  }
-}
-
-window.kickUnoPlayer = (id, e) => {
-  e.stopPropagation();
-  if (confirm("Bu oyuncuyu atmak istediğinize emin misiniz?")) {
-    broadcast({ type: 'uno-kicked', targetId: id });
-    state.uno.players.delete(id);
-    renderUnoLobby();
-  }
-};
-
-function getUnoDeck() {
-  const colors = ['red', 'blue', 'green', 'yellow'];
-  const deck = [];
-  for (let c of colors) {
-    deck.push({ color: c, val: '0' });
-    for (let i = 1; i <= 9; i++) {
-      deck.push({ color: c, val: i.toString() });
-      deck.push({ color: c, val: i.toString() });
-    }
-    deck.push({ color: c, val: 'Skip' }); deck.push({ color: c, val: 'Skip' });
-    deck.push({ color: c, val: 'Rev' }); deck.push({ color: c, val: 'Rev' });
-    deck.push({ color: c, val: '+2' }); deck.push({ color: c, val: '+2' });
-  }
-  for (let i = 0; i < 4; i++) {
-    deck.push({ color: 'black', val: 'Color' });
-    deck.push({ color: 'black', val: '+4' });
-  }
-  return deck.sort(() => Math.random() - 0.5);
-}
-
-function startUnoGame() {
-  const fillBots = document.getElementById('uno-fill-bots').checked;
-  if (fillBots) {
-    let botIndex = 1;
-    while (state.uno.players.size < state.uno.maxPlayers) {
-      const bId = 'bot-' + botIndex;
-      state.uno.players.set(bId, { name: '🤖 Bot ' + botIndex, ready: true, cardCount: 0 });
-      botIndex++;
-    }
-    broadcast({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
-  }
-
-  const deck = getUnoDeck();
-  const hands = {};
-  const turnOrder = Array.from(state.uno.players.keys());
-  state.uno.botHands = {};
-  for (const id of turnOrder) {
-    hands[id] = [];
-    for (let i = 0; i < 7; i++) hands[id].push(deck.pop());
-    if (id.startsWith('bot-')) state.uno.botHands[id] = hands[id];
-  }
-  let firstCard = deck.pop();
-  while (firstCard.color === 'black' || firstCard.val === 'Skip' || firstCard.val === 'Rev' || firstCard.val === '+2') {
-    deck.unshift(firstCard);
-    firstCard = deck.pop();
-  }
-  
-  const startMsg = {
-    type: 'uno-start',
-    turnOrder, turnIndex: 0, direction: 1,
-    hands, firstCard
-  };
-  
-  console.log("startUnoGame: myId=", state.myId, "turnOrder=", turnOrder, "hands length for me=", hands[state.myId]?.length);
-
-  state.uno.started = true;
-  state.uno.deck = deck;
-  state.uno.turnOrder = turnOrder;
-  state.uno.turnIndex = 0;
-  state.uno.direction = 1;
-  state.uno.myHand = hands[state.myId];
-  for (const id of turnOrder) {
-    if (state.uno.players.has(id)) state.uno.players.get(id).cardCount = hands[id].length;
-  }
-  state.uno.discard = [firstCard];
-  state.uno.currentColor = firstCard.color;
-
-  broadcast(startMsg);
-  
-  document.getElementById('uno-lobby').classList.add('hidden');
-  document.getElementById('uno-game').classList.remove('hidden');
-  renderUnoGame();
-}
-
-function renderUnoGame() {
-  try {
-    doRenderUnoGame();
-  } catch (err) {
-    console.error("UNO Render Error:", err);
-  }
-}
-
-function doRenderUnoGame() {
-  if (!state.uno.started) return;
-  
-  const currentTurnId = state.uno.turnOrder[state.uno.turnIndex];
-  const pName = state.uno.players.get(currentTurnId)?.name || 'Bilinmiyor';
-  document.getElementById('uno-turn-name').textContent = pName;
-  document.getElementById('uno-turn-indicator').style.background = (currentTurnId === state.myId) ? 'var(--ok)' : 'rgba(0,0,0,0.6)';
-  
-  if (currentTurnId.startsWith('bot-') && state.myId === state.uno.host) {
-    if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
-    state.uno.botTimeout = setTimeout(() => {
-      botPlay(currentTurnId);
-    }, 1500);
-  }
-  
-  document.getElementById('uno-dir-indicator').textContent = state.uno.direction === 1 ? '🔃' : '🔄';
-  
-  const topCard = state.uno.discard[state.uno.discard.length - 1];
-  
-  console.log("DEBUG: body contains uno-discard?", document.body.innerHTML.includes('uno-discard'));
-  console.log("DEBUG: getElementById('uno-center')", document.getElementById('uno-center'));
-  console.log("DEBUG: getElementById('uno-discard')", document.getElementById('uno-discard'));
-  
-  let discardDiv = document.getElementById('uno-discard');
-  if (!discardDiv) {
-    console.error("FATAL: uno-discard is MISSING from the DOM! Recreating it...");
-    discardDiv = document.createElement('div');
-    discardDiv.id = 'uno-discard';
-    discardDiv.className = 'uno-card-ui empty';
-    const center = document.getElementById('uno-center');
-    if (center) center.appendChild(discardDiv);
-    else return;
-  }
-  
-  discardDiv.className = `uno-card-ui ${state.uno.currentColor}`;
-  if (state.uno.triggerDiscardAnim) {
-    discardDiv.style.transform = 'scale(1.2)';
-    setTimeout(() => { discardDiv.style.transform = 'scale(1)'; }, 150);
-    state.uno.triggerDiscardAnim = false;
-  }
-  
-  if (state.uno.currentColor !== topCard.color && topCard.color === 'black') {
-     discardDiv.innerHTML = `<span class="mini tl">${topCard.val}</span> ${topCard.val} <span class="mini br">${topCard.val}</span>`;
-     discardDiv.style.borderColor = state.uno.currentColor;
-  } else {
-     discardDiv.innerHTML = `<span class="mini tl">${topCard.val}</span> ${topCard.val} <span class="mini br">${topCard.val}</span>`;
-     discardDiv.style.borderColor = 'white';
-  }
-
-  const table = document.getElementById('uno-table');
-  table.querySelectorAll('.uno-remote-player').forEach(el => el.remove());
-  
-  const otherPlayers = [];
-  let idx = state.uno.turnOrder.indexOf(state.myId);
-  for (let i = 1; i < state.uno.turnOrder.length; i++) {
-    const nextIdx = (idx + i) % state.uno.turnOrder.length;
-    otherPlayers.push(state.uno.turnOrder[nextIdx]);
-  }
-
-  const angles = [];
-  if (otherPlayers.length === 1) {
-    angles.push(270);
-  } else if (otherPlayers.length === 2) {
-    angles.push(210, 330);
-  } else if (otherPlayers.length === 3) {
-    angles.push(180, 270, 0);
-  }
-
-  otherPlayers.forEach((id, i) => {
-    const rp = document.createElement('div');
-    rp.className = 'uno-remote-player';
-    const angle = angles[i] || 0;
-    const rad = angle * Math.PI / 180;
-    const radiusX = 35; 
-    const radiusY = 30; 
-    
-    rp.dataset.pid = id;
-    rp.style.left = `calc(50% + ${Math.cos(rad) * radiusX}%)`;
-    rp.style.top = `calc(50% + ${Math.sin(rad) * radiusY}%)`;
-    rp.style.transform = `translate(-50%, -50%)`;
-    
-    const pInfo = state.uno.players.get(id);
-    if (!pInfo) return;
-    
-    rp.innerHTML = `
-      <div class="card-count" style="border-color: ${id === currentTurnId ? 'var(--ok)' : 'transparent'}">${pInfo.cardCount}</div>
-      <div class="uname">${escapeHtml(pInfo.name)}</div>
-    `;
-    table.appendChild(rp);
-  });
-
-  console.log("doRenderUnoGame: myHand size=", state.uno.myHand?.length);
-
-  const handDiv = document.getElementById('uno-my-hand');
-  handDiv.innerHTML = '';
-  state.uno.myHand.forEach((c, cIdx) => {
-    const cDiv = document.createElement('div');
-    cDiv.className = `uno-card-ui ${c.color}`;
-    if (c._new) {
-      cDiv.classList.add('draw-anim');
-      delete c._new;
-    }
-    cDiv.innerHTML = `<span class="mini tl">${c.val}</span> ${c.val} <span class="mini br">${c.val}</span>`;
-    
-    cDiv.addEventListener('click', () => {
-      if (currentTurnId !== state.myId) return;
-      if (canPlay(c, topCard)) {
-        if (c.color === 'black') {
-          document.getElementById('uno-color-picker').classList.remove('hidden');
-          document.querySelectorAll('.ucc').forEach(btn => {
-            btn.onclick = () => {
-              const selectedColor = btn.dataset.color;
-              document.getElementById('uno-color-picker').classList.add('hidden');
-              playCard(cIdx, selectedColor);
-            };
-          });
-        } else {
-          playCard(cIdx);
-        }
-      } else {
-        showToast("Bu kartı oynayamazsın!", "warn");
-      }
-    });
-    handDiv.appendChild(cDiv);
-  });
-
-  document.getElementById('uno-deck').onclick = () => {
-    if (!state.uno.started) return;
-    if (currentTurnId === state.myId) {
-      if (state.uno.waitingForKeepOrPlay) return;
-      const deckDiv = document.getElementById('uno-deck');
-      deckDiv.style.transform = 'scale(0.9)';
-      setTimeout(() => { deckDiv.style.transform = 'scale(1)'; }, 150);
-
-      if (state.uno.host === state.myId) {
-        if (state.uno.deck.length === 0) {
-          const top = state.uno.discard.pop();
-          state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
-          state.uno.discard = [top];
-        }
-        const newCard = state.uno.deck.pop();
-        state.uno.myHand.push({ ...newCard, _new: true });
-        const p = state.uno.players.get(state.myId);
-        if(p) p.cardCount++;
-        
-        const topCard = state.uno.discard[state.uno.discard.length - 1];
-        let canPlayDrawn = canPlay(newCard, topCard);
-        if (!canPlayDrawn) {
-          state.uno.turnIndex = getNextTurn();
-        } else {
-          state.uno.waitingForKeepOrPlay = state.myId;
-        }
-        
-        animateCardDraw(state.myId);
-        broadcast({ type: 'uno-draw-anim', pid: state.myId });
-        
-        const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
-        broadcast({
-          type: 'uno-sync',
-          host: state.uno.host,
-          players: Array.from(state.uno.players.entries()),
-          turnOrder: state.uno.turnOrder,
-          turnIndex: state.uno.turnIndex,
-          direction: state.uno.direction,
-          discard: state.uno.discard,
-          currentColor: state.uno.currentColor,
-          handsCount
-        });
-        renderUnoGame();
-        
-        if (canPlayDrawn) {
-          showDrawModal(newCard, state.uno.myHand.length - 1);
-        }
-      } else {
-        broadcast({ type: 'uno-req-draw' });
-      }
-    }
-  };
-}
-
-function canPlay(card, topCard) {
-  if (card.color === 'black') return true;
-  if (card.color === state.uno.currentColor) return true;
-  if (card.val === topCard.val) return true;
-  return false;
-}
-
-function getNextTurn(skip = 1, currentIdx = state.uno.turnIndex, currentDir = state.uno.direction) {
-  let len = state.uno.turnOrder.length;
-  let next = (currentIdx + currentDir * skip) % len;
-  if (next < 0) next += len;
-  return next;
-}
-
-function animateCardDraw(pid) {
-  const table = document.getElementById('uno-table');
-  const deck = document.getElementById('uno-deck');
-  if (!table || !deck) return;
-  
-  const deckRect = deck.getBoundingClientRect();
-  const tableRect = table.getBoundingClientRect();
-  
-  const startX = deckRect.left - tableRect.left + (deckRect.width / 2);
-  const startY = deckRect.top - tableRect.top + (deckRect.height / 2);
-  
-  let endX = startX;
-  let endY = startY + 150; 
-  
-  if (pid === state.myId) {
-    const hand = document.getElementById('uno-my-hand');
-    if (hand) {
-      const handRect = hand.getBoundingClientRect();
-      endX = handRect.left - tableRect.left + (handRect.width / 2);
-      endY = handRect.top - tableRect.top + (handRect.height / 2);
-    }
-  } else {
-    const rp = Array.from(document.querySelectorAll('.uno-remote-player')).find(el => el.dataset.pid === pid);
-    if (rp) {
-      const rpRect = rp.getBoundingClientRect();
-      endX = rpRect.left - tableRect.left + (rpRect.width / 2);
-      endY = rpRect.top - tableRect.top + (rpRect.height / 2);
-    }
-  }
-  
-  const animCard = document.createElement('div');
-  animCard.className = 'uno-card-ui back';
-  animCard.textContent = 'UNO';
-  animCard.style.position = 'absolute';
-  animCard.style.left = `${startX}px`;
-  animCard.style.top = `${startY}px`;
-  animCard.style.transform = `translate(-50%, -50%) scale(0.8)`;
-  animCard.style.transition = 'all 0.3s ease-out';
-  animCard.style.zIndex = 150;
-  
-  table.appendChild(animCard);
-  playSound('draw');
-  
-  animCard.getBoundingClientRect();
-  
-  animCard.style.left = `${endX}px`;
-  animCard.style.top = `${endY}px`;
-  animCard.style.transform = `translate(-50%, -50%) scale(0.3) rotate(180deg)`;
-  animCard.style.opacity = '0';
-  
-  setTimeout(() => animCard.remove(), 350);
-}
-
-function playCard(index, chosenColor = null) {
-  playPopSound();
-  const handDiv = document.getElementById('uno-my-hand');
-  const cardEl = handDiv.children[index];
-  if (cardEl) {
-    cardEl.classList.add('play-anim');
-  }
-  
-  setTimeout(() => {
-    const card = state.uno.myHand.splice(index, 1)[0];
-    const p = state.uno.players.get(state.myId);
-    if (p) p.cardCount--;
-    
-    state.uno.discard.push(card);
-    state.uno.currentColor = chosenColor || card.color;
-    
-    let skip = 1;
-    if (card.val === 'Rev') {
-      state.uno.direction *= -1;
-      if (state.uno.turnOrder.length === 2) skip = 2;
-    }
-    let drawCount = 0;
-    if (card.val === 'Skip') skip = 2;
-    if (card.val === '+2') { skip = 2; drawCount = 2; }
-    if (card.val === '+4') { skip = 2; drawCount = 4; }
-    
-    const oldTurnIndex = state.uno.turnIndex;
-    state.uno.turnIndex = getNextTurn(skip);
-    
-    state.uno.triggerDiscardAnim = true;
-    
-    let saidUno = false;
-    if (state.uno.saidUno) {
-      saidUno = true;
-      state.uno.saidUno = false;
-      document.getElementById('uno-uno-btn').classList.add('hidden');
-    }
-    
-    if (state.uno.myHand.length === 1 && !saidUno) {
-      document.getElementById('uno-uno-btn').classList.remove('hidden');
-    } else {
-      document.getElementById('uno-uno-btn').classList.add('hidden');
-    }
-    
-    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno });
-    renderUnoGame();
-    
-    if (state.uno.host === state.myId && drawCount > 0) {
-      setTimeout(() => {
-        const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
-        const victimId = state.uno.turnOrder[victimIndex];
-        forceDrawCards(victimId, drawCount);
-      }, 500);
-    }
-    
-    if (state.uno.myHand.length === 0) {
-      if (state.uno.host === state.myId) {
-        setTimeout(() => endUnoGame(), 800);
-      }
-      return;
-    }
-  }, 250);
-}
-
-function botPlay(botId) {
-  if (!state.uno.started || state.myId !== state.uno.host) return;
-  
-  const botHand = state.uno.botHands[botId];
-  if (!botHand) return;
-  
-  const topCard = state.uno.discard[state.uno.discard.length - 1];
-  
-  let validIndex = -1;
-  for (let i = 0; i < botHand.length; i++) {
-    if (canPlay(botHand[i], topCard)) {
-      validIndex = i;
-      break;
-    }
-  }
-  
-  if (validIndex !== -1) {
-    const card = botHand.splice(validIndex, 1)[0];
-    const p = state.uno.players.get(botId);
-    if (p) p.cardCount--;
-    
-    state.uno.discard.push(card);
-    let chosenColor = card.color;
-    if (chosenColor === 'black') {
-      const colors = ['red', 'blue', 'green', 'yellow'];
-      chosenColor = colors[Math.floor(Math.random() * colors.length)];
-    }
-    state.uno.currentColor = chosenColor;
-    
-    let skip = 1;
-    if (card.val === 'Rev') {
-      state.uno.direction *= -1;
-      if (state.uno.turnOrder.length === 2) skip = 2;
-    }
-    let drawCount = 0;
-    if (card.val === 'Skip') skip = 2;
-    if (card.val === '+2') { skip = 2; drawCount = 2; }
-    if (card.val === '+4') { skip = 2; drawCount = 4; }
-    
-    const oldTurnIndex = state.uno.turnIndex;
-    state.uno.turnIndex = getNextTurn(skip);
-    
-    let saidUno = false;
-    if (botHand.length === 1) saidUno = Math.random() > 0.3; // Bot %70 ihtimalle UNO der
-    if (saidUno) {
-      broadcast({ type: 'uno-said' });
-      showFloatingEmoji(botId, "UNO!");
-    }
-    
-    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, botId, oldTurnIndex, drawCount, saidUno });
-    playPopSound();
-    animateRemotePlay(botId, card);
-    state.uno.triggerDiscardAnim = true;
-    setTimeout(() => renderUnoGame(), 300);
-    
-    if (drawCount > 0) {
-      setTimeout(() => {
-        const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
-        const victimId = state.uno.turnOrder[victimIndex];
-        forceDrawCards(victimId, drawCount);
-      }, 500);
-    }
-    
-    if (botHand.length === 0) {
-      setTimeout(() => endUnoGame(), 800);
-      return;
-    }
-  } else {
-    if (state.uno.deck.length > 0) {
-      const newCard = state.uno.deck.pop();
-      botHand.push(newCard);
-      const p = state.uno.players.get(botId);
-      if(p) p.cardCount++;
-      
-      const topCard = state.uno.discard[state.uno.discard.length - 1];
-      const botCanPlay = canPlay(newCard, topCard);
-      if (!botCanPlay) {
-        state.uno.turnIndex = getNextTurn();
-      }
-      
-      animateCardDraw(botId);
-      broadcast({ type: 'uno-draw-anim', pid: botId });
-      
-      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
-      broadcast({
-        type: 'uno-sync',
-        host: state.uno.host,
-        players: Array.from(state.uno.players.entries()),
-        turnOrder: state.uno.turnOrder,
-        turnIndex: state.uno.turnIndex,
-        direction: state.uno.direction,
-        discard: state.uno.discard,
-        currentColor: state.uno.currentColor,
-        handsCount
-      });
-      renderUnoGame();
-      
-      if (botCanPlay) {
-        setTimeout(() => botPlay(botId), 1000);
-      }
-    } else {
-      state.uno.turnIndex = getNextTurn();
-      broadcast({ type: 'uno-draw', count: 0, nextTurnIndex: state.uno.turnIndex, botId }); 
-      renderUnoGame();
-    }
-  }
-}
-
-function playSound(type) {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    if (type === 'uno') {
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.5, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
-    } else if (type === 'draw') {
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(600, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.1);
-    }
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-  } catch (e) {}
-}
-
-function playPopSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(150, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-    
-    const bufferSize = ctx.sampleRate * 0.1;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-    }
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'highpass';
-    noiseFilter.frequency.value = 800;
-    noise.connect(noiseFilter);
-    
-    const noiseGain = ctx.createGain();
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
-    
-    noiseGain.gain.setValueAtTime(0.5, ctx.currentTime);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-    
-    osc.start(ctx.currentTime);
-    noise.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.1);
-    noise.stop(ctx.currentTime + 0.1);
-  } catch (e) {}
-}
-
-function showFloatingEmoji(pid, emoji) {
-  let target = document.getElementById('uno-table');
-  let x = '50%';
-  let y = '80%';
-  
-  if (pid !== state.myId) {
-    const rp = Array.from(document.querySelectorAll('.uno-remote-player')).find(el => el.dataset.pid === pid);
-    if (rp) {
-      x = rp.style.left;
-      y = rp.style.top;
-    }
-  }
-
-  const el = document.createElement('div');
-  el.className = 'floating-emoji';
-  el.textContent = emoji;
-  el.style.left = x;
-  el.style.top = y;
-  target.appendChild(el);
-  setTimeout(() => el.remove(), 2000);
-}
-
-function animateRemotePlay(pId, card) {
-  const table = document.getElementById('uno-table');
-  const rp = Array.from(document.querySelectorAll('.uno-remote-player')).find(el => el.dataset.pid === pId);
-  if (!rp) return;
-  
-  const dummy = document.createElement('div');
-  dummy.className = `uno-card-ui ${card.color}`;
-  dummy.style.position = 'absolute';
-  dummy.style.left = rp.style.left;
-  dummy.style.top = rp.style.top;
-  dummy.style.transform = 'translate(-50%, -50%) scale(0.5)';
-  dummy.style.zIndex = 100;
-  dummy.style.transition = 'all 0.3s ease-out';
-  dummy.innerHTML = `<span class="mini tl">${card.val}</span> ${card.val} <span class="mini br">${card.val}</span>`;
-  table.appendChild(dummy);
-  
-  setTimeout(() => {
-    dummy.style.left = '50%';
-    dummy.style.top = '50%';
-    dummy.style.transform = 'translate(-50%, -50%) scale(1)';
-  }, 10);
-  
-  setTimeout(() => dummy.remove(), 300);
-}
-
-function showDrawModal(card, index) {
-  const modal = document.getElementById('uno-draw-modal');
-  const container = document.getElementById('uno-drawn-card-container');
-  container.innerHTML = '';
-  
-  const cDiv = document.createElement('div');
-  cDiv.className = `uno-card-ui ${card.color}`;
-  cDiv.innerHTML = `<span class="mini tl">${card.val}</span> ${card.val} <span class="mini br">${card.val}</span>`;
-  cDiv.style.transform = 'scale(1.5)';
-  cDiv.style.margin = '20px';
-  container.appendChild(cDiv);
-  
-  modal.classList.remove('hidden');
-  
-  document.getElementById('uno-keep-btn').onclick = () => {
-    modal.classList.add('hidden');
-    if (state.uno.host === state.myId) {
-      state.uno.turnIndex = getNextTurn();
-      if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
-      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
-      broadcast({ type: 'uno-sync', host: state.uno.host, players: Array.from(state.uno.players.entries()), turnOrder: state.uno.turnOrder, turnIndex: state.uno.turnIndex, direction: state.uno.direction, discard: state.uno.discard, currentColor: state.uno.currentColor, handsCount });
-      renderUnoGame();
-    } else {
-      broadcast({ type: 'uno-keep' });
-    }
-  };
-  
-  document.getElementById('uno-play-drawn-btn').onclick = () => {
-    modal.classList.add('hidden');
-    if (card.color === 'black') {
-      document.getElementById('uno-color-picker').classList.remove('hidden');
-      document.querySelectorAll('.ucc').forEach(btn => {
-        btn.onclick = () => {
-          const selectedColor = btn.dataset.color;
-          document.getElementById('uno-color-picker').classList.add('hidden');
-          playCard(index, selectedColor);
-        };
-      });
-    } else {
-      playCard(index);
-    }
-  };
-}
 
 // --- DIRECT MESSAGING LOGIC ---
 
@@ -4559,306 +3241,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('server-dm-modal').classList.remove('hidden');
     renderServerDMFriends();
   });
+
+  window.addEventListener('click', () => {
+    if (state.remoteAudioCtx && state.remoteAudioCtx.state === 'suspended') {
+      state.remoteAudioCtx.resume().then(() => console.log('🔊 Remote AudioContext resumed via user click.'));
+    }
+    if (state.audioCtx && state.audioCtx.state === 'suspended') {
+      state.audioCtx.resume();
+    }
+    if (state.gateAudioCtx && state.gateAudioCtx.state === 'suspended') {
+      state.gateAudioCtx.resume();
+    }
+  });
 });
 
-window.addEventListener('DOMContentLoaded', () => {
-  const broadcastActivityMsg = (msg) => {
-    broadcast(msg);
-  };
 
-  const closeAllCards = () => {
-    ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('hidden');
-    });
-    const empty = document.getElementById('empty-state');
-    if (empty) empty.classList.add('hidden');
-  };
-
-  const setActivity = (act) => {
-    closeAllCards();
-    document.getElementById('activities-modal').classList.add('hidden');
-    broadcast({ type: 'activity_change', activity: act });
-    if (act === 'poll') document.getElementById('poll-card').classList.remove('hidden');
-    if (act === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
-    if (act === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
-  };
-
-  document.getElementById('act-poll')?.addEventListener('click', () => setActivity('poll'));
-  document.getElementById('act-lvs')?.addEventListener('click', () => setActivity('lvs'));
-  document.getElementById('act-wheel')?.addEventListener('click', () => setActivity('wheel'));
-
-  document.getElementById('poll-close')?.addEventListener('click', () => closeAllCards());
-  document.getElementById('lvs-close')?.addEventListener('click', () => closeAllCards());
-  document.getElementById('wheel-close')?.addEventListener('click', () => closeAllCards());
-
-  let pollState = null;
-  document.getElementById('poll-create')?.addEventListener('click', () => {
-    const q = document.getElementById('poll-q').value.trim();
-    const opts = [
-      document.getElementById('poll-opt1').value.trim(),
-      document.getElementById('poll-opt2').value.trim(),
-      document.getElementById('poll-opt3').value.trim(),
-      document.getElementById('poll-opt4').value.trim()
-    ].filter(o => o.length > 0);
-    if (!q || opts.length < 2) return alert('Soru ve en az 2 seçenek girin!');
-    
-    const msg = { type: 'poll_start', q, opts, id: Date.now() };
-    broadcastActivityMsg(msg);
-    handlePollStart(msg, true);
-  });
-
-  const handlePollStart = (data, isHost) => {
-    pollState = { id: data.id, q: data.q, opts: data.opts, votes: {}, myVote: null };
-    data.opts.forEach(o => pollState.votes[o] = 0);
-    
-    document.getElementById('poll-setup').classList.add('hidden');
-    document.getElementById('poll-view').classList.remove('hidden');
-    document.getElementById('poll-view-q').textContent = data.q;
-    
-    const endBtn = document.getElementById('poll-end');
-    if (isHost) endBtn.classList.remove('hidden');
-    else endBtn.classList.add('hidden');
-    
-    renderPoll();
-  };
-
-  const renderPoll = () => {
-    if(!pollState) return;
-    const cont = document.getElementById('poll-opts-container');
-    cont.innerHTML = '';
-    let total = Object.values(pollState.votes).reduce((a,b)=>a+b,0);
-    document.getElementById('poll-total-votes').textContent = `${total} Oy`;
-    
-    pollState.opts.forEach(opt => {
-      const v = pollState.votes[opt] || 0;
-      const pct = total === 0 ? 0 : Math.round((v/total)*100);
-      
-      const el = document.createElement('div');
-      el.className = 'poll-opt' + (pollState.myVote === opt ? ' voted' : '');
-      el.innerHTML = `
-        <div class="poll-bar" style="width: ${pct}%"></div>
-        <div class="poll-opt-text">
-          <span>${opt}</span>
-          <span>${v} (${pct}%)</span>
-        </div>
-      `;
-      el.onclick = () => {
-        if(pollState.myVote === opt) return;
-        const old = pollState.myVote;
-        pollState.myVote = opt;
-        broadcastActivityMsg({ type: 'poll_vote', pollId: pollState.id, opt, old });
-        
-        pollState.votes[opt]++;
-        if(old && pollState.votes[old] > 0) pollState.votes[old]--;
-        renderPoll();
-      };
-      cont.appendChild(el);
-    });
-  };
-
-  document.getElementById('poll-end')?.addEventListener('click', () => {
-    broadcastActivityMsg({ type: 'poll_end' });
-    endPoll();
-  });
-  const endPoll = () => {
-    pollState = null;
-    document.getElementById('poll-setup').classList.remove('hidden');
-    document.getElementById('poll-view').classList.add('hidden');
-  };
-
-  const lvsPlayer = document.getElementById('lvs-player');
-  let lvsSyncing = false;
-  
-  document.getElementById('lvs-file')?.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if(file) {
-      const url = URL.createObjectURL(file);
-      lvsPlayer.src = url;
-      document.getElementById('lvs-empty').style.display = 'none';
-      lvsPlayer.style.display = 'block';
-    }
-  });
-  
-  const sendLvsSync = (evType) => {
-    if(lvsSyncing) return;
-    broadcastActivityMsg({
-      type: 'lvs_sync',
-      ev: evType,
-      time: lvsPlayer.currentTime,
-      paused: lvsPlayer.paused
-    });
-  };
-  
-  lvsPlayer.addEventListener('play', () => sendLvsSync('play'));
-  lvsPlayer.addEventListener('pause', () => sendLvsSync('pause'));
-  lvsPlayer.addEventListener('seeked', () => sendLvsSync('seeked'));
-
-  const handleLvsSync = (data) => {
-    lvsSyncing = true;
-    if(Math.abs(lvsPlayer.currentTime - data.time) > 1) {
-      lvsPlayer.currentTime = data.time;
-    }
-    if(data.ev === 'play' && lvsPlayer.paused) lvsPlayer.play().catch(()=>{});
-    if(data.ev === 'pause' && !lvsPlayer.paused) lvsPlayer.pause();
-    setTimeout(() => lvsSyncing = false, 300);
-  };
-
-  let wheelItems = [];
-  const canvas = document.getElementById('wheel-canvas');
-  const ctx = canvas?.getContext('2d');
-  let currentRotation = 0;
-  
-  const drawWheel = () => {
-    if(!ctx) return;
-    ctx.clearRect(0,0,350,350);
-    const cx = 175, cy = 175, r = 170;
-    if(wheelItems.length === 0) {
-      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); 
-      ctx.fillStyle = '#333'; ctx.fill(); return;
-    }
-    
-    const slice = (Math.PI*2) / wheelItems.length;
-    const colors = ['#f87171','#60a5fa','#34d399','#fbbf24','#a78bfa','#f472b6','#38bdf8','#a3e635','#facc15','#fb923c'];
-    
-    for(let i=0; i<wheelItems.length; i++) {
-      const ang = i*slice;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r, ang, ang+slice);
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.fill();
-      ctx.stroke();
-      
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(ang + slice/2);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText(wheelItems[i], r - 20, 6);
-      ctx.restore();
-    }
-  };
-
-  const renderWheelItems = () => {
-    const list = document.getElementById('wheel-items-list');
-    list.innerHTML = '';
-    wheelItems.forEach((it, idx) => {
-      const row = document.createElement('div');
-      row.className = 'wheel-item-row';
-      row.innerHTML = `<span>${it}</span><button class="btn-sec btn-sm" style="padding:2px 6px;">✕</button>`;
-      row.querySelector('button').onclick = () => {
-        wheelItems.splice(idx, 1);
-        renderWheelItems();
-        drawWheel();
-        broadcastActivityMsg({type: 'wheel_items', items: wheelItems});
-      };
-      list.appendChild(row);
-    });
-  };
-
-  document.getElementById('wheel-add-item')?.addEventListener('click', () => {
-    const inp = document.getElementById('wheel-new-item');
-    const val = inp.value.trim().substring(0,15);
-    if(val && wheelItems.length < 15) {
-      wheelItems.push(val);
-      inp.value = '';
-      renderWheelItems();
-      drawWheel();
-      broadcastActivityMsg({type: 'wheel_items', items: wheelItems});
-    }
-  });
-
-  document.getElementById('wheel-new-item')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      document.getElementById('wheel-add-item')?.click();
-    }
-  });
-
-  const handleWheelReady = () => {
-    document.getElementById('wheel-setup').classList.add('hidden');
-    document.getElementById('wheel-play').classList.remove('hidden');
-  };
-
-  document.getElementById('wheel-ready')?.addEventListener('click', () => {
-    if(wheelItems.length < 2) return alert('En az 2 öğe ekleyin!');
-    handleWheelReady();
-    broadcastActivityMsg({ type: 'wheel_ready' });
-  });
-
-  const handleWheelReset = () => {
-    document.getElementById('wheel-play').classList.add('hidden');
-    document.getElementById('wheel-setup').classList.remove('hidden');
-    document.getElementById('wheel-winner-overlay').classList.add('hidden');
-  };
-
-  document.getElementById('wheel-reset-btn')?.addEventListener('click', () => {
-    handleWheelReset();
-    broadcastActivityMsg({ type: 'wheel_reset' });
-  });
-
-  document.getElementById('wheel-spin-btn')?.addEventListener('click', () => {
-    if(wheelItems.length < 2) return;
-    const spins = 5 + Math.random() * 5; 
-    const deg = spins * 360;
-    const targetDeg = currentRotation + deg;
-    broadcastActivityMsg({type: 'wheel_spin', targetDeg});
-    handleWheelSpin(targetDeg);
-  });
-
-  const handleWheelSpin = (targetDeg) => {
-    currentRotation = targetDeg;
-    canvas.style.transform = `rotate(${currentRotation}deg)`;
-    
-    setTimeout(() => {
-      const actualDeg = currentRotation % 360;
-      const sliceDeg = 360 / wheelItems.length;
-      const topAngle = (270 - actualDeg + 360) % 360;
-      let winnerIdx = Math.floor(topAngle / sliceDeg);
-      if(winnerIdx < 0) winnerIdx = 0;
-      if(winnerIdx >= wheelItems.length) winnerIdx = wheelItems.length - 1;
-      
-      const winner = wheelItems[winnerIdx];
-      document.getElementById('wheel-winner-text').textContent = winner;
-      document.getElementById('wheel-winner-overlay').classList.remove('hidden');
-    }, 4100);
-  };
-  
-  document.getElementById('wheel-winner-close')?.addEventListener('click', () => {
-    document.getElementById('wheel-winner-overlay').classList.add('hidden');
-  });
-
-  drawWheel();
-
-  window.activityHandler = (data) => {
-    try {
-      if (data.type === 'activity_change') {
-        closeAllCards();
-        if (data.activity === 'poll') document.getElementById('poll-card').classList.remove('hidden');
-        if (data.activity === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
-        if (data.activity === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
-      }
-      if (data.type === 'poll_start') handlePollStart(data, false);
-      if (data.type === 'poll_vote' && pollState && pollState.id === data.pollId) {
-        pollState.votes[data.opt]++;
-        if (data.old && pollState.votes[data.old] > 0) pollState.votes[data.old]--;
-        renderPoll();
-      }
-      if (data.type === 'poll_end') endPoll();
-      if (data.type === 'lvs_sync') handleLvsSync(data);
-      if (data.type === 'wheel_items') {
-        wheelItems = data.items;
-        renderWheelItems();
-        drawWheel();
-      }
-      if (data.type === 'wheel_ready') {
-        handleWheelReady();
-      }
-      if (data.type === 'wheel_reset') {
-        handleWheelReset();
-      }
-      if (data.type === 'wheel_spin') handleWheelSpin(data.targetDeg);
-    } catch(e) {}
-  };
-});

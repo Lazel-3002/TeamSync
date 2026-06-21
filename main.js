@@ -8,6 +8,48 @@ const os = require('os');
 const { spawn } = require('child_process');
 let cloudflaredProcess = null;
 
+const fs = require('fs');
+const baseUserData = app.getPath('userData');
+const lockFile = path.join(baseUserData, 'teamsync.lock');
+let isSecondInstance = false;
+
+function isPidRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === 'EPERM';
+  }
+}
+
+try {
+  if (!fs.existsSync(baseUserData)) {
+    fs.mkdirSync(baseUserData, { recursive: true });
+  }
+
+  if (fs.existsSync(lockFile)) {
+    try {
+      const lockContent = fs.readFileSync(lockFile, 'utf8').trim();
+      const existingPid = parseInt(lockContent, 10);
+      if (existingPid && isPidRunning(existingPid)) {
+        isSecondInstance = true;
+      }
+    } catch (e) {
+      isSecondInstance = true;
+    }
+  }
+
+  if (!isSecondInstance) {
+    fs.writeFileSync(lockFile, process.pid.toString(), 'utf8');
+    global.myAppLock = fs.openSync(lockFile, 'r+');
+  } else {
+    app.setPath('userData', `${baseUserData}-${process.pid}`);
+  }
+} catch (e) {
+  isSecondInstance = true;
+  app.setPath('userData', `${baseUserData}-${process.pid}`);
+}
+
 let mainWindow = null;
 let discoverySocket = null;
 let discoveryInterval = null;
@@ -132,7 +174,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      webviewTag: true
+      webviewTag: true,
+      webRTCIPHandlingPolicy: 'default_public_and_private_interfaces'
     },
     backgroundColor: '#1e1f22',
     title: 'TeamSync - P2P',
@@ -158,6 +201,32 @@ function createWindow() {
 }
 
 ipcMain.handle('get-local-ips', () => getLocalIPs());
+
+ipcMain.handle('load-accounts', () => {
+  const filePath = path.join(baseUserData, 'accounts.json');
+  if (fs.existsSync(filePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+});
+
+ipcMain.handle('save-accounts', (event, accounts) => {
+  const filePath = path.join(baseUserData, 'accounts.json');
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(accounts, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    return false;
+  }
+});
+
+ipcMain.handle('is-second-instance', () => {
+  return isSecondInstance;
+});
 
 ipcMain.handle('start-cloudflared', async (event, port) => {
   return new Promise((resolve, reject) => {
@@ -413,6 +482,23 @@ app.on('will-quit', () => {
   if (discoveryInterval) clearInterval(discoveryInterval);
   if (discoverySocket) {
     try { discoverySocket.close(); } catch (e) {}
+  }
+  
+  if (global.myAppLock) {
+    try { fs.closeSync(global.myAppLock); } catch (e) {}
+  }
+
+  if (!isSecondInstance) {
+    try {
+      if (fs.existsSync(lockFile)) {
+        fs.unlinkSync(lockFile);
+      }
+    } catch (e) {}
+  } else {
+    try {
+      const tempPath = app.getPath('userData');
+      fs.rmSync(tempPath, { recursive: true, force: true });
+    } catch (e) {}
   }
 });
 

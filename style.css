@@ -1790,3 +1790,82 @@ body {
   }
 }
 
+/* ===== HESAP YÖNETİCİSİ (ACCOUNT SWITCHER) ===== */
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.4);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+.account-row:hover {
+  background: var(--bg-hover);
+  border-color: var(--acc-light);
+  transform: translateY(-1px);
+}
+.account-row-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.account-row-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-row-name {
+  font-weight: 600;
+  color: var(--txt-main);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-row-id {
+  font-size: 10px;
+  color: var(--txt-mut);
+  font-family: monospace;
+}
+.account-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.account-row-checkbox-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 10px !important;
+  color: var(--txt-mut) !important;
+  margin: 0 !important;
+  cursor: pointer;
+  text-transform: none !important;
+  letter-spacing: 0px !important;
+}
+.account-row-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--txt-mut);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+.account-row-delete-btn:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+

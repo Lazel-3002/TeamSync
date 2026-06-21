@@ -1,4 +1,4 @@
-﻿const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   startCloudflared: (port) => ipcRenderer.invoke('start-cloudflared', port),
   stopCloudflared: () => ipcRenderer.send('stop-cloudflared'),
@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   notify: (title, body) => ipcRenderer.send('notify', { title, body }),
   setRemoteControl: (active) => ipcRenderer.send('set-remote-control', active),
   sendRemoteInput: (data) => ipcRenderer.send('remote-input', data),
-  onPeerDiscovered: (cb) => ipcRenderer.on('peer-discovered', cb)
+  onPeerDiscovered: (cb) => ipcRenderer.on('peer-discovered', cb),
+  loadAccounts: () => ipcRenderer.invoke('load-accounts'),
+  saveAccounts: (accounts) => ipcRenderer.invoke('save-accounts', accounts),
+  isSecondInstance: () => ipcRenderer.invoke('is-second-instance')
 });
 

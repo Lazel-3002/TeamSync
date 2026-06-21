@@ -13,11 +13,21 @@
       <h1>🎙️ TeamSync</h1>
       <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur, internetten bağlanılabilir</p>
 
+      <!-- Adım 0: Hesaplar -->
+      <div id="step-accounts" class="hidden">
+        <label>Hesap Seçin</label>
+        <div id="accounts-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; margin: 10px 0 15px; padding-right: 4px;">
+          <!-- Dinamik Liste -->
+        </div>
+        <button id="btn-new-account" class="btn-pri" style="margin-top: 5px;">Yeni Hesap Oluştur</button>
+      </div>
+
       <!-- Adım 1: İsim -->
       <div id="step-name">
         <label>Adın</label>
         <input id="name" type="text" placeholder="TeamSync" maxlength="20" />
         <button id="btn-next-name">İleri</button>
+        <button id="btn-back-accounts" class="btn-sec btn-sm hidden" style="margin-top: 10px; width: 100%; padding: 8px;">Hesap Seçimine Dön</button>
       </div>
 
       <!-- Adım 2: Seçim & Arkadaşlık -->
@@ -43,6 +53,7 @@
                 <span id="my-friend-id" class="menu-id-value">------</span>
                 <button id="btn-copy-friend-id" class="icon-btn sm" title="ID'yi Kopyala">📋</button>
               </div>
+              <button id="btn-logout" class="btn-sec btn-sm" style="margin-top: 8px; font-size: 11px; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 6px; color: var(--txt-mut); cursor: pointer; transition: all 0.2s;">🔄 Hesap Değiştir</button>
             </div>
           </div>
 
@@ -698,6 +709,11 @@
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="./mqtt.min.js"></script>
   <script src="renderer.js"></script>
+  <script src="js/whiteboard.js"></script>
+  <script src="js/watch-together.js"></script>
+  <script src="js/shared-browser.js"></script>
+  <script src="js/uno.js"></script>
+  <script src="js/lucky-wheel.js"></script>
 </body>
 </html>
 
