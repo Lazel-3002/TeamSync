@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell } = require('electron');
 const path = require('path');
 const dgram = require('dgram');
 const os = require('os');
@@ -100,7 +100,6 @@ function startDiscovery(peerId, name) {
   });
 
   discoveryInterval = setInterval(() => {
-    return; // <--- SADECE TEST İÇİN BUNU EKLEYİN (UDP KEŞFİ KAPATILDI)
     if (!discoverySocket) return;
     const msg = Buffer.from(JSON.stringify({
       id: myPeerId,

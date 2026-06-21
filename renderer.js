@@ -77,6 +77,32 @@ function setupInternetSignaling(roomId, myId, myName) {
 
   mqttClient.on('message', async (topic, message) => {
     try {
+      if (topic.endsWith('/file')) {
+        const buf = new Uint8Array(message);
+        let pipeIdx = -1;
+        for (let i = 0; i < 100; i++) {
+          if (buf[i] === 124) { // '|'
+            pipeIdx = i;
+            break;
+          }
+        }
+        if (pipeIdx > 0) {
+          const headerStr = new TextDecoder().decode(buf.slice(0, pipeIdx));
+          const chunk = buf.slice(pipeIdx + 1);
+          try {
+            const header = JSON.parse(headerStr);
+            const f = fileBuffer.get(header.id);
+            if (f) {
+              f.chunks.push(chunk);
+              f.received += chunk.length;
+              const prog = document.getElementById(`prog-${header.id}`);
+              if (prog) prog.style.width = (f.received / f.meta.size * 100) + '%';
+            }
+          } catch(err){}
+        }
+        return;
+      }
+
       const data = JSON.parse(message.toString());
       if (data.id === myId) return;
       
@@ -92,6 +118,10 @@ function setupInternetSignaling(roomId, myId, myName) {
           peer.ip = 'internet';
           handleSignal(data.id, 'internet', data.signal);
         }
+      } else if (data.type === 'room-broadcast') {
+        handleDataMessage(data.id, data.payload);
+      } else if (data.type === 'room-private' && data.target === myId) {
+        handleDataMessage(data.id, data.payload);
       }
     } catch(e) {}
   });
@@ -508,6 +538,8 @@ const ICE = [
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun.cloudflare.com:3478' },
   // Açık kaynaklı ve public TURN sunucusu (Symmetric NAT aşmak için)
+  { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
@@ -1212,8 +1244,11 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   pc.oniceconnectionstatechange = () => {
     console.log(`ICE state [${peerName}]:`, pc.iceConnectionState);
-    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+    if (pc.iceConnectionState === 'closed') {
       removePeer(peerId);
+    } else if (pc.iceConnectionState === 'failed') {
+      console.warn(`⚠️ WebRTC connection failed to ${peerName}. Voice/Video might not work, falling back to MQTT for data.`);
+      showToast(`${peerName} ile sesli/görüntülü bağlantı kurulamadı (Veri kanalı aktif).`, 'warn');
     } else if (pc.iceConnectionState === 'connected') {
       console.log(`✅ WebRTC connected to ${peerName}`);
     }
@@ -1835,6 +1870,19 @@ function appendChat(uid, name, text) {
 }
 
 function broadcast(msg) {
+  if (mqttClient && mqttClient.connected && state.room) {
+    try {
+      mqttClient.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({
+        type: 'room-broadcast',
+        id: state.myId,
+        payload: msg
+      }));
+      return;
+    } catch (e) {
+      console.warn('MQTT broadcast failed, falling back to WebRTC:', e);
+    }
+  }
+
   const msgStr = JSON.stringify(msg);
   state.peers.forEach((peer, id) => {
     if (peer.dc && peer.dc.readyState === 'open') {
@@ -2277,6 +2325,20 @@ function sendCtrlEvent(event) {
 }
 
 function broadcastTo(peerId, msg) {
+  if (mqttClient && mqttClient.connected && state.room) {
+    try {
+      mqttClient.publish(`teamsync/room/${state.room}/private/${peerId}`, JSON.stringify({
+        type: 'room-private',
+        id: state.myId,
+        target: peerId,
+        payload: msg
+      }));
+      return;
+    } catch (e) {
+      console.warn('MQTT unicast failed, falling back to WebRTC:', e);
+    }
+  }
+
   const peer = state.peers.get(peerId);
   if (peer && peer.dc && peer.dc.readyState === 'open') peer.dc.send(JSON.stringify(msg));
 }
@@ -2603,12 +2665,20 @@ async function sendFile(file) {
     msgBuf.set(header);
     msgBuf.set(chunk, header.length);
     
-    for (const [_, peer] of state.peers) {
-      if (peer.dc && peer.dc.readyState === 'open') {
-        while (peer.dc.bufferedAmount > 2 * 1024 * 1024) {
-          await new Promise(r => setTimeout(r, 50));
+    if (mqttClient && mqttClient.connected && state.room) {
+      try {
+        mqttClient.publish(`teamsync/room/${state.room}/file`, Buffer.from(msgBuf));
+      } catch (e) {
+        console.warn('MQTT file send failed:', e);
+      }
+    } else {
+      for (const [_, peer] of state.peers) {
+        if (peer.dc && peer.dc.readyState === 'open') {
+          while (peer.dc.bufferedAmount > 2 * 1024 * 1024) {
+            await new Promise(r => setTimeout(r, 50));
+          }
+          try { peer.dc.send(msgBuf); } catch(e){}
         }
-        try { peer.dc.send(msgBuf); } catch(e){}
       }
     }
     
