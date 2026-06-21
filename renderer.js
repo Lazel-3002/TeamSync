@@ -59,7 +59,12 @@ const state = {
     botHands: {},
     botTimeout: null,
     joinedActivity: false
-  }
+  },
+  lobbies: [],
+  activeLobbyId: null,
+  isLobbyHost: false,
+  spectating: false,
+  selectedLobbyActivity: null
 };
 
 const CHUNK_SIZE = 64 * 1024;
@@ -74,7 +79,15 @@ function setupInternetSignaling(roomId, myId, myName) {
   // Sinyalleşmeyi HiveMQ üzerinden Cloudflare Oda ID'si ile yapıyoruz.
   let brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
 
-  mqttClient = mqtt.connect(brokerUrl);
+  mqttClient = mqtt.connect(brokerUrl, {
+    clientId: 'teamsync-sig-' + myId,
+    keepalive: 60,
+    reconnectPeriod: 1000
+  });
+
+  mqttClient.on('error', (err) => {
+    console.error('MQTT signaling connection error:', err);
+  });
   
   mqttClient.on('connect', () => {
     if (!mqttClient) return; // Prevent crash if disconnected during connection phase
@@ -92,6 +105,11 @@ function setupInternetSignaling(roomId, myId, myName) {
         }));
       }
     }, 3000);
+
+    // Broadcast a lobby-sync-request to get active lobbies from other players immediately!
+    setTimeout(() => {
+      broadcast({ type: 'lobby-sync-request' });
+    }, 1000);
   });
 
   mqttClient.on('message', async (topic, message) => {
@@ -202,10 +220,21 @@ async function handleSignal(id, ip, signal) {
         console.warn('Received answer but signaling state is:', peer.pc.signalingState);
       }
     } else if (signal.type === 'ice') {
-      if (peer.pc.remoteDescription && peer.pc.remoteDescription.type) {
-        await peer.pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-      } else {
-        peer.iceQueue.push(new RTCIceCandidate(signal.candidate));
+      if (signal.candidate) {
+        // Skip null end-of-candidate marker to prevent RTCIceCandidate construction errors
+        if (signal.candidate.sdpMid === null && signal.candidate.sdpMLineIndex === null && !signal.candidate.candidate) {
+          return;
+        }
+        try {
+          const iceCand = new RTCIceCandidate(signal.candidate);
+          if (peer.pc.remoteDescription && peer.pc.remoteDescription.type) {
+            await peer.pc.addIceCandidate(iceCand);
+          } else {
+            peer.iceQueue.push(iceCand);
+          }
+        } catch (err) {
+          console.warn('Failed to parse candidate:', err, signal.candidate);
+        }
       }
     }
   } catch (e) {
@@ -555,7 +584,15 @@ let pingInterval = null;
 
 function setupGlobalMQTT() {
   if (state.globalMqtt) return;
-  state.globalMqtt = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+  state.globalMqtt = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+    clientId: 'teamsync-glob-' + state.friendId + '-' + state.myId,
+    keepalive: 60,
+    reconnectPeriod: 1000
+  });
+
+  state.globalMqtt.on('error', (err) => {
+    console.error('MQTT global connection error:', err);
+  });
   
   state.globalMqtt.on('connect', () => {
     console.log('🔗 Global MQTT (Arkadaşlık) bağlandı');
@@ -1232,7 +1269,14 @@ function setConnStatus(connected) {
 
 function playSound(type) {
   try {
-    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!state.sfxAudioCtx) {
+      state.sfxAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const actx = state.sfxAudioCtx;
+    if (actx.state === 'suspended') {
+      actx.resume().catch(() => {});
+    }
+
     const osc = actx.createOscillator();
     const gain = actx.createGain();
     osc.connect(gain);
@@ -1425,6 +1469,12 @@ async function handlePeerDiscovered(peer) {
   console.log('🔍 Peer bulundu:', peer.name, peer.ip);
   addUser({ id: peer.id, name: peer.name, mic: true, deaf: false, sharing: false, ip: peer.ip });
   
+  if (state.lobbies && state.lobbies.length > 0) {
+    setTimeout(() => {
+      syncLobbiesList();
+    }, 1500);
+  }
+  
   if (state.isJoining) {
     state.isJoining = false;
     document.getElementById('login').classList.add('hidden');
@@ -1472,6 +1522,82 @@ function removePeer(peerId) {
   }
   showToast(peer.name + ' ayrıldı', 'warn');
   updateEmptyGrid();
+
+  // Lobby cleanup on peer disconnect
+  let lobbyChanged = false;
+  state.lobbies.forEach((lob, index) => {
+    const wasPlayer = lob.players.some(p => p.id === peerId);
+    const wasSpectator = lob.spectators.some(s => s.id === peerId);
+    
+    if (wasPlayer || wasSpectator) {
+      lob.players = lob.players.filter(p => p.id !== peerId);
+      lob.spectators = lob.spectators.filter(s => s.id !== peerId);
+      lobbyChanged = true;
+      
+      if (lob.hostId === peerId) {
+        const nextPlayer = lob.players[0]; // first remaining player
+        if (nextPlayer) {
+          lob.hostId = nextPlayer.id;
+          lob.hostName = nextPlayer.name;
+          
+          if (nextPlayer.id === state.myId) {
+            state.isLobbyHost = true;
+            if (lob.activity === 'uno') {
+              const hostSettings = document.getElementById('uno-host-settings');
+              if (hostSettings) hostSettings.style.display = 'block';
+              const startBtn = document.getElementById('uno-start-btn');
+              if (startBtn) startBtn.classList.remove('hidden');
+              const readyBtn = document.getElementById('uno-ready-btn');
+              if (readyBtn) readyBtn.classList.add('hidden');
+            }
+          }
+        } else {
+          state.lobbies.splice(index, 1);
+        }
+      }
+    }
+  });
+
+  if (lobbyChanged) {
+    updateActivityCounts();
+    if (state.selectedLobbyActivity) {
+      renderLobbiesList(state.selectedLobbyActivity);
+    }
+    syncLobbiesList();
+  }
+
+  // Activity-specific cleanup on peer disconnect
+  if (state.uno.players.has(peerId)) {
+    state.uno.players.delete(peerId);
+    
+    if (state.uno.host === state.myId) {
+      const idx = state.uno.turnOrder.indexOf(peerId);
+      if (idx !== -1) {
+        state.uno.turnOrder.splice(idx, 1);
+        if (state.uno.turnIndex >= state.uno.turnOrder.length) {
+          state.uno.turnIndex = 0;
+        }
+      }
+      
+      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
+      broadcast({
+        type: 'uno-sync',
+        host: state.uno.host,
+        players: Array.from(state.uno.players.entries()),
+        turnOrder: state.uno.turnOrder,
+        turnIndex: state.uno.turnIndex,
+        direction: state.uno.direction,
+        discard: state.uno.discard,
+        currentColor: state.uno.currentColor,
+        handsCount
+      });
+      
+      renderUnoGame();
+    } else {
+      renderUnoLobby();
+      if (state.uno.started) renderUnoGame();
+    }
+  }
 }
 
 async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
@@ -1631,6 +1757,9 @@ function setupDataChannel(peerId, dc) {
 
         dc.send(JSON.stringify({ type: 'state', mic: state.micEnabled, deaf: state.deafened }));
         if (state.isSharing) dc.send(JSON.stringify({ type: 'sharing', sharing: true }));
+        if (state.lobbies && state.lobbies.length > 0) {
+          dc.send(JSON.stringify({ type: 'lobby-list-sync', lobbies: state.lobbies }));
+        }
         
         // Sync Hosted / Active Activities for late joiners
         const activeAct = getActiveActivity();
@@ -1734,13 +1863,168 @@ function setupDataChannel(peerId, dc) {
   };
 }
 
+const processedMessages = new Set();
 async function handleDataMessage(peerId, msg) {
+  if (msg && msg._mid) {
+    if (processedMessages.has(msg._mid)) return;
+    processedMessages.add(msg._mid);
+    if (processedMessages.size > 500) {
+      const first = processedMessages.values().next().value;
+      processedMessages.delete(first);
+    }
+  }
+  // Lobby system protocols - handle immediately without peer connection dependency
+  if (msg.type === 'lobby-list-sync') {
+    // Merge incoming lobbies: remove old ones hosted by the sender peer, and add the incoming ones hosted by the sender peer
+    const senderHostLobbies = (msg.lobbies || []).filter(l => l.hostId === peerId);
+    state.lobbies = (state.lobbies || []).filter(l => l.hostId !== peerId).concat(senderHostLobbies);
+
+    updateActivityCounts();
+    if (state.selectedLobbyActivity) {
+      renderLobbiesList(state.selectedLobbyActivity);
+    }
+    if (state.activeLobbyId) {
+      const activeLob = state.lobbies.find(l => l.id === state.activeLobbyId);
+      if (activeLob) {
+        if (activeLob.activity === 'uno') {
+          state.uno.host = activeLob.hostId;
+        } else if (activeLob.activity === 'sb') {
+          state.sb.host = activeLob.hostId;
+        }
+      }
+    }
+    return;
+  } else if (msg.type === 'lobby-join-req') {
+    if (state.isLobbyHost && msg.lobbyId === state.activeLobbyId) {
+      const lob = state.lobbies.find(l => l.id === state.activeLobbyId);
+      if (lob) {
+        if (msg.spectate) {
+          if (!lob.spectators.some(s => s.id === msg.peerId)) {
+            lob.spectators.push({ id: msg.peerId, name: msg.name });
+          }
+        } else {
+          if (!lob.players.some(p => p.id === msg.peerId)) {
+            lob.players.push({ id: msg.peerId, name: msg.name });
+          }
+        }
+        syncLobbiesList();
+
+        // Send direct synchronization state to the joining peer
+        if (lob.activity === 'uno') {
+          if (state.uno.started) {
+            broadcastTo(msg.peerId, { 
+              type: 'uno-sync', 
+              host: state.myId,
+              players: Array.from(state.uno.players.entries()),
+              turnOrder: state.uno.turnOrder,
+              turnIndex: state.uno.turnIndex,
+              direction: state.uno.direction,
+              discard: state.uno.discard,
+              currentColor: state.uno.currentColor,
+              handsCount: Array.from(state.uno.players.entries()).map(([id, p]) => ({ id, count: p.cardCount }))
+            });
+          } else {
+            broadcastTo(msg.peerId, { type: 'uno-lobby', host: state.myId });
+            broadcastTo(msg.peerId, { type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
+          }
+        } else if (lob.activity === 'wt') {
+          const url = document.getElementById('wt-url')?.value || '';
+          const match = url.match(/(?:v=|youtu\.be\/)([^&]+)/);
+          if (match) {
+            broadcastTo(msg.peerId, { type: 'wt-load', vid: match[1] });
+            if (state.wt.player && state.wt.player.getCurrentTime) {
+              const time = state.wt.player.getCurrentTime();
+              const isPlaying = state.wt.player.getPlayerState() === YT.PlayerState.PLAYING;
+              broadcastTo(msg.peerId, { type: isPlaying ? 'wt-play' : 'wt-pause', time });
+            }
+          }
+        } else if (lob.activity === 'sb') {
+          broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: state.sb.interactive });
+          const currentUrl = document.getElementById('sb-url')?.value || '';
+          if (currentUrl) {
+            broadcastTo(msg.peerId, { type: 'sb-nav', url: currentUrl });
+          }
+        } else if (lob.activity === 'poll') {
+          if (window.pollState) {
+            broadcastTo(msg.peerId, { 
+              type: 'poll_start', 
+              q: window.pollState.q, 
+              opts: window.pollState.opts, 
+              id: window.pollState.id 
+            });
+            Object.keys(window.pollState.votes).forEach(opt => {
+              const count = window.pollState.votes[opt] || 0;
+              for (let i = 0; i < count; i++) {
+                broadcastTo(msg.peerId, { type: 'poll_vote', pollId: window.pollState.id, opt });
+              }
+            });
+          }
+        } else if (lob.activity === 'wheel') {
+          if (window.wheelItems && window.wheelItems.length > 0) {
+            broadcastTo(msg.peerId, { type: 'wheel_items', items: window.wheelItems });
+            broadcastTo(msg.peerId, { type: 'wheel_ready' });
+          }
+        } else if (lob.activity === 'lvs') {
+          const lvsPlayer = document.getElementById('lvs-player');
+          if (lvsPlayer) {
+            broadcastTo(msg.peerId, {
+              type: 'lvs_sync',
+              ev: lvsPlayer.paused ? 'pause' : 'play',
+              time: lvsPlayer.currentTime,
+              paused: lvsPlayer.paused
+            });
+          }
+        }
+      }
+    }
+    return;
+  } else if (msg.type === 'lobby-leave-req') {
+    if (state.isLobbyHost && msg.lobbyId === state.activeLobbyId) {
+      const lob = state.lobbies.find(l => l.id === state.activeLobbyId);
+      if (lob) {
+        lob.players = lob.players.filter(p => p.id !== msg.peerId);
+        lob.spectators = lob.spectators.filter(s => s.id !== msg.peerId);
+        syncLobbiesList();
+      }
+    }
+    return;
+  } else if (msg.type === 'lobby-promote-host') {
+    if (msg.lobbyId === state.activeLobbyId) {
+      state.isLobbyHost = true;
+      state.uno.host = state.myId; // Enforce host change in UNO game too!
+      const hostSettings = document.getElementById('uno-host-settings');
+      if (hostSettings) hostSettings.style.display = 'block';
+      const startBtn = document.getElementById('uno-start-btn');
+      if (startBtn) startBtn.classList.remove('hidden');
+      const readyBtn = document.getElementById('uno-ready-btn');
+      if (readyBtn) readyBtn.classList.add('hidden');
+    }
+    return;
+  } else if (msg.type === 'lobby-sync-request') {
+    if (state.lobbies && state.lobbies.length > 0) {
+      syncLobbiesList();
+    }
+    return;
+  }
+
   const peer = state.peers.get(peerId);
   if (!peer) return;
   
   // Data Channel'dan gelen her veri (ping dahil) bu bağlantının hala çok sağlıklı olduğunu gösterir.
   // Bu yüzden MQTT sunucusu geçici olarak yavaşlasa/kopsa bile WebRTC bağlantımız kopmayacak!
   peer.lastSeen = Date.now();
+
+  // Filter cross-lobby activity messages
+  const isActivityMsg = msg.type.startsWith('wt-') || 
+                        msg.type.startsWith('uno-') || 
+                        msg.type.startsWith('sb-') || 
+                        ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
+
+  if (isActivityMsg) {
+    if (msg.lobbyId !== state.activeLobbyId) {
+      return;
+    }
+  }
 
   if (msg.type === 'ping-req') {
     try {
@@ -1965,8 +2249,113 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar }) {
         }
       });
     }
+    
+    // Sleek context menu on clicking user in room
+    li.addEventListener('click', (e) => {
+      if (e.target.closest('.vol-slider') || e.target.closest(`[data-ctrl="${id}"]`)) {
+        return;
+      }
+      e.preventDefault();
+      showUserContextMenu(e, id, name);
+    });
   }
   updateEmptyGrid();
+}
+
+function showUserContextMenu(e, targetId, targetName) {
+  const existing = document.getElementById('user-custom-context-menu');
+  if (existing) existing.remove();
+
+  const menu = document.createElement('div');
+  menu.id = 'user-custom-context-menu';
+  menu.className = 'user-context-menu';
+  
+  menu.style.left = `${e.clientX}px`;
+  menu.style.top = `${e.clientY}px`;
+
+  const isFriend = !!state.friends[targetId];
+
+  const title = document.createElement('div');
+  title.style.cssText = 'padding: 6px 12px; font-size: 11px; font-weight: bold; color: var(--txt-mut); border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 4px;';
+  title.textContent = targetName;
+  menu.appendChild(title);
+
+  // Friend Option Button
+  const friendBtn = document.createElement('button');
+  friendBtn.className = 'user-context-menu-item';
+  if (isFriend) {
+    friendBtn.classList.add('danger');
+    friendBtn.innerHTML = '👥 Arkadaşı Sil';
+    friendBtn.addEventListener('click', () => {
+      if (confirm(`"${targetName}" arkadaşını silmek istediğinize emin misiniz?`)) {
+        removeFriend(targetId);
+        showToast('Arkadaş silindi', 'info');
+      }
+      menu.remove();
+    });
+  } else {
+    friendBtn.innerHTML = '➕ Arkadaş Ekle';
+    friendBtn.addEventListener('click', () => {
+      if (state.globalMqtt && state.globalMqtt.connected) {
+        state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
+          type: 'friend_request',
+          id: state.friendId,
+          name: state.myName
+        }));
+        showToast('Arkadaşlık isteği gönderildi!', 'ok');
+      } else {
+        showToast('Hata: Bağlantı hazır değil.', 'warn');
+      }
+      menu.remove();
+    });
+  }
+  menu.appendChild(friendBtn);
+
+  // Message Button
+  const msgBtn = document.createElement('button');
+  msgBtn.className = 'user-context-menu-item';
+  msgBtn.innerHTML = '💬 Mesaj Gönder';
+  msgBtn.addEventListener('click', () => {
+    if (!state.friends[targetId]) {
+      state.friends[targetId] = { name: targetName, online: true, temporary: true };
+    }
+    openDM(targetId);
+    document.getElementById('server-dm-modal').classList.remove('hidden');
+    menu.remove();
+  });
+  menu.appendChild(msgBtn);
+
+  // Remote Control Button
+  const ctrlBtn = document.createElement('button');
+  ctrlBtn.className = 'user-context-menu-item';
+  ctrlBtn.innerHTML = '🖥️ Uzaktan Kontrol İste';
+  ctrlBtn.addEventListener('click', () => {
+    requestControl(targetId);
+    menu.remove();
+  });
+  menu.appendChild(ctrlBtn);
+
+  // Close Button
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'user-context-menu-item danger';
+  closeBtn.style.cssText = 'border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px;';
+  closeBtn.innerHTML = '✕ Kapat';
+  closeBtn.addEventListener('click', () => {
+    menu.remove();
+  });
+  menu.appendChild(closeBtn);
+
+  document.body.appendChild(menu);
+
+  const closeHandler = (event) => {
+    if (!menu.contains(event.target)) {
+      menu.remove();
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('click', closeHandler);
+  }, 50);
 }
 
 function updateUserUI(uid) {
@@ -2031,6 +2420,10 @@ function makeCardFocusable(card) {
 }
 
 function showInactiveOverlay(cardId, title, onJoin) {
+  if (state.activeLobbyId) {
+    onJoin();
+    return;
+  }
   const card = document.getElementById(cardId);
   if (!card) return;
   
@@ -2155,6 +2548,23 @@ function appendChat(uid, name, text) {
 }
 
 function broadcast(msg) {
+  if (state.activeLobbyId) {
+    msg.lobbyId = state.activeLobbyId;
+    
+    // Automatically transition lobby status to playing on match start messages
+    if (state.isLobbyHost && (msg.type === 'uno-sync' || msg.type === 'wt-load' || msg.type === 'sb-start' || msg.type === 'poll_start' || msg.type === 'wheel_ready')) {
+      const lob = state.lobbies.find(l => l.id === state.activeLobbyId);
+      if (lob && lob.status === 'waiting') {
+        lob.status = 'playing';
+        setTimeout(() => syncLobbiesList(), 100);
+      }
+    }
+  }
+  
+  if (!msg._mid) {
+    msg._mid = crypto.randomUUID();
+  }
+
   if (mqttClient && mqttClient.connected && state.room) {
     try {
       mqttClient.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({
@@ -2162,9 +2572,8 @@ function broadcast(msg) {
         id: state.myId,
         payload: msg
       }));
-      return;
     } catch (e) {
-      console.warn('MQTT broadcast failed, falling back to WebRTC:', e);
+      console.warn('MQTT broadcast failed:', e);
     }
   }
 
@@ -2411,6 +2820,7 @@ function bindUI() {
   });
 
   document.getElementById('act-btn').addEventListener('click', () => {
+    updateActivityCounts();
     document.getElementById('activities-modal').classList.remove('hidden');
   });
   document.getElementById('act-close').addEventListener('click', () => {
@@ -2620,6 +3030,12 @@ function sendCtrlEvent(event) {
 }
 
 function broadcastTo(peerId, msg) {
+  if (state.activeLobbyId) {
+    msg.lobbyId = state.activeLobbyId;
+  }
+  if (!msg._mid) {
+    msg._mid = crypto.randomUUID();
+  }
   if (mqttClient && mqttClient.connected && state.room) {
     try {
       mqttClient.publish(`teamsync/room/${state.room}/private/${peerId}`, JSON.stringify({
@@ -2628,14 +3044,19 @@ function broadcastTo(peerId, msg) {
         target: peerId,
         payload: msg
       }));
-      return;
     } catch (e) {
-      console.warn('MQTT unicast failed, falling back to WebRTC:', e);
+      console.warn('MQTT unicast failed:', e);
     }
   }
 
   const peer = state.peers.get(peerId);
-  if (peer && peer.dc && peer.dc.readyState === 'open') peer.dc.send(JSON.stringify(msg));
+  if (peer && peer.dc && peer.dc.readyState === 'open') {
+    try {
+      peer.dc.send(JSON.stringify(msg));
+    } catch (e) {
+      console.warn('Private WebRTC send error to', peerId, e);
+    }
+  }
 }
 
 function showToast(msg, type = 'info') {
@@ -2653,6 +3074,7 @@ function showToast(msg, type = 'info') {
 }
 
 function closeAllCards() {
+  leaveActiveLobby();
   ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
@@ -3243,6 +3665,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('click', () => {
+    if (state.sfxAudioCtx && state.sfxAudioCtx.state === 'suspended') {
+      state.sfxAudioCtx.resume().catch(() => {});
+    }
     if (state.remoteAudioCtx && state.remoteAudioCtx.state === 'suspended') {
       state.remoteAudioCtx.resume().then(() => console.log('🔊 Remote AudioContext resumed via user click.'));
     }
@@ -3253,6 +3678,366 @@ document.addEventListener('DOMContentLoaded', () => {
       state.gateAudioCtx.resume();
     }
   });
+
+  // --- LOBBY SYSTEM UI BINDINGS ---
+  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel'];
+  activities.forEach(act => {
+    const card = document.getElementById(`card-act-${act}`);
+    if (card) {
+      card.addEventListener('click', () => {
+        state.selectedLobbyActivity = act;
+        
+        // Show Lobbies Panel, Hide Activities List Panel
+        document.getElementById('act-list-card').classList.add('hidden');
+        document.getElementById('act-lobby-card').classList.remove('hidden');
+        
+        // Update Title
+        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı' };
+        document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
+        
+        renderLobbiesList(act);
+      });
+    }
+
+    const arrow = document.getElementById(`arrow-act-${act}`);
+    if (arrow) {
+      arrow.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent duplicate trigger
+        state.selectedLobbyActivity = act;
+        
+        // Show Lobbies Panel, Hide Activities List Panel
+        document.getElementById('act-list-card').classList.add('hidden');
+        document.getElementById('act-lobby-card').classList.remove('hidden');
+        
+        // Update Title
+        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı' };
+        document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
+        
+        renderLobbiesList(act);
+      });
+    }
+  });
+
+  // Back Button inside Lobbies Panel
+  document.getElementById('act-lobby-back').addEventListener('click', () => {
+    state.selectedLobbyActivity = null;
+    document.getElementById('act-lobby-card').classList.add('hidden');
+    document.getElementById('act-list-card').classList.remove('hidden');
+  });
+
+  // Close Button inside Lobbies Panel
+  document.getElementById('act-lobby-close').addEventListener('click', () => {
+    state.selectedLobbyActivity = null;
+    document.getElementById('activities-modal').classList.add('hidden');
+    document.getElementById('act-lobby-card').classList.add('hidden');
+    document.getElementById('act-list-card').classList.remove('hidden');
+  });
+
+  // Create New Lobby Button
+  document.getElementById('btn-create-new-lobby').addEventListener('click', () => {
+    const act = state.selectedLobbyActivity;
+    if (!act) return;
+    
+    // Create new lobby
+    const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film', wheel: 'Şans Çarkı' };
+    const newLobby = {
+      id: `LOB-${crypto.randomUUID()}`,
+      activity: act,
+      name: `${state.myName}'in ${names[act]} Lobisi`,
+      hostId: state.myId,
+      hostName: state.myName,
+      players: [{ id: state.myId, name: state.myName }],
+      spectators: [],
+      status: 'waiting'
+    };
+    
+    state.lobbies.push(newLobby);
+    state.activeLobbyId = newLobby.id;
+    state.isLobbyHost = true;
+    state.spectating = false;
+    
+    // Set the host in the state immediately before clicking the legacy button!
+    if (act === 'uno') {
+      state.uno.host = state.myId;
+      state.uno.joinedActivity = true;
+    } else if (act === 'wt') {
+      state.wt.joinedActivity = true;
+    } else if (act === 'sb') {
+      state.sb.host = state.myId;
+      state.sb.joinedActivity = true;
+    }
+    
+    syncLobbiesList();
+    
+    // Close activities modal and launch the activity
+    document.getElementById('activities-modal').classList.add('hidden');
+    document.getElementById('act-lobby-card').classList.add('hidden');
+    document.getElementById('act-list-card').classList.remove('hidden');
+    
+    // Programmatically click the hidden original activity button to trigger the modular initialization
+    const legacyBtn = document.getElementById(`act-${act}`);
+    if (legacyBtn) legacyBtn.click();
+  });
 });
+
+// --- LOBBY SYSTEM GLOBAL FUNCTIONS ---
+window.updateActivityCounts = function() {
+  const counts = {
+    wt: { l: 0, p: 0 },
+    uno: { l: 0, p: 0 },
+    sb: { l: 0, p: 0 },
+    poll: { l: 0, p: 0 },
+    lvs: { l: 0, p: 0 },
+    wheel: { l: 0, p: 0 }
+  };
+  
+  state.lobbies.forEach(lob => {
+    if (counts[lob.activity] !== undefined) {
+      counts[lob.activity].l += 1;
+      counts[lob.activity].p += lob.players.length;
+    }
+  });
+
+  // Update UI badges
+  Object.keys(counts).forEach(act => {
+    const badge = document.getElementById(`act-${act}-count`);
+    if (badge) {
+      const info = counts[act];
+      badge.textContent = `Lobi: ${info.l} • Oyuncu: ${info.p}`;
+      badge.classList.remove('hidden');
+      if (info.l > 0) {
+        badge.classList.add('vibrant');
+      } else {
+        badge.classList.remove('vibrant');
+      }
+    }
+  });
+};
+
+window.syncLobbiesList = function() {
+  broadcast({ type: 'lobby-list-sync', lobbies: state.lobbies });
+};
+
+window.renderLobbiesList = function(activity) {
+  const container = document.getElementById('lobby-items-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const list = state.lobbies.filter(l => l.activity === activity);
+  
+  // Update stats display
+  const totalLobbies = list.length;
+  const totalPlayers = list.reduce((sum, lob) => sum + lob.players.length, 0);
+  const statsEl = document.getElementById('act-lobby-stats');
+  if (statsEl) {
+    statsEl.textContent = `Aktif Lobi: ${totalLobbies} • Toplam Oyuncu: ${totalPlayers}`;
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = '<div class="muted" style="text-align:center; padding: 20px;">Henüz aktif lobi yok. İlk lobiyi siz oluşturun!</div>';
+    return;
+  }
+
+  list.forEach(lob => {
+    const row = document.createElement('div');
+    row.className = 'lobby-row';
+    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.08);';
+    
+    const maxPlayers = lob.activity === 'uno' ? 4 : 10;
+    const playerCount = lob.players.length;
+    const specCount = lob.spectators.length;
+    
+    const infoText = `Kurucu: ${escapeHtml(lob.hostName)} • Oyuncular: ${playerCount}/${maxPlayers} ${specCount > 0 ? `(${specCount} İzleyici)` : ''}`;
+    const statusText = lob.status === 'playing' ? '🎮 Devam Ediyor' : '⌛ Bekliyor';
+    const statusColor = lob.status === 'playing' ? '#f59e0b' : 'var(--ok)';
+
+    row.innerHTML = `
+      <div>
+        <div style="font-weight:bold; color:#fff;">${escapeHtml(lob.name)}</div>
+        <div style="font-size:11px; color:var(--txt-mut); margin-top:2px;">${infoText}</div>
+        <div style="font-size:10px; font-weight:bold; color:${statusColor}; margin-top:4px;">${statusText}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        ${lob.status === 'waiting' && playerCount < maxPlayers ? `<button class="btn-pri btn-sm join-btn" style="padding:4px 10px; font-size:12px;">Katıl</button>` : ''}
+        <button class="btn-sec btn-sm spectate-btn" style="padding:4px 10px; font-size:12px;">İzle</button>
+      </div>
+    `;
+
+    // Join Button handler
+    const joinBtn = row.querySelector('.join-btn');
+    if (joinBtn) {
+      joinBtn.addEventListener('click', () => {
+        joinLobby(lob.id, false);
+      });
+    }
+
+    // Spectate Button handler
+    const spectateBtn = row.querySelector('.spectate-btn');
+    if (spectateBtn) {
+      spectateBtn.addEventListener('click', () => {
+        joinLobby(lob.id, true);
+      });
+    }
+
+    container.appendChild(row);
+  });
+};
+
+window.joinLobby = function(lobbyId, spectate = false) {
+  state.activeLobbyId = lobbyId;
+  state.spectating = spectate;
+  
+  const lob = state.lobbies.find(l => l.id === lobbyId);
+  if (!lob) return;
+
+  state.isLobbyHost = (lob.hostId === state.myId);
+
+  // Set the host in the state immediately before clicking the legacy button!
+  if (lob.activity === 'uno') {
+    state.uno.host = lob.hostId;
+    state.uno.joinedActivity = true;
+  } else if (lob.activity === 'wt') {
+    state.wt.joinedActivity = true;
+  } else if (lob.activity === 'sb') {
+    state.sb.host = lob.hostId;
+    state.sb.joinedActivity = true;
+  }
+
+  broadcast({
+    type: 'lobby-join-req',
+    lobbyId,
+    peerId: state.myId,
+    name: state.myName,
+    spectate
+  });
+
+  document.getElementById('activities-modal').classList.add('hidden');
+  document.getElementById('act-lobby-card').classList.add('hidden');
+  document.getElementById('act-list-card').classList.remove('hidden');
+
+  const legacyBtn = document.getElementById(`act-${lob.activity}`);
+  if (legacyBtn) legacyBtn.click();
+};
+
+window.leaveActiveLobby = function() {
+  if (!state.activeLobbyId) return;
+  const lobbyId = state.activeLobbyId;
+  const lob = state.lobbies.find(l => l.id === lobbyId);
+  
+  if (lob) {
+    if (lob.activity === 'uno') {
+      broadcast({ type: 'uno-leave' });
+    } else if (lob.activity === 'wt') {
+      broadcast({ type: 'wt-leave' });
+    } else if (lob.activity === 'sb') {
+      broadcast({ type: 'sb-leave' });
+    }
+  }
+
+  state.activeLobbyId = null;
+  state.spectating = false;
+
+  if (state.isLobbyHost) {
+    state.isLobbyHost = false;
+    const lobIdx = state.lobbies.findIndex(l => l.id === lobbyId);
+    if (lobIdx !== -1) {
+      const currentLob = state.lobbies[lobIdx];
+      const nextPlayer = currentLob.players.find(p => p.id !== state.myId);
+      if (nextPlayer) {
+        currentLob.hostId = nextPlayer.id;
+        currentLob.hostName = nextPlayer.name;
+        currentLob.players = currentLob.players.filter(p => p.id !== state.myId);
+        broadcastTo(nextPlayer.id, { type: 'lobby-promote-host', lobbyId });
+      } else {
+        state.lobbies.splice(lobIdx, 1);
+      }
+    }
+  } else {
+    if (lob) {
+      broadcastTo(lob.hostId, { type: 'lobby-leave-req', lobbyId, peerId: state.myId });
+    }
+  }
+  syncLobbiesList();
+};
+
+window.checkSpectatorUI = function() {
+  const isSpec = state.spectating;
+  
+  // UNO
+  const unoReady = document.getElementById('uno-ready-btn');
+  const unoStart = document.getElementById('uno-start-btn');
+  const unoMax = document.getElementById('uno-max-players');
+  const unoBots = document.getElementById('uno-fill-bots');
+  const unoUno = document.getElementById('uno-uno-btn');
+  const unoCatch = document.getElementById('uno-catch-btn');
+  const unoReplay = document.getElementById('uno-replay-btn');
+  const unoDeck = document.getElementById('uno-deck');
+  
+  if (unoReady) unoReady.classList.toggle('hidden', isSpec);
+  if (unoStart) unoStart.classList.toggle('hidden', isSpec);
+  if (unoMax) unoMax.disabled = isSpec;
+  if (unoBots) unoBots.disabled = isSpec;
+  if (unoUno) unoUno.classList.toggle('hidden', isSpec);
+  if (unoCatch) unoCatch.classList.toggle('hidden', isSpec);
+  if (unoReplay) unoReplay.classList.toggle('hidden', isSpec);
+  if (unoDeck) unoDeck.style.pointerEvents = isSpec ? 'none' : 'auto';
+  
+  // WatchTogether
+  const wtUrl = document.getElementById('wt-url');
+  const wtLoad = document.getElementById('wt-load');
+  const wtContainer = document.getElementById('wt-player-container');
+  if (wtUrl) wtUrl.disabled = isSpec;
+  if (wtLoad) wtLoad.classList.toggle('hidden', isSpec);
+  if (wtContainer) wtContainer.style.pointerEvents = isSpec ? 'none' : 'auto';
+  
+  // Shared Browser
+  const sbOverlay = document.getElementById('sb-overlay');
+  const sbUrl = document.getElementById('sb-url');
+  const sbGo = document.getElementById('sb-go');
+  const sbBack = document.getElementById('sb-back');
+  const sbForward = document.getElementById('sb-forward');
+  const sbRefresh = document.getElementById('sb-refresh');
+  
+  if (sbOverlay) sbOverlay.style.display = isSpec ? 'block' : 'none';
+  if (sbUrl) sbUrl.disabled = isSpec;
+  if (sbGo) sbGo.classList.toggle('hidden', isSpec);
+  if (sbBack) sbBack.classList.toggle('hidden', isSpec);
+  if (sbForward) sbForward.classList.toggle('hidden', isSpec);
+  if (sbRefresh) sbRefresh.classList.toggle('hidden', isSpec);
+  
+  // Poll
+  const pollSetup = document.getElementById('poll-setup');
+  const pollEnd = document.getElementById('poll-end');
+  if (pollSetup && isSpec) pollSetup.classList.add('hidden');
+  if (pollEnd) pollEnd.classList.toggle('hidden', isSpec);
+  const pollContainer = document.getElementById('poll-opts-container');
+  if (pollContainer) pollContainer.style.pointerEvents = isSpec ? 'none' : 'auto';
+  
+  // Lucky Wheel
+  const wheelSetup = document.getElementById('wheel-setup');
+  const wheelSpin = document.getElementById('wheel-spin-btn');
+  const wheelReset = document.getElementById('wheel-reset-btn');
+  if (wheelSetup && isSpec) wheelSetup.classList.add('hidden');
+  if (wheelSpin) wheelSpin.classList.toggle('hidden', isSpec);
+  if (wheelReset) wheelReset.classList.toggle('hidden', isSpec);
+  
+  // Yerel Film (LVS)
+  const lvsFile = document.getElementById('lvs-file');
+  const lvsLoad = document.getElementById('lvs-load');
+  const lvsPlayer = document.getElementById('lvs-player');
+  if (lvsFile) lvsFile.classList.toggle('hidden', isSpec);
+  if (lvsLoad) lvsLoad.classList.toggle('hidden', isSpec);
+  if (lvsPlayer) {
+    lvsPlayer.style.pointerEvents = isSpec ? 'none' : 'auto';
+    if (isSpec) {
+      lvsPlayer.removeAttribute('controls');
+    } else {
+      lvsPlayer.setAttribute('controls', 'true');
+    }
+  }
+};
+
+// Enforce spectator locks continuously
+setInterval(window.checkSpectatorUI, 300);
 
 

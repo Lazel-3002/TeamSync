@@ -530,55 +530,132 @@
     </div>
 
     <div id="activities-modal" class="modal hidden">
-      <div class="mcard">
+      <!-- Activities List Card -->
+      <div class="mcard" id="act-list-card">
         <h3>🚀 Etkinlikler</h3>
         <p class="muted">Arkadaşlarınızla beraber yapabileceğiniz etkinlikler.</p>
+        
+        <!-- Hidden legacy buttons to trigger original activity handlers programmatically -->
+        <button id="act-wt" style="display:none;"></button>
+        <button id="act-uno" style="display:none;"></button>
+        <button id="act-sb" style="display:none;"></button>
+        <button id="act-poll" style="display:none;"></button>
+        <button id="act-lvs" style="display:none;"></button>
+        <button id="act-wheel" style="display:none;"></button>
+        
         <div class="sources" style="grid-template-columns: 1fr; gap: 16px;">
-          <div class="src act-src" id="act-wt" style="display: flex; align-items: center; text-align: left; padding: 16px;">
-            <div style="font-size: 40px; margin-right: 20px;">📺</div>
-            <div>
-              <div style="font-size: 18px; font-weight: bold; color: var(--acc-light);">WatchTogether</div>
-              <p class="muted" style="margin:4px 0 0 0;">Ortak YouTube izleyin. Biri durdurduğunda herkeste durur.</p>
+          <!-- WatchTogether -->
+          <div class="src act-src card-act-btn" id="card-act-wt" style="display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 16px; cursor: pointer;">
+            <div style="display: flex; align-items: center; flex: 1;">
+              <div style="font-size: 40px; margin-right: 20px;">📺</div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: var(--acc-light);">WatchTogether</div>
+                <p class="muted" style="margin:4px 0 0 0;">Ortak YouTube izleyin. Biri durdurduğunda herkeste durur.</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="act-count-badge hidden" id="act-wt-count">0</span>
+              <div class="act-arrow-btn" id="arrow-act-wt" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); transition: all 0.2s; font-size: 14px; color: var(--txt-main); cursor: pointer;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='var(--txt-main)';">➔</div>
             </div>
           </div>
-          <div class="src act-src" id="act-uno" style="display: flex; align-items: center; text-align: left; padding: 16px;">
-            <div style="font-size: 40px; margin-right: 20px;">🃏</div>
-            <div>
-              <div style="font-size: 18px; font-weight: bold; color: var(--ok);">UNO</div>
-              <p class="muted" style="margin:4px 0 0 0;">Arkadaşlarınızla P2P üzerinden UNO oynayın.</p>
+
+          <!-- UNO -->
+          <div class="src act-src card-act-btn" id="card-act-uno" style="display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 16px; cursor: pointer;">
+            <div style="display: flex; align-items: center; flex: 1;">
+              <div style="font-size: 40px; margin-right: 20px;">🃏</div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: var(--ok);">UNO</div>
+                <p class="muted" style="margin:4px 0 0 0;">Arkadaşlarınızla P2P üzerinden UNO oynayın.</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="act-count-badge hidden" id="act-uno-count">0</span>
+              <div class="act-arrow-btn" id="arrow-act-uno" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); transition: all 0.2s; font-size: 14px; color: var(--txt-main); cursor: pointer;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='var(--txt-main)';">➔</div>
             </div>
           </div>
-          <div class="src act-src" id="act-sb" style="display: flex; align-items: center; text-align: left; padding: 16px;">
-            <div style="font-size: 40px; margin-right: 20px;">🌐</div>
-            <div>
-              <div style="font-size: 18px; font-weight: bold; color: #3b82f6;">Ortak Tarayıcı</div>
-              <p class="muted" style="margin:4px 0 0 0;">Senkronize bir şekilde internette beraber sörf yapın.</p>
+
+          <!-- Ortak Tarayıcı -->
+          <div class="src act-src card-act-btn" id="card-act-sb" style="display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 16px; cursor: pointer;">
+            <div style="display: flex; align-items: center; flex: 1;">
+              <div style="font-size: 40px; margin-right: 20px;">🌐</div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: #3b82f6;">Ortak Tarayıcı</div>
+                <p class="muted" style="margin:4px 0 0 0;">Senkronize bir şekilde internette beraber sörf yapın.</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="act-count-badge hidden" id="act-sb-count">0</span>
+              <div class="act-arrow-btn" id="arrow-act-sb" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); transition: all 0.2s; font-size: 14px; color: var(--txt-main); cursor: pointer;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='var(--txt-main)';">➔</div>
             </div>
           </div>
-          <div class="src act-src" id="act-poll" style="display: flex; align-items: center; text-align: left; padding: 16px;">
-            <div style="font-size: 40px; margin-right: 20px;">📊</div>
-            <div>
-              <div style="font-size: 18px; font-weight: bold; color: #f59e0b;">Hızlı Anket</div>
-              <p class="muted" style="margin:4px 0 0 0;">Grupla ortak karar vermek için anketler oluşturun.</p>
+
+          <!-- Hızlı Anket -->
+          <div class="src act-src card-act-btn" id="card-act-poll" style="display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 16px; cursor: pointer;">
+            <div style="display: flex; align-items: center; flex: 1;">
+              <div style="font-size: 40px; margin-right: 20px;">📊</div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: #f59e0b;">Hızlı Anket</div>
+                <p class="muted" style="margin:4px 0 0 0;">Grupla ortak karar vermek için anketler oluşturun.</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="act-count-badge hidden" id="act-poll-count">0</span>
+              <div class="act-arrow-btn" id="arrow-act-poll" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); transition: all 0.2s; font-size: 14px; color: var(--txt-main); cursor: pointer;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='var(--txt-main)';">➔</div>
             </div>
           </div>
-          <div class="src act-src" id="act-lvs" style="display: flex; align-items: center; text-align: left; padding: 16px;">
-            <div style="font-size: 40px; margin-right: 20px;">🍿</div>
-            <div>
-              <div style="font-size: 18px; font-weight: bold; color: #ec4899;">Yerel Film İzle</div>
-              <p class="muted" style="margin:4px 0 0 0;">Sıfır kalite kaybıyla kendi filmlerinizi senkronize izleyin.</p>
+
+          <!-- Yerel Film İzle -->
+          <div class="src act-src card-act-btn" id="card-act-lvs" style="display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 16px; cursor: pointer;">
+            <div style="display: flex; align-items: center; flex: 1;">
+              <div style="font-size: 40px; margin-right: 20px;">🍿</div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: #ec4899;">Yerel Film İzle</div>
+                <p class="muted" style="margin:4px 0 0 0;">Sıfır kalite kaybıyla kendi filmlerinizi senkronize izleyin.</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="act-count-badge hidden" id="act-lvs-count">0</span>
+              <div class="act-arrow-btn" id="arrow-act-lvs" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); transition: all 0.2s; font-size: 14px; color: var(--txt-main); cursor: pointer;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='var(--txt-main)';">➔</div>
             </div>
           </div>
-          <div class="src act-src" id="act-wheel" style="display: flex; align-items: center; text-align: left; padding: 16px;">
-            <div style="font-size: 40px; margin-right: 20px;">🎡</div>
-            <div>
-              <div style="font-size: 18px; font-weight: bold; color: #10b981;">Şans Çarkı</div>
-              <p class="muted" style="margin:4px 0 0 0;">Kendi öğelerinizi ekleyin, çarkı çevirin ve kazananı bulun!</p>
+
+          <!-- Şans Çarkı -->
+          <div class="src act-src card-act-btn" id="card-act-wheel" style="display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 16px; cursor: pointer;">
+            <div style="display: flex; align-items: center; flex: 1;">
+              <div style="font-size: 40px; margin-right: 20px;">🎡</div>
+              <div>
+                <div style="font-size: 18px; font-weight: bold; color: #10b981;">Şans Çarkı</div>
+                <p class="muted" style="margin:4px 0 0 0;">Kendi öğelerinizi ekleyin, çarkı çevirin ve kazananı bulun!</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="act-count-badge hidden" id="act-wheel-count">0</span>
+              <div class="act-arrow-btn" id="arrow-act-wheel" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); transition: all 0.2s; font-size: 14px; color: var(--txt-main); cursor: pointer;" onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='var(--txt-main)';">➔</div>
             </div>
           </div>
         </div>
+        
         <div class="mactions">
           <button id="act-close" class="btn-sec">Kapat</button>
+        </div>
+      </div>
+      
+      <!-- New Lobbies Card -->
+      <div class="mcard hidden" id="act-lobby-card" style="min-width: 440px; max-width: 500px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <button id="act-lobby-back" style="background: rgba(255,255,255,0.08); border: none; color: var(--txt-main); font-size: 16px; cursor: pointer; padding: 6px 12px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">⬅ Geri</button>
+          <h3 id="act-lobby-title" style="margin: 0; font-size: 20px;">Lobilere Göz At</h3>
+        </div>
+        <p class="muted" style="margin-bottom: 8px;">Katılmak için bir lobi seçin veya yeni bir tane oluşturun.</p>
+        <div id="act-lobby-stats" style="font-size: 13px; font-weight: bold; color: var(--ok); margin-bottom: 16px; background: rgba(16, 185, 129, 0.1); padding: 8px 12px; border-radius: 8px; display: inline-block;">Aktif Lobi: 0 • Toplam Oyuncu: 0</div>
+        
+        <div id="lobby-items-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; margin-bottom: 16px; padding-right: 4px;">
+          <!-- Dynamically populated list of lobbies -->
+        </div>
+        
+        <div class="mactions" style="display: flex; gap: 8px;">
+          <button id="btn-create-new-lobby" class="btn-pri" style="flex: 1;">➕ Yeni Lobi Oluştur</button>
+          <button id="act-lobby-close" class="btn-sec" style="flex: 1;">Kapat</button>
         </div>
       </div>
     </div>
