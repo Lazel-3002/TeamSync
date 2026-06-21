@@ -1655,6 +1655,12 @@ function handleSBMessage(peerId, msg) {
         sbWebview.executeJavaScript(syncScript).catch(e => {});
       }
     }
+  } else if (msg.type === 'sb-close') {
+    document.getElementById('sb-card').classList.add('hidden');
+    if (focusedCard === document.getElementById('sb-card')) toggleFocus(document.getElementById('sb-card'));
+    state.sb.joinedActivity = false;
+    const sbWebview = document.getElementById('sb-webview');
+    if (sbWebview) sbWebview.src = 'https://www.google.com';
   }
 }
 
@@ -2641,6 +2647,7 @@ function initWhiteboard() {
     e.stopPropagation();
     if (focusedCard === wbCard) toggleFocus(wbCard);
     wbCard.classList.add('hidden');
+    state.wbJoined = false;
   });
   
   document.getElementById('wb-clear').addEventListener('click', (e) => {
@@ -2725,7 +2732,7 @@ async function sendFile(file) {
     
     if (mqttClient && mqttClient.connected && state.room) {
       try {
-        mqttClient.publish(`teamsync/room/${state.room}/file`, Buffer.from(msgBuf));
+        mqttClient.publish(`teamsync/room/${state.room}/file`, mqtt.Buffer.from(msgBuf));
       } catch (e) {
         console.warn('MQTT file send failed:', e);
       }
@@ -2859,6 +2866,11 @@ function handleWTMessage(peerId, msg) {
       state.wt.player.seekTo(msg.time);
       state.wt.player.pauseVideo();
     }
+  } else if (msg.type === 'wt-close') {
+    document.getElementById('wt-card').classList.add('hidden');
+    if (focusedCard === document.getElementById('wt-card')) toggleFocus(document.getElementById('wt-card'));
+    state.wt.joinedActivity = false;
+    if (state.wt.player && state.wt.player.stopVideo) state.wt.player.stopVideo();
   }
 }
 
@@ -2905,6 +2917,8 @@ function initActivitiesUI() {
     document.getElementById('wt-card').classList.add('hidden');
     if (focusedCard === document.getElementById('wt-card')) toggleFocus(document.getElementById('wt-card'));
     if (state.wt.player && state.wt.player.stopVideo) state.wt.player.stopVideo();
+    state.wt.joinedActivity = false;
+    broadcast({ type: 'wt-close' });
   });
   
   document.getElementById('wt-load').addEventListener('click', (e) => {
@@ -2963,6 +2977,7 @@ function initActivitiesUI() {
     document.getElementById('sb-card').classList.add('hidden');
     if (focusedCard === document.getElementById('sb-card')) toggleFocus(document.getElementById('sb-card'));
     sbWebview.src = 'https://www.google.com';
+    state.sb.joinedActivity = false;
   });
 
   document.getElementById('sb-go').addEventListener('click', (e) => {
@@ -3141,6 +3156,7 @@ function initActivitiesUI() {
     state.uno.started = false;
     document.getElementById('uno-lobby').classList.remove('hidden');
     document.getElementById('uno-game').classList.add('hidden');
+    state.uno.joinedActivity = false;
     broadcast({ type: 'uno-leave' });
   });
 
