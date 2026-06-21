@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
@@ -192,7 +192,7 @@
     </aside>
 
     <main class="main">
-      <div class="top-bar" style="position: absolute; top: 16px; right: 24px; z-index: 100; display: none; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; background: var(--bg-panel); padding: 6px 12px; border-radius: 20px; border: var(--border); box-shadow: var(--shadow-sm); backdrop-filter: var(--blur); max-width: calc(100% - 48px);">
+      <div class="top-bar">
         <span style="font-size: 12px; color: var(--txt-mut); font-weight: 600;">SUNUCU ID:</span>
         <span id="display-server-id" style="font-family: monospace; font-size: 15px; font-weight: bold; letter-spacing: 1px; color: var(--acc-light); user-select: all;">------</span>
         <button id="btn-copy-id" class="btn-sec btn-sm" style="padding: 4px 8px; font-size: 12px; margin-left: 4px; border-radius: 8px; background: rgba(255,255,255,0.1);" title="ID'yi Kopyala">📋</button>
@@ -390,6 +390,7 @@
               <canvas id="wheel-canvas" width="350" height="350" style="border-radius: 50%; box-shadow: 0 0 20px rgba(0,0,0,0.5); transition: transform 4s cubic-bezier(0.1, 0, 0.1, 1);"></canvas>
             </div>
             <button id="wheel-spin-btn" class="btn-pri" style="font-size: 20px; padding: 12px 30px; font-weight: bold; border-radius: 50px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);">🎡 ÇEVİR!</button>
+            <button id="wheel-reset-btn" class="btn-sec btn-sm" style="margin-top: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">Yeniden Düzenle</button>
           </div>
 
           <!-- Winner Overlay -->
@@ -496,16 +497,23 @@
     </div>
 
     <div id="settings-modal" class="modal hidden">
-      <div class="mcard">
+      <div class="mcard" style="width: 420px;">
         <h3>⚙️ Ayarlar</h3>
         <label class="lbl-block">Kamera / Ekran Kalitesi</label>
-        <select id="quality-select" class="sel-block">
+        <select id="quality-select" class="sel-block" style="margin-bottom: 12px; width: 100%;">
           <option value="high">Yüksek (1080p, 60 FPS)</option>
           <option value="medium" selected>Orta (720p, 30 FPS)</option>
           <option value="low">Düşük (480p, 15 FPS)</option>
         </select>
-        <div class="mactions">
-          <button id="settings-close" class="btn-pri">Kapat</button>
+        
+        <label class="lbl-block">Özel TURN Sunucusu (Farklı Ağlar İçin Gerekirse)</label>
+        <input type="text" id="turn-url" class="sel-block" placeholder="Örn: turns:myturn.com:443" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: white;" />
+        <input type="text" id="turn-user" class="sel-block" placeholder="Kullanıcı Adı" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: white;" />
+        <input type="password" id="turn-pass" class="sel-block" placeholder="Şifre" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 16px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: white;" />
+        
+        <div class="mactions" style="display: flex; gap: 10px;">
+          <button id="settings-save" class="btn-pri" style="flex: 1;">💾 Kaydet</button>
+          <button id="settings-close" class="btn-sec" style="flex: 1;">Kapat</button>
         </div>
       </div>
     </div>

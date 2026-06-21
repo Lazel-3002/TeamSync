@@ -140,8 +140,13 @@ function sendInternetSignal(targetId, signal) {
 }
 
 async function handleSignal(id, ip, signal) {
-  const peer = state.peers.get(id);
-  if (!peer) return;
+  let peer = state.peers.get(id);
+  if (!peer) {
+    console.log(`📨 Signal received but peer not found, creating peer connection for id=${id}, ip=${ip}`);
+    await handlePeerDiscovered({ id: id, name: 'Bilinmeyen Arkadaş', ip: ip });
+    peer = state.peers.get(id);
+    if (!peer) return;
+  }
   if (!peer.ip) peer.ip = ip;
   if (!peer.iceQueue) peer.iceQueue = [];
 
@@ -533,17 +538,35 @@ setInterval(() => {
 }, 10000);
 
 
-const ICE = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun.cloudflare.com:3478' },
-  // Açık kaynaklı ve public TURN sunucusu (Symmetric NAT aşmak için)
-  { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-];
+function getIceServers() {
+  const customUrl = localStorage.getItem('teamsync_turn_url') || '';
+  const customUser = localStorage.getItem('teamsync_turn_user') || '';
+  const customPass = localStorage.getItem('teamsync_turn_pass') || '';
+
+  const servers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ];
+
+  if (customUrl && customUser && customPass) {
+    servers.push({
+      urls: customUrl,
+      username: customUser,
+      credential: customPass
+    });
+  } else {
+    // Varsayılan Metered.ca Open Relay (Public)
+    servers.push(
+      { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    );
+  }
+  return servers;
+}
 
 window.addEventListener('DOMContentLoaded', async () => {
   const stepName = document.getElementById('step-name');
@@ -1217,7 +1240,7 @@ function removePeer(peerId) {
 
 async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (state.peers.has(peerId)) return;
-  const pc = new RTCPeerConnection({ iceServers: ICE });
+  const pc = new RTCPeerConnection({ iceServers: getIceServers() });
 
   state.localStream.getTracks().forEach(track => {
     pc.addTrack(track, state.localStream);
@@ -1285,8 +1308,11 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
       setupSpeakingDetection(peerId, e.streams[0]);
     } else if (e.track.kind === 'video') {
       peer.videoEl.srcObject = e.streams[0];
+      peer.videoEl.play().catch((err) => console.warn('peer.videoEl play failed in ontrack:', err));
       if (state.activeControl && state.activeControl.hostId === peerId) {
-        document.getElementById('remote-vid').srcObject = e.streams[0];
+        const remoteVid = document.getElementById('remote-vid');
+        remoteVid.srcObject = e.streams[0];
+        remoteVid.play().catch((err) => console.warn('remote-vid play failed:', err));
       }
     }
   };
@@ -1572,6 +1598,8 @@ async function handleDataMessage(peerId, msg) {
     handleUnoMessage(peerId, msg);
   } else if (msg.type.startsWith('sb-')) {
     handleSBMessage(peerId, msg);
+  } else if (['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_spin'].includes(msg.type)) {
+    if (window.activityHandler) window.activityHandler(msg);
   }
 }
 
@@ -1588,9 +1616,9 @@ function handleSBMessage(peerId, msg) {
          removeInactiveOverlay('sb-card');
          if (!focusedCard) toggleFocus(document.getElementById('sb-card'));
          if (state.sb.lastUrl) {
-           state.sb.ignoreNextNav = true;
-           document.getElementById('sb-webview').src = state.sb.lastUrl;
-           document.getElementById('sb-url').value = state.sb.lastUrl;
+            state.sb.ignoreNextNav = true;
+            document.getElementById('sb-webview').src = state.sb.lastUrl;
+            document.getElementById('sb-url').value = state.sb.lastUrl;
          }
       });
     }
@@ -1610,6 +1638,23 @@ function handleSBMessage(peerId, msg) {
     state.sb.ignoreNextNav = true;
     document.getElementById('sb-webview').src = msg.url;
     document.getElementById('sb-url').value = msg.url;
+  } else if (msg.type === 'sb-video-sync') {
+    if (state.sb.host !== state.myId && state.sb.joinedActivity) {
+      const sbWebview = document.getElementById('sb-webview');
+      if (sbWebview) {
+        const syncScript = `(() => {
+          const v = document.querySelector('video');
+          if (!v) return;
+          const targetTime = ${msg.currentTime} + (Date.now() - ${msg.ts}) / 1000;
+          if (Math.abs(v.currentTime - targetTime) > 2) {
+            v.currentTime = targetTime;
+          }
+          if (${msg.paused} && !v.paused) v.pause();
+          if (!${msg.paused} && v.paused) v.play().catch(e => {});
+        })()`;
+        sbWebview.executeJavaScript(syncScript).catch(e => {});
+      }
+    }
   }
 }
 
@@ -1793,6 +1838,8 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
   if (peerId === 'self') videoEl.muted = true;
   else videoEl.muted = false;
 
+  videoEl.play().catch(err => console.warn('videoEl play failed in addVideoCard:', err));
+
   const lbl = document.createElement('div');
   lbl.className = 'vlbl';
   lbl.innerHTML = `<span class="live"></span> ${escapeHtml(peerName)} ${isScreen ? '• Ekran' : ''}`;
@@ -1826,6 +1873,7 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
          removeInactiveOverlay(card.id);
          videoEl.muted = false;
          if (!focusedCard) toggleFocus(card);
+         videoEl.play().catch(err => console.warn('videoEl play failed on join click:', err));
       });
     } else {
       if (!focusedCard) toggleFocus(card);
@@ -2083,6 +2131,16 @@ function bindUI() {
 
   document.getElementById('settings').addEventListener('click', () => {
     document.getElementById('settings-modal').classList.remove('hidden');
+    document.getElementById('turn-url').value = localStorage.getItem('teamsync_turn_url') || '';
+    document.getElementById('turn-user').value = localStorage.getItem('teamsync_turn_user') || '';
+    document.getElementById('turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
+  });
+  document.getElementById('settings-save').addEventListener('click', () => {
+    localStorage.setItem('teamsync_turn_url', document.getElementById('turn-url').value.trim());
+    localStorage.setItem('teamsync_turn_user', document.getElementById('turn-user').value.trim());
+    localStorage.setItem('teamsync_turn_pass', document.getElementById('turn-pass').value.trim());
+    showToast('Ayarlar kaydedildi!', 'ok');
+    document.getElementById('settings-modal').classList.add('hidden');
   });
   document.getElementById('settings-close').addEventListener('click', () => {
     document.getElementById('settings-modal').classList.add('hidden');
@@ -2914,6 +2972,9 @@ function initActivitiesUI() {
     if (!/^https?:\/\//i.test(url)) {
       url = 'https://' + url;
     }
+    if (/youtube\.com|youtu\.be/i.test(url)) {
+      showToast("💡 İpucu: YouTube videolarını senkronize izlemek için 'WatchTogether' etkinliğini kullanabilirsiniz!", "info");
+    }
     sbWebview.src = url;
   });
   sbUrl.addEventListener('click', () => {
@@ -2953,6 +3014,7 @@ function initActivitiesUI() {
   });
 
   sbWebview.addEventListener('did-navigate', (e) => {
+    state.sb.lastVideoState = null;
     if (document.activeElement !== sbUrl) {
       sbUrl.value = e.url;
     }
@@ -2966,6 +3028,7 @@ function initActivitiesUI() {
   });
 
   sbWebview.addEventListener('did-navigate-in-page', (e) => {
+    state.sb.lastVideoState = null;
     if (document.activeElement !== sbUrl) {
       sbUrl.value = e.url;
     }
@@ -2977,6 +3040,69 @@ function initActivitiesUI() {
       broadcast({ type: 'sb-nav', url: e.url });
     }
   });
+
+  // Shared Browser Video Synchronization & Auto Ad-Skipper
+  setInterval(async () => {
+    const sbCard = document.getElementById('sb-card');
+    if (!sbCard || sbCard.classList.contains('hidden')) return;
+    const sbWebview = document.getElementById('sb-webview');
+    if (!sbWebview) return;
+
+    // 1. Automatic Ad-Skipping (Applies to both host and guest)
+    try {
+      await sbWebview.executeJavaScript(`(() => {
+        // Dismiss standard YouTube ad skip button
+        const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button');
+        if (skipBtn) {
+          skipBtn.click();
+        }
+        
+        // Dismiss YouTube overlay ads (non-video ads)
+        const overlayAd = document.querySelector('.ytp-ad-overlay-close-button');
+        if (overlayAd) {
+          overlayAd.click();
+        }
+
+        // Speed up and skip video ads immediately
+        const ad = document.querySelector('.ad-showing, .ad-interrupting');
+        const v = document.querySelector('video');
+        if (ad && v) {
+          v.playbackRate = 16.0;
+          v.currentTime = v.duration - 0.1;
+        }
+      })()`);
+    } catch (e) {}
+
+    // 2. Video Playback Synchronization (Host broadcasts state)
+    if (state.sb.host === state.myId) {
+      try {
+        const vState = await sbWebview.executeJavaScript(`(() => {
+          const v = document.querySelector('video');
+          if (!v) return null;
+          return {
+            paused: v.paused,
+            currentTime: v.currentTime,
+            url: window.location.href
+          };
+        })()`);
+
+        if (vState) {
+          if (!state.sb.lastVideoState ||
+              state.sb.lastVideoState.paused !== vState.paused ||
+              Math.abs(state.sb.lastVideoState.currentTime - vState.currentTime) > 2) {
+            
+            state.sb.lastVideoState = vState;
+            broadcast({
+              type: 'sb-video-sync',
+              paused: vState.paused,
+              currentTime: vState.currentTime,
+              ts: Date.now()
+            });
+          }
+        }
+      } catch (e) {}
+    }
+  }, 1000);
 
   document.getElementById('act-uno').addEventListener('click', () => {
     document.getElementById('activities-modal').classList.add('hidden');
@@ -3222,10 +3348,7 @@ function handleUnoMessage(peerId, msg) {
         state.uno.discard = [top];
       }
       const c = state.uno.deck.pop();
-      const p = state.peers.get(peerId);
-      if (p && p.dc && p.dc.readyState === 'open') {
-        p.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c, forced: false }));
-      }
+      broadcastTo(peerId, { type: 'uno-draw-result', card: c, forced: false });
       if (state.uno.players.has(peerId)) state.uno.players.get(peerId).cardCount++;
       
       const topCard = state.uno.discard[state.uno.discard.length - 1];
@@ -3410,10 +3533,7 @@ function forceDrawCards(victimId, count) {
     } else if (victimId.startsWith('bot-')) {
       state.uno.botHands[victimId].push(c);
     } else {
-      const peer = state.peers.get(victimId);
-      if (peer && peer.dc && peer.dc.readyState === 'open') {
-        peer.dc.send(JSON.stringify({ type: 'uno-draw-result', card: c, forced: true }));
-      }
+      broadcastTo(victimId, { type: 'uno-draw-result', card: c, forced: true });
     }
     
     animateCardDraw(victimId);
@@ -4427,11 +4547,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener('DOMContentLoaded', () => {
   const broadcastActivityMsg = (msg) => {
-    state.peers.forEach((peer) => {
-      if (peer.dc && peer.dc.readyState === 'open') {
-        peer.dc.send(JSON.stringify(msg));
-      }
-    });
+    broadcast(msg);
   };
 
   const closeAllCards = () => {
@@ -4446,11 +4562,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const setActivity = (act) => {
     closeAllCards();
     document.getElementById('activities-modal').classList.add('hidden');
-    state.peers.forEach(peer => {
-      if(peer.dc && peer.dc.readyState === 'open') {
-        peer.dc.send(JSON.stringify({ type: 'activity_change', activity: act }));
-      }
-    });
+    broadcast({ type: 'activity_change', activity: act });
     if (act === 'poll') document.getElementById('poll-card').classList.remove('hidden');
     if (act === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
     if (act === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
@@ -4642,10 +4754,32 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.getElementById('wheel-ready')?.addEventListener('click', () => {
-    if(wheelItems.length < 2) return alert('En az 2 öğe ekleyin!');
+  document.getElementById('wheel-new-item')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('wheel-add-item')?.click();
+    }
+  });
+
+  const handleWheelReady = () => {
     document.getElementById('wheel-setup').classList.add('hidden');
     document.getElementById('wheel-play').classList.remove('hidden');
+  };
+
+  document.getElementById('wheel-ready')?.addEventListener('click', () => {
+    if(wheelItems.length < 2) return alert('En az 2 öğe ekleyin!');
+    handleWheelReady();
+    broadcastActivityMsg({ type: 'wheel_ready' });
+  });
+
+  const handleWheelReset = () => {
+    document.getElementById('wheel-play').classList.add('hidden');
+    document.getElementById('wheel-setup').classList.remove('hidden');
+    document.getElementById('wheel-winner-overlay').classList.add('hidden');
+  };
+
+  document.getElementById('wheel-reset-btn')?.addEventListener('click', () => {
+    handleWheelReset();
+    broadcastActivityMsg({ type: 'wheel_reset' });
   });
 
   document.getElementById('wheel-spin-btn')?.addEventListener('click', () => {
@@ -4681,36 +4815,34 @@ window.addEventListener('DOMContentLoaded', () => {
 
   drawWheel();
 
-  setInterval(() => {
-    state.peers.forEach(peer => {
-      if(peer.dc && peer.dc.readyState === 'open' && !peer._activityHooked) {
-        peer._activityHooked = true;
-        peer.dc.addEventListener('message', (ev) => {
-          try {
-            const data = JSON.parse(ev.data);
-            if(data.type === 'activity_change') {
-              closeAllCards();
-              if (data.activity === 'poll') document.getElementById('poll-card').classList.remove('hidden');
-              if (data.activity === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
-              if (data.activity === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
-            }
-            if(data.type === 'poll_start') handlePollStart(data, false);
-            if(data.type === 'poll_vote' && pollState && pollState.id === data.pollId) {
-              pollState.votes[data.opt]++;
-              if(data.old && pollState.votes[data.old] > 0) pollState.votes[data.old]--;
-              renderPoll();
-            }
-            if(data.type === 'poll_end') endPoll();
-            if(data.type === 'lvs_sync') handleLvsSync(data);
-            if(data.type === 'wheel_items') {
-              wheelItems = data.items;
-              renderWheelItems();
-              drawWheel();
-            }
-            if(data.type === 'wheel_spin') handleWheelSpin(data.targetDeg);
-          } catch(e) {}
-        });
+  window.activityHandler = (data) => {
+    try {
+      if (data.type === 'activity_change') {
+        closeAllCards();
+        if (data.activity === 'poll') document.getElementById('poll-card').classList.remove('hidden');
+        if (data.activity === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
+        if (data.activity === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
       }
-    });
-  }, 1000);
+      if (data.type === 'poll_start') handlePollStart(data, false);
+      if (data.type === 'poll_vote' && pollState && pollState.id === data.pollId) {
+        pollState.votes[data.opt]++;
+        if (data.old && pollState.votes[data.old] > 0) pollState.votes[data.old]--;
+        renderPoll();
+      }
+      if (data.type === 'poll_end') endPoll();
+      if (data.type === 'lvs_sync') handleLvsSync(data);
+      if (data.type === 'wheel_items') {
+        wheelItems = data.items;
+        renderWheelItems();
+        drawWheel();
+      }
+      if (data.type === 'wheel_ready') {
+        handleWheelReady();
+      }
+      if (data.type === 'wheel_reset') {
+        handleWheelReset();
+      }
+      if (data.type === 'wheel_spin') handleWheelSpin(data.targetDeg);
+    } catch(e) {}
+  };
 });

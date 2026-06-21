@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell } = require('electron');
+app.name = 'TeamSync';
 const path = require('path');
 const dgram = require('dgram');
 const os = require('os');
@@ -375,6 +376,26 @@ app.whenReady().then(() => {
       details.requestHeaders['Referer'] = 'https://www.youtube.com/';
       details.requestHeaders['Origin'] = 'https://www.youtube.com';
       callback({ requestHeaders: details.requestHeaders });
+    }
+  );
+
+  // Reklam engelleme kuralı (Ortak Tarayıcı'da reklamları bloklamak için)
+  session.defaultSession.webRequest.onBeforeRequest(
+    {
+      urls: [
+        '*://*.doubleclick.net/*',
+        '*://*.googlesyndication.com/*',
+        '*://*.googleadservices.com/*',
+        '*://*.googletagservices.com/*',
+        '*://*.g.doubleclick.net/*',
+        '*://*.pagead2.googlesyndication.com/*',
+        '*://*.adsystem.com/*',
+        '*://*.adservice.com/*',
+        '*://*.analytics.google.com/*'
+      ]
+    },
+    (details, callback) => {
+      callback({ cancel: true });
     }
   );
 
