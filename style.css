@@ -1947,5 +1947,400 @@ body {
   display: none !important;
 }
 
+/* Custom Tooltip */
+.custom-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+}
 
+.custom-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 130%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--bg-card);
+  color: var(--txt-main);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  white-space: pre-wrap;
+  width: max-content;
+  max-width: 250px;
+  box-shadow: var(--shadow);
+  border: var(--border);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 99999;
+    gap: 8px !important;
+  }
+}
 
+/* ===== HESAP YÖNETİCİSİ (ACCOUNT SWITCHER) ===== */
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.4);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+.account-row:hover {
+  background: var(--bg-hover);
+  border-color: var(--acc-light);
+  transform: translateY(-1px);
+}
+.account-row-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.account-row-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-row-name {
+  font-weight: 600;
+  color: var(--txt-main);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-row-id {
+  font-size: 10px;
+  color: var(--txt-mut);
+  font-family: monospace;
+}
+.account-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.account-row-checkbox-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 10px !important;
+  color: var(--txt-mut) !important;
+  margin: 0 !important;
+  cursor: pointer;
+  text-transform: none !important;
+  letter-spacing: 0px !important;
+}
+.account-row-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--txt-mut);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+.account-row-delete-btn:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* User Context Menu Styles */
+.user-context-menu {
+  position: absolute;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  min-width: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--txt-main);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.user-context-menu-item:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: #fff;
+}
+
+.user-context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+/* Lobbies UI Styles */
+.lobby-row {
+  transition: all 0.2s ease;
+}
+.lobby-row:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+.act-count-badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-weight: bold;
+  padding: 4px 10px;
+  border-radius: 10px;
+  min-width: 24px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.act-count-badge.vibrant {
+  background: var(--ok);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+.act-count-badge.hidden {
+  display: none !important;
+}
+
+/* Custom Tooltip */
+.custom-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+}
+
+.custom-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 130%;
+  left: 0;
+  transform: translateY(10px);
+  background: var(--bg-card);
+  color: var(--txt-main);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  white-space: pre-wrap;
+  width: max-content;
+  max-width: 250px;
+  box-shadow: var(--shadow);
+  border: var(--border);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 99999;
+  text-align: left;
+  pointer-events: none;
+  backdrop-filter: var(--blur);
+}
+
+.custom-tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* UNO Premium Settings Menu */
+.uno-premium-settings {
+  display: none; 
+  margin: 20px 0; 
+  background: rgba(15, 23, 42, 0.75); 
+  backdrop-filter: blur(16px);
+  padding: 24px; 
+  border-radius: 16px; 
+  width: 100%; 
+  max-width: 480px; 
+  border: 1px solid rgba(255, 255, 255, 0.1); 
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  flex: 1 1 auto;
+  min-height: 250px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Universal Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.2); 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2); 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35); 
+}
+
+.uno-settings-section-title {
+  margin: 0 0 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.uno-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.2s ease;
+}
+
+.uno-settings-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.uno-settings-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex: 1;
+}
+
+/* Premium Checkbox Toggle Style */
+.uno-toggle-switch {
+  appearance: none;
+  width: 40px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  border: 2px solid transparent;
+  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.uno-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.uno-toggle-switch:checked {
+  background: var(--ok);
+}
+
+.uno-toggle-switch.warn:checked {
+  background: var(--warn);
+}
+
+.uno-toggle-switch:checked::after {
+  transform: translateX(18px);
+}
+
+.uno-settings-input {
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  transition: all 0.2s;
+  width: 70px;
+  text-align: center;
+}
+
+.uno-settings-input:focus {
+  border-color: var(--acc-light);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.uno-settings-select {
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.uno-settings-select:focus {
+  border-color: var(--acc-light);
+}
+
+.uno-settings-select option {
+  background: #1e293b;
+  color: #fff;
+}

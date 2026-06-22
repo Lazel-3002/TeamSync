@@ -23,6 +23,8 @@ function initUno() {
     document.getElementById('uno-start-btn').classList.remove('hidden');
     document.getElementById('uno-max-players').disabled = false;
     document.getElementById('uno-fill-bots').disabled = false;
+    document.getElementById('uno-start-cards').disabled = false;
+    document.querySelectorAll('.uno-rule-cb').forEach(cb => cb.disabled = false);
     
     broadcast({ type: 'uno-lobby', host: state.myId });
     renderUnoLobby();
@@ -72,6 +74,36 @@ function initUno() {
 
   document.getElementById('uno-fill-bots').addEventListener('change', (e) => {
     broadcast({ type: 'uno-fill', fill: e.target.checked });
+  });
+
+  document.getElementById('uno-start-cards').addEventListener('change', (e) => {
+    let val = parseInt(e.target.value);
+    if (val < 5) val = 5;
+    if (val > 20) val = 20;
+    e.target.value = val;
+    state.uno.rules.startCards = val;
+    broadcast({ type: 'uno-rules', rules: state.uno.rules });
+  });
+
+  const ruleIds = ['kombo', 'stacking', 'jumpin', 'drawuntilplay', 'nobluff', 'nopass', 'noblacklast', 'mirror', 'zeropass', 'sevenswap'];
+  const ruleKeys = ['kombo', 'stacking', 'jumpIn', 'drawUntilPlay', 'noBluff', 'noPass', 'noBlackLast', 'mirror', 'zeroPass', 'sevenSwap'];
+  
+  ruleIds.forEach((id, idx) => {
+    const el = document.getElementById('rule-' + id);
+    if(el) {
+      el.addEventListener('change', (e) => {
+        state.uno.rules[ruleKeys[idx]] = e.target.checked;
+        broadcast({ type: 'uno-rules', rules: state.uno.rules });
+      });
+    }
+  });
+
+  document.getElementById('uno-end-turn-btn').addEventListener('click', () => {
+     if (state.uno.host !== state.myId) {
+        broadcast({ type: 'uno-end-turn' });
+     } else {
+        processUnoEndTurn(state.myId);
+     }
   });
 
   document.getElementById('uno-uno-btn').addEventListener('click', () => {
@@ -166,6 +198,8 @@ function handleUnoMessage(peerId, msg) {
                document.getElementById('uno-host-settings').style.display = 'block';
                document.getElementById('uno-max-players').disabled = true;
                document.getElementById('uno-fill-bots').disabled = true;
+               document.getElementById('uno-start-cards').disabled = true;
+               document.querySelectorAll('.uno-rule-cb').forEach(cb => cb.disabled = true);
                document.getElementById('uno-ready-btn').classList.remove('hidden');
                document.getElementById('uno-start-btn').classList.add('hidden');
                document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
@@ -179,6 +213,8 @@ function handleUnoMessage(peerId, msg) {
           document.getElementById('uno-host-settings').style.display = 'block';
           document.getElementById('uno-max-players').disabled = true;
           document.getElementById('uno-fill-bots').disabled = true;
+          document.getElementById('uno-start-cards').disabled = true;
+          document.querySelectorAll('.uno-rule-cb').forEach(cb => cb.disabled = true);
           document.getElementById('uno-ready-btn').classList.remove('hidden');
           document.getElementById('uno-start-btn').classList.add('hidden');
           document.getElementById('uno-ready-btn').textContent = 'Hazır Değilim';
@@ -275,6 +311,10 @@ function handleUnoMessage(peerId, msg) {
       const topCard = state.uno.discard[state.uno.discard.length - 1];
       if (canPlay(msg.card, topCard)) {
         showDrawModal(msg.card, state.uno.myHand.length - 1);
+      } else if (state.uno.rules && state.uno.rules.drawUntilPlay) {
+         setTimeout(() => {
+             document.getElementById('uno-deck').click();
+         }, 400);
       }
     }
   } else if (msg.type === 'uno-keep') {
@@ -310,6 +350,21 @@ function handleUnoMessage(peerId, msg) {
     if (state.uno.host !== state.myId) document.getElementById('uno-max-players').value = msg.max;
   } else if (msg.type === 'uno-fill') {
     if (state.uno.host !== state.myId) document.getElementById('uno-fill-bots').checked = msg.fill;
+  } else if (msg.type === 'uno-rules') {
+    state.uno.rules = msg.rules;
+    if (state.uno.host !== state.myId) {
+      document.getElementById('uno-start-cards').value = msg.rules.startCards;
+      document.getElementById('rule-kombo').checked = msg.rules.kombo;
+      document.getElementById('rule-stacking').checked = msg.rules.stacking;
+      document.getElementById('rule-jumpin').checked = msg.rules.jumpIn;
+      document.getElementById('rule-drawuntilplay').checked = msg.rules.drawUntilPlay;
+      document.getElementById('rule-nobluff').checked = msg.rules.noBluff;
+      document.getElementById('rule-nopass').checked = msg.rules.noPass;
+      document.getElementById('rule-noblacklast').checked = msg.rules.noBlackLast;
+      document.getElementById('rule-mirror').checked = msg.rules.mirror;
+      document.getElementById('rule-zeropass').checked = msg.rules.zeroPass;
+      document.getElementById('rule-sevenswap').checked = msg.rules.sevenSwap;
+    }
   } else if (msg.type === 'uno-start') {
     state.uno.started = true;
     state.uno.turnOrder = msg.turnOrder;
@@ -364,15 +419,78 @@ function handleUnoMessage(peerId, msg) {
         setTimeout(() => endUnoGame(), 800);
         return;
       }
-      if (msg.drawCount > 0) {
-        setTimeout(() => {
-          const victimIndex = getNextTurn(1, msg.oldTurnIndex, msg.direction);
-          const victimId = state.uno.turnOrder[victimIndex];
-          forceDrawCards(victimId, msg.drawCount);
-        }, 500);
+      
+      let specialRuleTriggered = false;
+      if (msg.card.val === '0' && state.uno.rules && state.uno.rules.zeroPass) {
+          state.uno.zeroPassPending = true;
+          state.uno.collectedHands = {};
+          broadcast({ type: 'uno-req-hands' });
+          state.uno.collectedHands[state.myId] = [...state.uno.myHand];
+          for (let id in state.uno.botHands) state.uno.collectedHands[id] = [...state.uno.botHands[id]];
+          specialRuleTriggered = true;
+      }
+      if (msg.card.val === '7' && state.uno.rules && state.uno.rules.sevenSwap) {
+          state.uno.sevenSwapPending = true;
+          state.uno.sevenSwapInitiator = msg.botId || peerId;
+          state.uno.collectedHands = {};
+          broadcast({ type: 'uno-req-hands' });
+          state.uno.collectedHands[state.myId] = [...state.uno.myHand];
+          for (let id in state.uno.botHands) state.uno.collectedHands[id] = [...state.uno.botHands[id]];
+          specialRuleTriggered = true;
+      }
+      
+      if (!specialRuleTriggered && Object.keys(state.uno.collectedHands || {}).length === state.uno.players.size) {
+         checkAndProcessHandSwaps();
+      }
+      
+      if (msg.drawCount > 0 && !msg.isKombo) {
+        if (state.uno.rules && (state.uno.rules.stacking || state.uno.rules.mirror)) {
+            state.uno.pendingDrawCount = (state.uno.pendingDrawCount || 0) + msg.drawCount;
+            broadcast({ type: 'uno-pending-draw', count: state.uno.pendingDrawCount });
+        } else {
+            setTimeout(() => {
+              const victimIndex = getNextTurn(1, msg.oldTurnIndex, msg.direction);
+              const victimId = state.uno.turnOrder[victimIndex];
+              forceDrawCards(victimId, msg.drawCount);
+            }, 500);
+        }
       }
     }
 
+  } else if (msg.type === 'uno-pending-draw') {
+      state.uno.pendingDrawCount = msg.count;
+  } else if (msg.type === 'uno-take-pending') {
+      if (state.uno.host === state.myId) {
+          const count = state.uno.pendingDrawCount;
+          state.uno.pendingDrawCount = 0;
+          broadcast({ type: 'uno-pending-draw', count: 0 });
+          forceDrawCards(peerId, count);
+          
+          setTimeout(() => {
+              state.uno.turnIndex = getNextTurn(1);
+              broadcast({ type: 'uno-end-turn-sync', nextTurnIndex: state.uno.turnIndex });
+              renderUnoGame();
+          }, 800);
+      }
+  } else if (msg.type === 'uno-end-turn') {
+    if (state.uno.host === state.myId) {
+      processUnoEndTurn(peerId);
+    }
+  } else if (msg.type === 'uno-req-hands') {
+      broadcast({ type: 'uno-res-hands', hand: state.uno.myHand });
+  } else if (msg.type === 'uno-res-hands') {
+      if (state.uno.host === state.myId) {
+          state.uno.collectedHands = state.uno.collectedHands || {};
+          state.uno.collectedHands[peerId] = msg.hand;
+          checkAndProcessHandSwaps();
+      }
+  } else if (msg.type === 'uno-dist-hands') {
+      distributeHands(msg.hands);
+  } else if (msg.type === 'uno-end-turn-sync') {
+    state.uno.turnIndex = msg.nextTurnIndex;
+    if (state.uno.host === state.myId && state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
+    document.getElementById('uno-end-turn-btn').classList.add('hidden');
+    renderUnoGame();
   } else if (msg.type === 'uno-draw') {
     const pId = msg.botId || peerId;
     const p = state.uno.players.get(pId);
@@ -405,6 +523,46 @@ function handleUnoMessage(peerId, msg) {
   } else if (msg.type === 'uno-game-over') {
     showUnoGameOver(msg.rankings);
   }
+}
+
+function checkAndProcessHandSwaps() {
+    if (!state.uno.collectedHands || Object.keys(state.uno.collectedHands).length < state.uno.players.size) return;
+    
+    if (state.uno.zeroPassPending) {
+        state.uno.zeroPassPending = false;
+        let newHands = {};
+        for (let i=0; i<state.uno.turnOrder.length; i++) {
+            let nextIdx = getNextTurn(1, i, state.uno.direction);
+            newHands[state.uno.turnOrder[nextIdx]] = state.uno.collectedHands[state.uno.turnOrder[i]];
+        }
+        broadcast({ type: 'uno-dist-hands', hands: newHands });
+        distributeHands(newHands);
+    } else if (state.uno.sevenSwapPending) {
+        state.uno.sevenSwapPending = false;
+        let targets = state.uno.turnOrder.filter(id => id !== state.uno.sevenSwapInitiator);
+        if (targets.length > 0) {
+            let randomTarget = targets[Math.floor(Math.random() * targets.length)];
+            let newHands = { ...state.uno.collectedHands };
+            newHands[state.uno.sevenSwapInitiator] = state.uno.collectedHands[randomTarget];
+            newHands[randomTarget] = state.uno.collectedHands[state.uno.sevenSwapInitiator];
+            broadcast({ type: 'uno-dist-hands', hands: newHands });
+            distributeHands(newHands);
+        }
+    }
+}
+
+function distributeHands(hands) {
+    if (hands[state.myId]) state.uno.myHand = hands[state.myId];
+    for (const [id, h] of Object.entries(hands)) {
+        if (state.uno.players.has(id)) {
+            state.uno.players.get(id).cardCount = h.length;
+        }
+        if (id.startsWith('bot-') && state.myId === state.uno.host) {
+            state.uno.botHands[id] = h;
+        }
+    }
+    showToast("Eller değişti!", "warn");
+    renderUnoGame();
 }
 
 function forceDrawCards(victimId, count) {
@@ -509,9 +667,12 @@ function startUnoGame() {
   const hands = {};
   const turnOrder = Array.from(state.uno.players.keys());
   state.uno.botHands = {};
+  
+  const initialCardCount = state.uno.rules ? state.uno.rules.startCards : 7;
+  
   for (const id of turnOrder) {
     hands[id] = [];
-    for (let i = 0; i < 7; i++) hands[id].push(deck.pop());
+    for (let i = 0; i < initialCardCount; i++) hands[id].push(deck.pop());
     if (id.startsWith('bot-')) state.uno.botHands[id] = hands[id];
   }
   let firstCard = deck.pop();
@@ -557,6 +718,8 @@ function renderUnoGame() {
 
 function doRenderUnoGame() {
   if (!state.uno.started) return;
+  
+  updateUnoRulesUI();
   
   const currentTurnId = state.uno.turnOrder[state.uno.turnIndex];
   const pName = state.uno.players.get(currentTurnId)?.name || 'Bilinmiyor';
@@ -617,6 +780,11 @@ function doRenderUnoGame() {
     angles.push(210, 330);
   } else if (otherPlayers.length === 3) {
     angles.push(180, 270, 0);
+  } else if (otherPlayers.length > 3) {
+    const step = 180 / (otherPlayers.length - 1);
+    for (let i = 0; i < otherPlayers.length; i++) {
+      angles.push(180 + (i * step));
+    }
   }
 
   otherPlayers.forEach((id, i) => {
@@ -654,7 +822,31 @@ function doRenderUnoGame() {
     cDiv.innerHTML = `<span class="mini tl">${c.val}</span> ${c.val} <span class="mini br">${c.val}</span>`;
     
     cDiv.addEventListener('click', () => {
-      if (currentTurnId !== state.myId) return;
+      if (currentTurnId !== state.myId) {
+        if (state.uno.rules && state.uno.rules.jumpIn && canPlay(c, topCard, true)) {
+           if (c.color === 'black') {
+              document.getElementById('uno-color-picker').classList.remove('hidden');
+              document.querySelectorAll('.ucc').forEach(btn => {
+                btn.onclick = () => {
+                  const selectedColor = btn.dataset.color;
+                  document.getElementById('uno-color-picker').classList.add('hidden');
+                  playCard(cIdx, selectedColor, true);
+                };
+              });
+           } else {
+              playCard(cIdx, null, true);
+           }
+        }
+        return;
+      }
+      
+      if (state.uno.myHand.length === 1 && state.uno.rules && state.uno.rules.noBlackLast) {
+         if (c.color === 'black' || ['Skip', 'Rev', '+2'].includes(c.val)) {
+             showToast("Zorlu Son Kart: Son kart eylem veya siyah olamaz!", "warn");
+             return;
+         }
+      }
+      
       if (canPlay(c, topCard)) {
         if (c.color === 'black') {
           document.getElementById('uno-color-picker').classList.remove('hidden');
@@ -677,8 +869,12 @@ function doRenderUnoGame() {
 
   document.getElementById('uno-deck').onclick = () => {
     if (!state.uno.started) return;
-    if (currentTurnId === state.myId) {
-      if (state.uno.waitingForKeepOrPlay) return;
+    if (state.uno.turnOrder[state.uno.turnIndex] === state.myId) {
+      if (state.uno.pendingDrawCount > 0) {
+          broadcast({ type: 'uno-take-pending' });
+          return;
+      }
+      
       const deckDiv = document.getElementById('uno-deck');
       deckDiv.style.transform = 'scale(0.9)';
       setTimeout(() => { deckDiv.style.transform = 'scale(1)'; }, 150);
@@ -690,12 +886,14 @@ function doRenderUnoGame() {
           state.uno.discard = [top];
         }
         const newCard = state.uno.deck.pop();
-        state.uno.myHand.push({ ...newCard, _new: true });
         const p = state.uno.players.get(state.myId);
         if(p) p.cardCount++;
         
         const topCard = state.uno.discard[state.uno.discard.length - 1];
         let canPlayDrawn = canPlay(newCard, topCard);
+        
+        state.uno.myHand.push({ ...newCard, _new: true });
+        
         if (!canPlayDrawn) {
           state.uno.turnIndex = getNextTurn();
         } else {
@@ -721,15 +919,61 @@ function doRenderUnoGame() {
         
         if (canPlayDrawn) {
           showDrawModal(newCard, state.uno.myHand.length - 1);
+        } else if (state.uno.rules && state.uno.rules.drawUntilPlay) {
+           setTimeout(() => {
+               document.getElementById('uno-deck').click();
+           }, 400);
         }
       } else {
         broadcast({ type: 'uno-req-draw' });
       }
     }
   };
+
+  if (state.uno.myHand.length === 1 && !state.uno.saidUno) {
+    document.getElementById('uno-uno-btn').classList.remove('hidden');
+  } else {
+    document.getElementById('uno-uno-btn').classList.add('hidden');
+    if (state.uno.myHand.length !== 1) state.uno.saidUno = false;
+  }
+
+  if (state.uno.catchTarget) {
+    const targetPlayer = state.uno.players.get(state.uno.catchTarget);
+    if (!targetPlayer || targetPlayer.cardCount !== 1) {
+      document.getElementById('uno-catch-btn').classList.add('hidden');
+      state.uno.catchTarget = null;
+      if (state.uno.catchTimeout) clearTimeout(state.uno.catchTimeout);
+    }
+  }
 }
 
-function canPlay(card, topCard) {
+function canPlay(card, topCard, isJumpIn = false) {
+  if (state.uno.pendingDrawCount > 0) {
+    if (state.uno.rules && state.uno.rules.stacking && (card.val === '+2' || card.val === '+4') && card.val === topCard.val) {
+       return true;
+    }
+    if (state.uno.rules && state.uno.rules.mirror && card.val === 'Rev' && topCard.val === '+2') {
+       return true;
+    }
+    return false;
+  }
+
+  if (isJumpIn) {
+    return card.color !== 'black' && card.color === topCard.color && card.val === topCard.val;
+  }
+
+  // Blöf Kuralı (Serbest Atış kapalıysa)
+  if (card.val === '+4' && state.uno.rules && !state.uno.rules.noBluff) {
+    let hasMatchingColor = false;
+    for (let c of state.uno.myHand) {
+      if (c !== card && c.color === state.uno.currentColor) {
+        hasMatchingColor = true;
+        break;
+      }
+    }
+    if (hasMatchingColor) return false;
+  }
+
   if (card.color === 'black') return true;
   if (card.color === state.uno.currentColor) return true;
   if (card.val === topCard.val) return true;
@@ -796,7 +1040,7 @@ function animateCardDraw(pid) {
   setTimeout(() => animCard.remove(), 350);
 }
 
-function playCard(index, chosenColor = null) {
+function playCard(index, chosenColor = null, isJumpIn = false) {
   playPopSound();
   const handDiv = document.getElementById('uno-my-hand');
   const cardEl = handDiv.children[index];
@@ -812,6 +1056,10 @@ function playCard(index, chosenColor = null) {
     state.uno.discard.push(card);
     state.uno.currentColor = chosenColor || card.color;
     
+    if (isJumpIn) {
+      state.uno.turnIndex = state.uno.turnOrder.indexOf(state.myId);
+    }
+    
     let skip = 1;
     if (card.val === 'Rev') {
       state.uno.direction *= -1;
@@ -821,6 +1069,15 @@ function playCard(index, chosenColor = null) {
     if (card.val === 'Skip') skip = 2;
     if (card.val === '+2') { skip = 2; drawCount = 2; }
     if (card.val === '+4') { skip = 2; drawCount = 4; }
+    
+    let isKombo = false;
+    if (state.uno.rules && state.uno.rules.kombo && !isNaN(parseInt(card.val))) {
+      const hasAnother = state.uno.myHand.some(c => c.val === card.val);
+      if (hasAnother) {
+        skip = 0;
+        isKombo = true;
+      }
+    }
     
     const oldTurnIndex = state.uno.turnIndex;
     state.uno.turnIndex = getNextTurn(skip);
@@ -840,10 +1097,16 @@ function playCard(index, chosenColor = null) {
       document.getElementById('uno-uno-btn').classList.add('hidden');
     }
     
-    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno });
+    if (isKombo) {
+      document.getElementById('uno-end-turn-btn').classList.remove('hidden');
+    } else {
+      document.getElementById('uno-end-turn-btn').classList.add('hidden');
+    }
+    
+    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno, isJumpIn, isKombo });
     renderUnoGame();
     
-    if (state.uno.host === state.myId && drawCount > 0) {
+    if (state.uno.host === state.myId && drawCount > 0 && !isKombo) {
       setTimeout(() => {
         const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
         const victimId = state.uno.turnOrder[victimIndex];
@@ -858,6 +1121,13 @@ function playCard(index, chosenColor = null) {
       return;
     }
   }, 250);
+}
+
+function processUnoEndTurn(pid) {
+  state.uno.turnIndex = getNextTurn(1, state.uno.turnIndex, state.uno.direction);
+  document.getElementById('uno-end-turn-btn').classList.add('hidden');
+  broadcast({ type: 'uno-end-turn-sync', nextTurnIndex: state.uno.turnIndex });
+  renderUnoGame();
 }
 
 function botPlay(botId) {
@@ -1101,6 +1371,12 @@ function showDrawModal(card, index) {
   cDiv.style.margin = '20px';
   container.appendChild(cDiv);
   
+  if (state.uno.rules && state.uno.rules.noPass) {
+    document.getElementById('uno-keep-btn').style.display = 'none';
+  } else {
+    document.getElementById('uno-keep-btn').style.display = 'block';
+  }
+  
   modal.classList.remove('hidden');
   
   document.getElementById('uno-keep-btn').onclick = () => {
@@ -1175,3 +1451,29 @@ function showUnoGameOver(rankings) {
     document.getElementById('uno-replay-wait').classList.remove('hidden');
   }
 }
+
+function updateUnoRulesUI() {
+  const container = document.getElementById('uno-active-rules');
+  if (!container) return;
+  container.innerHTML = '';
+  const r = state.uno.rules;
+  if (!r) return;
+  
+  let hasRule = false;
+  
+  if (r.kombo) { container.innerHTML += '<div>🔥 Kombo</div>'; hasRule = true; }
+  if (r.stacking) { container.innerHTML += '<div>➕ Yığılma</div>'; hasRule = true; }
+  if (r.jumpIn) { container.innerHTML += '<div>⚡ Araya Girme</div>'; hasRule = true; }
+  if (r.drawUntilPlay) { container.innerHTML += '<div>📥 Zorunlu Çekme</div>'; hasRule = true; }
+  if (r.noBluff) { container.innerHTML += '<div>🎯 Serbest Atış</div>'; hasRule = true; }
+  if (r.noPass) { container.innerHTML += '<div>🚫 Pas Yok</div>'; hasRule = true; }
+  if (r.noBlackLast) { container.innerHTML += '<div>⬛ Zorlu Son Kart</div>'; hasRule = true; }
+  if (r.mirror) { container.innerHTML += '<div>🪞 Ayna Kuralı</div>'; hasRule = true; }
+  if (r.zeroPass) { container.innerHTML += '<div>🌀 0 Karmaşası</div>'; hasRule = true; }
+  if (r.sevenSwap) { container.innerHTML += '<div>🔀 7 Takası</div>'; hasRule = true; }
+  
+  if (!hasRule) {
+    container.innerHTML = '<div style="font-style: italic; color: #aaa;">Kural Yok</div>';
+  }
+}
+

@@ -58,7 +58,20 @@ const state = {
     turnOrder: [],
     botHands: {},
     botTimeout: null,
-    joinedActivity: false
+    joinedActivity: false,
+    rules: {
+      startCards: 7,
+      kombo: false,
+      stacking: false,
+      jumpIn: false,
+      drawUntilPlay: false,
+      noBluff: false,
+      noPass: false,
+      noBlackLast: false,
+      mirror: false,
+      zeroPass: false,
+      sevenSwap: false
+    }
   },
   lobbies: [],
   activeLobbyId: null,
@@ -2413,7 +2426,7 @@ function makeCardFocusable(card) {
   if (card.dataset.focusable) return;
   card.dataset.focusable = 'true';
   card.addEventListener('click', (e) => {
-    if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .uno-card-ui, .ucc, .uno-player-list, .act-src, #uno-table, .uno-remote-player, #wt-player-container, .wt-tools, #focus-lock-btn, .inactive-overlay')) return;
+    if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .uno-card-ui, .ucc, .uno-player-list, .act-src, #uno-table, .uno-remote-player, #wt-player-container, .wt-tools, #focus-lock-btn, .inactive-overlay, #uno-uno-btn, #uno-catch-btn, #uno-color-picker, #uno-end-turn-btn, #uno-turn-indicator, #uno-dir-indicator, .mactions')) return;
     if (e.target.tagName === 'CANVAS' && focusedCard === card) return;
     toggleFocus(card);
   });
