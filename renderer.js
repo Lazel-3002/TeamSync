@@ -169,8 +169,10 @@ function setupInternetSignaling(roomId, myId, myName) {
           handleSignal(data.id, 'internet', data.signal);
         }
       } else if (data.type === 'room-broadcast') {
+        console.log('📥 MQTT Broadcast alındı:', data.id, data.payload.type, data.payload);
         handleDataMessage(data.id, data.payload);
       } else if (data.type === 'room-private' && data.target === myId) {
+        console.log('📥 MQTT Private alındı:', data.id, data.payload.type, data.payload);
         handleDataMessage(data.id, data.payload);
       }
     } catch(e) {}
@@ -1699,14 +1701,14 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
         if (!peer.gainNode) {
           const source = state.remoteAudioCtx.createMediaStreamSource(e.streams[0]);
           peer.gainNode = state.remoteAudioCtx.createGain();
-          peer.gainNode.gain.value = 1.0;
+          peer.gainNode.gain.value = state.deafened ? 0.0 : 1.0;
           source.connect(peer.gainNode);
           peer.gainNode.connect(state.remoteAudioCtx.destination);
           peer.audioEl.muted = true;
         }
       } catch(err) {
-        peer.audioEl.volume = 1.0;
-        peer.audioEl.muted = false;
+        peer.audioEl.volume = state.deafened ? 0.0 : 1.0;
+        peer.audioEl.muted = state.deafened;
       }
 
       peer.audioEl.play().catch((err) => console.warn('Audio play failed:', err));
@@ -1879,6 +1881,7 @@ function setupDataChannel(peerId, dc) {
     if (typeof e.data === 'string') {
       try {
         const msg = JSON.parse(e.data);
+        console.log('📥 DC Mesajı alındı:', peerId, msg.type, msg);
         handleDataMessage(peerId, msg);
       } catch (err) {}
     } else {
@@ -2677,7 +2680,29 @@ function bindUI() {
 
   deaf.addEventListener('click', () => {
     state.deafened = !state.deafened;
-    state.peers.forEach(p => { p.audioEl.muted = state.deafened; });
+    
+    // Mute/unmute Web Audio gain nodes and audio elements of all peers
+    state.peers.forEach((peer, peerId) => {
+      peer.audioEl.muted = state.deafened;
+      if (peer.gainNode) {
+        if (state.deafened) {
+          peer.gainNode.gain.value = 0.0;
+        } else {
+          const slider = document.querySelector(`[data-vol="${peerId}"]`);
+          const val = slider ? parseFloat(slider.value) : 1.0;
+          peer.gainNode.gain.value = val;
+        }
+      } else {
+        if (state.deafened) {
+          peer.audioEl.volume = 0.0;
+        } else {
+          const slider = document.querySelector(`[data-vol="${peerId}"]`);
+          const val = slider ? parseFloat(slider.value) : 1.0;
+          peer.audioEl.volume = Math.min(val, 1.0);
+        }
+      }
+    });
+
     deaf.classList.toggle('off', state.deafened);
     deaf.querySelector('.icon').textContent = state.deafened ? '🔇' : '🎧';
     broadcast({ type: 'state', deaf: state.deafened });
@@ -2869,6 +2894,7 @@ function bindUI() {
   });
 
   document.getElementById('act-btn').addEventListener('click', () => {
+    broadcast({ type: 'lobby-sync-request' });
     updateActivityCounts();
     document.getElementById('activities-modal').classList.remove('hidden');
   });
