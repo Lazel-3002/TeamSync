@@ -478,12 +478,12 @@
       </div>
     
       <div id="poke-card" class="vcard hidden" style="background: radial-gradient(circle at center, #1e293b, #0f172a); display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: 12px; box-shadow: 0 0 30px rgba(0,0,0,0.8) inset;">
-        <div class="card-actions" style="position: absolute; top: 0; left: 0; right: 0; justify-content: space-between; padding: 10px 20px; zindex: 50; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);">
+        <div class="card-actions" style="position: absolute; top: 0; left: 0; right: 0; justify-content: space-between; padding: 10px 20px; z-index: 50; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);">
           <h3 style="margin: 0; font-family: 'Arial Black', sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #f8fafc; text-shadow: 0 2px 10px rgba(255,255,255,0.3);">⚔️ PokeSavaş ⚔️</h3>
           <button id="poke-close" class="btn-sec btn-sm" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Odadan Çık</button>
         </div>
 
-        <div id="poke-lobby-view" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; zindex: 10;">
+        <div id="poke-lobby-view" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; z-index: 10;">
           <h2 style="font-size: 28px; color: #e2e8f0; margin-bottom: 30px; text-shadow: 0 0 10px rgba(255,255,255,0.2);">Arena Bekleme Salonu</h2>
           
           <div style="display: flex; gap: 40px; margin-bottom: 40px;">
@@ -517,7 +517,7 @@
         <div id="poke-battle-view" class="hidden" style="flex: 1; display: flex; flex-direction: column; padding-top: 60px; position: relative;">
           <div id="poke-battle-arena" style="flex: 1; display: flex; align-items: center; justify-content: space-around; position: relative;">
             
-            <div style="display: flex; flex-direction: column; align-items: center; z-index: 10< width: 35%;">
+            <div style="display: flex; flex-direction: column; align-items: center; z-index: 10; width: 35%;">
               <div id="poke-p1-header" style="background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; font-weight: bold;">...</div>
               <div id="poke-p1-pokename" style="font-size: 18px; color: #fbbf24; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; text-shadow: 0 0 10px #fbbf24; display: none;"></div>
               <div id="poke-p1-pokemon-container" style="width: 200px; height: 200px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); display: flex; align-items: flex-end; justify-content: center; position: relative;">
@@ -531,7 +531,7 @@
               <div id="poke-projectile" style="position: absolute; display: none; font-size: 60px; z-index: 30; pointer-events: none; filter: drop-shadow(0 0 15px rgba(255,255,255,0.8));"></div>
             </div>
 
-            <div style="display: flex; flex-direction: column; align-items: center; z-index: 10< width: 35%;">
+            <div style="display: flex; flex-direction: column; align-items: center; z-index: 10; width: 35%;">
               <div id="poke-p2-header" style="background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; font-weight: bold;">...</div>
               <div id="poke-p2-pokename" style="font-size: 18px; color: #fbbf24; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; text-shadow: 0 0 10px #fbbf24; display: none;"></div>
               <div id="poke-p2-pokemon-container" style="width: 200px; height: 200px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); display: flex; align-items: flex-end; justify-content: center; position: relative;">
@@ -542,7 +542,7 @@
 
           </div>
 
-          <div id="poke-selection-panel" style="background: rgba(0,0,0,0.7); border-top: 1px solid rgba(255,255,255,0.1); padding: 20px; display: flex; flex-direction: column; align-items: center; backdrop-filter: blur(10px);; position: relative;">
+          <div id="poke-selection-panel" style="background: rgba(0,0,0,0.7); border-top: 1px solid rgba(255,255,255,0.1); padding: 20px; display: flex; flex-direction: column; align-items: center; backdrop-filter: blur(10px); position: relative;">
               
               <div id="poke-vol-control" style="position: absolute; top: 15px; left: 20px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);">
                 <button id="poke-vol-mute" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #fff; padding: 0; outline: none;" title="Sesi Kapat/Aç">🔊</button>

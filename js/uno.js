@@ -106,6 +106,7 @@ function initUno() {
   });
 
   document.getElementById('uno-uno-btn').addEventListener('click', () => {
+    if (!state.uno.myHand || state.uno.myHand.length !== 1) return;
     state.uno.saidUno = true;
     document.getElementById('uno-uno-btn').classList.add('hidden');
     broadcast({ type: 'uno-said' });
@@ -405,10 +406,13 @@ function handleUnoMessage(peerId, msg) {
         document.getElementById('uno-uno-btn').classList.remove('hidden');
       } else {
         if (state.uno.catchTimeout) clearTimeout(state.uno.catchTimeout);
+        state.uno.pendingCatchTarget = pId;
         state.uno.catchTimeout = setTimeout(() => {
-          state.uno.catchTarget = pId;
-          document.getElementById('uno-catch-btn').classList.remove('hidden');
-        }, 500);
+          if (state.uno.players.get(pId)?.cardCount === 1) {
+            state.uno.catchTarget = pId;
+            document.getElementById('uno-catch-btn').classList.remove('hidden');
+          }
+        }, 1000);
       }
     }
 
@@ -503,10 +507,11 @@ function handleUnoMessage(peerId, msg) {
   } else if (msg.type === 'uno-emoji') {
     showFloatingEmoji(peerId, msg.emoji);
   } else if (msg.type === 'uno-said') {
-    if (state.uno.catchTarget === peerId) {
-      clearTimeout(state.uno.catchTimeout);
+    if (state.uno.catchTarget === peerId || state.uno.pendingCatchTarget === peerId) {
+      if (state.uno.catchTimeout) clearTimeout(state.uno.catchTimeout);
       document.getElementById('uno-catch-btn').classList.add('hidden');
       state.uno.catchTarget = null;
+      state.uno.pendingCatchTarget = null;
     }
     showFloatingEmoji(peerId, "UNO!");
     showToast(state.uno.players.get(peerId)?.name + " UNO dedi!", "ok");
@@ -955,6 +960,7 @@ function hideUnoCatch() {
   }
   document.getElementById('uno-catch-btn').classList.add('hidden');
   state.uno.catchTarget = null;
+  state.uno.pendingCatchTarget = null;
 }
 
 function canPlay(card, topCard, isJumpIn = false) {

@@ -586,7 +586,25 @@ window.rejectInvite = (idx) => {
 
 window.showConfirm = (title, message) => {
   return new Promise((resolve) => {
-    const modal = document.getElementById('generic-confirm-modal');
+    let modal = document.getElementById('generic-confirm-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'generic-confirm-modal';
+      modal.className = 'hidden';
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+      modal.innerHTML = `
+        <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 400px; padding: 24px; text-align: center;">
+          <h3 id="generic-confirm-title" style="margin-top: 0; margin-bottom: 15px; font-size: 20px; color: #f8fafc;">⚠️ Onay</h3>
+          <p id="generic-confirm-message" style="margin-bottom: 24px; color: #94a3b8; font-size: 15px; line-height: 1.5;">Emin misiniz?</p>
+          <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="generic-confirm-yes" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 8px; background: #ef4444; border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">Evet</button>
+            <button id="generic-confirm-no" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">İptal</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+    
     document.getElementById('generic-confirm-title').innerText = title;
     document.getElementById('generic-confirm-message').innerText = message;
     modal.classList.remove('hidden');
