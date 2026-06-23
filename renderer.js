@@ -2633,6 +2633,7 @@ function broadcast(msg) {
   state.peers.forEach((peer, id) => {
     if (peer.dc && peer.dc.readyState === 'open') {
       try {
+        console.log('📤 DC Broadcast gönderiliyor:', id, msg.type, msg);
         peer.dc.send(msgStr);
       } catch (e) {
         console.warn('Broadcast send error to', id, e);
@@ -3127,6 +3128,7 @@ function broadcastTo(peerId, msg) {
   const peer = state.peers.get(peerId);
   if (peer && peer.dc && peer.dc.readyState === 'open') {
     try {
+      console.log('📤 DC Private gönderiliyor:', peerId, msg.type, msg);
       peer.dc.send(JSON.stringify(msg));
     } catch (e) {
       console.warn('Private WebRTC send error to', peerId, e);
