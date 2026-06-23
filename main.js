@@ -62,7 +62,7 @@ let robot = null;
 const DISCOVERY_PORT = 41234;
 
 try {
-  robot = require('robotjs');
+  robot = require('@jitsi/robotjs');
   console.log('✅ robotjs yüklendi - uzaktan kontrol aktif');
 } catch (e) {
   console.warn('⚠️ robotjs yüklenemedi. Uzaktan kontrol çalışmaz:', e.message);

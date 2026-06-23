@@ -3375,6 +3375,7 @@ function initActivitiesUI() {
   if (typeof initSharedBrowser === 'function') initSharedBrowser();
   if (typeof initUno === 'function') initUno();
   if (typeof initLuckyWheel === 'function') initLuckyWheel();
+  if (typeof initPoke === 'function') initPoke();
 }
 
 
@@ -3693,7 +3694,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- LOBBY SYSTEM UI BINDINGS ---
-  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel'];
+  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'poke'];
   activities.forEach(act => {
     const card = document.getElementById(`card-act-${act}`);
     if (card) {
@@ -3705,7 +3706,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı' };
+        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -3723,7 +3724,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı' };
+        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -3752,7 +3753,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!act) return;
     
     // Create new lobby
-    const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film', wheel: 'Şans Çarkı' };
+    const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
     const newLobby = {
       id: `LOB-${crypto.randomUUID()}`,
       activity: act,
@@ -3801,7 +3802,8 @@ window.updateActivityCounts = function() {
     sb: { l: 0, p: 0 },
     poll: { l: 0, p: 0 },
     lvs: { l: 0, p: 0 },
-    wheel: { l: 0, p: 0 }
+    wheel: { l: 0, p: 0 },
+    poke: { l: 0, p: 0 }
   };
   
   state.lobbies.forEach(lob => {
