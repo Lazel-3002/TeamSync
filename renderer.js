@@ -1804,6 +1804,9 @@ function setupDataChannel(peerId, dc) {
                 handsCount: Array.from(state.uno.players.entries()).map(([id, p]) => ({ id, count: p.cardCount }))
               }));
             }
+          } else if (activeAct === 'poke' && window.pokeState) {
+            dc.send(JSON.stringify({ type: 'poke_sync', state: window.pokeState }));
+          }
           } else if (activeAct === 'poll') {
             if (window.pollState) {
               dc.send(JSON.stringify({ 
@@ -1951,6 +1954,10 @@ async function handleDataMessage(peerId, msg) {
               broadcastTo(msg.peerId, { type: isPlaying ? 'wt-play' : 'wt-pause', time });
             }
           }
+        } else if (lob.activity === 'poke') {
+          if (window.pokeState) {
+            broadcastTo(msg.peerId, { type: 'poke_sync', state: window.pokeState });
+          }
         } else if (lob.activity === 'sb') {
           broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: state.sb.interactive });
           const currentUrl = document.getElementById('sb-url')?.value || '';
@@ -2027,10 +2034,10 @@ async function handleDataMessage(peerId, msg) {
   // Bu yüzden MQTT sunucusu geçici olarak yavaşlasa/kopsa bile WebRTC bağlantımız kopmayacak!
   peer.lastSeen = Date.now();
 
-  // Filter cross-lobby activity messages
   const isActivityMsg = msg.type.startsWith('wt-') || 
                         msg.type.startsWith('uno-') || 
                         msg.type.startsWith('sb-') || 
+                        msg.type.startsWith('poke_') || 
                         ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
 
   if (isActivityMsg) {
@@ -2185,7 +2192,7 @@ async function handleDataMessage(peerId, msg) {
     handleUnoMessage(peerId, msg);
   } else if (msg.type.startsWith('sb-')) {
     handleSBMessage(peerId, msg);
-  } else if (['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
+  } else if (msg.type.startsWith('poke_') || ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
     if (window.activityHandler) window.activityHandler(msg);
   }
 }
@@ -3088,7 +3095,7 @@ function showToast(msg, type = 'info') {
 
 function closeAllCards() {
   leaveActiveLobby();
-  ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card'].forEach(id => {
+  ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card', 'poke-card'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
     if (focusedCard && focusedCard.id === id) {
@@ -3116,6 +3123,14 @@ function closeAllCards() {
     if (lobby) lobby.classList.remove('hidden');
     const ugame = document.getElementById('uno-game');
     if (ugame) ugame.classList.add('hidden');
+  }
+
+  if (window.pokeState) {
+    window.pokeState = { p1: null, p2: null, spectators: [], round: 0, status: 'waiting' };
+    const pLobby = document.getElementById('poke-lobby-view');
+    if (pLobby) pLobby.classList.remove('hidden');
+    const pGame = document.getElementById('poke-battle-view');
+    if (pGame) pGame.classList.add('hidden');
   }
 
   const empty = document.getElementById('empty-state');

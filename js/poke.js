@@ -74,7 +74,7 @@ function initPoke() {
   document.getElementById('poke-close')?.addEventListener('click', () => {
     closeAllCards();
     broadcast({ type: 'activity_change', activity: 'none' });
-    pokeState = { p1: null, p2: null, spectators: [], round: 0, status: 'waiting' };
+    window.pokeState = { p1: null, p2: null, spectators: [], round: 0, status: 'waiting' };
     renderPokeLobby();
   });
 
@@ -455,6 +455,22 @@ function initPoke() {
   window.pokeActivityHandler = (data) => {
     if (data.type === 'activity_change' && data.activity === 'poke') {
       renderPokeLobby();
+    }
+    if (data.type === 'poke_sync') {
+      Object.assign(pokeState, data.state);
+      if (pokeState.status === 'selecting') {
+        document.getElementById('poke-battle-view').classList.remove('hidden');
+        document.getElementById('poke-lobby-view').classList.add('hidden');
+        document.getElementById('poke-next-round-panel').classList.add('hidden');
+        resetPokeBattle();
+        renderPokeBattle();
+      } else if (pokeState.status === 'battle_end') {
+        document.getElementById('poke-battle-view').classList.remove('hidden');
+        document.getElementById('poke-lobby-view').classList.add('hidden');
+        renderPokeBattle();
+      } else {
+        renderPokeLobby();
+      }
     }
     if (data.type === 'poke_join') {
       const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null };
