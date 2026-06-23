@@ -1915,9 +1915,14 @@ async function handleDataMessage(peerId, msg) {
   }
   // Lobby system protocols - handle immediately without peer connection dependency
   if (msg.type === 'lobby-list-sync') {
-    // Merge incoming lobbies: remove old ones hosted by the sender peer, and add the incoming ones hosted by the sender peer
-    const senderHostLobbies = (msg.lobbies || []).filter(l => l.hostId === peerId);
-    state.lobbies = (state.lobbies || []).filter(l => l.hostId !== peerId).concat(senderHostLobbies);
+    const incomingLobbies = msg.lobbies || [];
+    
+    // Keep our own hosted lobbies, and replace everything else with incoming lobbies hosted by others
+    const myHostedLobbies = (state.lobbies || []).filter(l => l.hostId === state.myId);
+    const incomingOtherLobbies = incomingLobbies.filter(l => l.hostId !== state.myId);
+    
+    state.lobbies = myHostedLobbies.concat(incomingOtherLobbies);
+    console.log('🔄 Lobi listesi senkronize edildi. Güncel lobiler:', state.lobbies);
 
     updateActivityCounts();
     if (state.selectedLobbyActivity) {
@@ -3820,6 +3825,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.sb.joinedActivity = true;
     }
     
+    updateActivityCounts();
     syncLobbiesList();
     
     // Close activities modal and launch the activity
