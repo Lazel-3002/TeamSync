@@ -1581,7 +1581,7 @@ body {
 
 
 /* ===== RESPONSIVE DESIGN ===== */
-@media (max-width: 950px) {
+@media (max-width: 750px) {
   .app {
     flex-direction: column;
   }

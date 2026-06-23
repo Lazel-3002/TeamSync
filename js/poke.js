@@ -458,18 +458,12 @@ function initPoke() {
     }
     if (data.type === 'poke_sync') {
       Object.assign(pokeState, data.state);
-      if (pokeState.status === 'selecting') {
-        document.getElementById('poke-battle-view').classList.remove('hidden');
-        document.getElementById('poke-lobby-view').classList.add('hidden');
-        document.getElementById('poke-next-round-panel').classList.add('hidden');
-        resetPokeBattle();
-        renderPokeBattle();
-      } else if (pokeState.status === 'battle_end') {
-        document.getElementById('poke-battle-view').classList.remove('hidden');
-        document.getElementById('poke-lobby-view').classList.add('hidden');
-        renderPokeBattle();
-      } else {
+      if (pokeState.status === 'waiting') {
         renderPokeLobby();
+      } else {
+        document.getElementById('poke-battle-view').classList.remove('hidden');
+        document.getElementById('poke-lobby-view').classList.add('hidden');
+        renderBattleArena();
       }
     }
     if (data.type === 'poke_join') {
