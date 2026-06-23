@@ -1806,7 +1806,6 @@ function setupDataChannel(peerId, dc) {
             }
           } else if (activeAct === 'poke' && window.pokeState) {
             dc.send(JSON.stringify({ type: 'poke_sync', state: window.pokeState }));
-          }
           } else if (activeAct === 'poll') {
             if (window.pollState) {
               dc.send(JSON.stringify({ 
