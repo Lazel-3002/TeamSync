@@ -19,7 +19,7 @@ function initWatchTogether() {
   
   document.getElementById('wt-close').addEventListener('click', (e) => {
     e.stopPropagation();
-    closeAllCards(); // CLEAN AND RESETS
+    closeAllCards(true); // CLEAN AND RESETS
     broadcast({ type: 'wt-close' });
   });
   
@@ -109,6 +109,6 @@ function handleWTMessage(peerId, msg) {
       state.wt.player.pauseVideo();
     }
   } else if (msg.type === 'wt-close') {
-    closeAllCards(); // CLEAN AND RESETS
+    closeAllCards(true); // CLEAN AND RESETS
   }
 }

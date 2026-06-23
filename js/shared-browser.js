@@ -40,7 +40,7 @@ function initSharedBrowser() {
   document.getElementById('sb-close').addEventListener('click', (e) => {
     e.stopPropagation();
     broadcast({ type: 'sb-close' });
-    closeAllCards(); // CLEAN AND RESETS
+    closeAllCards(true); // CLEAN AND RESETS
   });
 
   document.getElementById('sb-go').addEventListener('click', (e) => {
@@ -238,6 +238,6 @@ function handleSBMessage(peerId, msg) {
       }
     }
   } else if (msg.type === 'sb-close') {
-    closeAllCards(); // CLEAN AND RESETS
+    closeAllCards(true); // CLEAN AND RESETS
   }
 }

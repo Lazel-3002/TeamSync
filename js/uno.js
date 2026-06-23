@@ -32,8 +32,7 @@ function initUno() {
 
   document.getElementById('uno-close').addEventListener('click', (e) => {
     e.stopPropagation();
-    closeAllCards(); // CLEAN AND RESETS
-    broadcast({ type: 'uno-leave' });
+    closeAllCards(true); // CLEAN AND RESETS AND LEAVES LOBBY
   });
 
   document.getElementById('uno-ready-btn').addEventListener('click', (e) => {

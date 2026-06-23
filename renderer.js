@@ -3150,8 +3150,10 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
-function closeAllCards() {
-  leaveActiveLobby();
+function closeAllCards(leaveLobby = false) {
+  if (leaveLobby) {
+    leaveActiveLobby();
+  }
   ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card', 'poke-card'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');

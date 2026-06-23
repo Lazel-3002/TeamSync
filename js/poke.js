@@ -72,7 +72,7 @@ function initPoke() {
   document.getElementById('act-poke')?.addEventListener('click', () => setActivity('poke'));
 
   document.getElementById('poke-close')?.addEventListener('click', () => {
-    closeAllCards();
+    closeAllCards(true);
     broadcast({ type: 'activity_change', activity: 'none' });
     window.pokeState = { p1: null, p2: null, spectators: [], round: 0, status: 'waiting' };
     renderPokeLobby();

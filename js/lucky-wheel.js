@@ -17,7 +17,7 @@ function initLuckyWheel() {
   document.getElementById('act-wheel')?.addEventListener('click', () => setActivity('wheel'));
 
   const closeActivity = () => {
-    closeAllCards();
+    closeAllCards(true);
     broadcast({ type: 'activity_change', activity: 'none' });
   };
 
@@ -267,7 +267,7 @@ function initLuckyWheel() {
   window.activityHandler = (data) => {
     try {
       if (data.type === 'activity_change') {
-        closeAllCards();
+        closeAllCards(data.activity === 'none');
         if (data.activity === 'poll') document.getElementById('poll-card').classList.remove('hidden');
         if (data.activity === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
         if (data.activity === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
