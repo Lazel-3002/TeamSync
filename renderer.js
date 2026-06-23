@@ -435,7 +435,7 @@ window.renderAccountsList = async function() {
     const delBtn = row.querySelector('.account-row-delete-btn');
     delBtn.onclick = async (e) => {
       e.stopPropagation();
-      if (confirm(`"${acc.name}" hesabını bu cihazdan silmek istediğinize emin misiniz?`)) {
+      if (await window.showConfirm('⚠️ Hesabı Sil', `"${acc.name}" hesabını bu cihazdan silmek istediğinize emin misiniz?`)) {
         await deleteAccount(acc.id);
         await renderAccountsList();
       }
@@ -582,8 +582,33 @@ window.rejectInvite = (idx) => {
   saveProfile();
 };
 
-window.removeFriend = (id) => {
-  if (confirm('Bu kişiyi arkadaşlıktan çıkarmak istediğine emin misin?')) {
+window.showConfirm = (title, message) => {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('generic-confirm-modal');
+    document.getElementById('generic-confirm-title').innerText = title;
+    document.getElementById('generic-confirm-message').innerText = message;
+    modal.classList.remove('hidden');
+
+    const yesBtn = document.getElementById('generic-confirm-yes');
+    const noBtn = document.getElementById('generic-confirm-no');
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+    };
+
+    const onYes = () => { cleanup(); resolve(true); };
+    const onNo = () => { cleanup(); resolve(false); };
+
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+  });
+};
+
+window.removeFriend = async (id) => {
+  const confirmed = await window.showConfirm('⚠️ Arkadaşlıktan Çıkar', 'Bu kişiyi arkadaşlıktan çıkarmak istediğine emin misin?');
+  if (confirmed) {
     delete state.friends[id];
     saveProfile();
     if (state.globalMqtt) {
@@ -2305,8 +2330,8 @@ function showUserContextMenu(e, targetId, targetName) {
   if (isFriend) {
     friendBtn.classList.add('danger');
     friendBtn.innerHTML = '👥 Arkadaşı Sil';
-    friendBtn.addEventListener('click', () => {
-      if (confirm(`"${targetName}" arkadaşını silmek istediğinize emin misiniz?`)) {
+    friendBtn.addEventListener('click', async () => {
+      if (await window.showConfirm('⚠️ Arkadaşı Sil', `"${targetName}" arkadaşını silmek istediğinize emin misiniz?`)) {
         removeFriend(targetId);
         showToast('Arkadaş silindi', 'info');
       }

@@ -622,9 +622,9 @@ function renderUnoLobby() {
   }
 }
 
-window.kickUnoPlayer = (id, e) => {
+window.kickUnoPlayer = async (id, e) => {
   e.stopPropagation();
-  if (confirm("Bu oyuncuyu atmak istediğinize emin misiniz?")) {
+  if (await window.showConfirm('⚠️ Oyuncuyu At', "Bu oyuncuyu atmak istediğinize emin misiniz?")) {
     broadcast({ type: 'uno-kicked', targetId: id });
     state.uno.players.delete(id);
     renderUnoLobby();
