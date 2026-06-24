@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Notification</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: transparent;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      height: 100vh;
+      box-sizing: border-box;
+      padding: 10px;
+    }
+    
+    #notification-container {
+      width: 320px;
+      background: rgba(30, 31, 34, 0.95);
+      border-left: 4px solid #10b981;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      color: white;
+      padding: 16px;
+      transform: translateX(120%);
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #notification-container.show {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .title {
+      font-weight: bold;
+      font-size: 14px;
+      color: #10b981;
+      margin: 0;
+    }
+
+    .body {
+      font-size: 13px;
+      color: #e2e8f0;
+      margin: 0;
+      line-height: 1.4;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div id="notification-container">
+    <div class="title" id="notif-title">TeamSync</div>
+    <div class="body" id="notif-body">You have a new message.</div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    const container = document.getElementById('notification-container');
+    const titleEl = document.getElementById('notif-title');
+    const bodyEl = document.getElementById('notif-body');
+    let hideTimeout = null;
+
+    ipcRenderer.on('show-notification', (event, { title, body }) => {
+      // Show the electron window
+      require('electron').remote?.getCurrentWindow().showInactive() || window.process && require('electron').ipcRenderer.send('window-show-inactive');
+      
+      titleEl.textContent = title;
+      bodyEl.textContent = body;
+      
+      // Reset animation
+      container.classList.remove('show');
+      
+      // Trigger reflow
+      void container.offsetWidth;
+      
+      container.classList.add('show');
+      
+      if (hideTimeout) clearTimeout(hideTimeout);
+      
+      hideTimeout = setTimeout(() => {
+        container.classList.remove('show');
+      }, 3000);
+    });
+  </script>
+</body>
+</html>

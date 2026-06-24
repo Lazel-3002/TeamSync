@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage } = require('electron');
 app.name = 'TeamSync';
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 app.commandLine.appendSwitch('allow-loopback-in-peer-connection');
@@ -58,6 +58,11 @@ let currentRoom = '';
 let currentName = '';
 let remoteControlActive = false;
 let robot = null;
+
+let tray = null;
+let trayMenuWindow = null;
+let isQuitting = false;
+let notificationWindow = null;
 
 const DISCOVERY_PORT = 41234;
 
@@ -194,6 +199,27 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
   Menu.setApplicationMenu(null);
+
+  let hasShownHideNotification = false;
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      if (!hasShownHideNotification) {
+        hasShownHideNotification = true;
+        const hideNotif = new Notification({
+          title: 'TeamSync Arka Planda',
+          body: 'Uygulama tamamen kapatılmadı. Sağ alt köşedeki simgeye sağ tıklayarak çıkış yapabilirsiniz.',
+          silent: true
+        });
+        hideNotif.show();
+        setTimeout(() => {
+          hideNotif.close();
+        }, 1500);
+      }
+      return false;
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -332,8 +358,23 @@ ipcMain.on('unregister-ptt', () => {
 
 ipcMain.on('notify', (event, { title, body }) => {
   try {
-    new Notification({ title, body, silent: true }).show();
+    if (notificationWindow && !notificationWindow.isDestroyed()) {
+      notificationWindow.showInactive();
+      notificationWindow.webContents.send('show-notification', { title, body });
+    }
   } catch (e) {}
+});
+
+ipcMain.on('tray-action-show', () => {
+  if (mainWindow) {
+    mainWindow.show();
+    if (trayMenuWindow) trayMenuWindow.hide();
+  }
+});
+
+ipcMain.on('tray-action-quit', () => {
+  isQuitting = true;
+  app.quit();
 });
 
 ipcMain.on('set-remote-control', (event, active) => {
@@ -471,6 +512,125 @@ app.whenReady().then(() => {
   );
 
   createWindow();
+  
+  tray = new Tray(nativeImage.createEmpty()); // Placeholder until flag is generated
+  tray.setToolTip('TeamSync');
+
+  // Custom CSS Tray Menu Window
+  trayMenuWindow = new BrowserWindow({
+    width: 220,
+    height: 100,
+    show: false,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+  trayMenuWindow.loadFile('tray-menu.html');
+  trayMenuWindow.on('blur', () => {
+    trayMenuWindow.hide();
+  });
+
+  const showTrayMenu = () => {
+    if (!tray || !trayMenuWindow) return;
+    const bounds = tray.getBounds();
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    let x = bounds.x - 110 + (bounds.width / 2);
+    let y = bounds.y - 110;
+    
+    // Boundary checks
+    if (x < 0) x = 0;
+    if (x + 220 > width) x = width - 220;
+    if (y < 0) y = bounds.y + bounds.height + 10;
+    
+    trayMenuWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: 220, height: 100 });
+    trayMenuWindow.show();
+    trayMenuWindow.focus();
+  };
+
+  tray.on('click', showTrayMenu);
+  tray.on('right-click', showTrayMenu);
+
+  // Generate High Quality Ottoman Flag Tray Icon using Canvas
+  const flagWin = new BrowserWindow({ 
+    width: 128, height: 128, show: false, 
+    webPreferences: { nodeIntegration: true, contextIsolation: false }
+  });
+  
+  const flagHtml = `
+    <html><body>
+      <canvas id="c" width="128" height="128"></canvas>
+      <script>
+        const { ipcRenderer } = require('electron');
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        const svg = \`
+          <svg width="128" height="128" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <mask id="cmask">
+                <rect x="0" y="0" width="100" height="100" fill="white" />
+                <circle cx="56" cy="50" r="11" fill="black" />
+              </mask>
+              <g id="hilal">
+                <circle cx="50" cy="50" r="14" fill="#FFD700" mask="url(#cmask)" />
+              </g>
+            </defs>
+            <rect width="100" height="100" rx="20" fill="#c8102e" />
+            <circle cx="50" cy="50" r="42" fill="#006b3f" />
+            <g filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.4))">
+              <g transform="translate(-14, 0)"><use href="#hilal" /></g>
+              <g transform="translate(10, -18)"><use href="#hilal" /></g>
+              <g transform="translate(10, 18)"><use href="#hilal" /></g>
+            </g>
+          </svg>\`;
+        
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          ipcRenderer.send('set-tray-icon', canvas.toDataURL('image/png'));
+        };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      </script>
+    </body></html>
+  `;
+  flagWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(flagHtml));
+  
+  ipcMain.once('set-tray-icon', (event, dataUrl) => {
+    if (tray) {
+      tray.setImage(nativeImage.createFromDataURL(dataUrl).resize({width: 32, height: 32}));
+    }
+    flagWin.destroy();
+  });
+
+  notificationWindow = new BrowserWindow({
+    width: 350,
+    height: 120,
+    show: false,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    focusable: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  // Calculate position: bottom right corner, slightly above taskbar
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  notificationWindow.setPosition(width - 360, height - 130);
+  
+  notificationWindow.loadFile('notification.html');
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
