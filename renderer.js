@@ -1993,6 +1993,13 @@ async function handleDataMessage(peerId, msg) {
       removePeer(msg.targetId);
     }
     return;
+  } else if (msg.type === 'force_mute') {
+    if (msg.targetId === state.myId) {
+      state.serverMuted = true;
+      setMicEnabled(false);
+      showToast('Kurucu tarafından susturuldunuz!', 'danger');
+    }
+    return;
   }
 
   // Lobby system protocols - handle immediately without peer connection dependency
@@ -2750,6 +2757,11 @@ function bindUI() {
   }
 
   mic.addEventListener('click', () => {
+    if (state.serverMuted) {
+      showToast('Kurucu tarafından susturuldunuz. Sesinizi açamazsınız!', 'danger');
+      return;
+    }
+    
     if (state.pttMode) {
       state.pttMode = false;
       window.electronAPI.unregisterPTT();
@@ -2941,6 +2953,65 @@ function bindUI() {
 
   document.getElementById('founder-settings').addEventListener('click', () => {
     document.getElementById('founder-settings-modal').classList.remove('hidden');
+    
+    // Populate Player List
+    const listEl = document.getElementById('founder-player-list');
+    listEl.innerHTML = '';
+    
+    const peersArray = Array.from(state.peers.values());
+    if (peersArray.length === 0) {
+      listEl.innerHTML = '<div class="muted" style="text-align: center; font-size: 13px;">Sunucuda kimse yok.</div>';
+    } else {
+      peersArray.forEach(peer => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'space-between';
+        div.style.background = 'rgba(255,255,255,0.05)';
+        div.style.padding = '8px 12px';
+        div.style.borderRadius = '6px';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = peer.name || 'Bilinmeyen';
+        nameSpan.style.fontWeight = '500';
+        
+        const actionsDiv = document.createElement('div');
+        actionsDiv.style.display = 'flex';
+        actionsDiv.style.gap = '8px';
+        
+        const muteBtn = document.createElement('button');
+        muteBtn.className = 'btn-sec btn-sm';
+        muteBtn.textContent = '🔇 Sustur';
+        muteBtn.style.padding = '4px 8px';
+        muteBtn.style.fontSize = '12px';
+        muteBtn.onclick = () => {
+          if (state.globalMqtt && state.room) {
+            state.globalMqtt.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'force_mute', targetId: peer.id }));
+            showToast(`${peer.name} susturuldu.`, 'info');
+          }
+        };
+        
+        const kickBtn = document.createElement('button');
+        kickBtn.className = 'btn-sec btn-sm';
+        kickBtn.textContent = '👢 At';
+        kickBtn.style.padding = '4px 8px';
+        kickBtn.style.fontSize = '12px';
+        kickBtn.style.color = 'var(--danger)';
+        kickBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        kickBtn.onclick = () => {
+          if (state.globalMqtt && state.room) {
+            state.globalMqtt.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'kick_peer', targetId: peer.id }));
+            showToast(`${peer.name} atıldı.`, 'info');
+          }
+        };
+        
+        actionsDiv.appendChild(muteBtn);
+        actionsDiv.appendChild(kickBtn);
+        div.appendChild(nameSpan);
+        div.appendChild(actionsDiv);
+        listEl.appendChild(div);
+      });
+    }
   });
 
   document.getElementById('founder-settings-close').addEventListener('click', () => {
@@ -3015,6 +3086,9 @@ function bindUI() {
 }
 
 function setMicEnabled(enabled) {
+  if (enabled && state.serverMuted) {
+    enabled = false;
+  }
   state.micEnabled = enabled;
   state.localStream.getAudioTracks().forEach(t => t.enabled = enabled);
   const micBtn = document.getElementById('mic');
