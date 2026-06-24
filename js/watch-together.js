@@ -10,7 +10,7 @@ function initWatchTogether() {
       return;
     }
     
-    closeAllCards(); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
+    closeAllCards(false, 'wt-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     state.wt.joinedActivity = true;
     wtCard.classList.remove('hidden');
     makeCardFocusable(wtCard);
@@ -79,7 +79,7 @@ function onWTStateChange(event) {
 function handleWTMessage(peerId, msg) {
   if (msg.type === 'wt-load') {
     document.getElementById('activities-modal').classList.add('hidden');
-    closeAllCards(); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
+    closeAllCards(false, 'wt-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     const wtCard = document.getElementById('wt-card');
     wtCard.classList.remove('hidden');
     makeCardFocusable(wtCard);

@@ -3333,11 +3333,12 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
-function closeAllCards(leaveLobby = false) {
+function closeAllCards(leaveLobby = false, except = null) {
   if (leaveLobby) {
     leaveActiveLobby();
   }
   ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card', 'poke-card'].forEach(id => {
+    if (id === except) return;
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
     if (focusedCard && focusedCard.id === id) {
@@ -3345,18 +3346,18 @@ function closeAllCards(leaveLobby = false) {
     }
   });
 
-  if (state.wt) {
+  if (state.wt && except !== 'wt-card') {
     if (state.wt.player && state.wt.player.stopVideo) {
       try { state.wt.player.stopVideo(); } catch(e){}
     }
     state.wt.joinedActivity = false;
   }
-  if (state.sb) {
+  if (state.sb && except !== 'sb-card') {
     state.sb.joinedActivity = false;
     const sbWebview = document.getElementById('sb-webview');
     if (sbWebview) sbWebview.src = 'https://www.google.com';
   }
-  if (state.uno) {
+  if (state.uno && except !== 'uno-card') {
     state.uno.joinedActivity = false;
     state.uno.host = null;
     state.uno.players.clear();
@@ -3367,7 +3368,7 @@ function closeAllCards(leaveLobby = false) {
     if (ugame) ugame.classList.add('hidden');
   }
 
-  if (window.pokeState) {
+  if (window.pokeState && except !== 'poke-card') {
     window.pokeState = { p1: null, p2: null, spectators: [], round: 0, status: 'waiting' };
     const pLobby = document.getElementById('poke-lobby-view');
     if (pLobby) pLobby.classList.remove('hidden');

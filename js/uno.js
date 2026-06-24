@@ -10,7 +10,7 @@ function initUno() {
       return;
     }
 
-    closeAllCards(); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
+    closeAllCards(false, 'uno-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     unoCard.classList.remove('hidden');
     makeCardFocusable(unoCard);
     if (!focusedCard) toggleFocus(unoCard);
@@ -199,7 +199,7 @@ function handleUnoMessage(peerId, msg) {
   if (msg.type === 'uno-lobby') {
     if (!state.uno.host || state.uno.host === peerId) {
       state.uno.host = peerId;
-      closeAllCards(); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
+      closeAllCards(false, 'uno-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
       document.getElementById('uno-card').classList.remove('hidden');
       document.getElementById('uno-lobby').classList.remove('hidden');
       document.getElementById('uno-game').classList.add('hidden');
@@ -274,7 +274,7 @@ function handleUnoMessage(peerId, msg) {
       if (state.uno.players.has(h.id)) state.uno.players.get(h.id).cardCount = h.count;
     });
     
-    closeAllCards(); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
+    closeAllCards(false, 'uno-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     document.getElementById('uno-card').classList.remove('hidden');
     document.getElementById('uno-lobby').classList.add('hidden');
     document.getElementById('uno-game').classList.remove('hidden');

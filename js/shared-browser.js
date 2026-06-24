@@ -10,7 +10,7 @@ function initSharedBrowser() {
       return;
     }
 
-    closeAllCards(); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
+    closeAllCards(false, 'sb-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     state.sb.joinedActivity = true;
     sbCard.classList.remove('hidden');
     makeCardFocusable(sbCard);
@@ -195,7 +195,7 @@ function handleSBMessage(peerId, msg) {
   if (msg.type === 'sb-start') {
     state.sb.host = msg.host;
     state.sb.interactive = msg.interactive;
-    closeAllCards(); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
+    closeAllCards(false, 'sb-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     const sbCard = document.getElementById('sb-card');
     sbCard.classList.remove('hidden');
     makeCardFocusable(sbCard);
