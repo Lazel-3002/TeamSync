@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <!-- Base Red Gradient -->
+    <linearGradient id="fezBody" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7a0000" />
+      <stop offset="15%" stop-color="#b30000" />
+      <stop offset="50%" stop-color="#e60000" />
+      <stop offset="85%" stop-color="#a30000" />
+      <stop offset="100%" stop-color="#5a0000" />
+    </linearGradient>
+
+    <!-- Top Cap Gradient -->
+    <linearGradient id="fezTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cc0000" />
+      <stop offset="100%" stop-color="#800000" />
+    </linearGradient>
+
+    <!-- Tassel Gradient -->
+    <linearGradient id="tasselGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111" />
+      <stop offset="100%" stop-color="#333" />
+    </linearGradient>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+    
+    <filter id="tasselShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <!-- Main Body of Fez -->
+    <path d="M 18 85 
+             Q 50 96 82 85 
+             L 72 30 
+             Q 50 20 28 30 
+             Z" 
+          fill="url(#fezBody)" />
+
+    <!-- Top Ellipse -->
+    <ellipse cx="50" cy="30" rx="22" ry="9" fill="url(#fezTop)" />
+  </g>
+
+  <!-- Tassel Thread hanging down -->
+  <path d="M 50 30 Q 65 35 68 55" fill="none" stroke="#111" stroke-width="2.5" filter="url(#tasselShadow)" />
+  
+  <!-- Tassel Base (Knot) -->
+  <circle cx="68" cy="55" r="3" fill="#111" filter="url(#tasselShadow)" />
+  
+  <!-- Tassel Fringe -->
+  <path d="M 66 56 Q 64 70 60 78 M 68 57 Q 68 70 66 80 M 70 56 Q 73 70 76 78 M 67 56 Q 65 70 63 79 M 69 56 Q 71 70 72 79" 
+        fill="none" stroke="url(#tasselGrad)" stroke-width="1.8" stroke-linecap="round" filter="url(#tasselShadow)" />
+
+  <!-- Center Pin on top -->
+  <circle cx="50" cy="30" r="2.5" fill="#111" />
+</svg>

@@ -609,6 +609,7 @@
         </div>
         <button id="addip" class="btn" title="Manuel IP Ekle"><span class="icon">➕</span><span class="lbl">Manuel</span></button>
         <button id="addsdp" class="btn" title="Çapraz Ağ (SDP)"><span class="icon">🌐</span><span class="lbl">Uzak Ağ</span></button>
+        <button id="founder-settings" class="btn hidden" title="Kurucu Ayarları" style="color: #ffd700;"><span class="icon">👑</span><span class="lbl">Kurucu</span></button>
         <button id="settings" class="btn" title="Ayarlar"><span class="icon">⚙️</span><span class="lbl">Ayar</span></button>
       </div>
     </div>
@@ -676,6 +677,25 @@
         </div>
         <div class="mactions">
           <button id="remote-stop" class="btn-sec">Kontrolü Bırak</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Founder Settings Modal -->
+    <div id="founder-settings-modal" class="modal hidden">
+      <div class="mcard" style="width: 420px; max-width: 90vw;">
+        <h3>👑 Kurucu Ayarları</h3>
+        <p class="muted">Sadece sunucuyu kuran kişi bu ayarları görebilir.</p>
+        <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
+          <label style="font-weight:bold;">Sadece Arkadaşlar Katılabilir</label>
+          <label class="switch">
+            <input type="checkbox" id="founder-friends-only">
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <p class="muted" style="margin-top:10px; font-size:12px;">Aktif olduğunda, yalnızca şu an sunucuda bulunan herhangi bir kişinin arkadaş listesinde olanlar katılabilir. Yabancıların bağlantısı anında reddedilir.</p>
+        <div style="display:flex; gap:10px; margin-top:24px;">
+          <button id="founder-settings-close" class="btn-pri" style="flex:1;">Kapat</button>
         </div>
       </div>
     </div>

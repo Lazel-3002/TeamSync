@@ -114,7 +114,8 @@ function setupInternetSignaling(roomId, myId, myName) {
           type: 'hello',
           id: myId,
           name: myName,
-          avatar: state.myAvatar || null
+          avatar: state.myAvatar || null,
+          isRoomFounder: state.isRoomFounder
         }));
       }
     }, 3000);
@@ -157,11 +158,11 @@ function setupInternetSignaling(roomId, myId, myName) {
       if (data.id === myId) return;
       
       if (data.type === 'hello') {
-        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar });
+        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder });
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
         if (!peer) {
-          await handlePeerDiscovered({ id: data.id, name: data.name || 'Bilinmeyen', ip: 'internet', avatar: data.avatar });
+          await handlePeerDiscovered({ id: data.id, name: data.name || 'Bilinmeyen', ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder });
           peer = state.peers.get(data.id);
         }
         if (peer) {
@@ -1207,6 +1208,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.password = pw;
     state.useAI = useAI;
     state.pttMode = pttMode;
+    state.isRoomFounder = !isJoining;
+    state.friendsOnlyMode = false;
+    
+    if (state.isRoomFounder) {
+      document.getElementById('founder-settings').classList.remove('hidden');
+    } else {
+      document.getElementById('founder-settings').classList.add('hidden');
+    }
 
     try {
       state.cryptoKey = await setupCrypto(state.password);
@@ -1229,7 +1238,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('room-title').textContent = '# ' + serverName + (state.cryptoKey ? ' 🔒' : '');
       document.getElementById('display-server-id').textContent = roomId;
       
-      addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true, avatar: state.myAvatar });
+      addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true, avatar: state.myAvatar, isFounder: state.isRoomFounder });
       
       window.electronAPI.startDiscovery(state.myId, state.myName, state.room);
       setupInternetSignaling(state.room, state.myId, state.myName);
@@ -1525,7 +1534,26 @@ async function handlePeerDiscovered(peer) {
   }
 
   console.log('🔍 Peer bulundu:', peer.name, peer.ip);
-  addUser({ id: peer.id, name: peer.name, mic: true, deaf: false, sharing: false, ip: peer.ip });
+  
+  if (state.isRoomFounder && state.friendsOnlyMode) {
+    if (state.friends[peer.id]) {
+      console.log('✅ Peer is founder\'s friend, allowing.');
+    } else {
+      console.log('⏳ Checking if peer is anyone\'s friend...');
+      if (mqttClient && mqttClient.connected) {
+        mqttClient.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'check_friend', targetId: peer.id }));
+      }
+      peer.friendCheckTimeout = setTimeout(() => {
+        console.log('❌ Peer is no one\'s friend, kicking:', peer.name);
+        if (mqttClient && mqttClient.connected) {
+          mqttClient.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'kick_peer', targetId: peer.id, reason: 'Sadece arkadaşlar katılabilir.' }));
+        }
+        removePeer(peer.id);
+      }, 3000);
+    }
+  }
+  
+  addUser({ id: peer.id, name: peer.name, mic: true, deaf: false, sharing: false, ip: peer.ip, avatar: peer.avatar, isFounder: peer.isFounder });
   
   if (state.lobbies && state.lobbies.length > 0) {
     setTimeout(() => {
@@ -1934,6 +1962,39 @@ async function handleDataMessage(peerId, msg) {
       processedMessages.delete(first);
     }
   }
+  
+  if (msg.type === 'founder_settings_update') {
+    state.friendsOnlyMode = msg.friendsOnlyMode;
+    console.log('👑 Founder settings updated:', state.friendsOnlyMode);
+    return;
+  } else if (msg.type === 'check_friend') {
+    if (state.friends[msg.targetId]) {
+      if (mqttClient && mqttClient.connected) {
+        mqttClient.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'friend_confirmed', targetId: msg.targetId, byId: state.myId }));
+      }
+    }
+    return;
+  } else if (msg.type === 'friend_confirmed') {
+    if (state.isRoomFounder) {
+      const peer = state.peers.get(msg.targetId);
+      if (peer && peer.friendCheckTimeout) {
+        clearTimeout(peer.friendCheckTimeout);
+        peer.friendCheckTimeout = null;
+        console.log(`✅ Peer ${peer.name} is confirmed as friend by ${msg.byId}, allowing.`);
+      }
+    }
+    return;
+  } else if (msg.type === 'kick_peer') {
+    if (msg.targetId === state.myId) {
+      disconnectApp();
+      document.getElementById('error-text').textContent = "Sunucudan atıldınız: " + (msg.reason || "Bilinmeyen sebep.");
+      document.getElementById('error-modal').classList.remove('hidden');
+    } else {
+      removePeer(msg.targetId);
+    }
+    return;
+  }
+
   // Lobby system protocols - handle immediately without peer connection dependency
   if (msg.type === 'lobby-list-sync') {
     const incomingLobbies = msg.lobbies || [];
@@ -2278,7 +2339,7 @@ function setupSpeakingDetection(peerId, stream) {
   check();
 }
 
-function addUser({ id, name, mic, deaf, sharing, self, ip, avatar }) {
+function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) {
   if (document.querySelector(`[data-uid="${id}"]`)) return;
   const li = document.createElement('li');
   li.className = 'user';
@@ -2286,12 +2347,15 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar }) {
   const avatarHtml = avatar 
     ? `<img src="${escapeHtml(avatar)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
     : name.charAt(0).toUpperCase();
+  const fezHtml = isFounder ? `<img src="assets/fez.svg" class="founder-fez" />` : '';
+  const nameClass = isFounder ? 'founder-name' : '';
   li.innerHTML = `
     <div class="av">
+      ${fezHtml}
       ${avatarHtml}
       <div class="st"></div>
     </div>
-    <div class="uname" style="flex:1;">
+    <div class="uname ${nameClass}" style="flex:1;">
       <div style="font-weight:bold;">${escapeHtml(name)}</div>
       ${!self ? `
         <div style="display:flex; align-items:center; margin-top:2px;" title="Ses Seviyesi">
@@ -2873,6 +2937,22 @@ function bindUI() {
     document.getElementById('turn-url').value = localStorage.getItem('teamsync_turn_url') || '';
     document.getElementById('turn-user').value = localStorage.getItem('teamsync_turn_user') || '';
     document.getElementById('turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
+  });
+
+  document.getElementById('founder-settings').addEventListener('click', () => {
+    document.getElementById('founder-settings-modal').classList.remove('hidden');
+  });
+
+  document.getElementById('founder-settings-close').addEventListener('click', () => {
+    document.getElementById('founder-settings-modal').classList.add('hidden');
+  });
+
+  document.getElementById('founder-friends-only').addEventListener('change', (e) => {
+    state.friendsOnlyMode = e.target.checked;
+    if (state.globalMqtt && state.room) {
+      state.globalMqtt.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'founder_settings_update', friendsOnlyMode: state.friendsOnlyMode }));
+    }
+    showToast(state.friendsOnlyMode ? 'Sadece arkadaşlar modu aktif!' : 'Sadece arkadaşlar modu kapatıldı.', 'info');
   });
   document.getElementById('settings-save').addEventListener('click', () => {
     localStorage.setItem('teamsync_turn_url', document.getElementById('turn-url').value.trim());
