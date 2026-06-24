@@ -12,9 +12,21 @@ function initLuckyWheel() {
     if (act === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
   };
 
-  document.getElementById('act-poll')?.addEventListener('click', () => setActivity('poll'));
-  document.getElementById('act-lvs')?.addEventListener('click', () => setActivity('lvs'));
-  document.getElementById('act-wheel')?.addEventListener('click', () => setActivity('wheel'));
+  const handleActClick = (act) => {
+    if (state.activeLobbyId && !state.isLobbyHost) {
+      closeAllCards();
+      document.getElementById('activities-modal').classList.add('hidden');
+      if (act === 'poll') document.getElementById('poll-card').classList.remove('hidden');
+      if (act === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
+      if (act === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
+      return;
+    }
+    setActivity(act);
+  };
+
+  document.getElementById('act-poll')?.addEventListener('click', () => handleActClick('poll'));
+  document.getElementById('act-lvs')?.addEventListener('click', () => handleActClick('lvs'));
+  document.getElementById('act-wheel')?.addEventListener('click', () => handleActClick('wheel'));
 
   const closeActivity = () => {
     closeAllCards(true);

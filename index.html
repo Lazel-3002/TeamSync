@@ -267,6 +267,7 @@
             <button id="sb-refresh" class="btn-sec btn-sm" style="color: #000; font-weight: bold; background: transparent; border: none; font-size: 16px;" title="Yenile">🔄</button>
             <input type="text" id="sb-url" placeholder="https://..." style="pointer-events: auto; user-select: text; -webkit-user-select: text; position: relative; z-index: 1000; flex: 1; padding: 6px 12px; border-radius: 16px; border: 1px solid #9ca3af; background: #fff; color: #000; outline: none; font-size: 14px;" />
             <button id="sb-go" class="btn-pri btn-sm" style="background: #3b82f6;">Git</button>
+            <button id="sb-focus" class="btn-sec btn-sm" style="background: #6b7280; color: white;">Tam Ekran</button>
             <button id="sb-close" class="btn-sec btn-sm" style="background: #ef4444; color: white;">Kapat</button>
           </div>
           <div id="sb-player-container" style="flex: 1; width: 100%; position: relative; background: #fff;">
@@ -395,6 +396,18 @@
                   <button id="uno-play-drawn-btn" class="btn-ok" style="background: var(--ok); color: white; border: none; font-size: 16px; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.4);">Oyna</button>
                </div>
             </div>
+
+            <div id="uno-challenge-modal" class="hidden" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:250; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(8px);">
+               <div style="color:gold; font-size:32px; margin-bottom:10px; font-weight:900; text-shadow: 0 2px 10px rgba(255,215,0,0.8);">MEYDAN OKU!</div>
+               <div style="color:white; font-size:18px; max-width:350px; text-align:center; margin-bottom:30px; line-height:1.5;">
+                  Sana <b>+4</b> atıldı! Acaba blöf mü yapıyor?<br><br>
+                  Eğer meydan okursan eline bakılacak. Yasadışı +4 attıysa <b>cezayı o çeker (+4)</b>! Ama yasal attıysa <b>sen 6 kart çekersin</b>!
+               </div>
+               <div style="display:flex; gap: 20px;">
+                  <button id="uno-challenge-yes" class="btn-warn" style="font-size: 18px; padding: 15px 30px; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(239,68,68,0.5);">Meydan Oku</button>
+                  <button id="uno-challenge-no" class="btn-sec" style="font-size: 18px; padding: 15px 30px; background: rgba(255,255,255,0.1); border: 2px solid white; color: white; border-radius: 8px; cursor: pointer;">Kartları Çek</button>
+               </div>
+            </div>
           </div>
           <div id="uno-game-over" class="uno-view hidden" style="flex:1; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative;">
             <h2 style="font-size: 32px; color: gold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 20px;">🏆 OYUN BİTTİ 🏆</h2>
@@ -403,6 +416,15 @@
             </div>
             <button id="uno-replay-btn" class="btn-ok hidden" style="background: var(--ok); color: white; padding: 15px 30px; border-radius: 50px; font-weight: 900; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.5); border: 2px solid white;">Tekrar Oyna</button>
             <div id="uno-replay-wait" style="font-size: 16px; color: #aaa; font-style: italic;">Kurucunun oyunu yeniden başlatması bekleniyor...</div>
+          </div>
+          <div id="uno-round-over" class="uno-view hidden" style="flex:1; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative;">
+            <h2 style="font-size: 32px; color: #3b82f6; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 5px;">🔥 Tur Bitti! 🔥</h2>
+            <div id="uno-round-winner-info" style="font-size: 18px; margin-bottom: 20px; color: #e2e8f0;"></div>
+            <div id="uno-round-rankings" style="display: flex; flex-direction: column; gap: 10px; width: 80%; max-width: 400px; margin-bottom: 30px;">
+               <!-- Rankings will be injected here -->
+            </div>
+            <button id="uno-next-round-btn" class="btn-ok hidden" style="background: #3b82f6; color: white; padding: 15px 30px; border-radius: 50px; font-weight: 900; font-size: 20px; cursor: pointer; border: 2px solid white;">Sonraki Tur</button>
+            <div id="uno-next-round-wait" style="font-size: 16px; color: #aaa; font-style: italic;">Kurucunun yeni turu başlatması bekleniyor...</div>
           </div>
         </div>
 

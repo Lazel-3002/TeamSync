@@ -47,6 +47,7 @@ const state = {
   uno: {
     host: null,
     players: new Map(), // id -> { name, ready, cardCount }
+    scores: {}, // id -> score (first to 500 wins)
     maxPlayers: 4,
     started: false,
     myHand: [],

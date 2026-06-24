@@ -69,7 +69,15 @@ function initPoke() {
     if (act === 'poke') document.getElementById('poke-card').classList.remove('hidden');
   };
 
-  document.getElementById('act-poke')?.addEventListener('click', () => setActivity('poke'));
+  document.getElementById('act-poke')?.addEventListener('click', () => {
+    if (state.activeLobbyId && !state.isLobbyHost) {
+      closeAllCards();
+      document.getElementById('activities-modal').classList.add('hidden');
+      document.getElementById('poke-card').classList.remove('hidden');
+      return;
+    }
+    setActivity('poke');
+  });
 
   document.getElementById('poke-close')?.addEventListener('click', () => {
     closeAllCards(true);

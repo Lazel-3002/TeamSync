@@ -43,6 +43,14 @@ function initSharedBrowser() {
     closeAllCards(true); // CLEAN AND RESETS
   });
 
+  document.getElementById('sb-focus').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (typeof toggleFocus === 'function') {
+      const card = document.getElementById('sb-card');
+      if (card) toggleFocus(card);
+    }
+  });
+
   document.getElementById('sb-go').addEventListener('click', (e) => {
     e.stopPropagation();
     let url = sbUrl.value.trim();

@@ -169,10 +169,29 @@ function initUno() {
   });
 
   document.getElementById('uno-replay-btn').addEventListener('click', () => {
+    // Reset completely for a new match
+    state.uno.scores = {};
     broadcast({ type: 'uno-lobby', host: state.myId });
     document.getElementById('uno-game-over').classList.add('hidden');
     document.getElementById('uno-lobby').classList.remove('hidden');
     state.uno.started = false;
+  });
+
+  document.getElementById('uno-next-round-btn').addEventListener('click', () => {
+    // Start next round with current scores
+    if (state.uno.host === state.myId) {
+        startUnoRound();
+    }
+  });
+
+  document.getElementById('uno-challenge-yes').addEventListener('click', () => {
+    document.getElementById('uno-challenge-modal').classList.add('hidden');
+    broadcast({ type: 'uno-challenge-decision', challenge: true });
+  });
+
+  document.getElementById('uno-challenge-no').addEventListener('click', () => {
+    document.getElementById('uno-challenge-modal').classList.add('hidden');
+    broadcast({ type: 'uno-challenge-decision', challenge: false });
   });
 }
 
@@ -382,6 +401,7 @@ function handleUnoMessage(peerId, msg) {
     document.getElementById('uno-lobby').classList.add('hidden');
     document.getElementById('uno-game').classList.remove('hidden');
     document.getElementById('uno-game-over').classList.add('hidden');
+    document.getElementById('uno-round-over').classList.add('hidden');
     renderUnoGame();
   } else if (msg.type === 'uno-play') {
     playPopSound();
@@ -398,6 +418,29 @@ function handleUnoMessage(peerId, msg) {
     if (state.uno.host === state.myId) {
       state.uno.waitingForKeepOrPlay = null;
       if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
+      
+      if (pId !== state.myId && msg.drawCount > 0 && !msg.isKombo) {
+        if (state.uno.rules && (state.uno.rules.stacking || state.uno.rules.mirror)) {
+          state.uno.pendingDrawCount = (state.uno.pendingDrawCount || 0) + msg.drawCount;
+          broadcast({ type: 'uno-pending-draw', count: state.uno.pendingDrawCount });
+        } else {
+          setTimeout(() => {
+            const victimIndex = getNextTurn(1, msg.oldTurnIndex, state.uno.direction);
+            const victimId = state.uno.turnOrder[victimIndex];
+            if (msg.card.val === '+4') {
+                state.uno.challengePending = { attacker: pId, victim: victimId, hadMatchingColor: msg.hadMatchingColor };
+                broadcast({ type: 'uno-challenge-offer', attacker: pId, victim: victimId });
+                if (victimId.startsWith('bot-')) {
+                    setTimeout(() => {
+                        broadcast({ type: 'uno-challenge-decision', victim: victimId, challenge: false });
+                    }, 1500);
+                }
+            } else {
+                forceDrawCards(victimId, msg.drawCount);
+            }
+          }, 500);
+        }
+      }
     }
     state.uno.triggerDiscardAnim = true;
 
@@ -444,7 +487,7 @@ function handleUnoMessage(peerId, msg) {
       }
       
       if (!specialRuleTriggered && Object.keys(state.uno.collectedHands || {}).length === state.uno.players.size) {
-         checkAndProcessHandSwaps();
+         checkAndProcessCollectedHands();
       }
       
       if (msg.drawCount > 0 && !msg.isKombo) {
@@ -487,7 +530,7 @@ function handleUnoMessage(peerId, msg) {
       if (state.uno.host === state.myId) {
           state.uno.collectedHands = state.uno.collectedHands || {};
           state.uno.collectedHands[peerId] = msg.hand;
-          checkAndProcessHandSwaps();
+          checkAndProcessCollectedHands();
       }
   } else if (msg.type === 'uno-dist-hands') {
       distributeHands(msg.hands);
@@ -528,11 +571,46 @@ function handleUnoMessage(peerId, msg) {
     document.getElementById('uno-catch-btn').classList.add('hidden');
     showToast(state.uno.players.get(msg.targetId)?.name + " UNO demeyi unuttuğu için YAKALANDI!", "warn");
   } else if (msg.type === 'uno-game-over') {
-    showUnoGameOver(msg.rankings);
+    showUnoGameOver(msg.rankings, msg.winner);
+  } else if (msg.type === 'uno-round-over') {
+    showUnoRoundOver(msg.rankings, msg.roundPoints, msg.roundWinner);
+  } else if (msg.type === 'uno-challenge-offer') {
+    if (state.myId === msg.victim) {
+      document.getElementById('uno-challenge-modal').classList.remove('hidden');
+    }
+  } else if (msg.type === 'uno-challenge-decision') {
+    if (state.uno.host === state.myId && state.uno.challengePending) {
+       const victimId = msg.victim || peerId;
+       if (victimId !== state.uno.challengePending.victim) return;
+       
+       const attackerId = state.uno.challengePending.attacker;
+       const challenge = msg.challenge;
+       const hadMatchingColor = state.uno.challengePending.hadMatchingColor;
+       
+       state.uno.challengePending = null;
+       
+       if (!challenge) {
+           forceDrawCards(victimId, 4);
+       } else {
+           if (hadMatchingColor) {
+               // Illegal play! Attacker draws 4, victim draws 0 and GETS THEIR TURN BACK!
+               showToast(state.uno.players.get(attackerId)?.name + " Yasadışı +4 attığı için YAKALANDI!", "warn");
+               forceDrawCards(attackerId, 4);
+               // Revert skip
+               state.uno.turnIndex = state.uno.turnOrder.indexOf(victimId);
+               broadcast({ type: 'uno-end-turn-sync', nextTurnIndex: state.uno.turnIndex });
+               renderUnoGame();
+           } else {
+               // Legal play! Victim draws 6 (4 + 2 penalty)
+               showToast("Meydan okuma başarısız! +4 Yasaldı.", "ok");
+               forceDrawCards(victimId, 6);
+           }
+       }
+    }
   }
 }
 
-function checkAndProcessHandSwaps() {
+function checkAndProcessCollectedHands() {
     if (!state.uno.collectedHands || Object.keys(state.uno.collectedHands).length < state.uno.players.size) return;
     
     if (state.uno.zeroPassPending) {
@@ -548,12 +626,56 @@ function checkAndProcessHandSwaps() {
         state.uno.sevenSwapPending = false;
         let targets = state.uno.turnOrder.filter(id => id !== state.uno.sevenSwapInitiator);
         if (targets.length > 0) {
-            let randomTarget = targets[Math.floor(Math.random() * targets.length)];
-            let newHands = { ...state.uno.collectedHands };
-            newHands[state.uno.sevenSwapInitiator] = state.uno.collectedHands[randomTarget];
-            newHands[randomTarget] = state.uno.collectedHands[state.uno.sevenSwapInitiator];
+            let randTarget = targets[Math.floor(Math.random() * targets.length)];
+            let newHands = {};
+            for (let id of state.uno.turnOrder) {
+                if (id === state.uno.sevenSwapInitiator) newHands[id] = state.uno.collectedHands[randTarget];
+                else if (id === randTarget) newHands[id] = state.uno.collectedHands[state.uno.sevenSwapInitiator];
+                else newHands[id] = state.uno.collectedHands[id];
+            }
             broadcast({ type: 'uno-dist-hands', hands: newHands });
             distributeHands(newHands);
+        }
+    } else if (state.uno.scoringPending) {
+        state.uno.scoringPending = false;
+        let roundPoints = 0;
+        let winnerId = null;
+
+        for (const [id, hand] of Object.entries(state.uno.collectedHands)) {
+            if (hand.length === 0) {
+                winnerId = id;
+            } else {
+                hand.forEach(card => {
+                    let val = parseInt(card.val);
+                    if (!isNaN(val)) roundPoints += val;
+                    else if (['Skip', 'Rev', '+2'].includes(card.val)) roundPoints += 20;
+                    else if (['+4', 'Wild', 'Swap', 'Shuffle', 'Custom'].includes(card.val)) roundPoints += 50;
+                });
+            }
+        }
+
+        if (winnerId) {
+            if (!state.uno.scores) state.uno.scores = {};
+            state.uno.scores[winnerId] = (state.uno.scores[winnerId] || 0) + roundPoints;
+        }
+
+        let gameWinner = null;
+        const rankings = [];
+        Array.from(state.uno.players.entries()).forEach(([id, p]) => {
+            let score = state.uno.scores?.[id] || 0;
+            rankings.push({ id, name: p.name, score });
+            if (score >= 500) gameWinner = id;
+        });
+
+        rankings.sort((a, b) => b.score - a.score);
+
+        if (gameWinner) {
+            state.uno.started = false;
+            broadcast({ type: 'uno-game-over', rankings, winner: gameWinner });
+            showUnoGameOver(rankings, gameWinner);
+        } else {
+            broadcast({ type: 'uno-round-over', rankings, roundPoints, roundWinner: winnerId });
+            showUnoRoundOver(rankings, roundPoints, winnerId);
         }
     }
 }
@@ -670,6 +792,13 @@ function startUnoGame() {
     broadcast({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
   }
 
+  // Clear scores for a new game
+  state.uno.scores = {};
+
+  startUnoRound();
+}
+
+function startUnoRound() {
   const deck = getUnoDeck();
   const hands = {};
   const turnOrder = Array.from(state.uno.players.keys());
@@ -694,7 +823,7 @@ function startUnoGame() {
     hands, firstCard
   };
   
-  console.log("startUnoGame: myId=", state.myId, "turnOrder=", turnOrder, "hands length for me=", hands[state.myId]?.length);
+  console.log("startUnoRound: myId=", state.myId, "turnOrder=", turnOrder, "hands length for me=", hands[state.myId]?.length);
 
   state.uno.started = true;
   state.uno.deck = deck;
@@ -707,13 +836,23 @@ function startUnoGame() {
   }
   state.uno.discard = [firstCard];
   state.uno.currentColor = firstCard.color;
-
+  
   broadcast(startMsg);
   
   document.getElementById('uno-lobby').classList.add('hidden');
+  document.getElementById('uno-game-over').classList.add('hidden');
+  document.getElementById('uno-round-over').classList.add('hidden');
   document.getElementById('uno-game').classList.remove('hidden');
+  document.getElementById('uno-host-settings').style.display = 'none';
   renderUnoGame();
 }
+
+document.getElementById('uno-next-round-btn').onclick = () => {
+    if (state.uno.host === state.myId) {
+        broadcast({ type: 'uno-start-round' });
+        startUnoRound();
+    }
+};
 
 function renderUnoGame() {
   try {
@@ -978,18 +1117,6 @@ function canPlay(card, topCard, isJumpIn = false) {
     return card.color !== 'black' && card.color === topCard.color && card.val === topCard.val;
   }
 
-  // Blöf Kuralı (Serbest Atış kapalıysa)
-  if (card.val === '+4' && state.uno.rules && !state.uno.rules.noBluff) {
-    let hasMatchingColor = false;
-    for (let c of state.uno.myHand) {
-      if (c !== card && c.color === state.uno.currentColor) {
-        hasMatchingColor = true;
-        break;
-      }
-    }
-    if (hasMatchingColor) return false;
-  }
-
   if (card.color === 'black') return true;
   if (card.color === state.uno.currentColor) return true;
   if (card.val === topCard.val) return true;
@@ -1120,7 +1247,17 @@ function playCard(index, chosenColor = null, isJumpIn = false) {
       document.getElementById('uno-end-turn-btn').classList.add('hidden');
     }
     
-    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno, isJumpIn, isKombo });
+    let hadMatchingColor = false;
+    if (card.val === '+4') {
+        for (let c of state.uno.myHand) {
+            if (c !== card && c.color === state.uno.currentColor) {
+                hadMatchingColor = true;
+                break;
+            }
+        }
+    }
+    
+    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno, isJumpIn, isKombo, hadMatchingColor });
     renderUnoGame();
     
     if (state.uno.host === state.myId && drawCount > 0 && !isKombo) {
@@ -1131,7 +1268,17 @@ function playCard(index, chosenColor = null, isJumpIn = false) {
         setTimeout(() => {
           const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
           const victimId = state.uno.turnOrder[victimIndex];
-          forceDrawCards(victimId, drawCount);
+          if (card.val === '+4') {
+              state.uno.challengePending = { attacker: state.myId, victim: victimId, hadMatchingColor: hadMatchingColor };
+              broadcast({ type: 'uno-challenge-offer', attacker: state.myId, victim: victimId });
+              if (victimId.startsWith('bot-')) {
+                  setTimeout(() => {
+                      broadcast({ type: 'uno-challenge-decision', victim: victimId, challenge: false });
+                  }, 1500);
+              }
+          } else {
+              forceDrawCards(victimId, drawCount);
+          }
         }, 500);
       }
     }
@@ -1433,34 +1580,29 @@ function showDrawModal(card, index) {
 
 function endUnoGame() {
   if (state.uno.host !== state.myId) return;
-  state.uno.started = false;
-
-  const rankings = [];
-  Array.from(state.uno.players.entries()).forEach(([id, p]) => {
-    let count = p.cardCount;
-    if (id === state.myId) count = state.uno.myHand.length;
-    else if (id.startsWith('bot-')) count = state.uno.botHands[id]?.length || 0;
-    rankings.push({ id, name: p.name, count });
-  });
-
-  rankings.sort((a, b) => a.count - b.count);
-  broadcast({ type: 'uno-game-over', rankings });
-  showUnoGameOver(rankings);
+  state.uno.scoringPending = true;
+  state.uno.collectedHands = {};
+  broadcast({ type: 'uno-req-hands' });
+  state.uno.collectedHands[state.myId] = [...state.uno.myHand];
+  for (let id in state.uno.botHands) state.uno.collectedHands[id] = [...state.uno.botHands[id]];
+  
+  checkAndProcessCollectedHands();
 }
 
-function showUnoGameOver(rankings) {
+function showUnoGameOver(rankings, winnerId) {
   state.uno.started = false;
   document.getElementById('uno-game').classList.add('hidden');
+  document.getElementById('uno-round-over').classList.add('hidden');
   document.getElementById('uno-game-over').classList.remove('hidden');
   
   const container = document.getElementById('uno-rankings');
   container.innerHTML = '';
   rankings.forEach((r, idx) => {
-    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👏';
+    const medal = r.id === winnerId ? '👑' : (idx === 1 ? '🥈' : idx === 2 ? '🥉' : '👏');
     container.innerHTML += `
       <div style="background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 8px; display: flex; justify-content: space-between; font-size: 18px; border: 1px solid rgba(255,255,255,0.2);">
         <span>${medal} ${escapeHtml(r.name)}</span>
-        <span>${r.count} Kart</span>
+        <span style="color: gold; font-weight: bold;">${r.score} Puan</span>
       </div>
     `;
   });
@@ -1471,6 +1613,34 @@ function showUnoGameOver(rankings) {
   } else {
     document.getElementById('uno-replay-btn').classList.add('hidden');
     document.getElementById('uno-replay-wait').classList.remove('hidden');
+  }
+}
+
+function showUnoRoundOver(rankings, roundPoints, roundWinnerId) {
+  document.getElementById('uno-game').classList.add('hidden');
+  document.getElementById('uno-game-over').classList.add('hidden');
+  document.getElementById('uno-round-over').classList.remove('hidden');
+  
+  const winnerName = state.uno.players.get(roundWinnerId)?.name || 'Biri';
+  document.getElementById('uno-round-winner-info').innerHTML = `<b>${escapeHtml(winnerName)}</b> bu turu kazanarak <b>${roundPoints}</b> puan aldı! (Hedef: 500)`;
+
+  const container = document.getElementById('uno-round-rankings');
+  container.innerHTML = '';
+  rankings.forEach((r, idx) => {
+    container.innerHTML += `
+      <div style="background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 8px; display: flex; justify-content: space-between; font-size: 18px; border: 1px solid rgba(255,255,255,0.2);">
+        <span>${escapeHtml(r.name)}</span>
+        <span style="color: #3b82f6; font-weight: bold;">${r.score} Puan</span>
+      </div>
+    `;
+  });
+
+  if (state.uno.host === state.myId) {
+    document.getElementById('uno-next-round-btn').classList.remove('hidden');
+    document.getElementById('uno-next-round-wait').classList.add('hidden');
+  } else {
+    document.getElementById('uno-next-round-btn').classList.add('hidden');
+    document.getElementById('uno-next-round-wait').classList.remove('hidden');
   }
 }
 
