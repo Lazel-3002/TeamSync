@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Ses Efekti Test Aracı</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { margin-bottom: 30px; font-weight: 600; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 600px;
+      width: 100%;
+    }
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      border: 1px solid #334155;
+    }
+    .card h3 { margin-top: 0; color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 5px;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2563eb; }
+    button.off { background: #ef4444; }
+    button.off:hover { background: #dc2626; }
+    p.desc { font-size: 12px; color: #cbd5e1; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Ses Efekti Test Aracı</h1>
+  <p style="margin-bottom: 30px; text-align: center; color: #cbd5e1;">Aşağıdaki seçenekleri dinleyip beğendiğiniz tarzı seçebilirsiniz. Discord benzeri veya daha yumuşak tonlar tamamen kod ile (Web Audio API) üretildiğinden internetten dosya indirmeye gerek bırakmaz ve çok hızlı çalışır.</p>
+
+  <div class="grid">
+    <!-- Seçenek 1: Klasik / Discord Tarzı -->
+    <div class="card">
+      <h3>Seçenek 1 (Discord Tarzı)</h3>
+      <button onclick="playOp1(true)">Açma Sesi (On)</button>
+      <button class="off" onclick="playOp1(false)">Kapatma Sesi (Off)</button>
+      <p class="desc">Hızlı, net, iki notalı mekanik geçiş.</p>
+    </div>
+
+    <!-- Seçenek 2: Yumuşak / Baloncuk Tarzı -->
+    <div class="card">
+      <h3>Seçenek 2 (Yumuşak & Tok)</h3>
+      <button onclick="playOp2(true)">Açma Sesi (On)</button>
+      <button class="off" onclick="playOp2(false)">Kapatma Sesi (Off)</button>
+      <p class="desc">Daha derin, rahatsız etmeyen tok bir ses.</p>
+    </div>
+
+    <!-- Seçenek 3: Dijital / Fütüristik -->
+    <div class="card">
+      <h3>Seçenek 3 (Dijital UI)</h3>
+      <button onclick="playOp3(true)">Açma Sesi (On)</button>
+      <button class="off" onclick="playOp3(false)">Kapatma Sesi (Off)</button>
+      <p class="desc">Daha tiz ve teknolojik bir arayüz sesi.</p>
+    </div>
+    
+    <!-- Sağırlaştırma Testi -->
+    <div class="card">
+      <h3>Sağırlaştırma (Özel)</h3>
+      <button onclick="playDeaf(true)">Sağırlaştırmayı Kapat (On)</button>
+      <button class="off" onclick="playDeaf(false)">Sağırlaştır (Off)</button>
+      <p class="desc">Sağırlaştırma için daha ağır, 3 notalı bir bildirim.</p>
+    </div>
+  </div>
+
+  <script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let actx;
+
+    function initAudio() {
+      if (!actx) actx = new AudioContext();
+      if (actx.state === 'suspended') actx.resume();
+    }
+
+    // Option 1: Discord Style (Two quick staccato notes)
+    function playOp1(isOn) {
+      initAudio();
+      const t = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      
+      osc.type = 'sine';
+      osc.connect(gain);
+      gain.connect(actx.destination);
+
+      if (isOn) {
+        // Low to High
+        osc.frequency.setValueAtTime(400, t);
+        osc.frequency.setValueAtTime(600, t + 0.1);
+        
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.02);
+        gain.gain.linearRampToValueAtTime(0, t + 0.08); // First note ends
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.1);
+        gain.gain.linearRampToValueAtTime(0, t + 0.25); // Second note ends
+        
+        osc.start(t);
+        osc.stop(t + 0.3);
+      } else {
+        // High to Low
+        osc.frequency.setValueAtTime(600, t);
+        osc.frequency.setValueAtTime(400, t + 0.1);
+        
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.02);
+        gain.gain.linearRampToValueAtTime(0, t + 0.08); 
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.1);
+        gain.gain.linearRampToValueAtTime(0, t + 0.25); 
+        
+        osc.start(t);
+        osc.stop(t + 0.3);
+      }
+    }
+
+    // Option 2: Soft & Deep (Marimba/Woodblock feel)
+    function playOp2(isOn) {
+      initAudio();
+      const t = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      
+      osc.type = 'triangle';
+      osc.connect(gain);
+      gain.connect(actx.destination);
+
+      if (isOn) {
+        osc.frequency.setValueAtTime(300, t);
+        osc.frequency.exponentialRampToValueAtTime(450, t + 0.15);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+        osc.start(t);
+        osc.stop(t + 0.3);
+      } else {
+        osc.frequency.setValueAtTime(400, t);
+        osc.frequency.exponentialRampToValueAtTime(250, t + 0.15);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+        osc.start(t);
+        osc.stop(t + 0.3);
+      }
+    }
+
+    // Option 3: Digital UI
+    function playOp3(isOn) {
+      initAudio();
+      const t = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      
+      osc.type = 'square';
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      
+      // Filter to soften the square wave
+      const filter = actx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 1500;
+      osc.disconnect();
+      osc.connect(filter);
+      filter.connect(gain);
+
+      if (isOn) {
+        osc.frequency.setValueAtTime(600, t);
+        osc.frequency.setValueAtTime(900, t + 0.08);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.02);
+        gain.gain.linearRampToValueAtTime(0, t + 0.06);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.08);
+        gain.gain.linearRampToValueAtTime(0, t + 0.15);
+        osc.start(t);
+        osc.stop(t + 0.15);
+      } else {
+        osc.frequency.setValueAtTime(900, t);
+        osc.frequency.setValueAtTime(600, t + 0.08);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.02);
+        gain.gain.linearRampToValueAtTime(0, t + 0.06);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.08);
+        gain.gain.linearRampToValueAtTime(0, t + 0.15);
+        osc.start(t);
+        osc.stop(t + 0.15);
+      }
+    }
+
+    // Deafening Sound (Deeper, 3 notes)
+    function playDeaf(isOn) {
+      initAudio();
+      const t = actx.currentTime;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      
+      osc.type = 'sine';
+      osc.connect(gain);
+      gain.connect(actx.destination);
+
+      if (isOn) {
+        // Undeafen: 3 notes going up
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.setValueAtTime(250, t + 0.1);
+        osc.frequency.setValueAtTime(300, t + 0.2);
+        
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.08);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.12);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.18);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.22);
+        gain.gain.linearRampToValueAtTime(0, t + 0.4);
+        
+        osc.start(t);
+        osc.stop(t + 0.45);
+      } else {
+        // Deafen: 3 notes going down
+        osc.frequency.setValueAtTime(300, t);
+        osc.frequency.setValueAtTime(250, t + 0.1);
+        osc.frequency.setValueAtTime(200, t + 0.2);
+        
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.08);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.12);
+        gain.gain.linearRampToValueAtTime(0.1, t + 0.18);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.22);
+        gain.gain.linearRampToValueAtTime(0, t + 0.4);
+        
+        osc.start(t);
+        osc.stop(t + 0.45);
+      }
+    }
+  </script>
+</body>
+</html>

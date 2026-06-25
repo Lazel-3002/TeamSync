@@ -1355,41 +1355,55 @@ function setConnStatus(connected) {
   if (dot) dot.classList.toggle('on', !!connected);
 }
 
+function playNote(actx, freq, startTime, duration) {
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  osc.type = 'sine';
+  osc.connect(gain);
+  gain.connect(actx.destination);
+  
+  osc.frequency.setValueAtTime(freq, startTime);
+  
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.5, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.1);
+}
+
 function playSound(type) {
   try {
     if (!state.sfxAudioCtx) {
       state.sfxAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     const actx = state.sfxAudioCtx;
-    if (actx.state === 'suspended') {
-      actx.resume().catch(() => {});
-    }
+    if (actx.state === 'suspended') actx.resume().catch(console.error);
 
-    const osc = actx.createOscillator();
-    const gain = actx.createGain();
-    osc.connect(gain);
-    gain.connect(actx.destination);
+    const t = actx.currentTime + 0.02;
 
     if (type === 'on') {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(400, actx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(600, actx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0, actx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.1, actx.currentTime + 0.05);
-      gain.gain.linearRampToValueAtTime(0, actx.currentTime + 0.15);
-      osc.start(actx.currentTime);
-      osc.stop(actx.currentTime + 0.15);
+      // Tam Discord Unmute (Açma) Sesi
+      playNote(actx, 415, t, 0.08);
+      playNote(actx, 554, t + 0.1, 0.08);
     } else if (type === 'off') {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(600, actx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(400, actx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0, actx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.1, actx.currentTime + 0.05);
-      gain.gain.linearRampToValueAtTime(0, actx.currentTime + 0.15);
-      osc.start(actx.currentTime);
-      osc.stop(actx.currentTime + 0.15);
+      // Tam Discord Mute (Kapatma) Sesi
+      playNote(actx, 415, t, 0.08);
+      playNote(actx, 311, t + 0.1, 0.08);
+    } else if (type === 'deafOn') {
+      // Tam Discord Sağırlaştırma Kapatma (Undeafen)
+      playNote(actx, 185, t, 0.08);
+      playNote(actx, 233, t + 0.1, 0.08);
+      playNote(actx, 277, t + 0.2, 0.08);
+    } else if (type === 'deafOff') {
+      // Tam Discord Sağırlaştırma (Deafen)
+      playNote(actx, 277, t, 0.08);
+      playNote(actx, 233, t + 0.1, 0.08);
+      playNote(actx, 185, t + 0.2, 0.08);
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error("Audio error:", e);
+  }
 }
 
 async function setupLocalAudio() {
@@ -2801,6 +2815,13 @@ function bindUI() {
       document.getElementById('ptt').classList.add('hidden');
       setMicEnabled(true);
     }
+    
+    if (state.deafened) {
+      state.preDeafenMic = true;
+      document.getElementById('deaf').click();
+      return;
+    }
+    
     const enabled = !state.micEnabled;
     setMicEnabled(enabled);
     playSound(enabled ? 'on' : 'off');
@@ -2808,6 +2829,17 @@ function bindUI() {
 
   deaf.addEventListener('click', () => {
     state.deafened = !state.deafened;
+    
+    if (state.deafened) {
+      state.preDeafenMic = state.micEnabled;
+      if (state.micEnabled) {
+        setMicEnabled(false);
+      }
+    } else {
+      if (state.preDeafenMic) {
+        setMicEnabled(true);
+      }
+    }
     
     // Mute/unmute Web Audio gain nodes and audio elements of all peers
     state.peers.forEach((peer, peerId) => {
@@ -2832,10 +2864,9 @@ function bindUI() {
     });
 
     deaf.classList.toggle('off', state.deafened);
-    deaf.querySelector('.icon').textContent = state.deafened ? '🔇' : '🎧';
     broadcast({ type: 'state', deaf: state.deafened });
     updateUserUI('self');
-    playSound(state.deafened ? 'off' : 'on');
+    playSound(state.deafened ? 'deafOff' : 'deafOn');
   });
 
   share.addEventListener('click', async () => {
@@ -3124,10 +3155,11 @@ function setMicEnabled(enabled) {
     enabled = false;
   }
   state.micEnabled = enabled;
-  state.localStream.getAudioTracks().forEach(t => t.enabled = enabled);
+  if (state.localStream) {
+    state.localStream.getAudioTracks().forEach(t => t.enabled = enabled);
+  }
   const micBtn = document.getElementById('mic');
   micBtn.classList.toggle('off', !enabled);
-  micBtn.querySelector('.icon').textContent = enabled ? '🎤' : '🚫';
   broadcast({ type: 'state', mic: enabled });
   updateUserUI('self');
 }
