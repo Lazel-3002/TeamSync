@@ -216,6 +216,7 @@ async function handleSignal(id, ip, signal) {
       }
       await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
       const answer = await peer.pc.createAnswer();
+      answer.sdp = setMediaBitrates(answer.sdp);
       await peer.pc.setLocalDescription(answer);
       if (mqttClient && mqttClient.connected) {
         sendInternetSignal(id, { type: 'answer', sdp: answer });
@@ -1380,10 +1381,10 @@ async function setupLocalAudio() {
   const raw = await navigator.mediaDevices.getUserMedia({
     audio: {
       echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      sampleRate: 48000,
-      channelCount: 1
+      noiseSuppression: { ideal: true },
+      autoGainControl: { ideal: true },
+      sampleRate: { ideal: 48000 },
+      channelCount: { ideal: 2 }
     }
   });
 
@@ -1507,7 +1508,7 @@ async function setupDeviceList() {
     });
     sel.addEventListener('change', async () => {
       const newStream = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: { exact: sel.value }, echoCancellation: true, autoGainControl: true }
+        audio: { deviceId: { exact: sel.value }, echoCancellation: true, noiseSuppression: { ideal: true }, autoGainControl: { ideal: true }, sampleRate: { ideal: 48000 }, channelCount: { ideal: 2 } }
       });
       const newTrack = newStream.getAudioTracks()[0];
       state.localStream.getAudioTracks().forEach(t => state.localStream.removeTrack(t));
@@ -1691,6 +1692,11 @@ function removePeer(peerId) {
   }
 }
 
+function setMediaBitrates(sdp) {
+  if (!sdp) return sdp;
+  return sdp.replace(/a=fmtp:111(.*)/g, 'a=fmtp:111$1;maxaveragebitrate=128000;stereo=1;sprop-stereo=1;cbr=1');
+}
+
 async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (state.peers.has(peerId)) return;
   const pc = new RTCPeerConnection({ iceServers: getIceServers() });
@@ -1809,6 +1815,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   if (isInitiator) {
     const offer = await pc.createOffer();
+    offer.sdp = setMediaBitrates(offer.sdp);
     await pc.setLocalDescription(offer);
     if (mqttClient && mqttClient.connected) {
       sendInternetSignal(peerId, { type: 'offer', sdp: offer });
@@ -2925,6 +2932,7 @@ function bindUI() {
         const peer = state.peers.get(newId);
         await peer.pc.setRemoteDescription(new RTCSessionDescription(friendSdp));
         const answer = await peer.pc.createAnswer();
+        answer.sdp = setMediaBitrates(answer.sdp);
         await peer.pc.setLocalDescription(answer);
         
         document.getElementById('my-offer').value = 'Cevap hazırlanıyor (ICE)...';
