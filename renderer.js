@@ -544,6 +544,7 @@ function renderFriends() {
         <div class="friend-actions">
           <button class="icon-btn sm" style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3);" onclick="openDM('${fId}')" title="Mesaj Gönder">💬</button>
           ${inRoom ? `<button class="icon-btn sm" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom('${fId}')" title="Sunucusuna Katıl">🎮</button>` : ''}
+          <button class="icon-btn sm" style="background: ${f.isMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'}; color: ${f.isMuted ? '#fca5a5' : '#9ca3af'}; border-color: ${f.isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(107, 114, 128, 0.3)'};" onclick="toggleMuteFriend('${fId}')" title="${f.isMuted ? 'Sesi Aç' : 'Sessize Al / Engelle'}">${f.isMuted ? '🔇' : '🔊'}</button>
           <button class="icon-btn sm" style="color: #fca5a5;" onclick="removeFriend('${fId}')" title="Arkadaşlıktan Çıkar">✕</button>
         </div>
       `;
@@ -551,6 +552,12 @@ function renderFriends() {
     });
   }
 }
+
+window.toggleMuteFriend = (fId) => {
+  if (!state.friends[fId]) return;
+  state.friends[fId].isMuted = !state.friends[fId].isMuted;
+  saveProfile();
+};
 
 window.requestJoinRoom = (fId) => {
   if (state.globalMqtt && state.globalMqtt.connected) {
@@ -716,6 +723,14 @@ function setupGlobalMQTT() {
           }
         }
       } else if (topic.endsWith('/events')) {
+        let senderId = data.id || data.fromId;
+        if (senderId && state.friends[senderId] && state.friends[senderId].isMuted) {
+          const blockedEvents = ['dm_msg', 'dm_file_start', 'dm_file_chunk', 'room_join_request', 'server_invite_received'];
+          if (blockedEvents.includes(data.type)) {
+            return;
+          }
+        }
+        
         if (data.type === 'ping_latency_req' && data.ts) {
           const latency = Date.now() - data.ts;
           const pingMsEl = document.getElementById('global-ping-ms');
