@@ -2596,6 +2596,8 @@ input:checked + .slider:before {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  padding-right: 15px;
 }
 .premium-option-title {
   font-size: 14px;

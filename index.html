@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.youtube.com https://s.ytimg.com; connect-src 'self' wss://broker.hivemq.com:8884 https://s3.amazonaws.com https://unpkg.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*; frame-src 'self' https://www.youtube.com; worker-src 'self' blob:; object-src 'none';">
   <meta name="referrer" content="no-referrer" />
   <title>TeamSync</title>
   <link rel="stylesheet" href="style.css" />
@@ -190,6 +191,20 @@
             <span class="slider round"></span>
           </label>
         </div>
+
+        <div class="premium-option" onclick="document.getElementById('create-useSFW').click()">
+          <div class="premium-option-info">
+            <div class="premium-option-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Aile Dostu (Yapay Zeka Koruması)
+            </div>
+            <div class="premium-option-desc">Küfürleri ve +18 içerikleri yapay zekayla engeller. Açıldığında otomatik iner.</div>
+          </div>
+          <label class="switch" onclick="event.stopPropagation()">
+            <input type="checkbox" id="create-useSFW" />
+            <span class="slider round"></span>
+          </label>
+        </div>
         
         <button id="btn-create">Oluştur</button>
       </div>
@@ -307,7 +322,7 @@
             <button id="sb-close" class="btn-sec btn-sm" style="background: #ef4444; color: white;">Kapat</button>
           </div>
           <div id="sb-player-container" style="flex: 1; width: 100%; position: relative; background: #fff;">
-            <webview id="sb-webview" src="https://www.google.com" style="width: 100%; height: 100%; border: none; display: flex;"></webview>
+            <webview id="sb-webview" src="about:blank" style="width: 100%; height: 100%; border: none; display: flex;"></webview>
             <div id="sb-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.1); z-index: 100; cursor: not-allowed; display: none;" title="Etkileşim izniniz yok."></div>
           </div>
         </div>
@@ -790,6 +805,18 @@
           </label>
         </div>
         <p class="muted" style="margin-top:10px; font-size:12px;">Aktif olduğunda, yalnızca şu an sunucuda bulunan herhangi bir kişinin arkadaş listesinde olanlar katılabilir. Yabancıların bağlantısı anında reddedilir.</p>
+
+        <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
+          <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
+             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+             Yapay Zeka Koruması (+18/Küfür Engelleyici)
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="founder-sfw-mode">
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <p class="muted" style="margin-top:10px; font-size:12px;">Tüm katılımcıların sohbet mesajları ve profil fotoğrafları AI ile denetlenir.</p>
         
         <h4 style="margin-top:20px; font-weight:bold; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">👥 Oyuncu Yönetimi</h4>
         <div id="founder-player-list" style="margin-top: 10px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">

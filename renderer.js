@@ -78,8 +78,79 @@ const state = {
   activeLobbyId: null,
   isLobbyHost: false,
   spectating: false,
-  selectedLobbyActivity: null
+  selectedLobbyActivity: null,
+  sfwMode: false,
+  aiModel: null
 };
+
+const badWordsList = ['amk', 'amq', 'aq', 'oç', 'piç', 'yarak', 'yarrak', 'amcık', 'sik', 'sikerim', 'siktir', 'orospu', 'göt', 'pezevenk', 'fuck', 'shit', 'bitch', 'asshole', 'döl', 'dol', 'meme', 'yarak', 'yarrag', 'yaraq', 'yarraq', 'sg', 'siktir', 'sktir', 'am', 'kaltak', 'sürtük', 'pç'];
+const badWordsRegex = new RegExp('\\b(' + badWordsList.join('|') + ')\\b', 'gi');
+
+function cleanText(text, isUsername = false) {
+  if (!state.sfwMode || !text) return text;
+  if (text.match(badWordsRegex)) {
+    if (isUsername) return "Anonim";
+    return "Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.";
+  }
+  return text;
+}
+
+async function loadAIFilter() {
+  if (state.aiModel) return;
+  
+  if (window.nsfwjs) {
+    state.aiModel = await window.nsfwjs.load();
+    return;
+  }
+  
+  return new Promise((resolve) => {
+    const s1 = document.createElement('script');
+    s1.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs';
+    s1.onload = () => {
+      // Load image filter (nsfwjs)
+      const s2 = document.createElement('script');
+      s2.src = 'https://unpkg.com/nsfwjs';
+      s2.onload = async () => {
+        try { 
+          state.aiModel = await window.nsfwjs.load(); 
+          
+          // Load text embeddings model
+          const s3 = document.createElement('script');
+          s3.src = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder';
+          s3.onload = async () => {
+             try {
+                state.useModel = await window.use.load();
+                resolve();
+             } catch(e) { resolve(); }
+          };
+          s3.onerror = resolve;
+          document.head.appendChild(s3);
+          
+        } catch(e) { resolve(); }
+      };
+      s2.onerror = resolve;
+      document.head.appendChild(s2);
+    };
+    s1.onerror = resolve;
+    document.head.appendChild(s1);
+  });
+}
+
+async function checkAvatar(base64Str) {
+  if (!state.sfwMode || !state.aiModel || !base64Str) return base64Str;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = async () => {
+      try {
+        const preds = await state.aiModel.classify(img);
+        const bad = preds.some(p => (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') && p.probability > 0.6);
+        resolve(bad ? null : base64Str);
+      } catch(e) { resolve(base64Str); }
+    };
+    img.onerror = () => resolve(base64Str);
+    img.src = base64Str;
+  });
+}
 
 const CHUNK_SIZE = 64 * 1024;
 const fileBuffer = new Map();
@@ -116,7 +187,8 @@ function setupInternetSignaling(roomId, myId, myName) {
           id: myId,
           name: myName,
           avatar: state.myAvatar || null,
-          isRoomFounder: state.isRoomFounder
+          isRoomFounder: state.isRoomFounder,
+          sfwMode: state.sfwMode
         }));
       }
     }, 3000);
@@ -159,6 +231,12 @@ function setupInternetSignaling(roomId, myId, myName) {
       if (data.id === myId) return;
       
       if (data.type === 'hello') {
+        if (data.isRoomFounder && data.sfwMode) {
+           if (!state.sfwMode) {
+               state.sfwMode = true;
+               loadAIFilter();
+           }
+        }
         handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder });
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
@@ -1224,7 +1302,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false) => {
+  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false) => {
+    state.sfwMode = useSFW;
+    if (useSFW) {
+       showToast("Yapay zeka modelleri yükleniyor (3MB), Lütfen bekleyin...", "info");
+       await loadAIFilter();
+    }
+    document.getElementById('login').classList.add('hidden');
     state.room = roomId;
     state.password = pw;
     state.useAI = useAI;
@@ -1339,7 +1423,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Gerçek P2P ID mantığı: Cloudflared tüneline gerek kalmadan eşsiz bir ID üretiyoruz
     const odaId = "teamsync-" + Math.random().toString(36).substring(2, 10) + "-" + Math.random().toString(36).substring(2, 6);
     
-    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false);
+    const useSFW = document.getElementById('create-useSFW').checked;
+    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false, useSFW);
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -1551,6 +1636,12 @@ async function setupDeviceList() {
 }
 
 async function handlePeerDiscovered(peer) {
+  if (state.sfwMode) {
+    const cleaned = cleanText(peer.name);
+    if (cleaned !== peer.name) peer.name = "Anonim";
+    if (peer.avatar) peer.avatar = await checkAvatar(peer.avatar);
+  }
+  
   if (state.peers.has(peer.id)) {
     const existing = state.peers.get(peer.id);
     existing.lastSeen = Date.now();
@@ -2005,8 +2096,12 @@ async function handleDataMessage(peerId, msg) {
   }
   
   if (msg.type === 'founder_settings_update') {
-    state.friendsOnlyMode = msg.friendsOnlyMode;
-    console.log('👑 Founder settings updated:', state.friendsOnlyMode);
+    if (msg.friendsOnlyMode !== undefined) state.friendsOnlyMode = msg.friendsOnlyMode;
+    if (msg.sfwMode !== undefined) {
+      state.sfwMode = msg.sfwMode;
+      if (state.sfwMode) loadAIFilter();
+    }
+    console.log('👑 Founder settings updated:', msg);
     return;
   } else if (msg.type === 'check_friend') {
     if (state.friends[msg.targetId]) {
@@ -2231,12 +2326,25 @@ async function handleDataMessage(peerId, msg) {
     }
     updateUserUI(peerId);
   } else if (msg.type === 'chat') {
-    appendChat(peerId, peer.name, msg.text);
+    let isCensored = msg.isCensored || false;
+    if (!isCensored) {
+      const res = await checkTextWithAI(msg.text);
+      if (!res.ok) isCensored = true;
+    }
+    appendChat(peerId, peer.name, msg.text || '', isCensored);
   } else if (msg.type === 'chat-enc') {
+    let isCensored = msg.isCensored || false;
     if (state.cryptoKey) {
       const dec = await decryptMsg(msg.data, state.cryptoKey);
-      if (dec) appendChat(peerId, peer.name, dec);
-      else appendChat(peerId, peer.name, '🔒 [Şifre Çözülemedi]');
+      if (dec || dec === '') {
+         if (!isCensored && dec !== '') {
+            const res = await checkTextWithAI(dec);
+            if (!res.ok) isCensored = true;
+         }
+         appendChat(peerId, peer.name, dec || '', isCensored);
+      } else {
+         appendChat(peerId, peer.name, '🔒 [Şifre Çözülemedi]');
+      }
     } else {
       appendChat(peerId, peer.name, '🔒 [Kilitli Mesaj]');
     }
@@ -2701,30 +2809,97 @@ function removeVideoCard(peerId, isScreen) {
   }
   updateEmptyGrid();
 }
+async function checkTextWithAI(text) {
+  if (!state.sfwMode || !text) return { ok: true, text: text };
+  
+  const warning = "Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.";
+
+  if (text.match(badWordsRegex)) {
+    return { ok: false, warning: warning };
+  }
+
+  if (state.useModel && text.length > 5) {
+    try {
+       const inappropriatePhrases = [
+         "cinsel ilişki", "seks yapmak", "çıplak kadın", "porno izle", "mastürbasyon", 
+         "sikişmek", "sevişelim mi", "bana meme at", "kalktı", "azdırıcı",
+         "soyun", "bakire misin", "amını yalayım", "götünü sikerim", "sikiş", "göğüslerini aç"
+       ];
+       const sentences = [text, ...inappropriatePhrases];
+       const embeddings = await state.useModel.embed(sentences);
+       const embeddingsArray = embeddings.arraySync();
+       const targetEmbedding = embeddingsArray[0];
+       
+       let maxSimilarity = 0;
+       for (let i = 1; i < embeddingsArray.length; i++) {
+          const phraseEmbedding = embeddingsArray[i];
+          let dotProduct = 0;
+          let normA = 0;
+          let normB = 0;
+          for (let j = 0; j < targetEmbedding.length; j++) {
+            dotProduct += targetEmbedding[j] * phraseEmbedding[j];
+            normA += targetEmbedding[j] * targetEmbedding[j];
+            normB += phraseEmbedding[j] * phraseEmbedding[j];
+          }
+          const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+          if (similarity > maxSimilarity) maxSimilarity = similarity;
+       }
+       
+       if (maxSimilarity > 0.65) {
+          return { ok: false, warning: warning };
+       }
+    } catch(e) {
+      console.error("Metin yapay zeka analizi hatası:", e);
+    }
+  }
+
+  return { ok: true, text: text };
+}
 
 document.getElementById('cform').addEventListener('submit', async (e) => {
   e.preventDefault();
   const input = document.getElementById('cinput');
-  const text = input.value.trim();
-  if (!text) return;
+  const rawText = input.value.trim();
+  if (!rawText) return;
 
-  if (state.cryptoKey) {
-    const enc = await encryptMsg(text, state.cryptoKey);
-    broadcast({ type: 'chat-enc', data: enc });
-  } else {
-    broadcast({ type: 'chat', text });
+  const res = await checkTextWithAI(rawText);
+  let textToSend = rawText;
+  let isCensored = false;
+
+  if (!res.ok) {
+     showToast(res.warning, 'danger');
+     textToSend = '';
+     isCensored = true;
   }
   
-  appendChat('self', state.myName, text);
+  if (state.cryptoKey) {
+    const enc = await encryptMsg(textToSend, state.cryptoKey);
+    broadcast({ type: 'chat-enc', data: enc, isCensored: isCensored });
+  } else {
+    broadcast({ type: 'chat', text: textToSend, isCensored: isCensored });
+  }
+  
+  appendChat('self', state.myName, textToSend, isCensored);
   input.value = '';
 });
 
-function appendChat(uid, name, text) {
+function appendChat(uid, name, text, isCensored = false) {
+  if (state.sfwMode && !isCensored) {
+    text = cleanText(text);
+    const cleanedName = cleanText(name);
+    if (cleanedName !== name) name = "Anonim";
+  }
   const wrap = document.getElementById('msgs');
   const div = document.createElement('div');
   div.className = 'msg';
   const t = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-  div.innerHTML = `<span class="n">${escapeHtml(name)}</span><span class="t">${t}</span><div>${escapeHtml(text)}</div>`;
+  
+  let msgHtml = escapeHtml(text);
+  if (isCensored) {
+    msgHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
+  }
+  
+  div.innerHTML = `<span class="n">${escapeHtml(name)}</span><span class="t">${t}</span><div>${msgHtml}</div>`;
   wrap.appendChild(div);
   wrap.scrollTop = wrap.scrollHeight;
   
@@ -3018,6 +3193,8 @@ function bindUI() {
 
   document.getElementById('founder-settings').addEventListener('click', () => {
     document.getElementById('founder-settings-modal').classList.remove('hidden');
+    document.getElementById('founder-friends-only').checked = state.friendsOnlyMode || false;
+    document.getElementById('founder-sfw-mode').checked = state.sfwMode || false;
     
     // Populate Player List
     const listEl = document.getElementById('founder-player-list');
@@ -3090,6 +3267,16 @@ function bindUI() {
     }
     showToast(state.friendsOnlyMode ? 'Sadece arkadaşlar modu aktif!' : 'Sadece arkadaşlar modu kapatıldı.', 'info');
   });
+
+  document.getElementById('founder-sfw-mode').addEventListener('change', (e) => {
+    state.sfwMode = e.target.checked;
+    if (state.sfwMode) loadAIFilter();
+    if (state.globalMqtt && state.room) {
+      state.globalMqtt.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'founder_settings_update', sfwMode: state.sfwMode }));
+    }
+    showToast(state.sfwMode ? 'Yapay Zeka Koruması aktif!' : 'Yapay Zeka Koruması kapatıldı.', 'info');
+  });
+  
   document.getElementById('settings-save').addEventListener('click', () => {
     localStorage.setItem('teamsync_turn_url', document.getElementById('turn-url').value.trim());
     localStorage.setItem('teamsync_turn_user', document.getElementById('turn-user').value.trim());
@@ -3733,9 +3920,11 @@ window.renderDMs = () => {
   
   const html = messages.map(m => {
     const cls = m.sender === 'me' ? 'sent' : 'recv';
-    let contentHtml = escapeHtml(m.content);
+    let contentHtml = escapeHtml(m.content || '');
     
-    if (m.type === 'image') {
+    if (m.isCensored) {
+       contentHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
+    } else if (m.type === 'image') {
       contentHtml = `<img src="${m.content}" />`;
     } else if (m.type === 'file') {
       contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
@@ -3781,13 +3970,23 @@ window.renderServerDMFriends = () => {
   });
 };
 
-window.sendDMText = (text) => {
+window.sendDMText = async (text) => {
   if (!state.activeDM || !text.trim() || !state.globalMqtt || !state.globalMqtt.connected) return;
   const friendId = state.activeDM;
   
+  const res = await checkTextWithAI(text);
+  let textToSend = text;
+  let isCensored = false;
+
+  if (!res.ok) {
+     showToast(res.warning, 'danger');
+     textToSend = '';
+     isCensored = true;
+  }
+  
   // Local store
   if (!state.dms[friendId]) state.dms[friendId] = [];
-  state.dms[friendId].push({ sender: 'me', type: 'text', content: text, timestamp: Date.now() });
+  state.dms[friendId].push({ sender: 'me', type: 'text', content: textToSend, isCensored: isCensored, timestamp: Date.now() });
   saveDMs();
   renderDMs();
   
@@ -3796,7 +3995,8 @@ window.sendDMText = (text) => {
     type: 'dm_msg',
     fromId: state.friendId,
     msgType: 'text',
-    content: text
+    content: textToSend,
+    isCensored: isCensored
   }));
 };
 
@@ -3850,11 +4050,17 @@ window.sendDMFile = (file) => {
 
 state.incomingDMFiles = {};
 
-window.receiveDM = (fromId, data) => {
+window.receiveDM = async (fromId, data) => {
   if (!state.dms[fromId]) state.dms[fromId] = [];
   
   if (data.type === 'dm_msg') {
-    state.dms[fromId].push({ sender: 'them', type: data.msgType, content: data.content, timestamp: Date.now() });
+    let isCensored = data.isCensored || false;
+    if (!isCensored && data.content) {
+       const res = await checkTextWithAI(data.content);
+       if (!res.ok) isCensored = true;
+    }
+    
+    state.dms[fromId].push({ sender: 'them', type: data.msgType, content: data.content, isCensored: isCensored, timestamp: Date.now() });
     saveDMs();
     if (state.activeDM === fromId) renderDMs();
     else showToast(`${state.friends[fromId]?.name || 'Biri'} sana mesaj gönderdi.`, 'info');
@@ -3943,7 +4149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const canvas = document.createElement('canvas');
         const MAX_SIZE = 128;
         let width = img.width;
@@ -3964,6 +4170,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
+        if (state.sfwMode && state.aiModel) {
+          const checked = await checkAvatar(dataUrl);
+          if (!checked) {
+             showToast("Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.", "danger");
+             return;
+          }
+        }
+        
         state.myAvatar = dataUrl;
         state.myAvatarHash = getAvatarHash(dataUrl);
         document.getElementById('my-avatar-img').src = dataUrl;
