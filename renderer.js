@@ -87,7 +87,7 @@ const badWordsList = ['amk', 'amq', 'aq', 'oç', 'piç', 'yarak', 'yarrak', 'amc
 const badWordsRegex = new RegExp('\\b(' + badWordsList.join('|') + ')\\b', 'gi');
 
 function cleanText(text, isUsername = false) {
-  if (!state.sfwMode || !text) return text;
+  if (!state.sfwMode || !text || typeof text !== 'string') return text;
   if (text.match(badWordsRegex)) {
     if (isUsername) return "Anonim";
     return "Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.";
@@ -2810,6 +2810,7 @@ function removeVideoCard(peerId, isScreen) {
   updateEmptyGrid();
 }
 async function checkTextWithAI(text) {
+  if (typeof text !== 'string') text = String(text || '');
   if (!state.sfwMode || !text) return { ok: true, text: text };
   
   const warning = "Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.";
@@ -2884,10 +2885,12 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
 });
 
 function appendChat(uid, name, text, isCensored = false) {
-  if (state.sfwMode && !isCensored) {
-    text = cleanText(text);
-    const cleanedName = cleanText(name);
-    if (cleanedName !== name) name = "Anonim";
+  if (state.sfwMode) {
+    if (typeof name === 'string') {
+      const cleanedName = cleanText(name, true);
+      if (cleanedName !== name) name = "Anonim";
+    }
+    if (!isCensored && typeof text === 'string') text = cleanText(text);
   }
   const wrap = document.getElementById('msgs');
   const div = document.createElement('div');
@@ -2895,8 +2898,11 @@ function appendChat(uid, name, text, isCensored = false) {
   const t = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   
   let msgHtml = escapeHtml(text);
+  let notifyText = typeof text === 'string' ? text : String(text || '');
+
   if (isCensored) {
     msgHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
+    notifyText = "🚫 [Yapay Zeka Tarafından Sansürlendi]";
   }
   
   div.innerHTML = `<span class="n">${escapeHtml(name)}</span><span class="t">${t}</span><div>${msgHtml}</div>`;
@@ -2905,7 +2911,7 @@ function appendChat(uid, name, text, isCensored = false) {
   
   if (uid !== 'self') {
     if (window.electronAPI && window.electronAPI.notify) {
-      window.electronAPI.notify(name, text);
+      window.electronAPI.notify(name, notifyText);
     }
   }
 }
