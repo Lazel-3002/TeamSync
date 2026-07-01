@@ -13,6 +13,17 @@ const baseUserData = app.getPath('userData');
 const lockFile = path.join(baseUserData, 'teamsync.lock');
 let isSecondInstance = false;
 
+// Load .env variables
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const envFile = fs.readFileSync(envPath, 'utf8');
+  envFile.split('\n').forEach(line => {
+    const [key, ...rest] = line.split('=');
+    const val = rest.join('=');
+    if (key && val) process.env[key.trim()] = val.trim();
+  });
+}
+
 function isPidRunning(pid) {
   try {
     process.kill(pid, 0);

@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPeerDiscovered: (cb) => ipcRenderer.on('peer-discovered', cb),
   loadAccounts: () => ipcRenderer.invoke('load-accounts'),
   saveAccounts: (accounts) => ipcRenderer.invoke('save-accounts', accounts),
-  isSecondInstance: () => ipcRenderer.invoke('is-second-instance')
+  isSecondInstance: () => ipcRenderer.invoke('is-second-instance'),
+  getEnv: () => ({
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY
+  })
 });
 

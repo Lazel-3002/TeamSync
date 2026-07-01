@@ -2,6 +2,18 @@ const params = (() => {
   return window.__params || { name: '', room: '', password: '' };
 })();
 
+// Initialize Supabase
+let supabase = null;
+if (window.supabase && window.electronAPI) {
+  const envVars = window.electronAPI.getEnv();
+  if (envVars.SUPABASE_URL && envVars.SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && envVars.SUPABASE_ANON_KEY) {
+    supabase = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
+    console.log('Supabase initialized successfully.');
+  } else {
+    console.warn('Supabase URL or Key missing in .env file');
+  }
+}
+
 const state = {
   myId: crypto.randomUUID(),
   myName: '',
@@ -2882,6 +2894,16 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   
   appendChat('self', state.myName, textToSend, isCensored);
   input.value = '';
+
+  // Supabase Kayıt
+  if (typeof supabase !== 'undefined' && supabase) {
+    supabase.from('mesaj').insert([
+      { icerik: textToSend, kullanici_adi: state.myName || 'Anonim' }
+    ]).then(({ error }) => {
+      if (error) console.error('Supabase mesaj kayıt hatası:', error);
+      else console.log('Mesaj Supabase e kaydedildi.');
+    });
+  }
 });
 
 function appendChat(uid, name, text, isCensored = false) {
