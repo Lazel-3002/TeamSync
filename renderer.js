@@ -3,11 +3,11 @@ const params = (() => {
 })();
 
 // Initialize Supabase
-let supabase = null;
+let supabaseClient = null;
 if (window.supabase && window.electronAPI) {
   const envVars = window.electronAPI.getEnv();
   if (envVars.SUPABASE_URL && envVars.SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && envVars.SUPABASE_ANON_KEY) {
-    supabase = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
     console.log('Supabase initialized successfully.');
   } else {
     console.warn('Supabase URL or Key missing in .env file');
@@ -2896,8 +2896,8 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   input.value = '';
 
   // Supabase Kayıt
-  if (typeof supabase !== 'undefined' && supabase) {
-    supabase.from('mesaj').insert([
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    supabaseClient.from('mesaj').insert([
       { icerik: textToSend, kullanici_adi: state.myName || 'Anonim' }
     ]).then(({ error }) => {
       if (error) console.error('Supabase mesaj kayıt hatası:', error);
