@@ -3706,7 +3706,7 @@ function disconnectApp() {
   
   const grid = document.getElementById('grid');
   document.querySelectorAll('.vcard').forEach(el => {
-    if (el.id !== 'wb-card') el.remove();
+    if (el.id !== 'wb-card') el.classList.add('hidden');
   });
   if (!document.getElementById('empty-state')) {
     const empty = document.createElement('div');
