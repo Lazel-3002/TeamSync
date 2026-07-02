@@ -7,6 +7,32 @@
   <meta name="referrer" content="no-referrer" />
   <title>TeamSync</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Pokemon Selection Styles */
+    .poke-base-card {
+      background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 15px;
+      display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: all 0.3s ease;
+      position: relative; overflow: hidden; backdrop-filter: blur(10px);
+    }
+    .poke-base-card:hover {
+      transform: translateY(-5px) scale(1.05); background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.5); box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+    }
+    .poke-base-card img { width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5)); margin-bottom: 10px; }
+    .poke-base-name { color: white; font-weight: bold; font-size: 16px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+    .poke-type-badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 900; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); box-shadow: inset 0 2px 5px rgba(255,255,255,0.3); text-transform: uppercase;}
+
+    .poke-evo-card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(0,0,0,0.6)); border: 3px solid rgba(255,255,255,0.2);
+      border-radius: 20px; padding: 30px; display: flex; flex-direction: column; align-items: center; cursor: pointer;
+      transition: all 0.3s ease; width: 220px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative;
+    }
+    .poke-evo-card:hover {
+      transform: translateY(-10px) scale(1.1); border-color: #fbbf24; box-shadow: 0 15px 40px rgba(251, 191, 36, 0.4);
+    }
+    .poke-evo-card img { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); margin-bottom: 20px; }
+    .poke-evo-name { color: #fbbf24; font-weight: 900; font-size: 22px; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,1); }
+  </style>
 </head>
 <body>
   <div id="login" class="login-wrap">
@@ -594,6 +620,30 @@
                  input:checked + .poke-slider { background-color: #10b981; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
                  input:checked + .poke-slider:before { transform: translateX(20px); }
                  #poke-random-text { transition: color 0.3s ease; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; }
+
+                 /* Realistic Pokemon Faint Animation */
+                 @keyframes poke-faint-anim {
+                     0% { transform: translateY(0) scale(1); filter: brightness(1) drop-shadow(0 0 10px rgba(255,255,255,0.2)); opacity: 1; }
+                     15% { transform: translateY(-10px) scale(1.05); filter: brightness(10) drop-shadow(0 0 30px rgba(255,255,255,1)); opacity: 1; }
+                     25% { transform: translateY(0) scale(1); filter: brightness(0) saturate(100%) invert(20%) sepia(80%) saturate(600%) hue-rotate(330deg); opacity: 1; }
+                     100% { transform: translateY(120px) scale(0.3); filter: grayscale(1) brightness(0.2); opacity: 0; }
+                 }
+                 .anim-death {
+                     animation: poke-faint-anim 1.5s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards !important;
+                 }
+                 
+                 .btn-withdraw:hover { background: #ef4444 !important; }
+                 .btn-withdraw:active { transform: scale(0.92) !important; background: #991b1b !important; }
+
+                 /* Winner Animation */
+                 @keyframes poke-winner-anim {
+                     0% { transform: scale(1); }
+                     50% { transform: scale(1.2); filter: drop-shadow(0 0 20px rgba(255,215,0,0.8)); }
+                     100% { transform: scale(1.1); filter: drop-shadow(0 0 10px rgba(255,215,0,0.5)); }
+                 }
+                 .anim-winner {
+                     animation: poke-winner-anim 1.5s ease-out forwards !important;
+                 }
                </style>
                <div class="poke-switch">
                  <input type="checkbox" id="poke-random-moves-toggle" checked onchange="document.getElementById('poke-random-text').textContent = this.checked ? 'Rastgele Yetenekler (AÇIK)' : 'Manuel Seçim (KAPALI)'; document.getElementById('poke-random-text').style.color = this.checked ? '#10b981' : '#f43f5e';">
@@ -696,12 +746,43 @@
                 </div>
               </button>
             </div>
+            
+            <div id="poke-mercy-container" style="display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 20px;">
+                <button id="poke-surrender-btn" class="btn-sec" style="background: rgba(220,38,38,0.2); color: #fca5a5; border: 1px solid rgba(220,38,38,0.4); padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s;">Savaşı Bitirmek İstiyorum (Pes Et)</button>
+                <div id="poke-mercy-actions" class="hidden" style="display: flex; gap: 10px; align-items: center;">
+                    <span style="color: white; font-size: 14px; text-shadow: 0 1px 3px black;">Rakip pes etmek istiyor:</span>
+                    <button id="poke-mercy-accept-btn" class="btn-sec" style="background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold; cursor: pointer;">Affet</button>
+                    <button id="poke-mercy-reject-btn" class="btn-sec" style="background: rgba(220,38,38,0.2); color: #fca5a5; border: 1px solid rgba(220,38,38,0.4); padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold; cursor: pointer;">Reddet</button>
+                </div>
+            </div>
           </div>
 
 
           <div id="poke-next-round-panel" class="hidden" style="background: rgba(0,0,0,0.7); border-top: 1px solid rgba(255,255,255,0.1); padding: 20px; display: flex; align-items: center; justify-content: center;">
              <button id="poke-next-round-btn" class="btn-pri anim-next-btn" style="font-size: 22px; padding: 15px 50px; border-radius: 50px; display: none; background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899); background-size: 200% auto; border: 3px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); text-transform: uppercase; font-weight: 900; letter-spacing: 2px; color: white; cursor: pointer; transition: all 0.3s ease;">🔄 TEKRAR OYNA</button>
              <span id="poke-spectator-msg" style="color: #94a3b8; font-style: italic; display: none;">Sıradaki tur bekleniyor...</span>
+          </div>
+
+          <!-- Pokemon Selection Modal -->
+          <div id="poke-base-selection-modal" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.98); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
+            <button id="poke-withdraw-selection-btn" class="btn-withdraw" style="position: absolute; top: 20px; right: 20px; background: #dc2626; border: 1px solid #b91c1c; padding: 10px 20px; font-size: 14px; border-radius: 10px; cursor: pointer; color: white; font-weight: bold; transition: transform 0.1s, background 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">Savaştan Çekil</button>
+            <h2 style="color: white; font-size: 28px; margin-bottom: 5px; text-shadow: 0 0 10px rgba(255,255,255,0.5);">Pokemonunu Seç</h2>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Savaşmak istediğin türü ve ana Pokemonunu belirle.</p>
+            <div id="poke-base-selection-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 20px; width: 100%; max-width: 900px; padding-bottom: 40px;">
+               <!-- Base pokemons injected here -->
+            </div>
+            <div id="poke-waiting-base-msg" style="color: #fbbf24; margin-top: 15px; font-weight: bold; display: none; font-size: 20px;">Rakip Seçimini Yapıyor...</div>
+          </div>
+
+          <!-- Evolution Selection Modal -->
+          <div id="poke-evolution-selection-modal" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.98); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 80px 20px 40px 20px; overflow-y: auto;">
+            <button id="poke-evo-back-btn" class="btn-pri" style="position: absolute; top: 20px; left: 20px; background: #334155; padding: 10px 20px; font-size: 16px; border-radius: 10px; border: none; cursor: pointer; color: white;">⬅ Geri Dön</button>
+            <h2 style="color: white; font-size: 28px; margin-bottom: 5px;">Hangi Formla Savaşacaksın?</h2>
+            <p style="color: #94a3b8; margin-bottom: 30px;">(Evrim formu sadece görseli değiştirir, özellikleri etkilemez)</p>
+            <div id="poke-evolution-selection-flex" style="display: flex; gap: 30px; justify-content: center; align-items: flex-end; flex-wrap: wrap;">
+               <!-- Evolutions injected here -->
+            </div>
+            <div id="poke-waiting-evo-msg" style="color: #fbbf24; margin-top: 30px; font-weight: bold; display: none; font-size: 20px;">Rakip Evrimini Seçiyor...</div>
           </div>
 
           <!-- Move Selection Modal -->
@@ -1201,6 +1282,7 @@
   <script src="js/shared-browser.js"></script>
   <script src="js/uno.js"></script>
   <script src="js/lucky-wheel.js"></script>
+  <script src="js/pokeData.js"></script>
   <script src="js/poke.js"></script>
 
     <div id="generic-confirm-modal" class="modal hidden" style="z-index: 10000; align-items: center; justify-content: center;">

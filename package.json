@@ -11,7 +11,8 @@
   "author": "TeamSync",
   "license": "MIT",
   "dependencies": {
-    "@jitsi/robotjs": "^0.6.22"
+    "@jitsi/robotjs": "^0.6.22",
+    "acorn": "^8.17.0"
   },
   "devDependencies": {
     "electron": "^28.2.0",

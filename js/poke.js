@@ -273,6 +273,23 @@ function initPoke() {
     });
   });
 
+  // Withdraw and Mercy
+  document.getElementById('poke-withdraw-selection-btn')?.addEventListener('click', () => {
+     broadcastPokeMsg({ type: 'poke_withdraw' });
+  });
+  
+  document.getElementById('poke-surrender-btn')?.addEventListener('click', () => {
+     broadcastPokeMsg({ type: 'poke_mercy_request', id: state.myId });
+  });
+  
+  document.getElementById('poke-mercy-accept-btn')?.addEventListener('click', () => {
+     broadcastPokeMsg({ type: 'poke_mercy_accept', id: state.myId });
+  });
+  
+  document.getElementById('poke-mercy-reject-btn')?.addEventListener('click', () => {
+     broadcastPokeMsg({ type: 'poke_mercy_reject', id: state.myId });
+  });
+
   // Next Round
   document.getElementById('poke-next-round-btn')?.addEventListener('click', () => {
     const randT = document.getElementById('poke-random-moves-toggle'); broadcastPokeMsg({ type: 'poke_start', randomMoves: randT ? randT.checked : true });
@@ -911,15 +928,15 @@ function initPoke() {
       }
     }
     if (data.type === 'poke_join') {
-      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null, hp: 100, maxHp: 100, moves: [] };
+      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null, hp: 0, maxHp: 0, moves: [] };
       if (data.slot === 1) pokeState.p1 = pData;
       else if (data.slot === 2) pokeState.p2 = pData;
       renderPokeLobby();
     }
     if (data.type === 'poke_lobby') {
        pokeState.status = 'waiting';
-       if(pokeState.p1) { pokeState.p1.pokemon = null; pokeState.p1.hp = 100; }
-       if(pokeState.p2) { pokeState.p2.pokemon = null; pokeState.p2.hp = 100; }
+       if(pokeState.p1) { pokeState.p1.pokemon = null; /*pokeState.p1.hp = 100;*/ }
+       if(pokeState.p2) { pokeState.p2.pokemon = null; /*pokeState.p2.hp = 100;*/ }
        document.getElementById('poke-p1-pokemon').className = '';
        document.getElementById('poke-p2-pokemon').className = '';
        renderPokeLobby();
@@ -934,36 +951,204 @@ function initPoke() {
       if (isHostFallback) {
          const isRandom = data.randomMoves;
          const generateGame = async () => {
-            const types = Object.keys(POKEMONS);
-            const t1 = types[Math.floor(Math.random() * types.length)];
-            const t2 = types[Math.floor(Math.random() * types.length)];
-            const p1Poke = POKEMONS[t1][Math.floor(Math.random() * POKEMONS[t1].length)];
-            const p2Poke = POKEMONS[t2][Math.floor(Math.random() * POKEMONS[t2].length)];
-            const n1 = getPokemonNameFromUrl(p1Poke);
-            const n2 = getPokemonNameFromUrl(p2Poke);
-            
             if (isRandom) {
-              const p1Moves = await fetchRandomMoves(n1, t1, false);
-              const p2Moves = await fetchRandomMoves(n2, t2, false);
-              broadcastPokeMsg({
-                 type: 'poke_reveal',
-                 p1: { type: t1, pokemon: p1Poke, moves: p1Moves },
-                 p2: { type: t2, pokemon: p2Poke, moves: p2Moves }
-              });
+                const types = Object.keys(POKEMONS);
+                const t1 = types[Math.floor(Math.random() * types.length)];
+                const t2 = types[Math.floor(Math.random() * types.length)];
+                const p1Poke = POKEMONS[t1][Math.floor(Math.random() * POKEMONS[t1].length)];
+                const p2Poke = POKEMONS[t2][Math.floor(Math.random() * POKEMONS[t2].length)];
+                const n1 = getPokemonNameFromUrl(p1Poke);
+                const n2 = getPokemonNameFromUrl(p2Poke);
+                
+                const p1Moves = await fetchRandomMoves(n1, t1, false);
+                const p2Moves = await fetchRandomMoves(n2, t2, false);
+                broadcastPokeMsg({
+                   type: 'poke_reveal',
+                   p1: { type: t1, pokemon: p1Poke, moves: p1Moves },
+                   p2: { type: t2, pokemon: p2Poke, moves: p2Moves }
+                });
             } else {
-              const p1MovePool = await fetchRandomMoves(n1, t1, true);
-              const p2MovePool = await fetchRandomMoves(n2, t2, true);
-              broadcastPokeMsg({
-                 type: 'poke_select_moves_state',
-                 p1: { type: t1, pokemon: p1Poke, movePool: p1MovePool },
-                 p2: { type: t2, pokemon: p2Poke, movePool: p2MovePool }
-              });
+                broadcastPokeMsg({ type: 'poke_base_selection_state' });
             }
          };
          generateGame();
       }
     }
     
+
+    if (data.type === 'poke_base_selection_state') {
+       pokeState.status = 'base_selection';
+       
+       if (pokeState.p1) { pokeState.p1.baseReady = false; pokeState.p1.evoReady = false; }
+       if (pokeState.p2) { pokeState.p2.baseReady = false; pokeState.p2.evoReady = false; }
+
+       const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
+       const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
+       
+       if (isP1 || isP2) {
+          document.getElementById('poke-base-selection-modal').classList.remove('hidden');
+          document.getElementById('poke-evolution-selection-modal').classList.add('hidden');
+          document.getElementById('poke-move-selection-modal').classList.add('hidden');
+          document.getElementById('poke-waiting-base-msg').style.display = 'none';
+          
+          const grid = document.getElementById('poke-base-selection-grid');
+          grid.innerHTML = '';
+          window.POKEMON_FAMILIES.forEach(fam => {
+             const card = document.createElement('div');
+             card.className = 'poke-base-card';
+             card.innerHTML = `
+                <img src="${fam.evolutions[0].url}" />
+                <div class="poke-base-name">${fam.displayName}</div>
+                <div class="poke-type-badge" style="background: ${TYPE_COLORS[fam.type] || '#777'};">${TYPE_NAMES[fam.type] || fam.type}</div>
+             `;
+             card.onclick = () => {
+                document.getElementById('poke-base-selection-grid').innerHTML = '';
+                document.getElementById('poke-waiting-base-msg').style.display = 'block';
+                broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type });
+             };
+             grid.appendChild(card);
+          });
+       } else {
+          document.getElementById('poke-base-selection-modal').classList.add('hidden');
+       }
+
+       // Bot logic for base selection
+       const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+       if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
+          setTimeout(() => {
+             const rFam = window.POKEMON_FAMILIES[Math.floor(Math.random() * window.POKEMON_FAMILIES.length)];
+             broadcastPokeMsg({ type: 'poke_action_base_select', id: 'BOT', baseName: rFam.baseName, typeStr: rFam.type });
+          }, 300);
+       }
+    }
+
+    
+    if (data.type === 'poke_action_base_unselect') {
+       if (pokeState.p1 && pokeState.p1.id === data.id) {
+          pokeState.p1.baseReady = false;
+          pokeState.p1.baseName = null;
+       }
+       if (pokeState.p2 && pokeState.p2.id === data.id) {
+          pokeState.p2.baseReady = false;
+          pokeState.p2.baseName = null;
+       }
+       // If I am the one who unselected, re-render my base grid
+       if (data.id === state.myId) {
+           const grid = document.getElementById('poke-base-selection-grid');
+           if (grid) {
+               grid.innerHTML = '';
+               window.POKEMON_FAMILIES.forEach(fam => {
+                  const card = document.createElement('div');
+                  card.className = 'poke-base-card';
+                  card.innerHTML = `
+                     <img src="${fam.evolutions[0].url}" />
+                     <div class="poke-base-name">${fam.displayName}</div>
+                     <div class="poke-type-badge" style="background: ${TYPE_COLORS[fam.type] || '#777'};">${TYPE_NAMES[fam.type] || fam.type}</div>
+                  `;
+                  card.onclick = () => {
+                     document.getElementById('poke-base-selection-grid').innerHTML = '';
+                     document.getElementById('poke-waiting-base-msg').style.display = 'block';
+                     broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type });
+                  };
+                  grid.appendChild(card);
+               });
+           }
+       }
+    }
+
+    if (data.type === 'poke_action_base_select') {
+       if (pokeState.p1 && pokeState.p1.id === data.id) {
+    pokeState.p1.baseName = data.baseName;
+    pokeState.p1.type = data.typeStr;
+    pokeState.p1.baseReady = true;
+    const fam1 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
+    if(fam1) { pokeState.p1.hp = fam1.hp; pokeState.p1.maxHp = fam1.hp; }
+}
+       if (pokeState.p2 && pokeState.p2.id === data.id) {
+    pokeState.p2.baseName = data.baseName;
+    pokeState.p2.type = data.typeStr;
+    pokeState.p2.baseReady = true;
+    const fam2 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
+    if(fam2) { pokeState.p2.hp = fam2.hp; pokeState.p2.maxHp = fam2.hp; }
+}
+       
+       if (data.id === state.myId) {
+          document.getElementById('poke-base-selection-modal').classList.add('hidden');
+          document.getElementById('poke-evolution-selection-modal').classList.remove('hidden');
+          document.getElementById('poke-waiting-evo-msg').style.display = 'none';
+          
+          const fam = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
+          const flex = document.getElementById('poke-evolution-selection-flex');
+          flex.innerHTML = '';
+          fam.evolutions.forEach(evo => {
+             const card = document.createElement('div');
+             card.className = 'poke-evo-card';
+             card.innerHTML = `
+                <img src="${evo.url}" />
+                <div class="poke-evo-name">${evo.name}</div>
+             `;
+             card.onclick = () => {
+                document.getElementById('poke-evolution-selection-flex').innerHTML = '';
+                document.getElementById('poke-waiting-evo-msg').style.display = 'block';
+                broadcastPokeMsg({ type: 'poke_action_evo_select', id: state.myId, evoName: evo.name, evoUrl: evo.url });
+             };
+             flex.appendChild(card);
+          });
+       }
+
+       // Bot logic for evo selection
+       if (data.id === 'BOT') {
+          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+          if (isHostFallback) {
+             setTimeout(() => {
+                const fam = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
+                const rEvo = fam.evolutions[Math.floor(Math.random() * fam.evolutions.length)];
+                broadcastPokeMsg({ type: 'poke_action_evo_select', id: 'BOT', evoName: rEvo.name, evoUrl: rEvo.url });
+             }, 300);
+          }
+       }
+    }
+
+    if (data.type === 'poke_action_evo_select') {
+       if (pokeState.p1 && pokeState.p1.id === data.id) {
+          pokeState.p1.pokemon = data.evoUrl;
+          pokeState.p1.evoName = data.evoName;
+          pokeState.p1.evoReady = true;
+       }
+       if (pokeState.p2 && pokeState.p2.id === data.id) {
+          pokeState.p2.pokemon = data.evoUrl;
+          pokeState.p2.evoName = data.evoName;
+          pokeState.p2.evoReady = true;
+       }
+
+       // Proceed to move selection locally
+       if (data.id === state.myId) {
+          document.getElementById('poke-evolution-selection-modal').classList.add('hidden');
+          const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
+          const myState = isP1 ? pokeState.p1 : pokeState.p2;
+          
+          fetchRandomMoves(myState.baseName, myState.type, true).then(movePool => {
+             document.getElementById('poke-move-selection-modal').classList.remove('hidden');
+             document.getElementById('poke-confirm-moves-btn').style.display = 'block';
+             document.getElementById('poke-waiting-moves-msg').style.display = 'none';
+             document.getElementById('poke-move-selection-pokename').textContent = myState.evoName;
+             renderMoveSelection(movePool);
+          });
+       }
+
+       // Bot logic for move selection
+       if (data.id === 'BOT') {
+          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+          if (isHostFallback) {
+             setTimeout(() => {
+                fetchRandomMoves(pokeState.p2.baseName, pokeState.p2.type, true).then(movePool => {
+                   const bMoves = movePool.sort(() => 0.5 - Math.random()).slice(0, 4);
+                   broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves });
+                });
+             }, 300);
+          }
+       }
+    }
 
     if (data.type === 'poke_select_moves_state') {
        pokeState.status = 'move_selection';
@@ -1028,6 +1213,91 @@ function initPoke() {
        }
     }
     
+    
+    if (data.type === 'poke_withdraw') {
+        pokeState.status = 'waiting';
+        pokeState.p1 = null;
+        pokeState.p2 = null;
+        document.getElementById('poke-battle-view').classList.add('hidden');
+        document.getElementById('poke-base-selection-modal').classList.add('hidden');
+        document.getElementById('poke-evolution-selection-modal').classList.add('hidden');
+        document.getElementById('poke-move-selection-modal').classList.add('hidden');
+        renderPokeLobby();
+    }
+    
+    if (data.type === 'poke_mercy_request') {
+        if (data.id !== state.myId && data.id !== 'BOT') {
+            // Rakip pes etti, bize affet/reddet çıktı
+            document.getElementById('poke-surrender-btn').classList.add('hidden');
+            document.getElementById('poke-mercy-actions').classList.remove('hidden');
+            const logBox = document.getElementById('poke-battle-log');
+            logBox.textContent = "Rakip pes etmek istiyor! Kararını ver.";
+            logBox.style.display = 'flex';
+        } else {
+            // Biz pes ettik
+            const btn = document.getElementById('poke-surrender-btn');
+            btn.textContent = "Rakibin kararı bekleniyor...";
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.5';
+            
+            // Eğer rakip BOT ise, otomatik olarak kabul etsin
+            if (pokeState.p2 && pokeState.p2.id === 'BOT' && pokeState.p1 && pokeState.p1.id === state.myId) {
+                 setTimeout(() => {
+                      broadcastPokeMsg({ type: 'poke_mercy_accept', id: 'BOT' });
+                 }, 1500);
+            }
+        }
+    }
+    
+    if (data.type === 'poke_mercy_accept') {
+        const logBox = document.getElementById('poke-battle-log');
+        logBox.style.display = 'flex';
+        if (data.id === state.myId) {
+             logBox.textContent = "Rakibi affettin! Savaş sona erdi.";
+        } else {
+             logBox.textContent = "Rakip seni affetti! Savaş sona erdi.";
+        }
+        
+        // Savaş bitsin
+        document.getElementById('poke-next-round-panel').classList.remove('hidden');
+        const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
+        const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
+        if (state.isLobbyHost || isP1 || isP2) {
+          document.getElementById('poke-next-round-btn').style.display = 'block';
+          document.getElementById('poke-spectator-msg').style.display = 'none';
+        } else {
+          document.getElementById('poke-next-round-btn').style.display = 'none';
+          document.getElementById('poke-spectator-msg').style.display = 'block';
+        }
+        pokeState.status = 'game_over';
+        
+        // Butonları gizle
+        document.getElementById('poke-surrender-btn').classList.add('hidden');
+        document.getElementById('poke-mercy-actions').classList.add('hidden');
+    }
+    
+    if (data.type === 'poke_mercy_reject') {
+        const logBox = document.getElementById('poke-battle-log');
+        logBox.style.display = 'flex';
+        if (data.id === state.myId) {
+             logBox.textContent = "Rakibi affetmedin! Savaş devam ediyor.";
+        } else {
+             logBox.textContent = "Rakip seni affetmedi! Savaş devam ediyor.";
+        }
+        
+        // Reset buttons
+        const surBtn = document.getElementById('poke-surrender-btn');
+        surBtn.textContent = "Savaşı Bitirmek İstiyorum (Pes Et)";
+        surBtn.style.pointerEvents = 'auto';
+        surBtn.style.opacity = '1';
+        surBtn.classList.remove('hidden');
+        document.getElementById('poke-mercy-actions').classList.add('hidden');
+        
+        setTimeout(() => {
+           if(pokeState.status === 'revealed') logBox.style.display = 'none';
+        }, 3000);
+    }
+
     if (data.type === 'poke_reveal') {
       pokeState.status = 'revealed';
       document.getElementById('poke-move-selection-modal')?.classList.add('hidden');
@@ -1037,14 +1307,25 @@ function initPoke() {
       pokeState.p1.type = data.p1.type;
       pokeState.p1.pokemon = data.p1.pokemon;
       pokeState.p1.moves = data.p1.moves;
-      pokeState.p1.hp = 100;
-      pokeState.p1.maxHp = 100;
+      //pokeState.p1.hp = 100;
+      //pokeState.p1.maxHp = 100;
       
       pokeState.p2.type = data.p2.type;
       pokeState.p2.pokemon = data.p2.pokemon;
       pokeState.p2.moves = data.p2.moves;
-      pokeState.p2.hp = 100;
-      pokeState.p2.maxHp = 100;      customRenderBattleArena();
+      
+      if (!pokeState.p1.hp) {
+          const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
+          pokeState.p1.hp = fam1 ? fam1.hp : 140;
+          pokeState.p1.maxHp = fam1 ? fam1.hp : 140;
+      }
+      if (!pokeState.p2.hp) {
+          const fam2 = window.POKEMON_FAMILIES.find(f => data.p2.baseName ? f.baseName === data.p2.baseName : f.type === data.p2.type);
+          pokeState.p2.hp = fam2 ? fam2.hp : 140;
+          pokeState.p2.maxHp = fam2 ? fam2.hp : 140;
+      }
+
+      customRenderBattleArena();
       
       const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
       if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
@@ -1106,6 +1387,21 @@ function initPoke() {
   };
 
   // Add into global activity handler override
+  
+  // Back button for evolution modal
+  setTimeout(() => {
+    const backBtn = document.getElementById('poke-evo-back-btn');
+    if (backBtn) {
+       backBtn.onclick = () => {
+          document.getElementById('poke-evolution-selection-modal').classList.add('hidden');
+          document.getElementById('poke-base-selection-modal').classList.remove('hidden');
+          if (typeof broadcastPokeMsg !== 'undefined') {
+             broadcastPokeMsg({ type: 'poke_action_base_unselect', id: state.myId });
+          }
+       };
+    }
+  }, 1000);
+
   const originalActHandler = window.activityHandler;
   window.activityHandler = (data) => {
     if(originalActHandler) originalActHandler(data);
