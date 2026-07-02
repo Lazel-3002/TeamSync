@@ -3,16 +3,7 @@ const params = (() => {
 })();
 
 // Initialize Supabase
-let supabaseClient = null;
-if (window.supabase && window.electronAPI) {
-  const envVars = window.electronAPI.getEnv();
-  if (envVars.SUPABASE_URL && envVars.SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && envVars.SUPABASE_ANON_KEY) {
-    supabaseClient = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
-    console.log('Supabase initialized successfully.');
-  } else {
-    console.warn('Supabase URL or Key missing in .env file');
-  }
-}
+// Supabase replaced with local storage
 
 const state = {
   myId: crypto.randomUUID(),
@@ -894,7 +885,7 @@ function setupGlobalMQTT() {
           if (state.myAvatar) {
             state.globalMqtt.publish(`teamsync/user/${data.fromId}/events`, JSON.stringify({
               type: 'res_avatar',
-              fromId: state.friendId,
+              fromId: state.myId,
               avatar: state.myAvatar
             }));
           }
@@ -1833,7 +1824,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (state.peers.has(peerId)) return;
   const pc = new RTCPeerConnection({ iceServers: getIceServers() });
 
-  state.localStream.getTracks().forEach(track => {
+  if (state.localStream) state.localStream.getTracks().forEach(track => {
     pc.addTrack(track, state.localStream);
   });
 
@@ -1934,7 +1925,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   state.peers.set(peerId, {
     pc,
-    audioEl: document.createElement('audio'),
+    audioEl: (function(){ const a = document.createElement('audio'); a.style.display = 'none'; document.body.appendChild(a); return a; })(),
     videoEl: document.createElement('video'),
     dc,
     name: peerName,
@@ -2895,18 +2886,51 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   appendChat('self', state.myName, textToSend, isCensored);
   input.value = '';
 
-  // Supabase Kayıt
-  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-    supabaseClient.from('mesaj').insert([
-      { icerik: textToSend, kullanici_adi: state.myName || 'Anonim' }
-    ]).then(({ error }) => {
-      if (error) console.error('Supabase mesaj kayıt hatası:', error);
-      else console.log('Mesaj Supabase e kaydedildi.');
-    });
+  });
+
+function saveChatToLocal(uid, name, text, isCensored) {
+  try {
+    let history = JSON.parse(localStorage.getItem('chat_history_' + state.room) || '[]');
+    history.push({ uid, name, text, isCensored, time: Date.now() });
+    if (history.length > 500) history = history.slice(history.length - 500);
+    localStorage.setItem('chat_history_' + state.room, JSON.stringify(history));
+  } catch(e) {
+    console.error('Local chat save error:', e);
   }
-});
+}
+
+function loadLocalChatHistory() {
+  try {
+    const wrap = document.getElementById('msgs');
+    wrap.innerHTML = '';
+    const history = JSON.parse(localStorage.getItem('chat_history_' + state.room) || '[]');
+    history.forEach(msg => {
+       const div = document.createElement('div');
+       div.className = 'msg';
+       const date = new Date(msg.time);
+       const t = date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+       
+       let msgHtml = textToHtmlEscape(msg.text);
+       if (msg.isCensored) {
+         msgHtml = '<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"> Sansürlendi</span>';
+       }
+       div.innerHTML = '<span class="n">' + textToHtmlEscape(msg.name) + '</span><span class="t">' + t + '</span><div>' + msgHtml + '</div>';
+       wrap.appendChild(div);
+    });
+    wrap.scrollTop = wrap.scrollHeight;
+  } catch(e) {
+    console.error('Error loading chat:', e);
+  }
+}
+
+function textToHtmlEscape(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 function appendChat(uid, name, text, isCensored = false) {
+  saveChatToLocal(uid, name, text, isCensored);
+
   if (state.sfwMode) {
     if (typeof name === 'string') {
       const cleanedName = cleanText(name, true);
@@ -3684,7 +3708,7 @@ function limitVideoBitrate(sender) {
 
 function disconnectApp() {
   if (window.electronAPI && window.electronAPI.stopCloudflared) window.electronAPI.stopCloudflared();
-  if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
+  if (state.localStream) if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
   const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'none';
   if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
   if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
@@ -4021,7 +4045,7 @@ window.sendDMText = async (text) => {
   // MQTT send
   state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
     type: 'dm_msg',
-    fromId: state.friendId,
+    fromId: state.myId,
     msgType: 'text',
     content: textToSend,
     isCensored: isCensored
@@ -4055,7 +4079,7 @@ window.sendDMFile = (file) => {
     
     state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
       type: 'dm_file_start',
-      fromId: state.friendId,
+      fromId: state.myId,
       fileId: fileId,
       msgType: msgType,
       fileName: file.name,
@@ -4066,7 +4090,7 @@ window.sendDMFile = (file) => {
       const chunk = base64Data.substr(i * CHUNK_SIZE, CHUNK_SIZE);
       state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
         type: 'dm_file_chunk',
-        fromId: state.friendId,
+        fromId: state.myId,
         fileId: fileId,
         chunkIndex: i,
         data: chunk

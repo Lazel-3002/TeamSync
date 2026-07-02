@@ -13,6 +13,8 @@ function initPoke() {
     spectators: [],
     round: 0,
     status: 'waiting', // waiting, selecting, revealed, round_end
+    actionP1: null,
+    actionP2: null,
   };
 
   // Pokemon dictionaries by type (gifs or high quality images)
@@ -128,8 +130,16 @@ function initPoke() {
     } else {
       document.getElementById('poke-lobby-view').classList.add('hidden');
       document.getElementById('poke-battle-view').classList.remove('hidden');
-      renderBattleArena();
+      customRenderBattleArena();
     }
+  };
+
+  
+  const getMoveSpeed = (name) => {
+    if (!name) return 5;
+    let h = 0;
+    for(let i=0; i<name.length; i++) h += name.charCodeAt(i);
+    return (h % 10) + 1;
   };
 
   const TYPE_EMOJIS = {
@@ -238,148 +248,6 @@ function initPoke() {
     } catch(e) {}
   };
 
-  const playBattleAnimation = () => {
-    const p1Img = document.getElementById('poke-p1-pokemon');
-    const p2Img = document.getElementById('poke-p2-pokemon');
-    const proj = document.getElementById('poke-projectile');
-
-    p1Img.className = '';
-    p2Img.className = '';
-    
-    setTimeout(() => {
-      p1Img.classList.add('anim-lunge-p1');
-        playPokemonCry(pokeState.p1.pokemon);
-        proj.innerHTML = '<span class="proj-inner type-' + pokeState.p1.type + '">' + (TYPE_EMOJIS[pokeState.p1.type] || '💥') + '</span>';
-        proj.className = 'anim-proj-p1';
-      proj.style.display = 'block';
-      
-      setTimeout(() => {
-        proj.style.display = 'none';
-        p2Img.classList.add('anim-shake'); 
-      }, 500);
-    }, 1000);
-
-    setTimeout(() => {
-      p2Img.classList.add('anim-lunge-p2');
-        playPokemonCry(pokeState.p2.pokemon);
-        proj.innerHTML = '<span class="proj-inner type-' + pokeState.p2.type + '">' + (TYPE_EMOJIS[pokeState.p2.type] || '💥') + '</span>';
-        proj.className = 'anim-proj-p2';
-      proj.style.display = 'block';
-
-      setTimeout(() => {
-        proj.style.display = 'none';
-        p1Img.classList.add('anim-shake-p1');
-      }, 500);
-    }, 2500);
-
-    setTimeout(() => {
-      evaluateWinner();
-      document.getElementById('poke-next-round-panel').classList.remove('hidden');
-      
-      const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
-      const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
-      if (state.isLobbyHost || isP1 || isP2) {
-        document.getElementById('poke-next-round-btn').style.display = 'block';
-        document.getElementById('poke-spectator-msg').style.display = 'none';
-      } else {
-        document.getElementById('poke-next-round-btn').style.display = 'none';
-        document.getElementById('poke-spectator-msg').style.display = 'block';
-      }
-      window.pokeAnimPlaying = false;
-    }, 4000);
-  };
-
-  const renderBattleArena = () => {
-    const badge = document.getElementById('poke-vs-badge');
-    if (badge) badge.innerHTML = '<span style="font-size: 50px; font-style: italic; font-weight: 900; color: #cbd5e1; text-shadow: 0 4px 10px rgba(0,0,0,0.8);">VS</span>';
-
-    // Top headers
-    document.getElementById('poke-p1-header').textContent = pokeState.p1 ? pokeState.p1.name : "Oyuncu 1";
-    document.getElementById('poke-p2-header').textContent = pokeState.p2 ? pokeState.p2.name : "Oyuncu 2";
-
-    const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
-    const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
-    const isPlaying = isP1 || isP2;
-
-    const p1Img = document.getElementById('poke-p1-pokemon');
-    const p1Status = document.getElementById('poke-p1-status');
-    const p2Img = document.getElementById('poke-p2-pokemon');
-    const p2Status = document.getElementById('poke-p2-status');
-    
-    // Status text logic
-    if (pokeState.status === 'selecting') {
-      p1Img.style.display = 'none';
-      p2Img.style.display = 'none';
-      
-      p1Status.style.display = 'block';
-      p1Status.textContent = pokeState.p1.ready ? "HAZIR" : "SEÇİYOR...";
-      p1Status.style.color = pokeState.p1.ready ? "#22c55e" : "white";
-
-      p2Status.style.display = 'block';
-      p2Status.textContent = pokeState.p2.ready ? "HAZIR" : "SEÇİYOR...";
-      p2Status.style.color = pokeState.p2.ready ? "#22c55e" : "white";
-      
-      const p1n = document.getElementById('poke-p1-pokename');
-      const p2n = document.getElementById('poke-p2-pokename');
-      if(p1n) p1n.style.display = 'none';
-      if(p2n) p2n.style.display = 'none';
-
-      document.getElementById('poke-vs-badge').textContent = "VS";
-      document.getElementById('poke-vs-badge').style.color = "#cbd5e1";
-
-      p1Img.className = '';
-      p2Img.className = '';
-      window.pokeAnimPlaying = false;
-      if (isPlaying) {
-        const myPlayer = isP1 ? pokeState.p1 : pokeState.p2;
-        if (!myPlayer.ready) {
-          document.getElementById('poke-selection-panel').style.display = 'flex';
-        } else {
-          document.getElementById('poke-selection-panel').style.display = 'none';
-        }
-      } else {
-        document.getElementById('poke-selection-panel').style.display = 'none';
-      }
-
-      document.getElementById('poke-next-round-panel').classList.add('hidden');
-    } 
-    else if (pokeState.status === 'revealed') {
-      p1Status.style.display = 'none';
-      p2Status.style.display = 'none';
-      p1Img.style.display = 'block';
-      p2Img.style.display = 'block';
-      
-      const extractName = (url) => {
-        if (!url) return "?";
-        const parts = url.split('/');
-        let n = parts[parts.length - 1].replace('.gif', '').replace('.png', '').split('-')[0];
-        return n;
-      };
-      
-      const p1n = document.getElementById('poke-p1-pokename');
-      const p2n = document.getElementById('poke-p2-pokename');
-      if (p1n) {
-        p1n.style.display = 'block';
-        p1n.textContent = extractName(pokeState.p1.pokemon);
-      }
-      if (p2n) {
-        p2n.style.display = 'block';
-        p2n.textContent = extractName(pokeState.p2.pokemon);
-      }
-
-      p1Img.src = pokeState.p1.pokemon || UNKNOWN_AVATAR;
-      p2Img.src = pokeState.p2.pokemon || UNKNOWN_AVATAR;
-
-      document.getElementById('poke-selection-panel').style.display = 'none';
-      
-      if (!window.pokeAnimPlaying) {
-        window.pokeAnimPlaying = true;
-        document.getElementById('poke-next-round-panel').classList.add('hidden');
-        playBattleAnimation();
-      }
-    }
-  };
-
   // Join slots
   document.getElementById('poke-join-1')?.addEventListener('click', () => {
     broadcastPokeMsg({ type: 'poke_join', slot: 1, id: state.myId, name: state.myName, avatar: state.myAvatar });
@@ -394,7 +262,7 @@ function initPoke() {
 
   // Start Battle
   document.getElementById('poke-start-btn')?.addEventListener('click', () => {
-    broadcastPokeMsg({ type: 'poke_start' });
+    const randT = document.getElementById('poke-random-moves-toggle'); broadcastPokeMsg({ type: 'poke_start', randomMoves: randT ? randT.checked : true });
   });
 
   // Selection
@@ -407,55 +275,623 @@ function initPoke() {
 
   // Next Round
   document.getElementById('poke-next-round-btn')?.addEventListener('click', () => {
-    broadcastPokeMsg({ type: 'poke_start' });
+    const randT = document.getElementById('poke-random-moves-toggle'); broadcastPokeMsg({ type: 'poke_start', randomMoves: randT ? randT.checked : true });
   });
 
-  const evaluateWinner = () => {
-    const t1 = pokeState.p1.type;
-    const t2 = pokeState.p2.type;
 
-    const m1 = typeChart[t1][t2]; // P1 attacks P2
-    const m2 = typeChart[t2][t1]; // P2 attacks P1
+  const generateRealisticAttack = (attackerSlot, defenderSlot, moveType) => {
+      const area = document.getElementById('poke-effect-area');
+      if (!area) return;
+      const isP1 = attackerSlot === 'p1';
+      const atkImg = document.getElementById('poke-' + attackerSlot + '-pokemon');
+      const defImg = document.getElementById('poke-' + defenderSlot + '-pokemon');
+      
+      let startX = isP1 ? -150 : 150;
+      let targetX = isP1 ? 150 : -150;
+      let baseStartY = 0;
+      let baseTargetY = 0;
+      
+      if (atkImg && defImg && area) {
+         const areaRect = area.getBoundingClientRect();
+         const atkRect = atkImg.getBoundingClientRect();
+         const defRect = defImg.getBoundingClientRect();
+         
+         startX = (atkRect.left + atkRect.width / 2) - (areaRect.left + areaRect.width / 2);
+         baseStartY = (atkRect.top + atkRect.height / 2) - (areaRect.top + areaRect.height / 2);
+         
+         targetX = (defRect.left + defRect.width / 2) - (areaRect.left + areaRect.width / 2);
+         baseTargetY = (defRect.top + defRect.height / 2) - (areaRect.top + areaRect.height / 2);
+      }
+      
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.zIndex = '50';
+      container.style.pointerEvents = 'none';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      area.appendChild(container);
 
-    let winner = 0; // 0 = draw, 1 = p1, 2 = p2
-    let message = "Etkisiz kaldı!";
+      const createParticle = (config) => {
+          const p = document.createElement('div');
+          p.style.position = 'absolute';
+          p.style.left = '50%';
+          p.style.top = '50%';
+          p.style.width = config.w + 'px';
+          p.style.height = config.h + 'px';
+          p.style.background = config.color;
+          p.style.borderRadius = config.radius || '50%';
+          p.style.boxShadow = config.shadow || `0 0 10px ${config.color}`;
+          if (config.clipPath) p.style.clipPath = config.clipPath;
+          p.style.opacity = config.opacity !== undefined ? config.opacity : 1;
+          
+          container.appendChild(p);
+          
+          const isAtTarget = config.startX === targetX;
+          const finalStartX = config.startX !== undefined ? config.startX : startX;
+          const finalStartY = (config.startY !== undefined ? config.startY : 0) + (isAtTarget ? baseTargetY : baseStartY);
+          
+          const finalTargetX = config.targetX !== undefined ? config.targetX : targetX;
+          const finalTargetY = (config.targetY !== undefined ? config.targetY : 0) + baseTargetY;
+
+          p.animate([
+              { transform: `translate(calc(-50% + ${finalStartX}px), calc(-50% + ${finalStartY}px)) rotate(${config.rotation || 0}deg) scale(${config.scale || 1})`, opacity: p.style.opacity },
+              { transform: `translate(calc(-50% + ${finalTargetX}px), calc(-50% + ${finalTargetY}px)) rotate(${(config.rotation || 0) + (config.spin || 0)}deg) scale(${config.endScale || 1})`, opacity: config.endOpacity !== undefined ? config.endOpacity : 0 }
+          ], {
+              duration: config.duration || 500,
+              easing: config.easing || 'linear',
+              fill: 'forwards',
+              delay: config.delay || 0
+          });
+      };
+
+      // Type specific logic
+      if (moveType === 'fire') {
+          for(let i=0; i<40; i++) {
+              createParticle({
+                  startX: startX + (Math.random() * 20 - 10), startY: (Math.random() * 20 - 10),
+                  targetX: targetX + (Math.random() * 40 - 20), targetY: (Math.random() * 60 - 30),
+                  w: 15 + Math.random() * 15, h: 15 + Math.random() * 15,
+                  color: Math.random() > 0.5 ? '#ff4500' : (Math.random() > 0.5 ? '#ff8c00' : '#ffd700'),
+                  shadow: '0 0 15px #ff0000',
+                  duration: 300 + Math.random() * 200, delay: Math.random() * 200,
+                  endScale: 2 + Math.random() * 2, spin: Math.random() * 360
+              });
+          }
+      } else if (moveType === 'water') {
+          for(let i=0; i<30; i++) {
+              createParticle({
+                  startX: startX + (Math.random() * 10 - 5), startY: (Math.random() * 10 - 5),
+                  targetX: targetX + (Math.random() * 30 - 15), targetY: (Math.random() * 30 - 15),
+                  w: 8 + Math.random() * 8, h: 8 + Math.random() * 8,
+                  color: Math.random() > 0.5 ? '#00bfff' : '#1e90ff',
+                  radius: '50% 50% 50% 5%', rotation: isP1 ? 45 : -135,
+                  shadow: '0 0 10px #0000ff',
+                  duration: 250 + Math.random() * 150, delay: i * 10, endScale: 1.5
+              });
+          }
+      } else if (moveType === 'electric') {
+          for(let i=0; i<15; i++) {
+              createParticle({
+                  startX: startX + (Math.random() * 40 - 20), startY: (Math.random() * 40 - 20),
+                  targetX: targetX + (Math.random() * 40 - 20), targetY: (Math.random() * 40 - 20),
+                  w: 40 + Math.random() * 40, h: 4,
+                  color: '#ffff00', shadow: '0 0 20px #ffea00',
+                  duration: 100 + Math.random() * 100, delay: i * 30,
+                  rotation: isP1 ? (Math.random() * 40 - 20) : 180 + (Math.random() * 40 - 20), endScale: 1
+              });
+          }
+      } else if (moveType === 'grass') {
+          for(let i=0; i<25; i++) {
+              createParticle({
+                  startX: startX + (Math.random() * 30 - 15), startY: (Math.random() * 40 - 20),
+                  targetX: targetX + (Math.random() * 40 - 20), targetY: (Math.random() * 60 - 30),
+                  w: 20 + Math.random() * 10, h: 10 + Math.random() * 5,
+                  color: Math.random() > 0.5 ? '#32cd32' : '#228b22',
+                  radius: '0 50% 0 50%', shadow: '0 0 5px #006400',
+                  duration: 400 + Math.random() * 200, delay: Math.random() * 200,
+                  spin: 360 + Math.random() * 720, endScale: 1.2
+              });
+          }
+      } else if (moveType === 'dark' || moveType === 'ghost') {
+          createParticle({
+              startX: startX, startY: 0, targetX: targetX, targetY: 0,
+              w: 50, h: 50, color: moveType === 'dark' ? '#2f4f4f' : '#4b0082',
+              shadow: moveType === 'dark' ? '0 0 30px #000' : '0 0 30px #8a2be2',
+              duration: 400, endScale: 1.5, endOpacity: 1
+          });
+          for(let i=0; i<20; i++) {
+              createParticle({
+                  startX: startX + (Math.random() * 40 - 20), startY: (Math.random() * 40 - 20),
+                  targetX: targetX + (Math.random() * 60 - 30), targetY: (Math.random() * 60 - 30),
+                  w: 10 + Math.random() * 15, h: 10 + Math.random() * 15,
+                  color: Math.random() > 0.5 ? '#000000' : '#800080',
+                  shadow: '0 0 10px #4b0082',
+                  duration: 400, delay: Math.random() * 100, endScale: 0.5
+              });
+          }
+      } else if (moveType === 'ice') {
+          for(let i=0; i<30; i++) {
+              createParticle({
+                  startX: startX + (Math.random() * 20 - 10), startY: (Math.random() * 20 - 10),
+                  targetX: targetX + (Math.random() * 40 - 20), targetY: (Math.random() * 40 - 20),
+                  w: 10 + Math.random() * 10, h: 10 + Math.random() * 10,
+                  color: '#e0ffff', radius: '2px', shadow: '0 0 15px #00ffff',
+                  duration: 300 + Math.random() * 200, delay: i * 15, spin: Math.random() * 360, endScale: 1.5
+              });
+          }
+      } else if (moveType === 'psychic' || moveType === 'fairy') {
+          for(let i=0; i<30; i++) {
+              createParticle({
+                  startX: startX + (Math.random() * 40 - 20), startY: Math.sin(i) * 30,
+                  targetX: targetX + (Math.random() * 20 - 10), targetY: Math.sin(i + Math.PI) * 50,
+                  w: 10 + Math.random() * 5, h: 10 + Math.random() * 5,
+                  color: moveType === 'psychic' ? '#ff1493' : '#ffb6c1',
+                  radius: '50%', shadow: '0 0 20px ' + (moveType === 'psychic' ? '#ff00ff' : '#ff69b4'),
+                  duration: 400 + Math.random() * 200, delay: i * 10, endScale: 2
+              });
+          }
+      } else if (moveType === 'fighting' || moveType === 'normal' || moveType === 'rock' || moveType === 'ground' || moveType === 'steel') {
+          const baseColor = moveType === 'rock' ? '#8b4513' : (moveType === 'ground' ? '#d2b48c' : (moveType === 'steel' ? '#c0c0c0' : '#ffffff'));
+          for(let i=0; i<15; i++) {
+              createParticle({
+                  startX: startX, startY: 0,
+                  targetX: targetX + (Math.random() * 80 - 40), targetY: (Math.random() * 80 - 40),
+                  w: 10 + Math.random() * 10, h: 10 + Math.random() * 10,
+                  color: baseColor, radius: moveType === 'rock' ? '2px' : '50%',
+                  shadow: '0 0 5px ' + baseColor,
+                  duration: 200 + Math.random() * 200, delay: 100, spin: Math.random() * 360, endScale: 1.5
+              });
+          }
+      } else {
+          const clr = moveType === 'poison' ? '#800080' : (moveType === 'bug' ? '#9acd32' : (moveType === 'flying' ? '#add8e6' : '#8a2be2'));
+          for(let i=0; i<20; i++) {
+              createParticle({
+                  startX: startX, startY: 0, targetX: targetX, targetY: (Math.random() * 20 - 10),
+                  w: 30 + Math.random() * 20, h: 5 + Math.random() * 5,
+                  color: clr, radius: '10px', shadow: '0 0 15px ' + clr,
+                  duration: 300, delay: i * 20, endScale: 1.5
+              });
+          }
+      }
+      
+      setTimeout(() => {
+          for(let i=0; i<10; i++) {
+              createParticle({
+                  startX: targetX, startY: 0, targetX: targetX + (Math.random() * 100 - 50), targetY: (Math.random() * 100 - 50),
+                  w: 5 + Math.random() * 10, h: 5 + Math.random() * 10,
+                  color: '#ffffff', radius: '50%', shadow: '0 0 20px #fff',
+                  duration: 200 + Math.random() * 200, endScale: 0.1
+              });
+          }
+      }, 400);
+
+      setTimeout(() => {
+          if (container.parentNode) container.parentNode.removeChild(container);
+      }, 1000);
+  };
+
+  const playBattleAnimation = (attackerSlot, defenderSlot, moveName, moveType, damage, isSuper, isResisted) => {
+    const atkImg = document.getElementById('poke-' + attackerSlot + '-pokemon');
+    const defImg = document.getElementById('poke-' + defenderSlot + '-pokemon');
+    const proj = document.getElementById('poke-projectile');
+    const logBox = document.getElementById('poke-battle-log');
     
-    if (m1 > m2) {
-      winner = 1;
-      message = m1 >= 2 ? "Süper Etkili!" : "Avantajlı!";
-    } else if (m2 > m1) {
-      winner = 2;
-      message = m2 >= 2 ? "Süper Etkili!" : "Avantajlı!";
+    // UI Setup
+    document.getElementById('poke-selection-panel').classList.add('hidden'); // Hide moves during animation
+    
+    logBox.textContent = pokeState[attackerSlot].name + ", " + moveName + " kullandı!";
+    
+    atkImg.className = '';
+    defImg.className = '';
+    
+    setTimeout(() => {
+      atkImg.classList.add('anim-lunge-' + attackerSlot);
+      playPokemonCry(pokeState[attackerSlot].pokemon);
+      
+      proj.style.display = 'none';
+      generateRealisticAttack(attackerSlot, defenderSlot, moveType);
+      
+      setTimeout(() => {
+        proj.style.display = 'none';
+        defImg.classList.add('anim-shake');
+        
+        // Apply damage visually
+        pokeState[defenderSlot].hp -= damage;
+        if (pokeState[defenderSlot].hp < 0) pokeState[defenderSlot].hp = 0;
+        
+        updateHpUI(defenderSlot);
+        
+        let effectMsg = "";
+        if (isSuper) effectMsg = " Süper Etkili!";
+        else if (isResisted) effectMsg = " Etkisi Az!";
+        
+        logBox.textContent = moveName + " " + damage + " hasar verdi." + effectMsg;
+        
+        setTimeout(() => {
+           if (pokeState[defenderSlot].hp <= 0) {
+              logBox.textContent = pokeState[defenderSlot].name + " bayıldı! " + pokeState[attackerSlot].name + " kazandı!";
+              defImg.classList.add('anim-death');
+              atkImg.classList.add('anim-winner');
+              endBattle(attackerSlot);
+           } else {
+              // Switch turn
+              pokeState.turn = pokeState.turn === 1 ? 2 : 1;
+              customRenderBattleArena(); // Renders turn UI
+              window.pokeAnimPlaying = false;
+              
+              // If it's bot's turn, trigger bot
+              if (pokeState.turn === 2 && pokeState.p2.id === 'BOT' && state.isLobbyHost) {
+                 setTimeout(botPlay, 1500);
+              }
+           }
+        }, 2000);
+        
+      }, 500);
+    }, 500);
+  };
+
+  
+    const executeRound = (action1, action2) => {
+       window.pokeAnimPlaying = true;
+       const m1 = pokeState.p1.moves[action1.moveIdx];
+       const m2 = pokeState.p2.moves[action2.moveIdx];
+       const s1 = getMoveSpeed(m1.name);
+       const s2 = getMoveSpeed(m2.name);
+       
+       let first = 'p1', second = 'p2';
+       let firstMove = m1, secondMove = m2;
+       
+       if (s2 > s1 || (s2 === s1 && Math.random() > 0.5)) {
+          first = 'p2'; second = 'p1';
+          firstMove = m2; secondMove = m1;
+       }
+       
+       const execSingle = (attacker, defender, move, cb) => {
+          if (pokeState[attacker].hp <= 0) return cb(); // attacker is dead
+          
+          const defType = pokeState[defender].type;
+          let multiplier = 1;
+          if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) multiplier = typeChart[move.type][defType];
+          
+          let isSuper = multiplier > 1.5;
+          let isResisted = multiplier < 0.9;
+          let dmg = Math.floor(move.power * multiplier * (Math.random() * 0.2 + 0.9)); // +/- 10%
+          
+          playBattleAnimation(attacker, defender, move.name, move.type, dmg, isSuper, isResisted);
+          
+          setTimeout(() => {
+             cb();
+          }, 2000);
+       };
+       
+       execSingle(first, second, firstMove, () => {
+          if (pokeState[second].hp <= 0) {
+             window.pokeAnimPlaying = false;
+             endBattle(first);
+             return;
+          }
+          execSingle(second, first, secondMove, () => {
+             window.pokeAnimPlaying = false;
+             if (pokeState[first].hp <= 0) {
+                endBattle(second);
+             } else {
+                // Both survived, next turn!
+                pokeState.actionP1 = null;
+                pokeState.actionP2 = null;
+                customRenderBattleArena();
+                const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+                if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
+                   setTimeout(botPlay, 500);
+                }
+             }
+          });
+       });
+    };
+
+    const updateHpUI = (slot) => {
+    const hpText = document.getElementById('poke-' + slot + '-hp-text');
+    const hpBar = document.getElementById('poke-' + slot + '-hp-bar');
+    if(hpText && hpBar && pokeState[slot]) {
+      const p = pokeState[slot];
+      hpText.textContent = Math.floor(p.hp) + " / " + p.maxHp;
+      const pct = Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100));
+      hpBar.style.width = pct + "%";
+      
+      // Color change based on HP
+      if(pct > 50) hpBar.style.background = 'linear-gradient(90deg, #22c55e, #4ade80)'; // Green
+      else if(pct > 20) hpBar.style.background = 'linear-gradient(90deg, #eab308, #fde047)'; // Yellow
+      else hpBar.style.background = 'linear-gradient(90deg, #ef4444, #f87171)'; // Red
     }
+  };
 
-    const badge = document.getElementById('poke-vs-badge');
-    const p1Img = document.getElementById('poke-p1-pokemon');
-    const p2Img = document.getElementById('poke-p2-pokemon');
+  const endBattle = (winnerSlot) => {
+    document.getElementById('poke-next-round-panel').classList.remove('hidden');
     
-    if (winner === 0) {
-      badge.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); padding: 15px 30px; border-radius: 15px; border: 2px solid #fbbf24; box-shadow: 0 0 20px #fbbf24; white-space: nowrap;">
-          <span style="font-size: 36px; font-weight: 900; color: #fbbf24; text-shadow: 0 0 20px #fbbf24;">BERABERE!</span>
-          <span style="font-size: 16px; color: #fef08a; font-style: italic; margin-top: 5px;">Nötr Çarpışma</span>
-        </div>`;
-    } else if (winner === 1) {
-      badge.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); padding: 15px 30px; border-radius: 15px; border: 2px solid ${TYPE_COLORS[t1]}; box-shadow: 0 0 20px ${TYPE_COLORS[t1]}; white-space: nowrap;">
-          <span style="font-size: 16px; color: #e2e8f0; text-transform: uppercase; letter-spacing: 2px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${pokeState.p1.name}</span>
-          <span style="font-size: 32px; font-weight: 900; color: ${TYPE_COLORS[t1]}; text-shadow: 0 0 20px ${TYPE_COLORS[t1]}; margin: 5px 0;">KAZANDI!</span>
-          <span style="font-size: 14px; color: #fbbf24; font-style: italic;">${message}</span>
-        </div>`;
-      p1Img.classList.add('anim-winner');
-      p2Img.classList.add('anim-death');
+    const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
+    const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
+    if (state.isLobbyHost || isP1 || isP2) {
+      document.getElementById('poke-next-round-btn').style.display = 'block';
+      document.getElementById('poke-spectator-msg').style.display = 'none';
     } else {
-      badge.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); padding: 15px 30px; border-radius: 15px; border: 2px solid ${TYPE_COLORS[t2]}; box-shadow: 0 0 20px ${TYPE_COLORS[t2]}; white-space: nowrap;">
-          <span style="font-size: 16px; color: #e2e8f0; text-transform: uppercase; letter-spacing: 2px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${pokeState.p2.name}</span>
-          <span style="font-size: 32px; font-weight: 900; color: ${TYPE_COLORS[t2]}; text-shadow: 0 0 20px ${TYPE_COLORS[t2]}; margin: 5px 0;">KAZANDI!</span>
-          <span style="font-size: 14px; color: #fbbf24; font-style: italic;">${message}</span>
-        </div>`;
-      p2Img.classList.add('anim-winner');
-      p1Img.classList.add('anim-death');
+      document.getElementById('poke-next-round-btn').style.display = 'none';
+      document.getElementById('poke-spectator-msg').style.display = 'block';
+    }
+    window.pokeAnimPlaying = false;
+    pokeState.status = 'game_over';
+  };
+
+  const botPlay = () => {
+       if (pokeState.status !== 'revealed' || pokeState.actionP2 !== null) return;
+       
+       const myMoves = pokeState.p2.moves;
+       const targetType = pokeState.p1.type;
+       
+       // Find best move
+       let bestMoveIdx = 0;
+       let bestDamage = -1;
+       
+       for(let i=0; i<myMoves.length; i++) {
+          const move = myMoves[i];
+          let multiplier = 1;
+          if (typeChart[move.type] && typeChart[move.type][targetType] !== undefined) {
+            multiplier = typeChart[move.type][targetType];
+          }
+          const estDmg = move.power * multiplier;
+          if (estDmg > bestDamage) {
+             bestDamage = estDmg;
+             bestMoveIdx = i;
+          }
+       }
+       
+       broadcastPokeMsg({ type: 'poke_action_select', id: 'BOT', moveIdx: bestMoveIdx });
+    };
+
+    document.querySelectorAll('.poke-move-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      if (window.pokeAnimPlaying) return;
+      
+      let target = e.target;
+      while(target && !target.classList.contains('poke-move-btn')) {
+        target = target.parentElement;
+      }
+      
+      const moveIdx = parseInt(target.getAttribute('data-move'));
+    if (pokeState.p1 && pokeState.p1.id === state.myId) pokeState.actionP1 = { id: state.myId, moveIdx: moveIdx };
+    else if (pokeState.p2 && pokeState.p2.id === state.myId) pokeState.actionP2 = { id: state.myId, moveIdx: moveIdx };
+    customRenderBattleArena();
+    broadcastPokeMsg({ type: 'poke_action_select', id: state.myId, moveIdx: moveIdx });
+  });
+});
+
+  // Next Round
+  document.getElementById('poke-next-round-btn')?.addEventListener('click', () => {
+    broadcastPokeMsg({ type: 'poke_lobby' });
+  });
+
+  const getPokemonNameFromUrl = (url) => {
+    if (!url) return "Pokemon";
+    const parts = url.split('/');
+    return parts[parts.length - 1].replace('.gif', '').replace('.png', '').split('-')[0];
+  };
+
+  const fetchRandomMoves = async (pokeName, targetType, fullList = false) => {
+    try {
+      const res = await fetch('https://pokeapi.co/api/v2/pokemon/' + pokeName);
+      const data = await res.json();
+      const allUrls = data.moves.map(m => m.move.url).sort(() => 0.5 - Math.random());
+      
+      const poolUrls = allUrls.slice(0, fullList ? 12 : 8);
+      const allMoves = [];
+      
+      await Promise.all(poolUrls.map(async url => {
+         try {
+           const mRes = await fetch(url);
+           const mData = await mRes.json();
+           if (mData.power && mData.power > 0) {
+             // ensure no duplicates by name
+             if (!allMoves.find(x => x.name === mData.name.replace('-', ' ').toUpperCase())) {
+                allMoves.push({
+                  name: mData.name.replace('-', ' ').toUpperCase(),
+                  type: mData.type.name,
+                  power: mData.power
+                });
+             }
+           }
+         } catch(e) {}
+      }));
+      
+            if (fullList) {
+           while (allMoves.length < 4) {
+             allMoves.push({
+               name: ["STRUGGLE", "TACKLE", "FLAIL", "THRASH"][allMoves.length],
+               type: "normal",
+               power: 50
+             });
+           }
+           return allMoves; // return all fetched moves for manual selection
+        }
+      
+      // Auto selection logic
+      const stabMoves = allMoves.filter(m => m.type === targetType);
+      const normalMoves = allMoves.filter(m => m.type === 'normal');
+      const otherMoves = allMoves.filter(m => m.type !== targetType && m.type !== 'normal');
+      
+      const selectedMoves = [];
+      if (stabMoves.length > 0) selectedMoves.push(stabMoves.pop());
+      if (normalMoves.length > 0) selectedMoves.push(normalMoves.pop());
+      
+      const combined = [...stabMoves, ...normalMoves, ...otherMoves].sort(() => 0.5 - Math.random());
+      while (selectedMoves.length < 4 && combined.length > 0) {
+         selectedMoves.push(combined.pop());
+      }
+      
+      while (selectedMoves.length < 4) {
+         selectedMoves.push({ name: "TACKLE", type: "normal", power: 40 });
+      }
+      return selectedMoves;
+      
+    } catch(err) {
+      console.log('Move fetch err', err);
+      return [
+        {name: "TACKLE", type: "normal", power: 40},
+        {name: "QUICK ATTACK", type: "normal", power: 40},
+        {name: "SLAM", type: "normal", power: 80},
+        {name: "BODY SLAM", type: "normal", power: 85}
+      ];
+    }
+  };
+
+  // OVERWRITE renderBattleArena from earlier
+
+  // Move selection UI logic
+  let selectedManualMoves = [];
+  window.renderMoveSelection = (moves) => {
+     const list = document.getElementById('poke-move-selection-list');
+     const count = document.getElementById('poke-move-count');
+     const btn = document.getElementById('poke-confirm-moves-btn');
+     list.innerHTML = '';
+     selectedManualMoves = [];
+     count.textContent = '0';
+     btn.disabled = true;
+     btn.style.opacity = '0.5';
+     btn.style.cursor = 'not-allowed';
+     
+     moves.forEach((move, i) => {
+        const d = document.createElement('div');
+        d.className = 'manual-move-card';
+        d.style.background = 'rgba(255,255,255,0.1)';
+        d.style.border = '2px solid rgba(255,255,255,0.2)';
+        d.style.padding = '10px 15px';
+        d.style.borderRadius = '10px';
+        d.style.cursor = 'pointer';
+        d.style.display = 'flex';
+        d.style.flexDirection = 'column';
+        d.style.minWidth = '140px';
+        
+        d.innerHTML = `<span style="color:white; font-weight:bold;">${move.name}</span>
+                       <span style="font-size:12px; color:${TYPE_COLORS[move.type] || '#ccc'};">${move.type.toUpperCase()} | Güç: ${move.power}</span>`;
+        
+        d.addEventListener('click', () => {
+           const idx = selectedManualMoves.indexOf(move);
+           if (idx > -1) {
+              selectedManualMoves.splice(idx, 1);
+              d.style.border = '2px solid rgba(255,255,255,0.2)';
+              d.style.background = 'rgba(255,255,255,0.1)';
+           } else {
+              if (selectedManualMoves.length < 4) {
+                 selectedManualMoves.push(move);
+                 d.style.border = '2px solid #10b981';
+                 d.style.background = 'rgba(16,185,129,0.2)';
+              }
+           }
+           count.textContent = selectedManualMoves.length;
+           if (selectedManualMoves.length === 4) {
+              btn.disabled = false;
+              btn.style.opacity = '1';
+              btn.style.cursor = 'pointer';
+           } else {
+              btn.disabled = true;
+              btn.style.opacity = '0.5';
+              btn.style.cursor = 'not-allowed';
+           }
+        });
+        list.appendChild(d);
+     });
+  };
+  
+  document.getElementById('poke-confirm-moves-btn')?.addEventListener('click', () => {
+     if (selectedManualMoves.length !== 4) return;
+     document.getElementById('poke-confirm-moves-btn').style.display = 'none';
+     document.getElementById('poke-waiting-moves-msg').style.display = 'block';
+     broadcastPokeMsg({ type: 'poke_moves_ready', id: state.myId, moves: selectedManualMoves });
+  });
+
+  const customRenderBattleArena = () => {
+    const badge = document.getElementById('poke-vs-badge');
+    if (badge) badge.innerHTML = '<span style="font-size: 50px; font-style: italic; font-weight: 900; color: #cbd5e1; text-shadow: 0 4px 10px rgba(0,0,0,0.8);">VS</span>';
+
+    // Top headers
+    document.getElementById('poke-p1-header').textContent = pokeState.p1 ? pokeState.p1.name : "Oyuncu 1";
+    document.getElementById('poke-p2-header').textContent = pokeState.p2 ? pokeState.p2.name : "Oyuncu 2";
+
+    const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
+    const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
+
+    const p1Img = document.getElementById('poke-p1-pokemon');
+    const p1Status = document.getElementById('poke-p1-status');
+    const p2Img = document.getElementById('poke-p2-pokemon');
+    const p2Status = document.getElementById('poke-p2-status');
+    const logBox = document.getElementById('poke-battle-log');
+    
+    if (pokeState.status === 'selecting') {
+      p1Img.style.display = 'none'; p2Img.style.display = 'none';
+      p1Status.style.display = 'block'; p1Status.textContent = "HAZIRLANIYOR...";
+      p2Status.style.display = 'block'; p2Status.textContent = "HAZIRLANIYOR...";
+      
+      document.getElementById('poke-p1-hp-container').style.display = 'none';
+      document.getElementById('poke-p2-hp-container').style.display = 'none';
+      document.getElementById('poke-selection-panel').classList.add('hidden');
+      logBox.style.display = 'flex';
+      logBox.textContent = "Savaş alanı kuruluyor...";
+      document.getElementById('poke-next-round-panel').classList.add('hidden');
+    } 
+    else if (pokeState.status === 'revealed') {
+      p1Status.style.display = 'none'; p2Status.style.display = 'none';
+      p1Img.style.display = 'block'; p2Img.style.display = 'block';
+      
+      document.getElementById('poke-p1-pokename').style.display = 'block';
+      document.getElementById('poke-p1-pokename').textContent = getPokemonNameFromUrl(pokeState.p1.pokemon);
+      document.getElementById('poke-p2-pokename').style.display = 'block';
+      document.getElementById('poke-p2-pokename').textContent = getPokemonNameFromUrl(pokeState.p2.pokemon);
+
+      p1Img.src = pokeState.p1.pokemon || UNKNOWN_AVATAR;
+      p2Img.src = pokeState.p2.pokemon || UNKNOWN_AVATAR;
+      
+      document.getElementById('poke-p1-hp-container').style.display = 'flex';
+      document.getElementById('poke-p2-hp-container').style.display = 'flex';
+      updateHpUI('p1');
+      updateHpUI('p2');
+      
+      logBox.style.display = 'flex';
+      
+      // Determine if it's my turn
+      const myTurn = (pokeState.status === 'revealed');
+      let mySlot = null;
+      if (pokeState.p1 && pokeState.p1.id === state.myId) mySlot = 'p1';
+      else if (pokeState.p2 && pokeState.p2.id === state.myId) mySlot = 'p2';
+      
+      if (myTurn && mySlot && !window.pokeAnimPlaying && pokeState[mySlot].hp > 0 && !pokeState['action'+(mySlot.toUpperCase())]) {
+        logBox.textContent = "Senin sıran! Bir saldırı seç!";
+        document.getElementById('poke-selection-panel').classList.remove('hidden');
+        
+        // Populate moves
+        const moves = pokeState[mySlot].moves;
+        
+        for (let i=0; i<4; i++) {
+           const btn = document.querySelector('.poke-move-btn[data-move="'+i+'"]');
+           if (btn && moves[i]) {
+              btn.querySelector('.move-name').textContent = moves[i].name;
+              btn.querySelector('.move-type').textContent = (TYPE_NAMES[moves[i].type] || moves[i].type).toUpperCase();
+                const speedObj = btn.querySelector('.move-speed');
+                if(speedObj) speedObj.textContent = "Hız: " + getMoveSpeed(moves[i].name);
+              btn.querySelector('.move-type').className = 'move-type type-' + moves[i].type;
+              btn.querySelector('.move-type').style.color = TYPE_COLORS[moves[i].type] || '#fff';
+              btn.querySelector('.move-power').textContent = "Güç: " + moves[i].power;
+           }
+        }
+      } else {
+        document.getElementById('poke-selection-panel').classList.add('hidden');
+        if (!window.pokeAnimPlaying) {
+            let waitingFor = [];
+            if (!pokeState.actionP1 && pokeState.p1) waitingFor.push(pokeState.p1.name);
+            if (!pokeState.actionP2 && pokeState.p2) waitingFor.push(pokeState.p2.name);
+            if (waitingFor.length > 0) {
+               logBox.textContent = "Bekleniyor: " + waitingFor.join(' ve ') + " hamle düşünüyor...";
+            } else {
+               logBox.textContent = "Saldırılar gerçekleşiyor...";
+            }
+        }
+      }
     }
   };
 
@@ -471,90 +907,201 @@ function initPoke() {
       } else {
         document.getElementById('poke-battle-view').classList.remove('hidden');
         document.getElementById('poke-lobby-view').classList.add('hidden');
-        renderBattleArena();
+        customRenderBattleArena();
       }
     }
     if (data.type === 'poke_join') {
-      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null };
+      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null, hp: 100, maxHp: 100, moves: [] };
       if (data.slot === 1) pokeState.p1 = pData;
       else if (data.slot === 2) pokeState.p2 = pData;
       renderPokeLobby();
     }
+    if (data.type === 'poke_lobby') {
+       pokeState.status = 'waiting';
+       if(pokeState.p1) { pokeState.p1.pokemon = null; pokeState.p1.hp = 100; }
+       if(pokeState.p2) { pokeState.p2.pokemon = null; pokeState.p2.hp = 100; }
+       document.getElementById('poke-p1-pokemon').className = '';
+       document.getElementById('poke-p2-pokemon').className = '';
+       renderPokeLobby();
+    }
     if (data.type === 'poke_start') {
       pokeState.status = 'selecting';
-      if(pokeState.p1) { pokeState.p1.ready = false; pokeState.p1.type = null; pokeState.p1.pokemon = null; }
-      if(pokeState.p2) { pokeState.p2.ready = false; pokeState.p2.type = null; pokeState.p2.pokemon = null; }
-      
-      // Reset styles
-      document.getElementById('poke-p1-pokemon').className = '';
-      document.getElementById('poke-p2-pokemon').className = '';
-      
-      renderPokeLobby();
+      document.getElementById('poke-battle-view').classList.remove('hidden');
+      document.getElementById('poke-lobby-view').classList.add('hidden');
+      customRenderBattleArena();
 
-      // Bot AI logic
-      const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-      if (pokeState.p2 && pokeState.p2.id === 'BOT' && isHostFallback) {
-        setTimeout(() => {
-          if (pokeState.status === 'selecting') {
-             let chosenType = 'fire';
-             const types = Object.keys(typeChart);
-             if (window.pokeBotMemory && window.pokeBotMemory.length > 0) {
-               // Find most freq picked by player
-               const freqs = {};
-               window.pokeBotMemory.forEach(t => freqs[t] = (freqs[t] || 0) + 1);
-               const mostFreq = Object.keys(freqs).reduce((a, b) => freqs[a] > freqs[b] ? a : b);
-               // Find counter
-               const counters = types.filter(t => typeChart[t][mostFreq] === 2);
-               chosenType = counters.length > 0 ? counters[Math.floor(Math.random() * counters.length)] : types[Math.floor(Math.random() * types.length)];
-             } else {
-               chosenType = types[Math.floor(Math.random() * types.length)];
-             }
-             broadcastPokeMsg({ type: 'poke_select', id: 'BOT', pokeType: chosenType });
+      const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+      if (isHostFallback) {
+         const isRandom = data.randomMoves;
+         const generateGame = async () => {
+            const types = Object.keys(POKEMONS);
+            const t1 = types[Math.floor(Math.random() * types.length)];
+            const t2 = types[Math.floor(Math.random() * types.length)];
+            const p1Poke = POKEMONS[t1][Math.floor(Math.random() * POKEMONS[t1].length)];
+            const p2Poke = POKEMONS[t2][Math.floor(Math.random() * POKEMONS[t2].length)];
+            const n1 = getPokemonNameFromUrl(p1Poke);
+            const n2 = getPokemonNameFromUrl(p2Poke);
+            
+            if (isRandom) {
+              const p1Moves = await fetchRandomMoves(n1, t1, false);
+              const p2Moves = await fetchRandomMoves(n2, t2, false);
+              broadcastPokeMsg({
+                 type: 'poke_reveal',
+                 p1: { type: t1, pokemon: p1Poke, moves: p1Moves },
+                 p2: { type: t2, pokemon: p2Poke, moves: p2Moves }
+              });
+            } else {
+              const p1MovePool = await fetchRandomMoves(n1, t1, true);
+              const p2MovePool = await fetchRandomMoves(n2, t2, true);
+              broadcastPokeMsg({
+                 type: 'poke_select_moves_state',
+                 p1: { type: t1, pokemon: p1Poke, movePool: p1MovePool },
+                 p2: { type: t2, pokemon: p2Poke, movePool: p2MovePool }
+              });
+            }
+         };
+         generateGame();
+      }
+    }
+    
+
+    if (data.type === 'poke_select_moves_state') {
+       pokeState.status = 'move_selection';
+       pokeState.p1.type = data.p1.type;
+       pokeState.p1.pokemon = data.p1.pokemon;
+       pokeState.p1.moves = [];
+       pokeState.p1.ready = false;
+       
+       pokeState.p2.type = data.p2.type;
+       pokeState.p2.pokemon = data.p2.pokemon;
+       pokeState.p2.moves = [];
+       pokeState.p2.ready = false;
+
+       const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
+       if (isP1) document.getElementById('poke-move-selection-pokename').textContent = getPokemonNameFromUrl(pokeState.p1.pokemon);
+       else document.getElementById('poke-move-selection-pokename').textContent = getPokemonNameFromUrl(pokeState.p2.pokemon);
+
+       document.getElementById('poke-move-selection-modal').classList.remove('hidden');
+       document.getElementById('poke-confirm-moves-btn').style.display = 'block';
+       document.getElementById('poke-waiting-moves-msg').style.display = 'none';
+
+       const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
+       
+       if (isP1) renderMoveSelection(data.p1.movePool);
+       else if (isP2) renderMoveSelection(data.p2.movePool);
+       else {
+          // spectator
+          document.getElementById('poke-move-selection-modal').classList.add('hidden');
+       }
+       
+       // Handle bot
+       const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+       if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
+          // auto pick 4 moves for bot
+          const bMoves = data.p2.movePool.sort(() => 0.5 - Math.random()).slice(0, 4);
+          setTimeout(() => {
+             broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves });
+          }, 300);
+       }
+    }
+    
+    if (data.type === 'poke_moves_ready') {
+       if (pokeState.p1 && pokeState.p1.id === data.id) {
+          pokeState.p1.moves = data.moves;
+          pokeState.p1.ready = true;
+       }
+       if (pokeState.p2 && pokeState.p2.id === data.id) {
+          pokeState.p2.moves = data.moves;
+          pokeState.p2.ready = true;
+       }
+       
+       if (pokeState.p1.ready && pokeState.p2.ready) {
+          // Both ready! Switch to reveal
+          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+          if (isHostFallback) {
+             broadcastPokeMsg({
+                 type: 'poke_reveal',
+                 p1: { type: pokeState.p1.type, pokemon: pokeState.p1.pokemon, moves: pokeState.p1.moves },
+                 p2: { type: pokeState.p2.type, pokemon: pokeState.p2.pokemon, moves: pokeState.p2.moves }
+             });
           }
-        }, 400 + Math.random() * 400);
-      }
+       }
     }
-    if (data.type === 'poke_select') {
-      if (pokeState.p1 && pokeState.p1.id === data.id) {
-        pokeState.p1.ready = true;
-        pokeState.p1.type = data.pokeType; // Note: In a real secure game, this would be hidden until both ready, but for P2P friends it's fine
-      }
-      if (pokeState.p2 && pokeState.p2.id === data.id) {
-        pokeState.p2.ready = true;
-        pokeState.p2.type = data.pokeType;
-      }
-      renderBattleArena();
-
-      // If both ready and I am host, trigger reveal
-      const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-      if (pokeState.p1?.ready && pokeState.p2?.ready && isHostFallback) {
-        const p1Poke = POKEMONS[pokeState.p1.type][Math.floor(Math.random() * POKEMONS[pokeState.p1.type].length)];
-        const p2Poke = POKEMONS[pokeState.p2.type][Math.floor(Math.random() * POKEMONS[pokeState.p2.type].length)];
-        
-        // Small delay for dramatic effect
-        setTimeout(() => {
-          broadcastPokeMsg({ 
-            type: 'poke_reveal', 
-            p1Type: pokeState.p1.type, p1Poke: p1Poke,
-            p2Type: pokeState.p2.type, p2Poke: p2Poke
-          });
-        }, 500);
-      }
-    }
+    
     if (data.type === 'poke_reveal') {
       pokeState.status = 'revealed';
-      pokeState.p1.type = data.p1Type;
-      pokeState.p1.pokemon = data.p1Poke;
-      pokeState.p2.type = data.p2Type;
-      pokeState.p2.pokemon = data.p2Poke;
+      document.getElementById('poke-move-selection-modal')?.classList.add('hidden');
+      pokeState.actionP1 = null;
+        pokeState.actionP2 = null;
+      
+      pokeState.p1.type = data.p1.type;
+      pokeState.p1.pokemon = data.p1.pokemon;
+      pokeState.p1.moves = data.p1.moves;
+      pokeState.p1.hp = 100;
+      pokeState.p1.maxHp = 100;
+      
+      pokeState.p2.type = data.p2.type;
+      pokeState.p2.pokemon = data.p2.pokemon;
+      pokeState.p2.moves = data.p2.moves;
+      pokeState.p2.hp = 100;
+      pokeState.p2.maxHp = 100;      customRenderBattleArena();
+      
+      const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+      if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
+         setTimeout(botPlay, 1000);
+      }
+    }
 
-      // Save memory for bot
-      if (pokeState.p2 && pokeState.p2.id === 'BOT' && pokeState.p1 && pokeState.p1.id !== 'BOT') {
-        window.pokeBotMemory.push(pokeState.p1.type);
-        if (window.pokeBotMemory.length > 10) window.pokeBotMemory.shift();
+    if (data.type === 'poke_action_select') {
+         if (pokeState.status !== 'revealed') return;
+         if (pokeState.p1 && pokeState.p1.id === data.id) pokeState.actionP1 = data;
+         if (pokeState.p2 && pokeState.p2.id === data.id) pokeState.actionP2 = data;
+         customRenderBattleArena();
+         
+         const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+         if (pokeState.actionP1 && pokeState.actionP2 && isHostFallback) {
+            broadcastPokeMsg({
+                type: 'poke_round_execute',
+                actionP1: pokeState.actionP1,
+                actionP2: pokeState.actionP2
+            });
+         }
+      }
+      
+      if (data.type === 'poke_round_execute') {
+         if (pokeState.status !== 'revealed') return;
+         pokeState.actionP1 = data.actionP1;
+         pokeState.actionP2 = data.actionP2;
+         executeRound(data.actionP1, data.actionP2);
       }
 
-      renderBattleArena();
+
+      if (data.type === 'poke_attack') {
+      if (pokeState.status !== 'revealed') return;
+      if (window.pokeAnimPlaying) return;
+      
+      const isP1 = pokeState.turn === 1;
+      const attackerSlot = isP1 ? 'p1' : 'p2';
+      const defenderSlot = isP1 ? 'p2' : 'p1';
+      
+      // Verify user has right to attack
+      if (pokeState[attackerSlot].id !== data.id && data.id !== 'BOT') return;
+      
+      window.pokeAnimPlaying = true;
+      
+      const move = pokeState[attackerSlot].moves[data.moveIdx];
+      const defType = pokeState[defenderSlot].type; // Note: We use the type assigned originally, which matches the list it came from.
+      
+      let multiplier = 1;
+      if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) {
+         multiplier = typeChart[move.type][defType];
+      }
+      
+      const damage = Math.floor(move.power * multiplier * 0.4); // Scale down damage so 100 HP lasts a few turns
+      const isSuper = multiplier > 1;
+      const isResisted = multiplier < 1;
+      
+      playBattleAnimation(attackerSlot, defenderSlot, move.name, move.type, damage, isSuper, isResisted);
     }
   };
 
@@ -562,6 +1109,6 @@ function initPoke() {
   const originalActHandler = window.activityHandler;
   window.activityHandler = (data) => {
     if(originalActHandler) originalActHandler(data);
-    pokeActivityHandler(data);
+    if(typeof pokeActivityHandler !== 'undefined') pokeActivityHandler(data);
   };
 }
