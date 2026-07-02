@@ -234,8 +234,6 @@ function initPoke() {
     });
   }
 
-
-  
   const playPokemonCry = (pokemonUrl) => {
     try {
       if (!pokemonUrl) return;
@@ -250,9 +248,17 @@ function initPoke() {
 
   // Join slots
   document.getElementById('poke-join-1')?.addEventListener('click', () => {
+    if ((pokeState.p1 && pokeState.p1.id === state.myId) || (pokeState.p2 && pokeState.p2.id === state.myId)) {
+      if (typeof showToast === 'function') showToast("Zaten bir slota katıldınız!", "warn");
+      return;
+    }
     broadcastPokeMsg({ type: 'poke_join', slot: 1, id: state.myId, name: state.myName, avatar: state.myAvatar });
   });
   document.getElementById('poke-join-2')?.addEventListener('click', () => {
+    if ((pokeState.p1 && pokeState.p1.id === state.myId) || (pokeState.p2 && pokeState.p2.id === state.myId)) {
+      if (typeof showToast === 'function') showToast("Zaten bir slota katıldınız!", "warn");
+      return;
+    }
     broadcastPokeMsg({ type: 'poke_join', slot: 2, id: state.myId, name: state.myName, avatar: state.myAvatar });
   });
 
@@ -596,7 +602,7 @@ function initPoke() {
                 pokeState.actionP1 = null;
                 pokeState.actionP2 = null;
                 customRenderBattleArena();
-                const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+                const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
                 if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
                    setTimeout(botPlay, 500);
                 }
@@ -941,31 +947,41 @@ function initPoke() {
        document.getElementById('poke-p2-pokemon').className = '';
        renderPokeLobby();
     }
-    if (data.type === 'poke_start') {
+            if (data.type === 'poke_start') {
       pokeState.status = 'selecting';
       document.getElementById('poke-battle-view').classList.remove('hidden');
       document.getElementById('poke-lobby-view').classList.add('hidden');
       customRenderBattleArena();
 
-      const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
-      if (isHostFallback) {
+      // ONLY player 1 computes random logic to prevent conflicts
+      if (pokeState.p1 && pokeState.p1.id === state.myId) {
          const isRandom = data.randomMoves;
          const generateGame = async () => {
             if (isRandom) {
-                const types = Object.keys(POKEMONS);
-                const t1 = types[Math.floor(Math.random() * types.length)];
-                const t2 = types[Math.floor(Math.random() * types.length)];
-                const p1Poke = POKEMONS[t1][Math.floor(Math.random() * POKEMONS[t1].length)];
-                const p2Poke = POKEMONS[t2][Math.floor(Math.random() * POKEMONS[t2].length)];
+                // Find a random family, then a random evolution from it
+                const fam1 = window.POKEMON_FAMILIES[Math.floor(Math.random() * window.POKEMON_FAMILIES.length)];
+                const fam2 = window.POKEMON_FAMILIES[Math.floor(Math.random() * window.POKEMON_FAMILIES.length)];
+                
+                const t1 = fam1.type;
+                const t2 = fam2.type;
+                
+                // Get all evolutions URLs
+                const evos1 = fam1.evolutions.map(e => e.url);
+                const evos2 = fam2.evolutions.map(e => e.url);
+                
+                const p1Poke = evos1[Math.floor(Math.random() * evos1.length)];
+                const p2Poke = evos2[Math.floor(Math.random() * evos2.length)];
+                
                 const n1 = getPokemonNameFromUrl(p1Poke);
                 const n2 = getPokemonNameFromUrl(p2Poke);
                 
                 const p1Moves = await fetchRandomMoves(n1, t1, false);
                 const p2Moves = await fetchRandomMoves(n2, t2, false);
+                
                 broadcastPokeMsg({
                    type: 'poke_reveal',
-                   p1: { type: t1, pokemon: p1Poke, moves: p1Moves },
-                   p2: { type: t2, pokemon: p2Poke, moves: p2Moves }
+                   p1: { type: t1, baseName: fam1.baseName, pokemon: p1Poke, moves: p1Moves },
+                   p2: { type: t2, baseName: fam2.baseName, pokemon: p2Poke, moves: p2Moves }
                 });
             } else {
                 broadcastPokeMsg({ type: 'poke_base_selection_state' });
@@ -974,7 +990,6 @@ function initPoke() {
          generateGame();
       }
     }
-    
 
     if (data.type === 'poke_base_selection_state') {
        pokeState.status = 'base_selection';
@@ -1013,7 +1028,7 @@ function initPoke() {
        }
 
        // Bot logic for base selection
-       const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+       const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
        if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
           setTimeout(() => {
              const rFam = window.POKEMON_FAMILIES[Math.floor(Math.random() * window.POKEMON_FAMILIES.length)];
@@ -1098,7 +1113,7 @@ function initPoke() {
 
        // Bot logic for evo selection
        if (data.id === 'BOT') {
-          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
           if (isHostFallback) {
              setTimeout(() => {
                 const fam = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
@@ -1138,7 +1153,7 @@ function initPoke() {
 
        // Bot logic for move selection
        if (data.id === 'BOT') {
-          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
           if (isHostFallback) {
              setTimeout(() => {
                 fetchRandomMoves(pokeState.p2.baseName, pokeState.p2.type, true).then(movePool => {
@@ -1180,7 +1195,7 @@ function initPoke() {
        }
        
        // Handle bot
-       const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+       const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
        if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
           // auto pick 4 moves for bot
           const bMoves = data.p2.movePool.sort(() => 0.5 - Math.random()).slice(0, 4);
@@ -1190,7 +1205,7 @@ function initPoke() {
        }
     }
     
-    if (data.type === 'poke_moves_ready') {
+        if (data.type === 'poke_moves_ready') {
        if (pokeState.p1 && pokeState.p1.id === data.id) {
           pokeState.p1.moves = data.moves;
           pokeState.p1.ready = true;
@@ -1200,9 +1215,9 @@ function initPoke() {
           pokeState.p2.ready = true;
        }
        
-       if (pokeState.p1.ready && pokeState.p2.ready) {
+       if (pokeState.p1 && pokeState.p2 && pokeState.p1.ready && pokeState.p2.ready) {
           // Both ready! Switch to reveal
-          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
           if (isHostFallback) {
              broadcastPokeMsg({
                  type: 'poke_reveal',
@@ -1212,7 +1227,6 @@ function initPoke() {
           }
        }
     }
-    
     
     if (data.type === 'poke_withdraw') {
         pokeState.status = 'waiting';
@@ -1327,7 +1341,7 @@ function initPoke() {
 
       customRenderBattleArena();
       
-      const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+      const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
       if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
          setTimeout(botPlay, 1000);
       }
@@ -1339,7 +1353,7 @@ function initPoke() {
          if (pokeState.p2 && pokeState.p2.id === data.id) pokeState.actionP2 = data;
          customRenderBattleArena();
          
-         const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId) || true;
+         const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
          if (pokeState.actionP1 && pokeState.actionP2 && isHostFallback) {
             broadcastPokeMsg({
                 type: 'poke_round_execute',
