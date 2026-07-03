@@ -2701,6 +2701,7 @@ function toggleFocus(card) {
     main.classList.remove('focus-mode');
     focusArea.classList.add('hidden');
     document.getElementById('focus-lock-btn').classList.add('hidden');
+    document.getElementById('focus-fullscreen-btn').classList.add('hidden');
   } else {
     if (focusedCard) grid.appendChild(focusedCard);
     focusArea.appendChild(card);
@@ -2708,6 +2709,7 @@ function toggleFocus(card) {
     main.classList.add('focus-mode');
     focusArea.classList.remove('hidden');
     document.getElementById('focus-lock-btn').classList.remove('hidden');
+    document.getElementById('focus-fullscreen-btn').classList.remove('hidden');
   }
 }
 

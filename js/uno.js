@@ -812,8 +812,6 @@ function startUnoRound() {
   const turnOrder = Array.from(state.uno.players.keys());
   state.uno.botHands = {};
   
-  const initialCardCount = state.uno.rules ? state.uno.rules.startCards : 7;
-  
   for (const id of turnOrder) {
     hands[id] = [];
     for (let i = 0; i < initialCardCount; i++) hands[id].push(deck.pop());
