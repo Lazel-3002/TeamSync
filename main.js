@@ -552,6 +552,7 @@ function normalizeKey(key) {
 }
 
 app.whenReady().then(() => {
+  app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   const { session } = require('electron');
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['*://*.youtube.com/*', '*://*.ytimg.com/*'] },
@@ -590,7 +591,11 @@ app.whenReady().then(() => {
       'x-frame-options',
       'X-Frame-Options',
       'content-security-policy',
-      'Content-Security-Policy'
+      'Content-Security-Policy',
+      'cross-origin-opener-policy',
+      'Cross-Origin-Opener-Policy',
+      'cross-origin-embedder-policy',
+      'Cross-Origin-Embedder-Policy'
     ];
     
     headersToRemove.forEach(header => {

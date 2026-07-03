@@ -773,15 +773,7 @@ function setupGlobalMQTT() {
       }
     }, 5000);
 
-    if (pingInterval) clearInterval(pingInterval);
-    pingInterval = setInterval(() => {
-      if (state.globalMqtt && state.globalMqtt.connected) {
-        state.globalMqtt.publish(`teamsync/user/${state.friendId}/events`, JSON.stringify({
-          type: 'ping_latency_req',
-          ts: Date.now()
-        }));
-      }
-    }, 2000);
+    // Removed global MQTT ping logic for serverless operation
   });
   
   state.globalMqtt.on('message', (topic, message) => {
@@ -821,21 +813,7 @@ function setupGlobalMQTT() {
           }
         }
         
-        if (data.type === 'ping_latency_req' && data.ts) {
-          const latency = Date.now() - data.ts;
-          const pingMsEl = document.getElementById('global-ping-ms');
-          const pingDisp = document.getElementById('global-ping-display');
-          if (pingMsEl && pingDisp) {
-            pingMsEl.textContent = latency;
-            pingDisp.className = 'global-ping ' + (latency < 100 ? 'ping-good' : (latency < 250 ? 'ping-ok' : 'ping-bad'));
-          }
-          const selfPingEl = document.getElementById('ping-self');
-          if (selfPingEl) {
-            selfPingEl.textContent = `${latency}ms`;
-            selfPingEl.className = 'uping ' + (latency < 100 ? 'ping-good' : (latency < 250 ? 'ping-ok' : 'ping-bad'));
-          }
-          return;
-        }
+        // ping_latency_req removed for serverless operation
 
         if (data.type === 'friend_request') {
           if (!state.friends[data.id] && !state.friendRequests.find(r => r.id === data.id)) {
@@ -2367,10 +2345,35 @@ async function handleDataMessage(peerId, msg) {
     } catch(e) {}
   } else if (msg.type === 'ping-res') {
     const latency = Date.now() - msg.ts;
+    // Exponential Moving Average for smoothing ping
+    if (peer.smoothedPing === undefined) {
+      peer.smoothedPing = latency;
+    } else {
+      peer.smoothedPing = Math.round(0.3 * latency + 0.7 * peer.smoothedPing);
+    }
     const pingEl = document.getElementById(`ping-${peerId}`);
     if (pingEl) {
-      pingEl.textContent = `${latency}ms`;
-      pingEl.className = 'uping ' + (latency < 50 ? 'ping-good' : (latency < 120 ? 'ping-ok' : 'ping-bad'));
+      pingEl.textContent = `${peer.smoothedPing}ms`;
+      pingEl.className = 'uping ' + (peer.smoothedPing < 50 ? 'ping-good' : (peer.smoothedPing < 120 ? 'ping-ok' : 'ping-bad'));
+    }
+    
+    // Update 'ping-self' based on average peer pings since we are serverless
+    let totalPing = 0;
+    let peerCount = 0;
+    state.peers.forEach(p => {
+      if (p.smoothedPing !== undefined) {
+        totalPing += p.smoothedPing;
+        peerCount++;
+      }
+    });
+    const selfPingEl = document.getElementById('ping-self');
+    if (selfPingEl && peerCount > 0) {
+      const avgPing = Math.round(totalPing / peerCount);
+      selfPingEl.textContent = `${avgPing}ms`;
+      selfPingEl.className = 'uping ' + (avgPing < 50 ? 'ping-good' : (avgPing < 120 ? 'ping-ok' : 'ping-bad'));
+    } else if (selfPingEl) {
+      selfPingEl.textContent = `--ms`;
+      selfPingEl.className = 'uping ping-ok';
     }
   } else if (msg.type === 'state') {
     if (msg.mic !== undefined) peer.mic = msg.mic;
