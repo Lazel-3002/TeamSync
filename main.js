@@ -574,6 +574,26 @@ app.whenReady().then(() => {
     }
   );
 
+  // --- WEBRTC MEDYA VE EKRAN PAYLAŞIMI İZİNLERİ ---
+  session.defaultSession.setPermissionCheckHandler(() => true);
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(true); // Mikrofon ve Kamera izinlerini otomatik onayla
+  });
+
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+      if (sources && sources.length > 0) {
+        // En basit yöntemle ilk (ana) ekranı paylaşıma açarız
+        callback({ video: sources[0], audio: 'loopback' });
+      } else {
+        callback();
+      }
+    }).catch(err => {
+      console.error('Ekran kaynakları alınamadı:', err);
+      callback();
+    });
+  });
+
   createWindow();
   
   tray = new Tray(nativeImage.createEmpty()); // Placeholder until flag is generated

@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 
 export default function RemoteControl({ isHandshakeComplete, onRemoteControlGranted }) {
-  const [pin, setPin] = useState(Math.floor(1000 + Math.random() * 9000).toString());
+  const generateComplexPin = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$*!';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const [pin, setPin] = useState(generateComplexPin());
   const [enteredPin, setEnteredPin] = useState('');
   const [status, setStatus] = useState('idle'); // idle, waiting, connected
 
   const generateNewPin = () => {
-    setPin(Math.floor(1000 + Math.random() * 9000).toString());
+    setPin(generateComplexPin());
   };
 
   const verifyPin = (e) => {
@@ -21,46 +30,34 @@ export default function RemoteControl({ isHandshakeComplete, onRemoteControlGran
   };
 
   return (
-    <div style={{ padding: '20px', background: '#1e293b', borderRadius: '12px', marginTop: '20px', border: '1px solid #475569' }}>
-      <h3 style={{ margin: '0 0 15px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span>🎮</span> Uzaktan Kontrol Güvenliği
-      </h3>
-      
+    <div style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 10, display: 'flex', alignItems: 'center', background: 'rgba(15, 23, 42, 0.85)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(5px)', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
       {!isHandshakeComplete ? (
-        <div style={{ color: '#ef4444', fontSize: '13px' }}>
-          Uzaktan kontrol için uçtan uca şifreli bağlantının kurulması bekleniyor...
-        </div>
+        <span style={{ fontSize: '11px', color: '#94a3b8' }}>🎮 Uzaktan Kontrol: Bekleniyor</span>
       ) : status === 'idle' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <div style={{ background: '#0f172a', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '8px' }}>SİZE BAĞLANMALARI İÇİN GEREKEN GÜVENLİK PİNİ:</div>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', letterSpacing: '4px', color: '#10b981' }}>{pin}</div>
-            <button onClick={generateNewPin} style={{ marginTop: '10px', background: 'transparent', color: '#38bdf8', border: 'none', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }}>
-              Yeni PIN Üret
-            </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} title="Tıklayarak yeni PIN üret" onClick={generateNewPin} style={{cursor: 'pointer'}}>
+            <span style={{ fontSize: '12px', color: '#94a3b8' }}>🎮 PIN:</span>
+            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#10b981', letterSpacing: '1px' }}>{pin}</span>
           </div>
-          
-          <form onSubmit={verifyPin} style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.2)' }}></div>
+          <form onSubmit={verifyPin} style={{ display: 'flex', gap: '6px' }}>
             <input 
               type="text" 
-              placeholder="Bağlanmak için PIN girin"
+              placeholder="PIN gir"
               value={enteredPin}
               onChange={(e) => setEnteredPin(e.target.value)}
-              style={{ flex: 1, padding: '10px', background: '#0f172a', border: '1px solid #334155', color: 'white', borderRadius: '6px', textAlign: 'center', letterSpacing: '2px', fontSize: '16px' }}
-              maxLength={4}
+              style={{ width: '80px', padding: '4px 6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', textAlign: 'center', fontSize: '11px', outline: 'none', letterSpacing: '1px' }}
+              maxLength={8}
             />
-            <button type="submit" style={{ background: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', padding: '0 20px', cursor: 'pointer', fontWeight: 'bold' }}>
-              Onayla
+            <button type="submit" style={{ background: '#4f46e5', color: 'white', border: 'none', borderRadius: '4px', padding: '0 8px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>
+              Bağlan
             </button>
           </form>
         </div>
       ) : (
-        <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-          <div style={{ color: '#10b981', fontSize: '16px', fontWeight: 'bold', marginBottom: '5px' }}>Uzaktan Kontrol Aktif!</div>
-          <div style={{ color: '#94a3b8', fontSize: '12px' }}>Karşı taraf bilgisayarınızı kontrol ediyor.</div>
-          <button onClick={() => setStatus('idle')} style={{ marginTop: '15px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: 'pointer' }}>
-            Bağlantıyı Kes
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+           <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 'bold' }}>🟢 Uzaktan Kontrol Aktif</span>
+           <button onClick={() => setStatus('idle')} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '10px' }}>Bitir</button>
         </div>
       )}
     </div>

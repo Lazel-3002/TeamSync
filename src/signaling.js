@@ -20,18 +20,38 @@ export const setSignalHandlers = (onSignal, onHandshake) => {
   onHandshakeComplete = onHandshake;
 };
 
+const udpPeerMap = new Map();
+
 /**
- * 1. Supabase kanalına bağlanır (Dinlemeye başlar)
+ * 1. Supabase kanalına bağlanır veya UDP modunu açar
  */
 export const connectSignaling = async (userId) => {
-  const supabase = getSupabase();
-  if (!supabase) {
-    console.warn('Supabase yok, Demo modunda çalışıyor.');
-    return;
-  }
-
   currentUserId = userId;
   await generateKeyPair();
+
+  const supabase = getSupabase();
+  if (!supabase) {
+    console.warn('Supabase yok, Yerel Ağ (UDP) modunda çalışıyor.');
+    if (window.electronAPI) {
+      window.electronAPI.startDiscovery(userId, "Local User", "main");
+      
+      window.electronAPI.onPeerDiscovered((event, peer) => {
+        if (peer.id && peer.ip) udpPeerMap.set(peer.id, peer.ip);
+      });
+
+      window.electronAPI.onUDPSignal(async (event, payload) => {
+        if (payload.id && payload.ip) udpPeerMap.set(payload.id, payload.ip);
+        if (payload.signal && payload.signal.event) {
+          if (payload.signal.event === 'handshake') {
+            await handleIncomingHandshake(payload.signal.data);
+          } else if (payload.signal.event === 'signal') {
+            await handleIncomingSignal(payload.signal.data);
+          }
+        }
+      });
+    }
+    return;
+  }
 
   activeChannel = supabase.channel(`user:${userId}`);
 
@@ -49,24 +69,33 @@ export const connectSignaling = async (userId) => {
     });
 };
 
+const sendUdpOrSupabase = async (targetUserId, eventName, payload) => {
+  const supabase = getSupabase();
+  if (supabase && activeChannel) {
+    const targetChannel = supabase.channel(`user:${targetUserId}`);
+    await targetChannel.send({ type: 'broadcast', event: eventName, payload });
+  } else if (window.electronAPI) {
+    const ip = udpPeerMap.get(targetUserId);
+    if (ip) {
+      // Pack both event type and payload into the generic signal wrapper
+      const udpPayload = { event: eventName, data: payload };
+      window.electronAPI.sendUDPSignal(ip, udpPayload);
+    } else {
+      console.error('UDP: Hedef IP bulunamadı! Cihazlar aynı ağda mı?');
+    }
+  }
+};
+
 /**
  * 2. Karşı tarafa ECDH Handshake (El sıkışma) teklifi gönderir.
  */
-export const initiateHandshake = async (targetUserId) => {
-  const supabase = getSupabase();
-  if (!supabase) return;
-
+export const initiateHandshake = async (targetUserId, userInfo) => {
   const myPubKey = await exportMyPublicKey();
-  
-  const targetChannel = supabase.channel(`user:${targetUserId}`);
-  await targetChannel.send({
-    type: 'broadcast',
-    event: 'handshake',
-    payload: {
-      from: currentUserId,
-      type: 'offer',
-      publicKey: myPubKey
-    }
+  await sendUdpOrSupabase(targetUserId, 'handshake', {
+    from: currentUserId,
+    type: 'offer',
+    publicKey: myPubKey,
+    userInfo: userInfo || { name: 'Bilinmeyen Kullanıcı' }
   });
   console.log(`🤝 ${targetUserId} kişisine Handshake teklifi gönderildi.`);
 };
@@ -83,25 +112,25 @@ const handleIncomingHandshake = async (data) => {
 
   // Eğer bu bir 'offer' ise, biz de kendi public key'imizle 'answer' dönmeliyiz
   if (data.type === 'offer') {
-    const supabase = getSupabase();
     const myPubKey = await exportMyPublicKey();
     
-    const targetChannel = supabase.channel(`user:${data.from}`);
-    await targetChannel.send({
-      type: 'broadcast',
-      event: 'handshake',
-      payload: {
-        from: currentUserId,
-        type: 'answer',
-        publicKey: myPubKey
-      }
+    // Geçici çözüm: App.jsx global değişkenini okuyamayacağımız için 
+    // şimdilik basit bir "Cevaplayan" bilgisi göndereceğiz veya App.jsx'den setSignalHandlers ile alabiliriz.
+    // Ancak daha kolayı `currentUserId` göndermek.
+    await sendUdpOrSupabase(data.from, 'handshake', {
+      from: currentUserId,
+      type: 'answer',
+      publicKey: myPubKey,
+      userInfo: window.__MY_USER_INFO || { name: 'Oda Sahibi' }
     });
     console.log(`🤝 ${data.from} kişisine Handshake cevabı dönüldü.`);
   }
 
   // Handshake tamamlandığı için UI tarafını bilgilendir
-  if (onHandshakeComplete) onHandshakeComplete(data.from);
+  if (onHandshakeComplete) onHandshakeComplete(data.from, data.userInfo);
 };
+
+export const signalEvents = new EventTarget();
 
 /**
  * 4. Gelen şifreli WebRTC sinyalini çözer.
@@ -109,8 +138,9 @@ const handleIncomingHandshake = async (data) => {
 const handleIncomingSignal = async (encryptedBase64) => {
   try {
     const decryptedData = await decryptMessage(encryptedBase64);
-    if (decryptedData && onWebRTCSignal) {
-      onWebRTCSignal(decryptedData);
+    if (decryptedData) {
+      if (onWebRTCSignal) onWebRTCSignal(decryptedData);
+      signalEvents.dispatchEvent(new CustomEvent('signal', { detail: decryptedData }));
     }
   } catch (err) {
     console.error('Şifreli mesaj çözülemedi:', err);
@@ -121,18 +151,9 @@ const handleIncomingSignal = async (encryptedBase64) => {
  * 5. Karşı tarafa ŞİFRELİ sinyal gönderir. (Örn: WebRTC SDP veya ICE)
  */
 export const sendEncryptedSignal = async (targetUserId, data) => {
-  const supabase = getSupabase();
-  if (!supabase) return;
-
   try {
     const encryptedData = await encryptMessage(data);
-    const targetChannel = supabase.channel(`user:${targetUserId}`);
-    
-    await targetChannel.send({
-      type: 'broadcast',
-      event: 'signal',
-      payload: encryptedData,
-    });
+    await sendUdpOrSupabase(targetUserId, 'signal', encryptedData);
   } catch (error) {
     console.error('Sinyal gönderim hatası:', error);
   }

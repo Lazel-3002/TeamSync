@@ -1,9 +1,20 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import WebRTC from './WebRTC';
 import Chat from './Chat';
 import RemoteControl from './RemoteControl';
+import Activities from './Activities';
 
-function RoomLobby({ currentAccount, onLogout, myId, targetId, isHandshakeComplete, isHost }) {
+function RoomLobby({ currentAccount, onLogout, myId, targetId, isHandshakeComplete, isHost, incomingSignal, connectedPeers }) {
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isDeafened, setIsDeafened] = useState(false);
+  const [preDeafenMic, setPreDeafenMic] = useState(true);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isRemoteControlActive, setIsRemoteControlActive] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isActivitiesOpen, setIsActivitiesOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+
   // SVG Icons
   const MicOnIcon = () => <svg className="icon icon-on" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>;
   const MicOffIcon = () => <svg className="icon icon-off" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="22"/></svg>;
@@ -23,11 +34,40 @@ function RoomLobby({ currentAccount, onLogout, myId, targetId, isHandshakeComple
 
   // Simulate local user item in user list
   const userList = [
-    { id: myId, name: currentAccount?.name || 'Sen', avatar: currentAccount?.avatarUrl, status: '9ms', isSelf: true }
+    { id: myId, name: currentAccount?.name || 'Sen', avatar: currentAccount?.avatarUrl, status: '9ms', isSelf: true, mic: isDeafened ? false : isMicOn, deaf: isDeafened }
   ];
-  if (targetId && isHandshakeComplete) {
-    userList.push({ id: targetId, name: 'Karşı Taraf', status: '25ms', isSelf: false });
+  
+  if (connectedPeers && connectedPeers.length > 0) {
+    connectedPeers.forEach(peer => {
+      userList.push({ id: peer.id, name: peer.name, avatar: peer.avatar, status: '25ms', isSelf: false, mic: true, deaf: false });
+    });
   }
+
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(targetId || myId);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const toggleMic = () => {
+    if (isDeafened) return; // Cannot unmute if deafened
+    setIsMicOn(!isMicOn);
+  };
+
+  const toggleDeafen = () => {
+    if (!isDeafened) {
+      setPreDeafenMic(isMicOn);
+      setIsMicOn(false);
+      setIsDeafened(true);
+    } else {
+      setIsDeafened(false);
+      if (preDeafenMic) setIsMicOn(true);
+    }
+  };
+
+  const toggleScreenShare = () => {
+    setIsScreenSharing(!isScreenSharing);
+  };
 
   return (
     <div id="app" className="app" style={{ display: 'flex' }}>
@@ -41,20 +81,37 @@ function RoomLobby({ currentAccount, onLogout, myId, targetId, isHandshakeComple
         </div>
 
         <div className="lbl">KULLANICILAR</div>
-        <ul id="users" className="users">
+        <ul id="users" className="users" style={{ padding: '10px 15px', display: 'flex', flexDirection: 'column', gap: '8px', margin: 0, listStyle: 'none' }}>
           {userList.map((u, i) => (
-            <li key={i} className="user-item">
-              <div style={{ position: 'relative' }}>
-                <img src={u.avatar || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjQ1IiByPSIyNSIgZmlsbD0iI2FhYSIvPjxwYXRoIGQ9Ik01MCwgNzAgQzIwLCA3MCAtMTAsIDEwMCAtMTAsIDEwMCBMMTEwLCAxMDAgQzExMCwgMTAwIDgwLCA3MCA1MCwgNzAgWiIgZmlsbD0iI2FhYSIvPjwvc3ZnPg=='} alt="Avatar" className="user-avatar" />
-                {u.isSelf && <div className="user-avatar-indicator"></div>}
+            <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ position: 'relative', width: '32px', height: '32px' }}>
+                {u.avatar ? (
+                  <img src={u.avatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '14px' }}>
+                    {u.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {u.isSelf && (
+                  <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '12px', height: '12px', background: '#10b981', border: '2px solid #0f172a', borderRadius: '50%' }}></div>
+                )}
               </div>
-              <div className="user-info">
-                <span className="user-name">
+              
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                <span style={{ 
+                  color: u.isSelf ? '#fbbf24' : '#f8fafc', 
+                  fontWeight: 'bold', 
+                  fontSize: '13px',
+                  textShadow: u.isSelf ? '0 0 8px rgba(251, 191, 36, 0.6)' : 'none'
+                }}>
                   {u.name}
-                  {u.isSelf && <span style={{ color: '#aaa', fontWeight: 'normal', fontSize: '11px', marginLeft: '4px' }}>(sen)</span>}
+                  {u.isSelf && <span style={{ fontWeight: 'normal', opacity: 0.8, marginLeft: '4px' }}>(sen)</span>}
                 </span>
               </div>
-              <div className="user-status" style={{ color: '#10b981' }}>{u.status}</div>
+              
+              <div style={{ color: '#10b981', fontSize: '11px', fontWeight: 'bold' }}>
+                {u.status}
+              </div>
             </li>
           ))}
         </ul>
@@ -89,59 +146,98 @@ function RoomLobby({ currentAccount, onLogout, myId, targetId, isHandshakeComple
       <main className="main" style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
         
         {/* TOP BAR */}
-        <div className="top-bar">
-          <span style={{ fontSize: '12px', color: 'var(--txt-mut)', fontWeight: '600' }}>SUNUCU ID:</span>
-          <span id="display-server-id" style={{ fontFamily: 'monospace', fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px', color: 'var(--acc-light)', userSelect: 'all', marginLeft: '8px' }}>
-            {targetId || myId}
-          </span>
-          <button id="btn-copy-id" className="btn-sec btn-sm" style={{ padding: '4px 8px', fontSize: '12px', marginLeft: '4px', borderRadius: '8px', background: 'rgba(255,255,255,0.1)' }} title="ID'yi Kopyala">📋</button>
+        <div className="top-bar" style={{ display: 'flex', alignItems: 'center', padding: '10px 20px', background: 'rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '6px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ fontSize: '13px', color: 'var(--txt-mut)', fontWeight: '600', marginRight: '10px' }}>SUNUCU ID:</span>
+            <span id="display-server-id" style={{ fontFamily: 'monospace', fontSize: '20px', fontWeight: '900', letterSpacing: '2px', color: 'var(--acc)', userSelect: 'all' }}>
+              {targetId || myId}
+            </span>
+            <button id="btn-copy-id" className="btn-sec btn-sm" onClick={handleCopyId} style={{ padding: '6px 12px', fontSize: '14px', marginLeft: '12px', borderRadius: '8px', background: copySuccess ? '#10b981' : 'rgba(255,255,255,0.1)', color: 'white', transition: 'all 0.3s' }} title="ID'yi Kopyala">
+              {copySuccess ? '✅ Kopyalandı' : '📋 Kopyala'}
+            </button>
+          </div>
           
-          <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 16px' }}></div>
+          <div style={{ flex: 1 }}></div>
           
           <button id="btn-show-server-dms" className="btn-pri btn-sm" style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '8px', background: '#8b5cf6', marginRight: '8px' }}>💬 Mesajlar</button>
           <button id="btn-show-server-invites" className="btn-pri btn-sm" style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '8px' }}>👥 Arkadaşlar / Davet Et</button>
         </div>
 
         {/* GRID AREA */}
-        <div id="grid" className="grid" style={{ flex: 1, position: 'relative' }}>
-           {!isHandshakeComplete ? (
-             <div id="empty-state" className="empty">
-               <h2>👋 Bağlantı Bekleniyor</h2>
-               <p>Sunucu açıldı. Bağlantı bekleniyor...</p>
+        <div id="grid" className="grid" style={{ flex: 1, position: 'relative', display: 'flex' }}>
+           {!isHandshakeComplete && (
+             <div id="empty-state" className="empty" style={{ position: 'absolute', zIndex: 5, background: 'rgba(15, 23, 42, 0.8)', padding: '10px 20px', borderRadius: '8px', top: '20px', right: '20px' }}>
+               <span style={{color: '#94a3b8', fontSize: '13px'}}>👋 Bağlantı Bekleniyor...</span>
              </div>
-           ) : (
-             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
-               <WebRTC currentUserId={myId} targetUserId={targetId} isHandshakeComplete={isHandshakeComplete} />
-               <RemoteControl isHandshakeComplete={isHandshakeComplete} onRemoteControlGranted={() => {}} />
+           )}
+           <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
+             <WebRTC 
+               currentUserId={myId} 
+               targetUserId={targetId} 
+               isHandshakeComplete={isHandshakeComplete} 
+               isMicOn={isMicOn} 
+               isDeafened={isDeafened} 
+               isScreenSharing={isScreenSharing} 
+               onScreenShareStop={() => setIsScreenSharing(false)} 
+               incomingSignal={incomingSignal}
+               isRemoteControlActive={isRemoteControlActive}
+             />
+             <RemoteControl 
+               isHandshakeComplete={isHandshakeComplete} 
+               onRemoteControlGranted={() => setIsRemoteControlActive(true)}
+               onRemoteControlRevoked={() => setIsRemoteControlActive(false)}
+             />
+           </div>
+           
+           {isChatOpen && (
+             <div style={{ width: '300px', height: '100%', padding: '20px 20px 20px 0' }}>
+               <Chat 
+                 currentUserId={myId} 
+                 targetUserId={targetId} 
+                 isHandshakeComplete={isHandshakeComplete} 
+               />
              </div>
+           )}
+
+           {isActivitiesOpen && (
+             <Activities 
+               onClose={() => setIsActivitiesOpen(false)} 
+               myId={myId}
+               targetId={targetId}
+               isHost={isHost}
+               connectedPeers={connectedPeers}
+               currentAccount={currentAccount}
+             />
            )}
         </div>
 
         {/* BOTTOM CONTROL BAR */}
         <div className="bar">
           <div className="bar-group">
-            <button id="mic" className="btn" title="Mikrofon (M)">
-              <MicOnIcon />
-              <MicOffIcon />
-              <span className="lbl">Ses</span>
+            <button id="mic" className={`btn ${!isMicOn ? 'off' : ''}`} title="Mikrofon (M)" onClick={toggleMic}>
+              {isMicOn ? <MicOnIcon /> : <MicOffIcon />}
+              <span className="lbl" style={{ color: isMicOn ? 'inherit' : '#ef4444' }}>Ses</span>
             </button>
-            <button id="deaf" className="btn" title="Sağırlaştır (D)">
-              <DeafOnIcon />
-              <DeafOffIcon />
-              <span className="lbl">Sağır</span>
+            <button id="deaf" className={`btn ${isDeafened ? 'off' : ''}`} title="Sağırlaştır (D)" onClick={toggleDeafen}>
+              {isDeafened ? <DeafOffIcon /> : <DeafOnIcon />}
+              <span className="lbl" style={{ color: !isDeafened ? 'inherit' : '#ef4444' }}>Sağır</span>
             </button>
           </div>
 
           <div className="bar-group center-group">
-            <button id="share" className="btn" title="Ekran Paylaş (S)">
+            <button id="share" className={`btn ${isScreenSharing ? 'active' : ''}`} title="Ekran Paylaş (S)" onClick={toggleScreenShare} style={{ color: isScreenSharing ? '#10b981' : 'inherit' }}>
               <ScreenIcon />
               <span className="lbl">Ekran</span>
+            </button>
+            <button id="chat-btn" className={`btn ${isChatOpen ? 'active' : ''}`} title="Sohbet" onClick={() => setIsChatOpen(!isChatOpen)} style={{ color: isChatOpen ? '#10b981' : 'inherit' }}>
+              <span style={{ fontSize: '20px' }}>💬</span>
+              <span className="lbl">Sohbet</span>
             </button>
             <button id="wb-btn" className="btn" title="Beyaz Tahta (W)">
               <WbIcon />
               <span className="lbl">Tahta</span>
             </button>
-            <button id="act-btn" className="btn" title="Etkinlikler (E)">
+            <button id="act-btn" className={`btn ${isActivitiesOpen ? 'active' : ''}`} title="Etkinlikler (E)" onClick={() => setIsActivitiesOpen(!isActivitiesOpen)} style={{ color: isActivitiesOpen ? '#8b5cf6' : 'inherit' }}>
               <ActIcon />
               <span className="lbl">Etkinlik</span>
             </button>

@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
-import { sendEncryptedSignal } from '../signaling.js';
+import React, { useState, useEffect } from 'react';
 
 export default function Chat({ currentUserId, targetUserId, isHandshakeComplete }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
 
-  // Sinyalizasyon modülünden (signaling.js) gelen mesajları almak için
-  // App.jsx tarafında onWebRTCSignal fonksiyonundan buraya prop veya event ile veri akışı sağlanacak.
+  useEffect(() => {
+    const handleIncomingChat = (e) => {
+      const payload = e.detail;
+      setMessages(prev => [...prev, { id: Date.now(), text: payload.text, sender: 'peer' }]);
+    };
+    window.addEventListener('webrtc-chat', handleIncomingChat);
+    return () => window.removeEventListener('webrtc-chat', handleIncomingChat);
+  }, []);
   
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -16,11 +21,8 @@ export default function Chat({ currentUserId, targetUserId, isHandshakeComplete 
     setMessages(prev => [...prev, newMsg]);
     setInput('');
 
-    // Şifreli olarak mesajı gönder
-    await sendEncryptedSignal(targetUserId, {
-      type: 'chat',
-      text: newMsg.text
-    });
+    // WebRTC DataChannel üzerinden gönderilmesi için event fırlat
+    window.dispatchEvent(new CustomEvent('send-webrtc-chat', { detail: { type: 'chat', text: newMsg.text } }));
   };
 
   return (

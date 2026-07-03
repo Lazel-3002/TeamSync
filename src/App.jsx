@@ -45,20 +45,35 @@ function App() {
     };
   }, []);
 
+  const [incomingSignal, setIncomingSignal] = useState(null);
+  const [connectedPeers, setConnectedPeers] = useState([]);
+
   useEffect(() => {
     // Sinyalizasyon dinleyicilerini ayarla
     setSignalHandlers(
       (signalData) => {
         console.log('Şifreli sinyal alındı:', signalData.type);
-        // İleride WebRTC ve Chat bileşenlerine bu verileri yönlendireceğiz
+        setIncomingSignal(signalData);
       },
-      (peerId) => {
-        console.log('Handshake tamamlandı! Peer:', peerId);
+      (peerId, userInfo) => {
+        console.log('Handshake tamamlandı! Peer:', peerId, userInfo);
         setIsHandshakeComplete(true);
         if (!targetId) setTargetId(peerId);
+        
+        setConnectedPeers(prev => {
+          if (!prev.find(p => p.id === peerId)) {
+            return [...prev, { id: peerId, name: userInfo?.name || 'Kullanıcı', avatar: userInfo?.avatar }];
+          }
+          return prev;
+        });
       }
     );
   }, [targetId]);
+
+  // Global değişkene koyarak signaling.js'in kolayca okumasını sağla
+  useEffect(() => {
+    window.__MY_USER_INFO = { name: currentAccount?.name, avatar: currentAccount?.avatarUrl };
+  }, [currentAccount]);
 
   const handleConnect = async (e, passedId, isHost) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -113,11 +128,14 @@ function App() {
           onLogout={() => {
             setIsHandshakeComplete(false);
             setTargetId('');
+            setConnectedPeers([]);
           }}
           myId={myId}
           targetId={targetId}
           isHandshakeComplete={isHandshakeComplete}
           isHost={status.includes('Sunucu Oluşturuldu')}
+          incomingSignal={incomingSignal}
+          connectedPeers={connectedPeers}
         />
       )}
     </>
