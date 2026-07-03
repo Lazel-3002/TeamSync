@@ -25,7 +25,10 @@ export const setSignalHandlers = (onSignal, onHandshake) => {
  */
 export const connectSignaling = async (userId) => {
   const supabase = getSupabase();
-  if (!supabase) throw new Error('Supabase başlatılmadı!');
+  if (!supabase) {
+    console.warn('Supabase yok, Demo modunda çalışıyor.');
+    return;
+  }
 
   currentUserId = userId;
   await generateKeyPair();

@@ -211,7 +211,7 @@ function createWindow() {
 
   if (process.env.REACT_DEV === 'true') {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile('index.html');
   }
@@ -643,6 +643,18 @@ app.whenReady().then(() => {
       tray.setImage(nativeImage.createFromDataURL(dataUrl).resize({width: 32, height: 32}));
     }
     flagWin.destroy();
+  });
+  
+  ipcMain.on('tray-action-show', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    if (trayMenuWindow) trayMenuWindow.hide();
+  });
+
+  ipcMain.on('tray-action-quit', () => {
+    app.quit();
   });
 
   notificationWindow = new BrowserWindow({
