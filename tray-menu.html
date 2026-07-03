@@ -24,7 +24,7 @@
       flex-direction: column;
       gap: 4px;
     }
-
+ 
     .menu-item {
       padding: 8px 12px;
       color: #e2e8f0;
@@ -37,7 +37,7 @@
       gap: 8px;
       transition: all 0.2s ease;
     }
-
+ 
     .menu-item:hover {
       background: rgba(255,255,255,0.1);
       color: #fff;
@@ -47,7 +47,7 @@
       background: rgba(239, 68, 68, 0.2);
       color: #ef4444;
     }
-
+ 
     .divider {
       height: 1px;
       background: rgba(255,255,255,0.1);
@@ -67,16 +67,14 @@
       Tamamen Çıkış Yap
     </div>
   </div>
-
+ 
   <script>
-    const { ipcRenderer } = require('electron');
-    
     document.getElementById('btn-show').addEventListener('click', () => {
-      ipcRenderer.send('tray-action-show');
+      window.trayAPI.showApp();
     });
-
+ 
     document.getElementById('btn-quit').addEventListener('click', () => {
-      ipcRenderer.send('tray-action-quit');
+      window.trayAPI.quitApp();
     });
   </script>
 </body>

@@ -34,19 +34,19 @@
       flex-direction: column;
       gap: 6px;
     }
-
+ 
     #notification-container.show {
       transform: translateX(0);
       opacity: 1;
     }
-
+ 
     .title {
       font-weight: bold;
       font-size: 14px;
       color: #10b981;
       margin: 0;
     }
-
+ 
     .body {
       font-size: 13px;
       color: #e2e8f0;
@@ -61,19 +61,16 @@
     <div class="title" id="notif-title">TeamSync</div>
     <div class="body" id="notif-body">You have a new message.</div>
   </div>
-
+ 
   <script>
-    const { ipcRenderer } = require('electron');
-    
     const container = document.getElementById('notification-container');
     const titleEl = document.getElementById('notif-title');
     const bodyEl = document.getElementById('notif-body');
     let hideTimeout = null;
-
-    ipcRenderer.on('show-notification', (event, { title, body }) => {
-      // Show the electron window
-      require('electron').remote?.getCurrentWindow().showInactive() || window.process && require('electron').ipcRenderer.send('window-show-inactive');
-      
+ 
+    window.notifyAPI.onShowNotification(({ title, body }) => {
+      // Pencereyi gösterme işini zaten main.js -> notificationWindow.showInactive()
+      // çağrısı yapıyor, burada ekstra Node/remote erişimine gerek yok.
       titleEl.textContent = title;
       bodyEl.textContent = body;
       

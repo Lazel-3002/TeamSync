@@ -205,6 +205,19 @@ function createWindow() {
     return { action: 'deny' };
   });
 
+  // Defense-in-depth: renderer tarafında <webview> etiketine yazılan güvenlik
+  // özniteliklerine güvenmek yerine, main process'te de zorla uyguluyoruz.
+  // Böylece render sürecindeki bir hata/açık, webview'e Node.js erişimi
+  // sızdıramaz.
+  mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    delete webPreferences.preload;
+    delete webPreferences.preloadURL;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
+  });
+
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     console.log(`[Renderer ${level}] ${message} (${line})`);
   });
@@ -317,8 +330,21 @@ ipcMain.on('window-max', () => {
 ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
 });
-ipcMain.on('app-quit-force', () => {
+function forceQuit() {
+  if (cloudflaredProcess) {
+    try { cloudflaredProcess.kill(); } catch (e) {}
+  }
+  if (discoveryInterval) clearInterval(discoveryInterval);
+  if (discoverySocket) { try { discoverySocket.close(); } catch (e) {} }
+  if (global.myAppLock) { try { fs.closeSync(global.myAppLock); } catch(e) {} }
+  try { if (!isSecondInstance && fs.existsSync(lockFile)) fs.unlinkSync(lockFile); } catch(e) {}
+  
   app.exit(0);
+  process.exit(0);
+}
+
+ipcMain.on('app-quit-force', () => {
+  forceQuit();
 });
 
 ipcMain.handle('get-sources', async () => {
@@ -411,8 +437,7 @@ ipcMain.on('tray-action-show', () => {
 });
 
 ipcMain.on('tray-action-quit', () => {
-  isQuitting = true;
-  app.quit();
+  forceQuit();
 });
 
 ipcMain.on('set-remote-control', (event, active) => {
@@ -565,8 +590,10 @@ app.whenReady().then(() => {
     skipTaskbar: true,
     resizable: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      preload: path.join(__dirname, 'preload-tray.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
     }
   });
   trayMenuWindow.loadFile('tray-menu.html');
@@ -597,14 +624,18 @@ app.whenReady().then(() => {
   // Generate High Quality Ottoman Flag Tray Icon using Canvas
   const flagWin = new BrowserWindow({ 
     width: 128, height: 128, show: false, 
-    webPreferences: { nodeIntegration: true, contextIsolation: false }
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-flag.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
   });
   
   const flagHtml = `
     <html><body>
       <canvas id="c" width="128" height="128"></canvas>
       <script>
-        const { ipcRenderer } = require('electron');
         const canvas = document.getElementById('c');
         const ctx = canvas.getContext('2d');
         const svg = \`
@@ -630,7 +661,7 @@ app.whenReady().then(() => {
         const img = new Image();
         img.onload = () => {
           ctx.drawImage(img, 0, 0);
-          ipcRenderer.send('set-tray-icon', canvas.toDataURL('image/png'));
+          window.flagAPI.sendIcon(canvas.toDataURL('image/png'));
         };
         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
       </script>
@@ -654,7 +685,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('tray-action-quit', () => {
-    app.quit();
+    forceQuit();
   });
 
   notificationWindow = new BrowserWindow({
@@ -669,8 +700,10 @@ app.whenReady().then(() => {
     skipTaskbar: true,
     focusable: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      preload: path.join(__dirname, 'preload-notification.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
@@ -715,4 +748,3 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
-

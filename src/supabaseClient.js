@@ -9,7 +9,7 @@ export const initSupabase = async () => {
 
   try {
     // Electron'dan env değişkenlerini al
-    const envVars = await window.electronAPI.getEnvVars();
+    const envVars = await window.electronAPI.getEnv();
     
     const supabaseUrl = envVars.SUPABASE_URL;
     const supabaseAnonKey = envVars.SUPABASE_ANON_KEY;

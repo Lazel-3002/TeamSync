@@ -6,7 +6,7 @@ import Chat from './components/Chat.jsx';
 import RemoteControl from './components/RemoteControl.jsx';
 import Titlebar from './components/Titlebar.jsx';
 import ProfileSetup from './components/ProfileSetup.jsx';
-import Sidebar from './components/Sidebar.jsx';
+import Dashboard from './components/Dashboard.jsx';
 import RoomLobby from './components/RoomLobby.jsx';
 
 function App() {
@@ -60,85 +60,67 @@ function App() {
     );
   }, [targetId]);
 
-  const handleConnect = async (e) => {
-    e.preventDefault();
-    if (!targetId.trim()) return;
+  const handleConnect = async (e, passedId, isHost) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const idToConnect = passedId || targetId;
+    if (!idToConnect || !idToConnect.trim()) return;
     
-    setStatus('Handshake teklifi gönderiliyor...');
-    await initiateHandshake(targetId);
+    if (isHost) {
+      // Create server: We just wait for incoming connections
+      setStatus(`Sunucu Oluşturuldu: ${idToConnect}. Bağlantı bekleniyor...`);
+      setIsHandshakeComplete(true);
+    } else {
+      // Join server: Initiate handshake
+      setStatus(`Bağlanılıyor: ${idToConnect}...`);
+      await initiateHandshake(idToConnect);
+    }
   };
 
   if (!currentAccount) {
-    return (
-      <>
-        <Titlebar />
-        <div style={{ paddingTop: '50px' }}>
-          <ProfileSetup onComplete={(acc) => {
-            setCurrentAccount(acc);
-            setMyId(acc.id);
-            // Optionally auto-connect signaling here
-          }} />
-        </div>
-      </>
-    );
+    return <ProfileSetup onComplete={setCurrentAccount} />;
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+    <>
       <Titlebar />
       
-      {/* Container below titlebar */}
-      <div style={{ display: 'flex', width: '100%', marginTop: '35px' }}>
-        
-        {/* Left Sidebar */}
-        <Sidebar currentAccount={currentAccount} onLogout={() => setCurrentAccount(null)} />
+      {!isHandshakeComplete && isConnected && (
+        <Dashboard 
+          currentAccount={currentAccount} 
+          onLogout={() => setCurrentAccount(null)}
+          onJoinRoom={({ id, isHost, password }) => {
+            // Generate random ID if host and no ID provided
+            const finalId = (isHost && (!id || !id.trim())) ? 
+              "teamsync-" + Math.random().toString(36).substring(2, 8).toUpperCase() : 
+              id;
+            
+            if (!finalId || !finalId.trim()) {
+              alert("Lütfen geçerli bir Sunucu ID girin!");
+              return;
+            }
+            
+            setTargetId(finalId);
+            handleConnect(null, finalId, isHost);
+          }} 
+        />
+      )}
 
-        {/* Main Content Area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0f172a', padding: '20px', overflowY: 'auto' }}>
-          
-          {/* ROOM LOBBY / CONNECTION FORM */}
-          {!isHandshakeComplete && isConnected && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <RoomLobby 
-                currentAccount={currentAccount} 
-                onJoinRoom={({ id, name, isHost, password }) => {
-                  setTargetId(id);
-                  handleConnect({ preventDefault: () => {} });
-                }} 
-              />
-            </div>
-          )}
 
-          {/* MAIN CONTENT GRID */}
-          {isConnected && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', height: '100%' }}>
-              {/* Sol Sütun: WebRTC ve Uzaktan Kontrol */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <WebRTC 
-                  currentUserId={myId} 
-                  targetUserId={targetId} 
-                  isHandshakeComplete={isHandshakeComplete} 
-                />
-                <RemoteControl 
-                  isHandshakeComplete={isHandshakeComplete}
-                  onRemoteControlGranted={() => console.log('Uzaktan kontrol erişimi verildi!')}
-                />
-              </div>
-
-              {/* Sağ Sütun: Şifreli Mesajlaşma */}
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <Chat 
-                  currentUserId={myId} 
-                  targetUserId={targetId} 
-                  isHandshakeComplete={isHandshakeComplete} 
-                />
-              </div>
-            </div>
-          )}
-          
-        </div>
-      </div>
-    </div>
+      {/* MAIN CONTENT GRID (Inside Room) */}
+      {isConnected && isHandshakeComplete && (
+        <RoomLobby 
+          currentAccount={currentAccount}
+          onLogout={() => {
+            setIsHandshakeComplete(false);
+            setTargetId('');
+          }}
+          myId={myId}
+          targetId={targetId}
+          isHandshakeComplete={isHandshakeComplete}
+          isHost={status.includes('Sunucu Oluşturuldu')}
+        />
+      )}
+    </>
   );
 }
 
