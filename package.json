@@ -4,7 +4,7 @@
   "description": "P2P sesli/görüntülü/ekran paylaşımı + uzaktan kontrol - sunucusuz",
   "main": "main.js",
   "scripts": {
-    "start": "cross-env REACT_DEV=true concurrently \"vite\" \"electron .\"",
+    "start": "electron .",
     "dev:react": "cross-env REACT_DEV=true concurrently \"vite\" \"electron .\"",
     "build:react": "vite build",
     "build": "electron-builder --win portable --x64",

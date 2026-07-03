@@ -289,11 +289,13 @@ function handleUnoMessage(peerId, msg) {
       const currentTurnId = state.uno.turnOrder[state.uno.turnIndex];
       if (currentTurnId !== peerId) return;
       
-      if (state.uno.deck.length === 0) {
+      if (state.uno.deck.length === 0 && state.uno.discard.length > 1) {
         const top = state.uno.discard.pop();
         state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
         state.uno.discard = [top];
       }
+      
+      if (state.uno.deck.length === 0) return; // Still empty?
       const c = state.uno.deck.pop();
       broadcastTo(peerId, { type: 'uno-draw-result', card: c, forced: false });
       if (state.uno.players.has(peerId)) state.uno.players.get(peerId).cardCount++;
@@ -760,22 +762,26 @@ window.kickUnoPlayer = async (id, e) => {
   }
 };
 
-function getUnoDeck() {
+function getUnoDeck(requiredCards = 108) {
   const colors = ['red', 'blue', 'green', 'yellow'];
-  const deck = [];
-  for (let c of colors) {
-    deck.push({ color: c, val: '0' });
-    for (let i = 1; i <= 9; i++) {
-      deck.push({ color: c, val: i.toString() });
-      deck.push({ color: c, val: i.toString() });
+  let deck = [];
+  const numDecks = Math.max(1, Math.ceil(requiredCards / 108));
+  
+  for (let d = 0; d < numDecks; d++) {
+    for (let c of colors) {
+      deck.push({ color: c, val: '0' });
+      for (let i = 1; i <= 9; i++) {
+        deck.push({ color: c, val: i.toString() });
+        deck.push({ color: c, val: i.toString() });
+      }
+      deck.push({ color: c, val: 'Skip' }); deck.push({ color: c, val: 'Skip' });
+      deck.push({ color: c, val: 'Rev' }); deck.push({ color: c, val: 'Rev' });
+      deck.push({ color: c, val: '+2' }); deck.push({ color: c, val: '+2' });
     }
-    deck.push({ color: c, val: 'Skip' }); deck.push({ color: c, val: 'Skip' });
-    deck.push({ color: c, val: 'Rev' }); deck.push({ color: c, val: 'Rev' });
-    deck.push({ color: c, val: '+2' }); deck.push({ color: c, val: '+2' });
-  }
-  for (let i = 0; i < 4; i++) {
-    deck.push({ color: 'black', val: 'Color' });
-    deck.push({ color: 'black', val: '+4' });
+    for (let i = 0; i < 4; i++) {
+      deck.push({ color: 'black', val: 'Color' });
+      deck.push({ color: 'black', val: '+4' });
+    }
   }
   return deck.sort(() => Math.random() - 0.5);
 }
@@ -799,7 +805,9 @@ function startUnoGame() {
 }
 
 function startUnoRound() {
-  const deck = getUnoDeck();
+  const initialCardCount = state.uno.rules ? state.uno.rules.startCards : 7;
+  const totalRequired = state.uno.players.size * initialCardCount + 20;
+  const deck = getUnoDeck(totalRequired);
   const hands = {};
   const turnOrder = Array.from(state.uno.players.keys());
   state.uno.botHands = {};
@@ -1367,6 +1375,11 @@ function botPlay(botId) {
       return;
     }
   } else {
+    if (state.uno.deck.length === 0 && state.uno.discard.length > 1) {
+       const topDiscard = state.uno.discard.pop();
+       state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
+       state.uno.discard = [topDiscard];
+    }
     if (state.uno.deck.length > 0) {
       const newCard = state.uno.deck.pop();
       botHand.push(newCard);
