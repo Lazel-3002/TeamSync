@@ -3,7 +3,16 @@ const params = (() => {
 })();
 
 // Initialize Supabase
-// Supabase replaced with local storage
+let supabaseClient = null;
+if (window.supabase && window.electronAPI) {
+  const envVars = window.electronAPI.getEnv();
+  if (envVars.SUPABASE_URL && envVars.SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && envVars.SUPABASE_ANON_KEY) {
+    supabaseClient = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
+    console.log('Supabase initialized successfully.');
+  } else {
+    console.warn('Supabase URL or Key missing in .env file');
+  }
+}
 
 const state = {
   myId: crypto.randomUUID(),
@@ -1412,7 +1421,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (state.peers.size === 0) {
         disconnectApp();
         document.getElementById('error-text').textContent = "Böyle bir sunucu bulunamadı. Lütfen ID'yi kontrol edin.";
-        document.getElementById('error-modal').classList.remove('hidden');
+        document.getElementById('error-modal').classList.add('hidden');
       }
     }, 4000);
   });
@@ -2886,6 +2895,15 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   appendChat('self', state.myName, textToSend, isCensored);
   input.value = '';
 
+  // Supabase Kayıt
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    supabaseClient.from('mesaj').insert([
+      { icerik: textToSend, kullanici_adi: state.myName || 'Anonim' }
+    ]).then(({ error }) => {
+      if (error) console.error('Supabase mesaj kayıt hatası:', error);
+      else console.log('Mesaj Supabase e kaydedildi.');
+    });
+  }
   });
 
 function saveChatToLocal(uid, name, text, isCensored) {
@@ -4151,6 +4169,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.addEventListener(evt, handler);
   };
   
+  // Custom Titlebar Events
+  addEvt('tb-min', 'click', () => window.electronAPI && window.electronAPI.windowMin());
+  addEvt('tb-max', 'click', () => window.electronAPI && window.electronAPI.windowMax());
+  addEvt('tb-close', 'click', () => window.electronAPI && window.electronAPI.windowClose());
+  addEvt('tb-forcequit', 'click', () => window.electronAPI && window.electronAPI.appQuitForce());
+
   addEvt('dm-close-btn', 'click', closeDM);
   addEvt('server-dm-close', 'click', () => {
     document.getElementById('server-dm-modal').classList.add('hidden');

@@ -196,7 +196,8 @@ function createWindow() {
     backgroundColor: '#1e1f22',
     title: 'TeamSync - P2P',
     autoHideMenuBar: true,
-    webSecurity: true
+    webSecurity: true,
+    frame: false
   });
   
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -294,6 +295,27 @@ ipcMain.on('stop-cloudflared', () => {
     cloudflaredProcess = null;
   }
 });
+
+// Custom titlebar handlers
+ipcMain.on('window-min', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+ipcMain.on('window-max', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
+});
+ipcMain.on('app-quit-force', () => {
+  app.exit(0);
+});
+
 ipcMain.handle('get-sources', async () => {
   try {
     const sources = await desktopCapturer.getSources({

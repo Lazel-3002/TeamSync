@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getEnv: () => ({
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY
-  })
+  }),
+  windowMin: () => ipcRenderer.send('window-min'),
+  windowMax: () => ipcRenderer.send('window-max'),
+  windowClose: () => ipcRenderer.send('window-close'),
+  appQuitForce: () => ipcRenderer.send('app-quit-force')
 });
 

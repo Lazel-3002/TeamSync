@@ -45,6 +45,74 @@ body {
 .hidden { display: none !important; }
 .muted { color: var(--txt-mut); font-size: 12px; }
 
+/* ===== CUSTOM TITLEBAR ===== */
+.custom-titlebar {
+  height: 35px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  -webkit-app-region: drag;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 999999;
+}
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+}
+.titlebar-icon {
+  font-size: 14px;
+  margin-right: 8px;
+}
+.titlebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt-main);
+  letter-spacing: 0.5px;
+}
+.titlebar-right {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+.tb-btn {
+  background: transparent;
+  border: none;
+  color: var(--txt-mut);
+  width: 46px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  outline: none;
+}
+.tb-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--txt-main);
+}
+.tb-close:hover {
+  background: #e81123 !important;
+  color: white !important;
+}
+.tb-forcequit {
+  font-size: 16px;
+  margin-right: 4px;
+}
+.tb-forcequit:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger) !important;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+
+body { padding-top: 35px; } /* Prevent overlap */
+
 /* ===== GİRİŞ ===== */
 .login-wrap {
   height: 100vh;
