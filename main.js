@@ -209,7 +209,12 @@ function createWindow() {
     console.log(`[Renderer ${level}] ${message} (${line})`);
   });
 
-  mainWindow.loadFile('index.html');
+  if (process.env.REACT_DEV === 'true') {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile('index.html');
+  }
   Menu.setApplicationMenu(null);
 
   let hasShownHideNotification = false;
