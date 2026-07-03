@@ -1504,8 +1504,22 @@ function playSound(type) {
 }
 
 async function setupLocalAudio() {
+  if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') {
+    try { state.gateAudioCtx.close(); } catch(e) {}
+  }
+  if (state.audioCtx && state.audioCtx.state !== 'closed') {
+    try { state.audioCtx.close(); } catch(e) {}
+  }
+  if (state.rawMicStream) {
+    state.rawMicStream.getTracks().forEach(t => t.stop());
+  }
+
+  const sel = document.getElementById('mic-select');
+  const deviceId = sel && sel.value ? { exact: sel.value } : undefined;
+
   const raw = await navigator.mediaDevices.getUserMedia({
     audio: {
+      deviceId: deviceId,
       echoCancellation: true,
       noiseSuppression: { ideal: true },
       autoGainControl: { ideal: true },
@@ -1513,6 +1527,8 @@ async function setupLocalAudio() {
       channelCount: { ideal: 2 }
     }
   });
+
+  state.rawMicStream = raw;
 
   const vuCtx = new (window.AudioContext || window.webkitAudioContext)();
   state.gateAudioCtx = vuCtx;
@@ -1548,6 +1564,26 @@ async function setupLocalAudio() {
   state.processedStream.addTrack(blankVideoTrack);
   
   state.localStream = state.processedStream;
+
+  if (state.gateAudioCtx) {
+    state.uiAnalyser = state.gateAudioCtx.createAnalyser();
+    state.uiAnalyser.fftSize = 512;
+    const finalSrc = state.gateAudioCtx.createMediaStreamSource(state.localStream);
+    finalSrc.connect(state.uiAnalyser);
+  }
+
+  if (state.peers && state.peers.size > 0) {
+    const newAudioTrack = state.localStream.getAudioTracks()[0];
+    state.peers.forEach(peer => {
+      const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
+      if (sender && newAudioTrack) sender.replaceTrack(newAudioTrack);
+    });
+  }
+
+  if (state.micEnabled === false) {
+    state.localStream.getAudioTracks().forEach(t => t.enabled = false);
+    if (state.rawMicStream) state.rawMicStream.getAudioTracks().forEach(t => t.enabled = false);
+  }
 }
 
 async function applyAIDenoise(stream) {
@@ -1587,6 +1623,7 @@ async function applyAIDenoise(stream) {
 function setupVUMeter() {
   if (!state.vuAnalyser) return;
   const data = new Uint8Array(state.vuAnalyser.frequencyBinCount);
+  let uiData;
   const vuBar = document.getElementById('vu');
   const vuText = document.getElementById('vu-text');
 
@@ -1604,11 +1641,29 @@ function setupVUMeter() {
     if (state.gateGainNode && state.gateAudioCtx) {
       if (!isSpeaking) {
         state.gateGainNode.gain.setTargetAtTime(0, state.gateAudioCtx.currentTime, 0.05);
-        if (state.isSpeakingLocally) { state.isSpeakingLocally = false; updateUserUI('self'); }
       } else {
         state.gateGainNode.gain.setTargetAtTime(1, state.gateAudioCtx.currentTime, 0.05);
-        if (!state.isSpeakingLocally) { state.isSpeakingLocally = true; updateUserUI('self'); }
       }
+    }
+
+    let isActuallySpeaking = isSpeaking;
+    if (state.uiAnalyser) {
+      if (!uiData || uiData.length !== state.uiAnalyser.frequencyBinCount) {
+        uiData = new Uint8Array(state.uiAnalyser.frequencyBinCount);
+      }
+      state.uiAnalyser.getByteFrequencyData(uiData);
+      let sumUI = 0;
+      for (let i = 0; i < uiData.length; i++) sumUI += uiData[i] * uiData[i];
+      const rmsUI = Math.sqrt(sumUI / uiData.length);
+      const dbUI = 20 * Math.log10(rmsUI / 255 || 0.0001);
+      const pctUI = Math.min(100, Math.max(0, (dbUI + 60) * 100 / 60));
+      isActuallySpeaking = pctUI > 2;
+    }
+
+    if (isActuallySpeaking) {
+      if (!state.isSpeakingLocally) { state.isSpeakingLocally = true; updateUserUI('self'); }
+    } else {
+      if (state.isSpeakingLocally) { state.isSpeakingLocally = false; updateUserUI('self'); }
     }
 
     if (vuBar) {
@@ -1633,16 +1688,7 @@ async function setupDeviceList() {
       sel.appendChild(opt);
     });
     sel.addEventListener('change', async () => {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: { exact: sel.value }, echoCancellation: true, noiseSuppression: { ideal: true }, autoGainControl: { ideal: true }, sampleRate: { ideal: 48000 }, channelCount: { ideal: 2 } }
-      });
-      const newTrack = newStream.getAudioTracks()[0];
-      state.localStream.getAudioTracks().forEach(t => state.localStream.removeTrack(t));
-      state.localStream.addTrack(newTrack);
-      state.peers.forEach(peer => {
-        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
-        if (sender) sender.replaceTrack(newTrack);
-      });
+      await setupLocalAudio();
     });
   } catch (e) {}
 }
@@ -1735,6 +1781,7 @@ function removePeer(peerId) {
   if (!peer) return;
   if (peer.pc) peer.pc.close();
   if (peer.dc) peer.dc.close();
+  if (peer.audioCtx) { try { peer.audioCtx.close(); } catch(e) {} }
   state.peers.delete(peerId);
   const userEl = document.querySelector(`[data-uid="${peerId}"]`);
   if (userEl) userEl.remove();
@@ -2479,7 +2526,12 @@ async function handleDataMessage(peerId, msg) {
 
 
 function setupSpeakingDetection(peerId, stream) {
+  const peer = state.peers.get(peerId);
+  if (peer && peer.audioCtx) {
+    try { peer.audioCtx.close(); } catch(e) {}
+  }
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (peer) peer.audioCtx = audioCtx;
   const source = audioCtx.createMediaStreamSource(stream);
   const analyser = audioCtx.createAnalyser();
   analyser.fftSize = 512;
@@ -3416,6 +3468,9 @@ function setMicEnabled(enabled) {
   state.micEnabled = enabled;
   if (state.localStream) {
     state.localStream.getAudioTracks().forEach(t => t.enabled = enabled);
+  }
+  if (state.rawMicStream) {
+    state.rawMicStream.getAudioTracks().forEach(t => t.enabled = enabled);
   }
   const micBtn = document.getElementById('mic');
   micBtn.classList.toggle('off', !enabled);

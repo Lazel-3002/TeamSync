@@ -574,6 +574,29 @@ app.whenReady().then(() => {
     }
   );
 
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    let responseHeaders = { ...details.responseHeaders };
+    
+    // Ortak Tarayıcı (webview) için gömülmeyi engelleyen başlıkları kaldır
+    const headersToRemove = [
+      'x-frame-options',
+      'X-Frame-Options',
+      'content-security-policy',
+      'Content-Security-Policy'
+    ];
+    
+    headersToRemove.forEach(header => {
+      if (responseHeaders[header]) {
+        delete responseHeaders[header];
+      }
+    });
+    
+    callback({
+      cancel: false,
+      responseHeaders: responseHeaders
+    });
+  });
+
   // --- WEBRTC MEDYA VE EKRAN PAYLAŞIMI İZİNLERİ ---
   session.defaultSession.setPermissionCheckHandler(() => true);
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {

@@ -1418,9 +1418,12 @@ function botPlay(botId) {
   }
 }
 
+let unoAudioCtx = null;
+
 function playSound(type) {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!unoAudioCtx) unoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = unoAudioCtx;
     if (ctx.state === 'suspended') ctx.resume();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -1450,7 +1453,8 @@ function playSound(type) {
 
 function playPopSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!unoAudioCtx) unoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = unoAudioCtx;
     if (ctx.state === 'suspended') ctx.resume();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
