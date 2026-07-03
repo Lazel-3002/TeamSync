@@ -35,11 +35,13 @@
       "output": "dist"
     },
     "files": [
-      "main.js",
-      "preload.js",
-      "index.html",
-      "renderer.js",
-      "style.css"
+      "**/*",
+      "!node_modules",
+      "!dist",
+      "!.env",
+      "!yapaydenetleyici.js",
+      "!problemler.md",
+      "!yapaydenetliyici.md"
     ],
     "win": {
       "target": [

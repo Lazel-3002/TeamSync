@@ -230,6 +230,14 @@ function createWindow() {
   }
   Menu.setApplicationMenu(null);
 
+  if (!app.isPackaged) {
+    try {
+      require('./yapaydenetleyici.js')(mainWindow);
+    } catch (e) {
+      console.warn("Yapay denetleyici başlatılamadı:", e);
+    }
+  }
+
   let hasShownHideNotification = false;
   mainWindow.on('close', (event) => {
     if (!isQuitting) {

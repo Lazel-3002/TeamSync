@@ -5,3 +5,6 @@ dist/
 *.zip
 *.asar
 .env
+ 
+problemler.md
+yapaydenetliyici.md
