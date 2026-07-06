@@ -869,6 +869,8 @@ function initPoke() {
 
       p1Img.src = pokeState.p1.pokemon || UNKNOWN_AVATAR;
       p2Img.src = pokeState.p2.pokemon || UNKNOWN_AVATAR;
+      p1Img.className = '';
+      p2Img.className = '';
       
       document.getElementById('poke-p1-hp-container').style.display = 'flex';
       document.getElementById('poke-p2-hp-container').style.display = 'flex';
@@ -1328,16 +1330,13 @@ function initPoke() {
       pokeState.p2.pokemon = data.p2.pokemon;
       pokeState.p2.moves = data.p2.moves;
       
-      if (!pokeState.p1.hp) {
-          const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
-          pokeState.p1.hp = fam1 ? fam1.hp : 140;
-          pokeState.p1.maxHp = fam1 ? fam1.hp : 140;
-      }
-      if (!pokeState.p2.hp) {
-          const fam2 = window.POKEMON_FAMILIES.find(f => data.p2.baseName ? f.baseName === data.p2.baseName : f.type === data.p2.type);
-          pokeState.p2.hp = fam2 ? fam2.hp : 140;
-          pokeState.p2.maxHp = fam2 ? fam2.hp : 140;
-      }
+      const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
+      pokeState.p1.hp = fam1 ? fam1.hp : 140;
+      pokeState.p1.maxHp = fam1 ? fam1.hp : 140;
+
+      const fam2 = window.POKEMON_FAMILIES.find(f => data.p2.baseName ? f.baseName === data.p2.baseName : f.type === data.p2.type);
+      pokeState.p2.hp = fam2 ? fam2.hp : 140;
+      pokeState.p2.maxHp = fam2 ? fam2.hp : 140;
 
       customRenderBattleArena();
       
