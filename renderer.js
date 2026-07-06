@@ -2,6 +2,54 @@ const params = (() => {
   return window.__params || { name: '', room: '', password: '' };
 })();
 
+// E2EE MQTT INTERCEPTION
+if (window.mqtt && window.CryptoJS) {
+  const originalMqttConnect = window.mqtt.connect;
+  window.mqtt.connect = function(url, options) {
+      const client = originalMqttConnect.call(window.mqtt, url, options);
+      
+      const origPublish = client.publish.bind(client);
+      client.publish = function(topic, message, opts, cb) {
+          if (typeof message === 'string' && message.trim().startsWith('{')) {
+              try {
+                  const secret = topic.split('/')[2];
+                  if (secret) {
+                      const encrypted = CryptoJS.AES.encrypt(message, secret).toString();
+                      message = 'E2EE:' + encrypted;
+                  }
+              } catch(e) { console.error("E2EE Encrypt Error", e); }
+          }
+          return origPublish(topic, message, opts, cb);
+      };
+
+      const origOn = client.on.bind(client);
+      client.on = function(event, handler) {
+          if (event === 'message') {
+              return origOn(event, async (topic, message) => {
+                  let msgStr = message.toString();
+                  if (msgStr.startsWith('E2EE:')) {
+                      try {
+                          const secret = topic.split('/')[2];
+                          if (secret) {
+                              const decrypted = CryptoJS.AES.decrypt(msgStr.substring(5), secret);
+                              msgStr = decrypted.toString(CryptoJS.enc.Utf8);
+                              if (!msgStr) throw new Error("Mismatched key or corrupted data");
+                              message = { toString: () => msgStr };
+                          }
+                      } catch(e) {
+                          console.warn('E2EE Decryption failed (ignored)', topic);
+                          return;
+                      }
+                  }
+                  return handler(topic, message);
+              });
+          }
+          return origOn(event, handler);
+      };
+      return client;
+  };
+}
+
 // Initialize Supabase
 let supabaseClient = null;
 if (window.supabase && window.electronAPI) {
@@ -14,86 +62,7 @@ if (window.supabase && window.electronAPI) {
   }
 }
 
-const state = {
-  myId: crypto.randomUUID(),
-  myName: '',
-  room: '',
-  password: '',
-  peers: new Map(),
-  localStream: null,
-  screenStream: null,
-  processedStream: null,
-  audioCtx: null,
-  micEnabled: true,
-  deafened: false,
-  isSharing: false,
-  isRecording: false,
-  recordingStream: null,
-  recorder: null,
-  recordedChunks: [],
-  recStart: 0,
-  pttMode: false,
-  friendId: '',
-  friends: {},
-  friendRequests: [],
-  globalMqtt: null,
-  pttActive: false,
-  volume: 1.0,
-  useAI: true,
-  activeControl: null,
-  pendingControlReq: null,
-  speakingPeers: new Map(),
-  analyser: null,
-  gainNode: null,
-  cryptoKey: null,
-  wbContext: null,
-  drawing: false,
-  micThreshold: 20,
-  dms: {}, // { friendId: [ { sender: 'me'|'them', type: 'text'|'file', content: '...', timestamp: 123 }, ... ] }
-  activeDM: null,
-  myAvatar: null,
-  myAvatarHash: null,
-  act: { wt: false, uno: false },
-  wt: { player: null, isReady: false, lastAction: 0, ignoreNextEvent: false, joinedActivity: false },
-  sb: { host: null, interactive: false, ignoreNextNav: false, joinedActivity: false, lastUrl: '', lastVideoState: null },
-  uno: {
-    host: null,
-    players: new Map(), // id -> { name, ready, cardCount }
-    scores: {}, // id -> score (first to 500 wins)
-    maxPlayers: 4,
-    started: false,
-    myHand: [],
-    deck: [],
-    discard: [],
-    turnIndex: 0,
-    direction: 1,
-    currentColor: '',
-    turnOrder: [],
-    botHands: {},
-    botTimeout: null,
-    joinedActivity: false,
-    rules: {
-      startCards: 7,
-      kombo: false,
-      stacking: false,
-      jumpIn: false,
-      drawUntilPlay: false,
-      noBluff: false,
-      noPass: false,
-      noBlackLast: false,
-      mirror: false,
-      zeroPass: false,
-      sevenSwap: false
-    }
-  },
-  lobbies: [],
-  activeLobbyId: null,
-  isLobbyHost: false,
-  spectating: false,
-  selectedLobbyActivity: null,
-  sfwMode: false,
-  aiModel: null
-};
+const state = window.state;
 
 const badWordsList = ['amk', 'amq', 'aq', 'oç', 'piç', 'yarak', 'yarrak', 'amcık', 'sik', 'sikerim', 'siktir', 'orospu', 'göt', 'pezevenk', 'fuck', 'shit', 'bitch', 'asshole', 'döl', 'dol', 'meme', 'yarak', 'yarrag', 'yaraq', 'yarraq', 'sg', 'siktir', 'sktir', 'am', 'kaltak', 'sürtük', 'pç'];
 const badWordsRegex = new RegExp('\\b(' + badWordsList.join('|') + ')\\b', 'gi');
