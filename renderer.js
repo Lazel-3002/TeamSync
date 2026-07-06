@@ -174,7 +174,7 @@ function setupInternetSignaling(roomId, myId, myName) {
   if (mqttClient) mqttClient.end();
   
   // Sinyalleşmeyi HiveMQ üzerinden Cloudflare Oda ID'si ile yapıyoruz.
-  let brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
+  let brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
 
   mqttClient = mqtt.connect(brokerUrl, {
     clientId: 'teamsync-sig-' + myId,
@@ -742,7 +742,7 @@ let pingInterval = null;
 
 function setupGlobalMQTT() {
   if (state.globalMqtt) return;
-  state.globalMqtt = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+  state.globalMqtt = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
     clientId: 'teamsync-glob-' + state.friendId + '-' + state.myId,
     keepalive: 60,
     reconnectPeriod: 1000
