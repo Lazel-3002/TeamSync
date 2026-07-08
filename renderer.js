@@ -879,9 +879,8 @@ function getIceServers() {
   const customPass = localStorage.getItem('teamsync_turn_pass') || '';
 
   const servers = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' }
+    { urls: 'stun:74.125.250.129:19302' }, // stun.l.google.com
+    { urls: 'stun:162.159.207.0:3478' }    // stun.cloudflare.com
   ];
 
   if (customUrl && customUser && customPass) {
@@ -891,13 +890,13 @@ function getIceServers() {
       credential: customPass
     });
   } else {
-    // Varsayılan Metered.ca Open Relay (Public)
+    // Varsayılan Metered.ca Open Relay (Public) - IP ile
     servers.push(
-      { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      { urls: 'turns:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turns:15.235.47.158:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:15.235.47.158:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:15.235.47.158:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
     );
   }
   return servers;
