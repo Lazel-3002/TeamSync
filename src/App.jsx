@@ -16,6 +16,7 @@ function App() {
   const [targetId, setTargetId] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isHandshakeComplete, setIsHandshakeComplete] = useState(false);
+  const [isInRoom, setIsInRoom] = useState(false);
 
   useEffect(() => {
     async function setup() {
@@ -58,6 +59,7 @@ function App() {
       (peerId, userInfo) => {
         console.log('Handshake tamamlandı! Peer:', peerId, userInfo);
         setIsHandshakeComplete(true);
+        setIsInRoom(true);
         if (!targetId) setTargetId(peerId);
         
         setConnectedPeers(prev => {
@@ -83,7 +85,10 @@ function App() {
     if (isHost) {
       // Create server: We just wait for incoming connections
       setStatus(`Sunucu Oluşturuldu: ${idToConnect}. Bağlantı bekleniyor...`);
-      setIsHandshakeComplete(true);
+      await disconnectSignaling();
+      await connectSignaling(idToConnect);
+      setIsInRoom(true);
+      setIsHandshakeComplete(false);
     } else {
       // Join server: Initiate handshake
       setStatus(`Bağlanılıyor: ${idToConnect}...`);
@@ -99,7 +104,7 @@ function App() {
     <>
       <Titlebar />
       
-      {!isHandshakeComplete && isConnected && (
+      {!isInRoom && isConnected && (
         <Dashboard 
           currentAccount={currentAccount} 
           onLogout={() => setCurrentAccount(null)}
@@ -122,10 +127,11 @@ function App() {
 
 
       {/* MAIN CONTENT GRID (Inside Room) */}
-      {isConnected && isHandshakeComplete && (
+      {isConnected && isInRoom && (
         <RoomLobby 
           currentAccount={currentAccount}
           onLogout={() => {
+            setIsInRoom(false);
             setIsHandshakeComplete(false);
             setTargetId('');
             setConnectedPeers([]);

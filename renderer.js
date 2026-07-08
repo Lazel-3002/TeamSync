@@ -1875,24 +1875,8 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
     if (e.track.kind === 'audio') {
       peer.audioEl.srcObject = e.streams[0];
-      
-      try {
-        if (!state.remoteAudioCtx) state.remoteAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (state.remoteAudioCtx.state === 'suspended') {
-          state.remoteAudioCtx.resume().catch(() => {});
-        }
-        if (!peer.gainNode) {
-          const source = state.remoteAudioCtx.createMediaStreamSource(e.streams[0]);
-          peer.gainNode = state.remoteAudioCtx.createGain();
-          peer.gainNode.gain.value = state.deafened ? 0.0 : 1.0;
-          source.connect(peer.gainNode);
-          peer.gainNode.connect(state.remoteAudioCtx.destination);
-          peer.audioEl.muted = true;
-        }
-      } catch(err) {
-        peer.audioEl.volume = state.deafened ? 0.0 : 1.0;
-        peer.audioEl.muted = state.deafened;
-      }
+      peer.audioEl.volume = state.deafened ? 0.0 : 1.0;
+      peer.audioEl.muted = state.deafened;
 
       peer.audioEl.play().catch((err) => console.warn('Audio play failed:', err));
       setupSpeakingDetection(peerId, e.streams[0]);

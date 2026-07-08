@@ -187,6 +187,20 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
     };
   }, [peerConnection, targetUserId]);
 
+  async function createAndSendOffer() {
+    if (!peerConnection) return;
+    try {
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      await sendEncryptedSignal(targetUserId, {
+        type: 'offer',
+        sdp: offer
+      });
+    } catch (e) {
+      console.error("Offer gönderilemedi:", e);
+    }
+  }
+
   // PeerConnection hazır olduğunda veya micStream geldiğinde track'leri ekle
   useEffect(() => {
     if (peerConnection && micStream) {
@@ -195,8 +209,14 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
           peerConnection.addTrack(track, micStream);
         }
       });
+      
+      const isInitiator = currentUserId.toLowerCase() > targetUserId.toLowerCase();
+      if (isInitiator) {
+        console.log("We are the WebRTC initiator. Creating and sending offer...");
+        createAndSendOffer();
+      }
     }
-  }, [peerConnection, micStream]);
+  }, [peerConnection, micStream, currentUserId, targetUserId]);
 
   // Ekran paylaşımı dinleyicisi
   useEffect(() => {
@@ -218,20 +238,6 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
       createAndSendOffer();
     }
   }, [peerConnection, localStream]);
-
-  const createAndSendOffer = async () => {
-    if (!peerConnection) return;
-    try {
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      await sendEncryptedSignal(targetUserId, {
-        type: 'offer',
-        sdp: offer
-      });
-    } catch (e) {
-      console.error("Offer gönderilemedi:", e);
-    }
-  };
 
   const startScreenShare = async () => {
     try {

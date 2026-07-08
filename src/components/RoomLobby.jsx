@@ -173,7 +173,7 @@ function RoomLobby({ currentAccount, onLogout, myId, targetId, isHandshakeComple
            <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
              <WebRTC 
                currentUserId={myId} 
-               targetUserId={targetId} 
+               targetUserId={connectedPeers[0]?.id || targetId} 
                isHandshakeComplete={isHandshakeComplete} 
                isMicOn={isMicOn} 
                isDeafened={isDeafened} 
