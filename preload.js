@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUDPSignal: (cb) => ipcRenderer.on('udp-signal', cb),
   directConnect: (ip) => ipcRenderer.send('direct-connect', ip),
   getSources: () => ipcRenderer.invoke('get-sources'),
+  setScreenShareSource: (id) => ipcRenderer.send('set-screen-share-source', id),
   registerPTT: (key) => ipcRenderer.send('register-ptt', key),
   unregisterPTT: () => ipcRenderer.send('unregister-ptt'),
   onPTT: (cb) => ipcRenderer.on('ptt-trigger', cb),

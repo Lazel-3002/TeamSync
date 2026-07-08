@@ -804,7 +804,8 @@ function setupGlobalMQTT() {
         } else if (data.type === 'room_join_request') {
           if (state.room) {
             state.pendingJoinReq = { id: data.id, name: data.name };
-            document.getElementById('jr-name').textContent = data.name;
+            const nameEl = document.getElementById('join-req-name');
+            if (nameEl) nameEl.textContent = data.name;
             document.getElementById('join-request-modal').classList.remove('hidden');
             playSound('on');
             if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify('Katılma İsteği', `${data.name} odanıza katılmak istiyor.`);
@@ -3480,17 +3481,12 @@ async function startScreenShare(sourceId) {
   try {
     const consts = getVideoConstraints();
     const shareAudio = document.getElementById('share-audio').checked;
-    state.screenStream = await navigator.mediaDevices.getUserMedia({
-      audio: shareAudio ? {
-        mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId }
-      } : false,
-      video: {
-        mandatory: {
-          chromeMediaSource: 'desktop',
-          chromeMediaSourceId: sourceId,
-          maxFrameRate: consts.frameRate.ideal || 30
-        }
-      }
+    if (window.electronAPI && window.electronAPI.setScreenShareSource) {
+      window.electronAPI.setScreenShareSource(sourceId);
+    }
+    state.screenStream = await navigator.mediaDevices.getDisplayMedia({
+      audio: shareAudio,
+      video: { frameRate: consts.frameRate.ideal || 30 }
     });
     const track = state.screenStream.getVideoTracks()[0];
     state.peers.forEach(peer => {

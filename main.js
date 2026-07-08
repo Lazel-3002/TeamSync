@@ -191,7 +191,8 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
       webviewTag: true,
-      webRTCIPHandlingPolicy: 'default_public_and_private_interfaces'
+      webRTCIPHandlingPolicy: 'default_public_and_private_interfaces',
+      autoplayPolicy: 'no-user-gesture-required'
     },
     backgroundColor: '#1e1f22',
     title: 'TeamSync - P2P',
@@ -616,14 +617,20 @@ app.whenReady().then(() => {
     callback(true); // Mikrofon ve Kamera izinlerini otomatik onayla
   });
 
+  let currentScreenShareSourceId = null;
+  ipcMain.on('set-screen-share-source', (event, id) => {
+    currentScreenShareSourceId = id;
+  });
+
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      if (sources && sources.length > 0) {
-        // En basit yöntemle ilk (ana) ekranı paylaşıma açarız
-        callback({ video: sources[0], audio: 'loopback' });
+    desktopCapturer.getSources({ types: ['window', 'screen'] }).then((sources) => {
+      const selectedSource = sources.find(s => s.id === currentScreenShareSourceId) || sources[0];
+      if (selectedSource) {
+        callback({ video: selectedSource, audio: 'loopback' });
       } else {
         callback();
       }
+      currentScreenShareSourceId = null;
     }).catch(err => {
       console.error('Ekran kaynakları alınamadı:', err);
       callback();

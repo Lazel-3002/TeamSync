@@ -74,7 +74,7 @@ class YapayDenetleyici {
     this.mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
       // level 3 is error
       if (level >= 3) {
-        if (message.includes('chrome-extension://') || message.includes('Autoplay is only allowed')) return;
+        if (message.includes('chrome-extension://') || message.includes('Autoplay is only allowed') || message.includes('ERR_ABORTED (-3)')) return;
         this.logProblem('Arayüz (Renderer) Hatası', `Dosya: ${sourceId}:${line}\nHata: ${message}`, 'high');
       }
     });

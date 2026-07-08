@@ -99,6 +99,13 @@ function initSharedBrowser() {
     sbWebview.focus();
   });
 
+  sbWebview.addEventListener('did-fail-load', (e) => {
+    if (e.errorCode === -3) {
+      console.log('Webview load aborted (-3), typically normal when navigating away quickly.');
+      return;
+    }
+  });
+
   sbWebview.addEventListener('did-navigate', (e) => {
     state.sb.lastVideoState = null;
     if (document.activeElement !== sbUrl) {
