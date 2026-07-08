@@ -111,7 +111,21 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:74.125.250.129:19302' }, // IP fallback
+        { urls: 'stun:162.159.207.0:3478' },   // IP fallback
+        { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        // IP fallbacks
+        { urls: 'turns:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turns:15.235.47.158:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:15.235.47.158:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:15.235.47.158:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
       ]
     });
 
