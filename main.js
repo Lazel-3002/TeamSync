@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage } = require('electron');
 app.name = 'TeamSync';
+app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 app.commandLine.appendSwitch('allow-loopback-in-peer-connection');
 const path = require('path');

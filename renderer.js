@@ -597,14 +597,24 @@ function renderFriends() {
           </div>
           <div>
             <b>${escapeHtml(f.name)}</b>
-            ${inRoom ? '<div style="font-size: 11px; color: var(--ok); margin-top: 2px;">🟢 Sunucuda</div>' : ''}
+            ${inRoom ? '<div style="font-size: 11px; color: var(--ok); margin-top: 2px; display:flex; align-items:center;"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="margin-right:4px;"><circle cx="12" cy="12" r="12"></circle></svg> Sunucuda</div>' : ''}
           </div>
         </div>
-        <div class="friend-actions">
-          <button class="icon-btn sm" style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3);" onclick="openDM('${fId}')" title="Mesaj Gönder">💬</button>
-          ${inRoom ? `<button class="icon-btn sm" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom('${fId}')" title="Sunucusuna Katıl">🎮</button>` : ''}
-          <button class="icon-btn sm" style="background: ${f.isMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'}; color: ${f.isMuted ? '#fca5a5' : '#9ca3af'}; border-color: ${f.isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(107, 114, 128, 0.3)'};" onclick="toggleMuteFriend('${fId}')" title="${f.isMuted ? 'Sesi Aç' : 'Sessize Al / Engelle'}">${f.isMuted ? '🔇' : '🔊'}</button>
-          <button class="icon-btn sm" style="color: #fca5a5;" onclick="removeFriend('${fId}')" title="Arkadaşlıktan Çıkar">✕</button>
+        <div class="friend-actions" style="display: flex; gap: 8px; align-items: center;">
+          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3);" onclick="openDM('${fId}')" title="Mesaj Gönder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          </button>
+          ${inRoom ? `<button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom('${fId}')" title="Sunucusuna Katıl">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h4"></path><path d="M8 10v4"></path><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line></svg>
+          </button>` : ''}
+          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: ${f.isMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'}; color: ${f.isMuted ? '#fca5a5' : '#9ca3af'}; border-color: ${f.isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(107, 114, 128, 0.3)'};" onclick="toggleMuteFriend('${fId}')" title="${f.isMuted ? 'Sesi Aç' : 'Sessize Al / Engelle'}">
+            ${f.isMuted 
+              ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>` 
+              : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`}
+          </button>
+          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);" onclick="removeFriend('${fId}')" title="Arkadaşlıktan Çıkar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+          </button>
         </div>
       `;
       flist.appendChild(li);
