@@ -268,6 +268,15 @@ function createWindow() {
 
 ipcMain.handle('get-local-ips', () => getLocalIPs());
 
+ipcMain.handle('toggle-fullscreen', () => {
+  if (mainWindow) {
+    const isFull = mainWindow.isFullScreen();
+    mainWindow.setFullScreen(!isFull);
+    return !isFull;
+  }
+  return false;
+});
+
 ipcMain.handle('load-accounts', () => {
   const filePath = path.join(baseUserData, 'accounts.json');
   if (fs.existsSync(filePath)) {
@@ -577,7 +586,13 @@ app.whenReady().then(() => {
         '*://*.pagead2.googlesyndication.com/*',
         '*://*.adsystem.com/*',
         '*://*.adservice.com/*',
-        '*://*.analytics.google.com/*'
+        '*://*.analytics.google.com/*',
+        '*://*.facebook.com/tr*',
+        '*://*.criteo.com/*',
+        '*://*.taboola.com/*',
+        '*://*.outbrain.com/*',
+        '*://*.amazon-adsystem.com/*',
+        '*://*.mc.yandex.ru/*'
       ]
     },
     (details, callback) => {

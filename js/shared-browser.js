@@ -56,7 +56,11 @@ function initSharedBrowser() {
     let url = sbUrl.value.trim();
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) {
-      url = 'https://' + url;
+      if (url.includes('.') && !url.includes(' ')) {
+        url = 'https://' + url;
+      } else {
+        url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url);
+      }
     }
     if (/youtube\.com|youtu\.be/i.test(url)) {
       showToast("💡 İpucu: YouTube videolarını senkronize izlemek için 'WatchTogether' etkinliğini kullanabilirsiniz!", "info");
@@ -94,9 +98,91 @@ function initSharedBrowser() {
     sbWebview.focus();
   });
   
-  // Webview DOM hazır olduğunda keyboard input'u aktif et
+  // Webview DOM hazır olduğunda keyboard input'u aktif et ve eklentileri yükle
   sbWebview.addEventListener('dom-ready', () => {
     sbWebview.focus();
+
+    // YouTube Dislike Eklentisi (Return YouTube Dislike API)
+    sbWebview.executeJavaScript(`
+      (() => {
+        if (!window.location.hostname.includes('youtube.com')) return;
+        if (window.__ryd_injected) return;
+        window.__ryd_injected = true;
+
+        async function updateDislikes() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const videoId = urlParams.get('v');
+          if (!videoId) return;
+
+          try {
+            const res = await fetch('https://returnyoutubedislikeapi.com/votes?videoId=' + videoId);
+            const data = await res.json();
+            if (!data || !data.dislikes) return;
+
+            // YouTube arayüzündeki dislike butonunu bul
+            const formatNumber = (num) => {
+              if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+              if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+              if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+              return num.toString();
+            };
+
+            const dislikeText = formatNumber(data.dislikes);
+
+            // Klasik veya yeni YouTube arayüzündeki dislike butonu text alanını arayalım
+            // Yeni arayüzde dislike butonu genellikle "segmented-like-dislike-button-view-model" içindedir
+            const observer = new MutationObserver((mutations, obs) => {
+              const buttons = document.querySelectorAll('dislike-button-view-model button');
+              if (buttons.length > 0) {
+                const dislikeBtn = buttons[0];
+                let textEl = dislikeBtn.querySelector('.cbox');
+                if (!textEl) {
+                  // Yeni tasarım text elemanı ekleyelim
+                  const span = document.createElement('span');
+                  span.className = 'cbox';
+                  span.style.marginLeft = '6px';
+                  span.style.fontSize = '1.4rem';
+                  span.style.fontWeight = '500';
+                  span.style.lineHeight = '2rem';
+                  dislikeBtn.appendChild(span);
+                  textEl = span;
+                }
+                textEl.innerText = dislikeText;
+                obs.disconnect(); // Bulduk ve yazdık
+              }
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true });
+            
+            // Eğer sayfa çoktan yüklendiyse hemen tetikleyelim (observer yakalayamazsa diye)
+            setTimeout(() => {
+              const buttons = document.querySelectorAll('dislike-button-view-model button');
+              if (buttons.length > 0) {
+                const dislikeBtn = buttons[0];
+                let textEl = dislikeBtn.querySelector('.cbox');
+                if (!textEl) {
+                  const span = document.createElement('span');
+                  span.className = 'cbox';
+                  span.style.marginLeft = '6px';
+                  span.style.fontSize = '1.4rem';
+                  span.style.fontWeight = '500';
+                  span.style.lineHeight = '2rem';
+                  dislikeBtn.appendChild(span);
+                  textEl = span;
+                }
+                textEl.innerText = dislikeText;
+              }
+            }, 1000);
+
+          } catch(e) { console.error('RYD Error:', e); }
+        }
+
+        // Sayfa değiştiğinde (SPA navigation) tekrar çalıştır
+        window.addEventListener('yt-navigate-finish', updateDislikes);
+        // İlk yüklemede de çalıştır
+        updateDislikes();
+      })();
+    `).catch(err => console.error("Script injection failed", err));
   });
 
   sbWebview.addEventListener('did-fail-load', (e) => {
@@ -131,6 +217,14 @@ function initSharedBrowser() {
     }
     if (state.sb.host === state.myId || state.sb.interactive) {
       broadcast({ type: 'sb-nav', url: e.url });
+    }
+  });
+
+  sbWebview.addEventListener('new-window', (e) => {
+    // Popup veya yeni sekme açmak isteyen linkleri aynı webview içinde aç
+    e.preventDefault();
+    if (e.url) {
+      sbWebview.src = e.url;
     }
   });
 

@@ -3427,10 +3427,17 @@ function bindUI() {
     e.stopPropagation();
     state.focusLocked = !state.focusLocked;
     const btn = document.getElementById('focus-lock-btn');
-    btn.textContent = state.focusLocked ? '🔒' : '🔓';
+    btn.innerHTML = state.focusLocked ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>';
     btn.style.background = state.focusLocked ? 'rgba(220, 38, 38, 0.8)' : 'rgba(0,0,0,0.6)';
     btn.style.borderColor = state.focusLocked ? 'rgba(239, 68, 68, 1)' : 'rgba(255,255,255,0.2)';
     showToast(state.focusLocked ? 'Odak Kilitlendi' : 'Odak Kilidi Açıldı', 'info');
+  });
+
+  document.getElementById('focus-fullscreen-btn').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (window.electronAPI && window.electronAPI.toggleFullscreen) {
+      await window.electronAPI.toggleFullscreen();
+    }
   });
   
   initActivitiesUI();
@@ -3676,6 +3683,14 @@ function closeAllCards(leaveLobby = false, except = null) {
   if (leaveLobby) {
     leaveActiveLobby();
   }
+  
+  if (document.activeElement) {
+    try { document.activeElement.blur(); } catch(e){}
+  }
+
+  // Odak modunu sıfırla ki boş kalıp UI'ı bloke etmesin
+  state.focusLocked = false;
+
   ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card', 'poke-card'].forEach(id => {
     if (id === except) return;
     const el = document.getElementById(id);
@@ -3684,6 +3699,15 @@ function closeAllCards(leaveLobby = false, except = null) {
       toggleFocus(focusedCard);
     }
   });
+
+  // Eğer her şey kapanıyorsa (except yoksa), odak alanını kesin gizle
+  if (!except) {
+    document.querySelector('.main').classList.remove('focus-mode');
+    document.getElementById('focus-area').classList.add('hidden');
+    document.getElementById('focus-lock-btn').classList.add('hidden');
+    document.getElementById('focus-fullscreen-btn').classList.add('hidden');
+    focusedCard = null;
+  }
 
   if (state.wt && except !== 'wt-card') {
     if (state.wt.player && state.wt.player.stopVideo) {
