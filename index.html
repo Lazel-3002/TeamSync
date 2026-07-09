@@ -32,6 +32,61 @@
     }
     .poke-evo-card img { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); margin-bottom: 20px; }
     .poke-evo-name { color: #fbbf24; font-weight: 900; font-size: 22px; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,1); }
+    
+    /* Activity Card Premium Styles */
+    .card-act-btn {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(12px);
+    }
+    .card-act-btn:hover {
+      transform: translateY(-5px) scale(1.02);
+      background: linear-gradient(135deg, rgba(40, 55, 75, 0.9), rgba(15, 23, 42, 1));
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+    }
+    .card-act-btn::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 50%; height: 100%;
+      background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transform: skewX(-25deg);
+      transition: all 0.7s ease;
+    }
+    .card-act-btn:hover::before {
+      left: 200%;
+    }
+    .card-act-btn svg {
+      filter: drop-shadow(0 0 5px currentColor);
+      transition: transform 0.3s ease, filter 0.3s ease;
+    }
+    .card-act-btn:hover svg {
+      transform: scale(1.15) rotate(5deg);
+      filter: drop-shadow(0 0 15px currentColor);
+    }
+    .card-act-btn > div > div > div:first-child {
+      font-size: 20px !important;
+      font-weight: 900 !important;
+      letter-spacing: 0.5px;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+      transition: all 0.3s ease;
+    }
+    .card-act-btn:hover > div > div > div:first-child {
+      transform: scale(1.05);
+      transform-origin: left;
+    }
+    .card-act-btn p.muted {
+      color: rgba(255,255,255,0.7) !important;
+      font-size: 13px !important;
+      line-height: 1.4;
+      margin-top: 6px !important;
+    }
   </style>
 </head>
 <body>
