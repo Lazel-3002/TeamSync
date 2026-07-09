@@ -111,7 +111,7 @@ function App() {
           onJoinRoom={({ id, isHost, password }) => {
             // Generate random ID if host and no ID provided
             const finalId = (isHost && (!id || !id.trim())) ? 
-              "teamsync-" + Math.random().toString(36).substring(2, 8).toUpperCase() : 
+              `TS-${crypto.randomUUID()}` : 
               id;
             
             if (!finalId || !finalId.trim()) {

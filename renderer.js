@@ -146,7 +146,7 @@ function setupInternetSignaling(roomId, myId, myName) {
   let brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
 
   mqttClient = mqtt.connect(brokerUrl, {
-    clientId: 'teamsync-sig-' + myId,
+    clientId: 'sig-' + myId,
     keepalive: 60,
     reconnectPeriod: 1000
   });
@@ -722,7 +722,7 @@ let pingInterval = null;
 function setupGlobalMQTT() {
   if (state.globalMqtt) return;
   state.globalMqtt = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
-    clientId: 'teamsync-glob-' + state.friendId + '-' + state.myId,
+    clientId: 'glob-' + state.friendId + '-' + state.myId,
     keepalive: 60,
     reconnectPeriod: 1000
   });
@@ -1399,7 +1399,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const sName = createName.value.trim() || 'Oyun Odası';
     
     // Gerçek P2P ID mantığı: Cloudflared tüneline gerek kalmadan eşsiz bir ID üretiyoruz
-    const odaId = "teamsync-" + Math.random().toString(36).substring(2, 10) + "-" + Math.random().toString(36).substring(2, 6);
+    const odaId = `TS-${crypto.randomUUID()}`;
     
     const useSFW = document.getElementById('create-useSFW').checked;
     startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false, useSFW);
@@ -3551,7 +3551,7 @@ function startRecording() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `teamsync-${Date.now()}.webm`;
+      a.download = `record-${Date.now()}.webm`;
       a.click();
       URL.revokeObjectURL(url);
     };
