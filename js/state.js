@@ -76,5 +76,6 @@ window.state = {
   spectating: false,
   selectedLobbyActivity: null,
   sfwMode: false,
-  aiModel: null
+  aiModel: null,
+  gameMode: false
 };

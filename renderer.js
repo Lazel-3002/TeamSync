@@ -1280,8 +1280,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false) => {
+  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false, useGameMode = false) => {
     state.sfwMode = useSFW;
+    state.gameMode = useGameMode;
     if (useSFW) {
        showToast("Yapay zeka modelleri yükleniyor (3MB), Lütfen bekleyin...", "info");
        await loadAIFilter();
@@ -1402,7 +1403,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     const odaId = `TS-${crypto.randomUUID()}`;
     
     const useSFW = document.getElementById('create-useSFW').checked;
-    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false, useSFW);
+    const useGameMode = document.getElementById('create-gameMode') ? document.getElementById('create-gameMode').checked : false;
+    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false, useSFW, useGameMode);
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -2106,6 +2108,7 @@ async function handleDataMessage(peerId, msg) {
   
   if (msg.type === 'founder_settings_update') {
     if (msg.friendsOnlyMode !== undefined) state.friendsOnlyMode = msg.friendsOnlyMode;
+    if (msg.gameMode !== undefined) state.gameMode = msg.gameMode;
     if (msg.sfwMode !== undefined) {
       state.sfwMode = msg.sfwMode;
       if (state.sfwMode) loadAIFilter();
@@ -3294,6 +3297,7 @@ function bindUI() {
     document.getElementById('founder-settings-modal').classList.remove('hidden');
     document.getElementById('founder-friends-only').checked = state.friendsOnlyMode || false;
     document.getElementById('founder-sfw-mode').checked = state.sfwMode || false;
+    document.getElementById('founder-game-mode').checked = state.gameMode || false;
     
     // Populate Player List
     const listEl = document.getElementById('founder-player-list');
@@ -3374,6 +3378,14 @@ function bindUI() {
       state.globalMqtt.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'founder_settings_update', sfwMode: state.sfwMode }));
     }
     showToast(state.sfwMode ? 'Yapay Zeka Koruması aktif!' : 'Yapay Zeka Koruması kapatıldı.', 'info');
+  });
+  
+  document.getElementById('founder-game-mode').addEventListener('change', (e) => {
+    state.gameMode = e.target.checked;
+    if (state.globalMqtt && state.room) {
+      state.globalMqtt.publish(`teamsync/room/${state.room}/broadcast`, JSON.stringify({ type: 'founder_settings_update', gameMode: state.gameMode }));
+    }
+    showToast(state.gameMode ? 'Oyun Modu aktif (15FPS/Düşük İşlemci)!' : 'Oyun Modu kapatıldı.', 'info');
   });
   
   document.getElementById('settings-save').addEventListener('click', () => {
@@ -3502,7 +3514,7 @@ async function startScreenShare(sourceId) {
     }
     state.screenStream = await navigator.mediaDevices.getDisplayMedia({
       audio: shareAudio,
-      video: { frameRate: consts.frameRate.ideal || 30 }
+      video: { frameRate: state.gameMode ? 15 : (consts.frameRate.ideal || 30) }
     });
     const track = state.screenStream.getVideoTracks()[0];
     state.peers.forEach(peer => {
