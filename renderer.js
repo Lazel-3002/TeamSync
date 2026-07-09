@@ -3435,8 +3435,15 @@ function bindUI() {
 
   document.getElementById('focus-fullscreen-btn').addEventListener('click', async (e) => {
     e.stopPropagation();
-    if (window.electronAPI && window.electronAPI.toggleFullscreen) {
-      await window.electronAPI.toggleFullscreen();
+    const focusArea = document.getElementById('focus-area');
+    if (!document.fullscreenElement) {
+      if (focusArea.requestFullscreen) {
+        await focusArea.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
     }
   });
   
@@ -3718,7 +3725,7 @@ function closeAllCards(leaveLobby = false, except = null) {
   if (state.sb && except !== 'sb-card') {
     state.sb.joinedActivity = false;
     const sbWebview = document.getElementById('sb-webview');
-    if (sbWebview) sbWebview.src = 'https://www.google.com';
+    if (sbWebview) sbWebview.src = 'https://duckduckgo.com'; // Her zaman duckduckgo kalacak
   }
   if (state.uno && except !== 'uno-card') {
     state.uno.joinedActivity = false;
@@ -4361,7 +4368,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -4379,7 +4386,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film İzle', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -4408,7 +4415,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!act) return;
     
     // Create new lobby
-    const names = { wt: 'WatchTogether', uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Yerel Film', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
+    const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
     const newLobby = {
       id: `LOB-${crypto.randomUUID()}`,
       activity: act,

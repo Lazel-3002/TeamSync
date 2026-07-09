@@ -575,30 +575,20 @@ app.whenReady().then(() => {
   );
 
   // Reklam engelleme kuralı (Ortak Tarayıcı'da reklamları bloklamak için)
-  session.defaultSession.webRequest.onBeforeRequest(
-    {
-      urls: [
-        '*://*.doubleclick.net/*',
-        '*://*.googlesyndication.com/*',
-        '*://*.googleadservices.com/*',
-        '*://*.googletagservices.com/*',
-        '*://*.g.doubleclick.net/*',
-        '*://*.pagead2.googlesyndication.com/*',
-        '*://*.adsystem.com/*',
-        '*://*.adservice.com/*',
-        '*://*.analytics.google.com/*',
-        '*://*.facebook.com/tr*',
-        '*://*.criteo.com/*',
-        '*://*.taboola.com/*',
-        '*://*.outbrain.com/*',
-        '*://*.amazon-adsystem.com/*',
-        '*://*.mc.yandex.ru/*'
-      ]
-    },
-    (details, callback) => {
-      callback({ cancel: true });
+  const { ElectronBlocker } = require('@ghostery/adblocker-electron');
+  const fetch = require('cross-fetch');
+  ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+    // disable cosmetic filtering to avoid session.registerPreloadScript missing error
+    if (blocker.config) {
+      blocker.config.loadCosmeticFilters = false;
+    } else {
+      blocker.config = { loadCosmeticFilters: false, loadNetworkFilters: true };
     }
-  );
+    blocker.enableBlockingInSession(session.defaultSession);
+    console.log("Adblocker ağı seviyesinde başarıyla aktif edildi.");
+  }).catch((err) => {
+    console.error('Adblocker yüklenirken hata oluştu:', err);
+  });
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     let responseHeaders = { ...details.responseHeaders };

@@ -13,9 +13,11 @@
   "author": "TeamSync",
   "license": "MIT",
   "dependencies": {
+    "@ghostery/adblocker-electron": "^2.18.1",
     "@jitsi/robotjs": "^0.6.22",
     "@supabase/supabase-js": "^2.110.0",
     "acorn": "^8.17.0",
+    "cross-fetch": "^4.1.0",
     "crypto-js": "^4.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

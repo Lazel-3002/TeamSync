@@ -62,9 +62,7 @@ function initSharedBrowser() {
         url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url);
       }
     }
-    if (/youtube\.com|youtu\.be/i.test(url)) {
-      showToast("💡 İpucu: YouTube videolarını senkronize izlemek için 'WatchTogether' etkinliğini kullanabilirsiniz!", "info");
-    }
+
     sbWebview.src = url;
   });
   sbUrl.addEventListener('click', () => {
@@ -239,24 +237,37 @@ function initSharedBrowser() {
     try {
       await sbWebview.executeJavaScript(`(() => {
         // Dismiss standard YouTube ad skip button
-        const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button');
-        if (skipBtn) {
-          skipBtn.click();
-        }
+        const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-overlay-close-button');
+        if (skipBtn) skipBtn.click();
         
-        // Dismiss YouTube overlay ads (non-video ads)
-        const overlayAd = document.querySelector('.ytp-ad-overlay-close-button');
-        if (overlayAd) {
-          overlayAd.click();
-        }
-
         // Speed up and skip video ads immediately
-        const ad = document.querySelector('.ad-showing, .ad-interrupting');
+        const ad = document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay');
         const v = document.querySelector('video');
         if (ad && v) {
           v.playbackRate = 16.0;
-          v.currentTime = v.duration - 0.1;
+          v.muted = true;
+          if (!isNaN(v.duration) && v.duration > 0) {
+            v.currentTime = v.duration - 0.1;
+          }
         }
+
+        // Cosmetic removal of Shorts ads and sponsored items
+        document.querySelectorAll('ytd-reel-video-renderer, ytd-rich-item-renderer, ytd-video-renderer, ytd-promoted-sparkles-web-renderer, ytd-ad-slot-renderer').forEach(el => {
+          // Remove obvious ad containers
+          if (el.tagName.toLowerCase().includes('ad-slot') || el.tagName.toLowerCase().includes('promoted')) {
+            el.remove();
+            return;
+          }
+          // Check for "Sponsorlu" or "Ad" badges
+          const badges = el.querySelectorAll('.badge-shape-wiz__text, #ad-badge, .ytd-badge-supported-renderer, [id^="ad-text"]');
+          for (let b of badges) {
+            const text = b.innerText ? b.innerText.trim().toLowerCase() : '';
+            if (text === 'sponsorlu' || text === 'ad' || text === 'reklam') {
+              el.remove();
+              break;
+            }
+          }
+        });
       })()`);
     } catch (e) {}
 
