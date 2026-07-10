@@ -333,6 +333,10 @@ function initPoke() {
       container.style.width = '100%';
       container.style.height = '100%';
       area.appendChild(container);
+      
+      // FIX: Clean up the container from the DOM after the animation completes
+      // to prevent severe lag caused by accumulating thousands of transparent divs
+      setTimeout(() => container.remove(), 3000);
 
       const createParticle = (config) => {
           const p = document.createElement('div');
@@ -716,7 +720,7 @@ function initPoke() {
                 allMoves.push({
                   name: mData.name.replace('-', ' ').toUpperCase(),
                   type: mData.type.name,
-                  power: mData.power
+                  power: Math.min(Math.max(mData.power, 40), 85)
                 });
              }
            }
@@ -869,6 +873,8 @@ function initPoke() {
 
       p1Img.src = pokeState.p1.pokemon || UNKNOWN_AVATAR;
       p2Img.src = pokeState.p2.pokemon || UNKNOWN_AVATAR;
+      if (pokeState.p1.evoName) p1Img.dataset.realname = pokeState.p1.evoName;
+      if (pokeState.p2.evoName) p2Img.dataset.realname = pokeState.p2.evoName;
       p1Img.className = '';
       p2Img.className = '';
       
@@ -1014,7 +1020,7 @@ function initPoke() {
              const card = document.createElement('div');
              card.className = 'poke-base-card';
              card.innerHTML = `
-                <img src="${fam.evolutions[0].url}" />
+                <img src="${fam.evolutions[0].url}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                 <div class="poke-base-name">${fam.displayName}</div>
                 <div class="poke-type-badge" style="background: ${TYPE_COLORS[fam.type] || '#777'};">${TYPE_NAMES[fam.type] || fam.type}</div>
              `;
@@ -1058,7 +1064,7 @@ function initPoke() {
                   const card = document.createElement('div');
                   card.className = 'poke-base-card';
                   card.innerHTML = `
-                     <img src="${fam.evolutions[0].url}" />
+                     <img src="${fam.evolutions[0].url}" data-realname="${fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                      <div class="poke-base-name">${fam.displayName}</div>
                      <div class="poke-type-badge" style="background: ${TYPE_COLORS[fam.type] || '#777'};">${TYPE_NAMES[fam.type] || fam.type}</div>
                   `;
@@ -1079,14 +1085,14 @@ function initPoke() {
     pokeState.p1.type = data.typeStr;
     pokeState.p1.baseReady = true;
     const fam1 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
-    if(fam1) { pokeState.p1.hp = fam1.hp; pokeState.p1.maxHp = fam1.hp; }
+    if(fam1) { pokeState.p1.hp = 250; pokeState.p1.maxHp = 250; }
 }
        if (pokeState.p2 && pokeState.p2.id === data.id) {
     pokeState.p2.baseName = data.baseName;
     pokeState.p2.type = data.typeStr;
     pokeState.p2.baseReady = true;
     const fam2 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
-    if(fam2) { pokeState.p2.hp = fam2.hp; pokeState.p2.maxHp = fam2.hp; }
+    if(fam2) { pokeState.p2.hp = 250; pokeState.p2.maxHp = 250; }
 }
        
        if (data.id === state.myId) {
@@ -1101,7 +1107,7 @@ function initPoke() {
              const card = document.createElement('div');
              card.className = 'poke-evo-card';
              card.innerHTML = `
-                <img src="${evo.url}" />
+                <img src="${evo.url}" data-realname="${evo.name}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                 <div class="poke-evo-name">${evo.name}</div>
              `;
              card.onclick = () => {
@@ -1331,12 +1337,12 @@ function initPoke() {
       pokeState.p2.moves = data.p2.moves;
       
       const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
-      pokeState.p1.hp = fam1 ? fam1.hp : 140;
-      pokeState.p1.maxHp = fam1 ? fam1.hp : 140;
+      pokeState.p1.hp = 250;
+      pokeState.p1.maxHp = 250;
 
       const fam2 = window.POKEMON_FAMILIES.find(f => data.p2.baseName ? f.baseName === data.p2.baseName : f.type === data.p2.type);
-      pokeState.p2.hp = fam2 ? fam2.hp : 140;
-      pokeState.p2.maxHp = fam2 ? fam2.hp : 140;
+      pokeState.p2.hp = 250;
+      pokeState.p2.maxHp = 250;
 
       customRenderBattleArena();
       
