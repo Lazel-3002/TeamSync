@@ -567,8 +567,11 @@ function initPoke() {
        window.pokeAnimPlaying = true;
        const m1 = pokeState.p1.moves[action1.moveIdx];
        const m2 = pokeState.p2.moves[action2.moveIdx];
-       const s1 = getMoveSpeed(m1.name);
-       const s2 = getMoveSpeed(m2.name);
+       const rawS1 = (pokeState.p1.speed || 50) + (100 - m1.power) * 0.5;
+       const s1 = Math.max(1, Math.min(10, Math.round(rawS1 / 15)));
+       
+       const rawS2 = (pokeState.p2.speed || 50) + (100 - m2.power) * 0.5;
+       const s2 = Math.max(1, Math.min(10, Math.round(rawS2 / 15)));
        
        let first = 'p1', second = 'p2';
        let firstMove = m1, secondMove = m2;
@@ -706,70 +709,94 @@ function initPoke() {
     return parts[parts.length - 1].replace('.gif', '').replace('.png', '').split('-')[0];
   };
 
-  const fetchRandomMoves = async (pokeName, targetType, fullList = false) => {
+  const fetchPokemonStatsAndMoves = async (pokeName, targetType, fullList = false) => {
     try {
-      const res = await fetch('https://pokeapi.co/api/v2/pokemon/' + pokeName);
+      const pokeApiName = pokeName.toLowerCase().replace(/ /g, '-').replace(/\./g, '').replace(/'/g, '');
+      const res = await fetch('https://pokeapi.co/api/v2/pokemon/' + pokeApiName);
       const data = await res.json();
-      const allUrls = data.moves.map(m => m.move.url).sort(() => 0.5 - Math.random());
       
-      const poolUrls = allUrls.slice(0, fullList ? 12 : 8);
-      const allMoves = [];
+      let stats = { hp: 70, speed: 50 };
+      if (data.stats) {
+          data.stats.forEach(s => {
+              if (s.stat.name === 'hp') stats.hp = s.base_stat;
+              if (s.stat.name === 'speed') stats.speed = s.base_stat;
+          });
+      }
+
+      let allMoves = [];
+      if (data.moves) {
+          data.moves.forEach(m => {
+              const moveName = m.move.name;
+              const dictMove = window.POKEMON_MOVES ? window.POKEMON_MOVES[moveName] : null;
+              if (dictMove && dictMove.power > 0) {
+                 const mObj = {
+                     name: moveName.replace(/-/g, ' ').toUpperCase(),
+                     type: dictMove.type,
+                     power: dictMove.power
+                 };
+                 if (!allMoves.find(x => x.name === mObj.name)) {
+                     allMoves.push(mObj);
+                 }
+              }
+          });
+      }
       
-      await Promise.all(poolUrls.map(async url => {
-         try {
-           const mRes = await fetch(url);
-           const mData = await mRes.json();
-           if (mData.power && mData.power > 0) {
-             // ensure no duplicates by name
-             if (!allMoves.find(x => x.name === mData.name.replace('-', ' ').toUpperCase())) {
-                allMoves.push({
-                  name: mData.name.replace('-', ' ').toUpperCase(),
-                  type: mData.type.name,
-                  power: Math.min(Math.max(mData.power, 40), 85)
-                });
-             }
-           }
-         } catch(e) {}
-      }));
+      allMoves.sort((a, b) => b.power - a.power);
       
-            if (fullList) {
-           while (allMoves.length < 4) {
-             allMoves.push({
-               name: ["STRUGGLE", "TACKLE", "FLAIL", "THRASH"][allMoves.length],
-               type: "normal",
-               power: 50
-             });
-           }
-           return allMoves; // return all fetched moves for manual selection
-        }
+      if (fullList) {
+         if (allMoves.length === 0) allMoves = [{name: "STRUGGLE", type: "normal", power: 50}];
+         return { stats, moves: allMoves };
+      }
       
-      // Auto selection logic
-      const stabMoves = allMoves.filter(m => m.type === targetType);
-      const normalMoves = allMoves.filter(m => m.type === 'normal');
-      const otherMoves = allMoves.filter(m => m.type !== targetType && m.type !== 'normal');
+      // If NOT fullList (e.g. Bot), filter to good/high-level moves to pick smartly
+      const goodMoveNames = [];
+      data.moves.forEach(m => {
+          let maxLvl = 0;
+          m.version_group_details.forEach(v => {
+              if (v.move_learn_method.name === 'level-up' && v.level_learned_at > maxLvl) {
+                  maxLvl = v.level_learned_at;
+              }
+          });
+          if (maxLvl > 20 || m.version_group_details.some(v => v.move_learn_method.name === 'machine')) {
+              goodMoveNames.push(m.move.name.replace(/-/g, ' ').toUpperCase());
+          }
+      });
+      
+      const goodMoves = allMoves.filter(m => goodMoveNames.includes(m.name));
+      const poolForBot = goodMoves.length > 5 ? goodMoves : allMoves;
+      
+      const stabMoves = poolForBot.filter(m => m.type === targetType).slice(0, 10);
+      const otherMoves = poolForBot.filter(m => m.type !== targetType).slice(0, 15);
       
       const selectedMoves = [];
-      if (stabMoves.length > 0) selectedMoves.push(stabMoves.pop());
-      if (normalMoves.length > 0) selectedMoves.push(normalMoves.pop());
+      if (stabMoves.length > 0) {
+          stabMoves.sort(() => 0.5 - Math.random());
+          selectedMoves.push(stabMoves.pop());
+          if (stabMoves.length > 0) selectedMoves.push(stabMoves.pop());
+      }
       
-      const combined = [...stabMoves, ...normalMoves, ...otherMoves].sort(() => 0.5 - Math.random());
-      while (selectedMoves.length < 4 && combined.length > 0) {
-         selectedMoves.push(combined.pop());
+      otherMoves.sort(() => 0.5 - Math.random());
+      while (selectedMoves.length < 4 && otherMoves.length > 0) {
+          selectedMoves.push(otherMoves.pop());
       }
       
       while (selectedMoves.length < 4) {
          selectedMoves.push({ name: "TACKLE", type: "normal", power: 40 });
       }
-      return selectedMoves;
+      
+      return { stats, moves: selectedMoves };
       
     } catch(err) {
-      console.log('Move fetch err', err);
-      return [
-        {name: "TACKLE", type: "normal", power: 40},
-        {name: "QUICK ATTACK", type: "normal", power: 40},
-        {name: "SLAM", type: "normal", power: 80},
-        {name: "BODY SLAM", type: "normal", power: 85}
-      ];
+      console.log('Stats/Move fetch err', err);
+      return {
+        stats: { hp: 70, speed: 50 },
+        moves: [
+          {name: "TACKLE", type: "normal", power: 40},
+          {name: "QUICK ATTACK", type: "normal", power: 40},
+          {name: "SLAM", type: "normal", power: 80},
+          {name: "BODY SLAM", type: "normal", power: 85}
+        ]
+      };
     }
   };
 
@@ -777,7 +804,7 @@ function initPoke() {
 
   // Move selection UI logic
   let selectedManualMoves = [];
-  window.renderMoveSelection = (moves) => {
+  window.renderMoveSelection = (moves, mySpeed = 50) => {
      const list = document.getElementById('poke-move-selection-list');
      const count = document.getElementById('poke-move-count');
      const btn = document.getElementById('poke-confirm-moves-btn');
@@ -789,19 +816,23 @@ function initPoke() {
      btn.style.cursor = 'not-allowed';
      
      moves.forEach((move, i) => {
+        const rawSpeed = (mySpeed || 50) + (100 - move.power) * 0.5;
+        const moveSpeed = Math.max(1, Math.min(10, Math.round(rawSpeed / 15)));
         const d = document.createElement('div');
         d.className = 'manual-move-card';
         d.style.background = 'rgba(255,255,255,0.1)';
         d.style.border = '2px solid rgba(255,255,255,0.2)';
-        d.style.padding = '10px 15px';
-        d.style.borderRadius = '10px';
+        d.style.padding = '10px 14px';
+        d.style.borderRadius = '8px';
         d.style.cursor = 'pointer';
         d.style.display = 'flex';
         d.style.flexDirection = 'column';
-        d.style.minWidth = '140px';
+        d.style.alignItems = 'center';
+        d.style.justifyContent = 'center';
+        d.style.minWidth = '130px';
         
-        d.innerHTML = `<span style="color:white; font-weight:bold;">${move.name}</span>
-                       <span style="font-size:12px; color:${TYPE_COLORS[move.type] || '#ccc'};">${move.type.toUpperCase()} | Güç: ${move.power}</span>`;
+        d.innerHTML = `<span style="color:white; font-weight:bold; font-size:15px; text-align:center;">${move.name}</span>
+                       <span style="font-size:12px; text-align:center; margin-top:4px; color:${TYPE_COLORS[move.type] || '#ccc'};">${move.type.toUpperCase()} | Güç: ${move.power} | Hız: ${moveSpeed}/10</span>`;
         
         d.addEventListener('click', () => {
            const idx = selectedManualMoves.indexOf(move);
@@ -832,10 +863,12 @@ function initPoke() {
   };
   
   document.getElementById('poke-confirm-moves-btn')?.addEventListener('click', () => {
-     if (selectedManualMoves.length !== 4) return;
+     if (selectedManualMoves.length === 0) return;
      document.getElementById('poke-confirm-moves-btn').style.display = 'none';
      document.getElementById('poke-waiting-moves-msg').style.display = 'block';
-     broadcastPokeMsg({ type: 'poke_moves_ready', id: state.myId, moves: selectedManualMoves });
+     const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
+     const myStats = isP1 ? pokeState.p1.stats : pokeState.p2.stats;
+     broadcastPokeMsg({ type: 'poke_moves_ready', id: state.myId, moves: selectedManualMoves, stats: myStats });
   });
 
   const customRenderBattleArena = () => {
@@ -910,8 +943,10 @@ function initPoke() {
            if (btn && moves[i]) {
               btn.querySelector('.move-name').textContent = moves[i].name;
               btn.querySelector('.move-type').textContent = (TYPE_NAMES[moves[i].type] || moves[i].type).toUpperCase();
+                const rawSpeed = (pokeState[mySlot].speed || 50) + (100 - moves[i].power) * 0.5;
+                const calcSpeed = Math.max(1, Math.min(10, Math.round(rawSpeed / 15)));
                 const speedObj = btn.querySelector('.move-speed');
-                if(speedObj) speedObj.textContent = "Hız: " + getMoveSpeed(moves[i].name);
+                if(speedObj) speedObj.textContent = "Hız: " + calcSpeed + "/10";
               btn.querySelector('.move-type').className = 'move-type type-' + moves[i].type;
               btn.querySelector('.move-type').style.color = TYPE_COLORS[moves[i].type] || '#fff';
               btn.querySelector('.move-power').textContent = "Güç: " + moves[i].power;
@@ -989,13 +1024,13 @@ function initPoke() {
                 const n1 = getPokemonNameFromUrl(p1Poke);
                 const n2 = getPokemonNameFromUrl(p2Poke);
                 
-                const p1Moves = await fetchRandomMoves(n1, t1, false);
-                const p2Moves = await fetchRandomMoves(n2, t2, false);
+                const p1Data = await fetchPokemonStatsAndMoves(n1, t1, false);
+                const p2Data = await fetchPokemonStatsAndMoves(n2, t2, false);
                 
                 broadcastPokeMsg({
                    type: 'poke_reveal',
-                   p1: { type: t1, baseName: fam1.baseName, evoName: p1Evo.name, pokemon: p1Poke, moves: p1Moves },
-                   p2: { type: t2, baseName: fam2.baseName, evoName: p2Evo.name, pokemon: p2Poke, moves: p2Moves }
+                   p1: { type: t1, baseName: fam1.baseName, evoName: p1Evo.name, pokemon: p1Poke, moves: p1Data.moves, stats: p1Data.stats },
+                   p2: { type: t2, baseName: fam2.baseName, evoName: p2Evo.name, pokemon: p2Poke, moves: p2Data.moves, stats: p2Data.stats }
                 });
             } else {
                 broadcastPokeMsg({ type: 'poke_base_selection_state' });
@@ -1156,12 +1191,13 @@ function initPoke() {
           const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
           const myState = isP1 ? pokeState.p1 : pokeState.p2;
           
-          fetchRandomMoves(myState.baseName, myState.type, true).then(movePool => {
+          fetchPokemonStatsAndMoves(myState.evoName || myState.baseName, myState.type, true).then(res => {
+             myState.stats = res.stats;
              document.getElementById('poke-move-selection-modal').classList.remove('hidden');
              document.getElementById('poke-confirm-moves-btn').style.display = 'block';
              document.getElementById('poke-waiting-moves-msg').style.display = 'none';
              document.getElementById('poke-move-selection-pokename').textContent = myState.evoName;
-             renderMoveSelection(movePool);
+             renderMoveSelection(res.moves, res.stats.speed);
           });
        }
 
@@ -1170,9 +1206,9 @@ function initPoke() {
           const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
           if (isHostFallback) {
              setTimeout(() => {
-                fetchRandomMoves(pokeState.p2.baseName, pokeState.p2.type, true).then(movePool => {
-                   const bMoves = movePool.sort(() => 0.5 - Math.random()).slice(0, 4);
-                   broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves });
+                fetchPokemonStatsAndMoves(pokeState.p2.evoName || pokeState.p2.baseName, pokeState.p2.type, true).then(res => {
+                   const bMoves = res.moves.sort(() => 0.5 - Math.random()).slice(0, 4);
+                   broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves, stats: res.stats });
                 });
              }, 300);
           }
@@ -1201,8 +1237,8 @@ function initPoke() {
 
        const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
        
-       if (isP1) renderMoveSelection(data.p1.movePool);
-       else if (isP2) renderMoveSelection(data.p2.movePool);
+       if (isP1) renderMoveSelection(data.p1.movePool, pokeState.p1.stats ? pokeState.p1.stats.speed : 50);
+       else if (isP2) renderMoveSelection(data.p2.movePool, pokeState.p2.stats ? pokeState.p2.stats.speed : 50);
        else {
           // spectator
           document.getElementById('poke-move-selection-modal').classList.add('hidden');
@@ -1222,10 +1258,12 @@ function initPoke() {
         if (data.type === 'poke_moves_ready') {
        if (pokeState.p1 && pokeState.p1.id === data.id) {
           pokeState.p1.moves = data.moves;
+          if (data.stats) pokeState.p1.stats = data.stats;
           pokeState.p1.ready = true;
        }
        if (pokeState.p2 && pokeState.p2.id === data.id) {
           pokeState.p2.moves = data.moves;
+          if (data.stats) pokeState.p2.stats = data.stats;
           pokeState.p2.ready = true;
        }
        
@@ -1345,12 +1383,22 @@ function initPoke() {
       if (data.p2.evoName) pokeState.p2.evoName = data.p2.evoName;
       
       const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
-      pokeState.p1.hp = 250;
-      pokeState.p1.maxHp = 250;
+      if (data.p1.stats) {
+          pokeState.p1.hp = Math.floor(data.p1.stats.hp * 2.5 + 50);
+          pokeState.p1.maxHp = pokeState.p1.hp;
+          pokeState.p1.speed = data.p1.stats.speed;
+      } else {
+          pokeState.p1.hp = 250; pokeState.p1.maxHp = 250; pokeState.p1.speed = 50;
+      }
 
       const fam2 = window.POKEMON_FAMILIES.find(f => data.p2.baseName ? f.baseName === data.p2.baseName : f.type === data.p2.type);
-      pokeState.p2.hp = 250;
-      pokeState.p2.maxHp = 250;
+      if (data.p2.stats) {
+          pokeState.p2.hp = Math.floor(data.p2.stats.hp * 2.5 + 50);
+          pokeState.p2.maxHp = pokeState.p2.hp;
+          pokeState.p2.speed = data.p2.stats.speed;
+      } else {
+          pokeState.p2.hp = 250; pokeState.p2.maxHp = 250; pokeState.p2.speed = 50;
+      }
 
       customRenderBattleArena();
       
@@ -1405,7 +1453,7 @@ function initPoke() {
          multiplier = typeChart[move.type][defType];
       }
       
-      const damage = Math.floor(move.power * multiplier * 0.4); // Scale down damage so 100 HP lasts a few turns
+      const damage = Math.floor(move.power * multiplier * 0.6); // Scaled based on new real HP formula
       const isSuper = multiplier > 1;
       const isResisted = multiplier < 1;
       
