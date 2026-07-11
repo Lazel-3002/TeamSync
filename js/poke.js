@@ -508,10 +508,12 @@ function initPoke() {
     
     logBox.textContent = pokeState[attackerSlot].name + ", " + moveName + " kullandı!";
     
-    atkImg.className = '';
-    defImg.className = '';
+    atkImg.className = 'poke-idle-anim-' + attackerSlot;
+    defImg.className = 'poke-idle-anim-' + defenderSlot;
     
     setTimeout(() => {
+      atkImg.className = '';
+      defImg.className = '';
       atkImg.classList.add('anim-lunge-' + attackerSlot);
       playPokemonCry(pokeState[attackerSlot].pokemon);
       
@@ -520,7 +522,8 @@ function initPoke() {
       
       setTimeout(() => {
         proj.style.display = 'none';
-        defImg.classList.add('anim-shake');
+        if (defenderSlot === 'p1') defImg.classList.add('anim-shake-p1');
+        else defImg.classList.add('anim-shake');
         
         // Apply damage visually
         pokeState[defenderSlot].hp -= damage;
@@ -537,8 +540,10 @@ function initPoke() {
         setTimeout(() => {
            if (pokeState[defenderSlot].hp <= 0) {
               logBox.textContent = pokeState[defenderSlot].name + " bayıldı! " + pokeState[attackerSlot].name + " kazandı!";
-              defImg.classList.add('anim-death');
-              atkImg.classList.add('anim-winner');
+              if (defenderSlot === 'p1') defImg.classList.add('anim-death-p1');
+              else defImg.classList.add('anim-death');
+              if (attackerSlot === 'p1') atkImg.classList.add('anim-winner-p1');
+              else atkImg.classList.add('anim-winner');
               endBattle(attackerSlot);
            } else {
               // Switch turn
@@ -871,12 +876,14 @@ function initPoke() {
       document.getElementById('poke-p2-pokename').style.display = 'block';
       document.getElementById('poke-p2-pokename').textContent = getPokemonNameFromUrl(pokeState.p2.pokemon);
 
-      p1Img.src = pokeState.p1.pokemon || UNKNOWN_AVATAR;
-      p2Img.src = pokeState.p2.pokemon || UNKNOWN_AVATAR;
       if (pokeState.p1.evoName) p1Img.dataset.realname = pokeState.p1.evoName;
       if (pokeState.p2.evoName) p2Img.dataset.realname = pokeState.p2.evoName;
-      p1Img.className = '';
-      p2Img.className = '';
+      p1Img.dataset.errState = '0';
+      p2Img.dataset.errState = '0';
+      p1Img.src = pokeState.p1.pokemon || UNKNOWN_AVATAR;
+      p2Img.src = pokeState.p2.pokemon || UNKNOWN_AVATAR;
+      p1Img.className = 'poke-idle-anim-p1';
+      p2Img.className = 'poke-idle-anim-p2';
       
       document.getElementById('poke-p1-hp-container').style.display = 'flex';
       document.getElementById('poke-p2-hp-container').style.display = 'flex';
@@ -951,8 +958,8 @@ function initPoke() {
        pokeState.status = 'waiting';
        if(pokeState.p1) { pokeState.p1.pokemon = null; /*pokeState.p1.hp = 100;*/ }
        if(pokeState.p2) { pokeState.p2.pokemon = null; /*pokeState.p2.hp = 100;*/ }
-       document.getElementById('poke-p1-pokemon').className = '';
-       document.getElementById('poke-p2-pokemon').className = '';
+       document.getElementById('poke-p1-pokemon').className = 'poke-idle-anim-p1';
+       document.getElementById('poke-p2-pokemon').className = 'poke-idle-anim-p2';
        renderPokeLobby();
     }
             if (data.type === 'poke_start') {
@@ -973,12 +980,11 @@ function initPoke() {
                 const t1 = fam1.type;
                 const t2 = fam2.type;
                 
-                // Get all evolutions URLs
-                const evos1 = fam1.evolutions.map(e => e.url);
-                const evos2 = fam2.evolutions.map(e => e.url);
+                const p1Evo = fam1.evolutions[Math.floor(Math.random() * fam1.evolutions.length)];
+                const p2Evo = fam2.evolutions[Math.floor(Math.random() * fam2.evolutions.length)];
                 
-                const p1Poke = evos1[Math.floor(Math.random() * evos1.length)];
-                const p2Poke = evos2[Math.floor(Math.random() * evos2.length)];
+                const p1Poke = p1Evo.url;
+                const p2Poke = p2Evo.url;
                 
                 const n1 = getPokemonNameFromUrl(p1Poke);
                 const n2 = getPokemonNameFromUrl(p2Poke);
@@ -988,8 +994,8 @@ function initPoke() {
                 
                 broadcastPokeMsg({
                    type: 'poke_reveal',
-                   p1: { type: t1, baseName: fam1.baseName, pokemon: p1Poke, moves: p1Moves },
-                   p2: { type: t2, baseName: fam2.baseName, pokemon: p2Poke, moves: p2Moves }
+                   p1: { type: t1, baseName: fam1.baseName, evoName: p1Evo.name, pokemon: p1Poke, moves: p1Moves },
+                   p2: { type: t2, baseName: fam2.baseName, evoName: p2Evo.name, pokemon: p2Poke, moves: p2Moves }
                 });
             } else {
                 broadcastPokeMsg({ type: 'poke_base_selection_state' });
@@ -1020,7 +1026,7 @@ function initPoke() {
              const card = document.createElement('div');
              card.className = 'poke-base-card';
              card.innerHTML = `
-                <img src="${fam.evolutions[0].url}" loading="lazy" onerror="window.handlePokeImgError(this)" />
+                <img src="${fam.evolutions[0].url}" data-realname="${fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                 <div class="poke-base-name">${fam.displayName}</div>
                 <div class="poke-type-badge" style="background: ${TYPE_COLORS[fam.type] || '#777'};">${TYPE_NAMES[fam.type] || fam.type}</div>
              `;
@@ -1229,8 +1235,8 @@ function initPoke() {
           if (isHostFallback) {
              broadcastPokeMsg({
                  type: 'poke_reveal',
-                 p1: { type: pokeState.p1.type, pokemon: pokeState.p1.pokemon, moves: pokeState.p1.moves },
-                 p2: { type: pokeState.p2.type, pokemon: pokeState.p2.pokemon, moves: pokeState.p2.moves }
+                 p1: { type: pokeState.p1.type, evoName: pokeState.p1.evoName, pokemon: pokeState.p1.pokemon, moves: pokeState.p1.moves },
+                 p2: { type: pokeState.p2.type, evoName: pokeState.p2.evoName, pokemon: pokeState.p2.pokemon, moves: pokeState.p2.moves }
              });
           }
        }
@@ -1329,12 +1335,14 @@ function initPoke() {
       pokeState.p1.type = data.p1.type;
       pokeState.p1.pokemon = data.p1.pokemon;
       pokeState.p1.moves = data.p1.moves;
+      if (data.p1.evoName) pokeState.p1.evoName = data.p1.evoName;
       //pokeState.p1.hp = 100;
       //pokeState.p1.maxHp = 100;
       
       pokeState.p2.type = data.p2.type;
       pokeState.p2.pokemon = data.p2.pokemon;
       pokeState.p2.moves = data.p2.moves;
+      if (data.p2.evoName) pokeState.p2.evoName = data.p2.evoName;
       
       const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
       pokeState.p1.hp = 250;

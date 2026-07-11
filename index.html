@@ -87,39 +87,129 @@
       line-height: 1.4;
       margin-top: 6px !important;
     }
+    
+    @keyframes idle-breathe-p1 {
+      0% { transform: scaleX(-1) translateY(0px) scaleY(1); }
+      50% { transform: scaleX(-1) translateY(-8px) scaleY(1.03); }
+      100% { transform: scaleX(-1) translateY(0px) scaleY(1); }
+    }
+    .poke-idle-anim-p1 {
+      animation: idle-breathe-p1 3s ease-in-out infinite;
+    }
+    
+    @keyframes idle-breathe-p2 {
+      0% { transform: scaleX(1) translateY(0px) scaleY(1); }
+      50% { transform: scaleX(1) translateY(-8px) scaleY(1.03); }
+      100% { transform: scaleX(1) translateY(0px) scaleY(1); }
+    }
+    .poke-idle-anim-p2 {
+      animation: idle-breathe-p2 3s ease-in-out infinite;
+    }
+
+    @keyframes poke-death-p1 {
+      0% { opacity: 1; transform: scaleX(-1) scale(1) rotate(0deg); }
+      20% { transform: scaleX(-1) scale(0.9) rotate(-10deg) translate(-10px); }
+      40% { transform: scaleX(-1) scale(0.9) rotate(10deg) translate(10px); }
+      60% { opacity: 0.8; transform: scaleX(-1) scale(0.8) rotate(-20deg) translateY(20px); }
+      to { opacity: 0; display: none; transform: scaleX(-1) scale(0.5) rotate(-90deg) translateY(100px); }
+    }
+    .anim-death-p1 {
+      filter: grayscale(1) brightness(0.5);
+      animation: 1.5s ease-in forwards poke-death-p1 !important;
+    }
+
+    @keyframes poke-winner-p1 {
+      0% { filter: drop-shadow(0 0 10px #fbbf24); transform: scaleX(-1) scale(1); }
+      to { filter: drop-shadow(0 0 30px #f59e0b) brightness(1.2); transform: scaleX(-1) scale(1.1); }
+    }
+    .anim-winner-p1 {
+      animation: 2s ease-out infinite alternate poke-winner-p1 !important;
+    }
   </style>
   <script>
     window.handlePokeImgError = function(img) {
-        if (!img.dataset.fetching) {
-            img.dataset.fetching = 'true';
-            const oldSrc = img.src;
-            // Gösterici olarak poketop yükle
-            img.src = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
+        let state = img.dataset.errState || '0';
+        
+        if (state === 'done') return;
+        
+        if (state === '0') {
+            // First fallback: Showdown Gen 5 static sprites (Pixel art, faces correct direction)
+            img.dataset.errState = '1';
+            img.dataset.oldSrc = img.src;
+            
+            const cleanName = img.dataset.oldSrc.match(/\/([^\/]+)\.gif$/);
+            if (cleanName && cleanName[1]) {
+                img.src = `https://play.pokemonshowdown.com/sprites/gen5/${cleanName[1]}.png`;
+            } else {
+                img.dataset.errState = 'done';
+                img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
+            }
+        } else if (state === '1') {
+            // Gen 5 failed: Try PokeAPI HOME sprites (3D forward-facing)
+            img.dataset.errState = '2';
+            img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png'; // Placeholder while fetching
             
             const realName = img.dataset.realname;
             if (realName) {
                 let pokeApiName = realName.toLowerCase().replace(/ /g, '-').replace(/\./g, '').replace(/'/g, '');
                 
+                const paradoxFixes = {
+                    "ironcrown": "iron-crown", "ironboulder": "iron-boulder", "ironleaves": "iron-leaves",
+                    "ironvaliant": "iron-valiant", "ironthorns": "iron-thorns", "ironmoth": "iron-moth",
+                    "ironjugulis": "iron-jugulis", "ironhands": "iron-hands", "ironbundle": "iron-bundle",
+                    "irontreads": "iron-treads", "roaringmoon": "roaring-moon", "sandyshocks": "sandy-shocks",
+                    "slitherwing": "slither-wing", "fluttermane": "flutter-mane", "brutebonnet": "brute-bonnet",
+                    "screamtail": "scream-tail", "greattusk": "great-tusk", "walkingwake": "walking-wake",
+                    "ragingbolt": "raging-bolt", "gougingfire": "gouging-fire", "tinglu": "ting-lu",
+                    "chienpao": "chien-pao", "wochien": "wo-chien", "chiyu": "chi-yu", "ogerpon": "ogerpon",
+                    "mega-charizard-x": "charizard-mega-x", "mega-charizard-y": "charizard-mega-y",
+                    "mega-mewtwo-x": "mewtwo-mega-x", "mega-mewtwo-y": "mewtwo-mega-y",
+                    "aegislash": "aegislash-shield", "giratina": "giratina-altered", "shaymin": "shaymin-land",
+                    "basculin": "basculin-red-striped", "darmanitan": "darmanitan-standard", "tornadus": "tornadus-incarnate",
+                    "thundurus": "thundurus-incarnate", "landorus": "landorus-incarnate", "keldeo": "keldeo-ordinary",
+                    "meloetta": "meloetta-aria", "meowstic": "meowstic-male", "pumpkaboo": "pumpkaboo-average",
+                    "gourgeist": "gourgeist-average", "lycanroc": "lycanroc-midday", "wishiwashi": "wishiwashi-solo",
+                    "minior": "minior-red-meteor", "mimikyu": "mimikyu-disguised", "toxtricity": "toxtricity-amped",
+                    "eiscue": "eiscue-ice", "indeedee": "indeedee-male", "morpeko": "morpeko-full-belly",
+                    "urshifu": "urshifu-single-strike", "basculegion": "basculegion-male", "enamorus": "enamorus-incarnate",
+                    "palafin": "palafin-zero", "gimmighoul": "gimmighoul-chest", "tatsugiri": "tatsugiri-curly",
+                    "dudunsparce": "dudunsparce-two-segment", "squawkabilly": "squawkabilly-green-plumage",
+                    "maushold": "maushold-family-of-four", "oricorio": "oricorio-baile"
+                };
+                if (paradoxFixes[pokeApiName]) pokeApiName = paradoxFixes[pokeApiName];
+                
                 fetch(`https://pokeapi.co/api/v2/pokemon/${pokeApiName}`)
                     .then(r => { if (!r.ok) throw new Error(); return r.json(); })
                     .then(data => {
-                        // Orijinal yüksek çözünürlüklü resmi yükle
-                        img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${data.id}.png`;
+                        img.dataset.errState = '3'; 
+                        img.dataset.pokeId = data.id; // Save ID for official-artwork fallback
+                        img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${data.id}.png`;
                     })
                     .catch(() => {
-                        const cleanName = oldSrc.match(/\/([^\/]+)\.gif$/);
-                        if (cleanName && cleanName[1]) {
-                            img.src = `https://play.pokemonshowdown.com/sprites/gen5/${cleanName[1]}.png`;
-                        }
+                        img.dataset.errState = 'done';
+                        img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
                     });
             } else {
-                const cleanName = oldSrc.match(/\/([^\/]+)\.gif$/);
-                if (cleanName && cleanName[1]) {
-                    img.src = `https://play.pokemonshowdown.com/sprites/gen5/${cleanName[1]}.png`;
-                }
+                img.dataset.errState = 'done';
+                img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
             }
+        } else if (state === '2') {
+            // PokeAPI HOME placeholder fetch is still running, ignore
+        } else if (state === '3') {
+            // HOME failed: Try official-artwork
+            img.dataset.errState = '4';
+            if (img.dataset.pokeId) {
+                img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${img.dataset.pokeId}.png`;
+            } else {
+                img.dataset.errState = 'done';
+                img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
+            }
+        } else if (state === '4') {
+            // All fallbacks failed
+            img.dataset.errState = 'done';
+            img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
         }
-    }
+    };
   </script>
 </head>
 <body>

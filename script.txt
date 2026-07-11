@@ -1,0 +1,101 @@
+>   <script>
+      window.handlePokeImgError = function(img) {
+          let state = img.dataset.errState || '0';
+          
+          if (state === 'done') return;
+          
+          if (state === '0') {
+              img.dataset.errState = '1';
+              img.dataset.oldSrc = img.src;
+              img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
+              
+              const realName = img.dataset.realname;
+              if (realName) {
+                  let pokeApiName = realName.toLowerCase().replace(/ /g, '-').replace(/\./g, '').replace(/'/g, '');
+                  
+                  const paradoxFixes = {
+                      "ironcrown": "iron-crown", "ironboulder": "iron-boulder", "ironleaves": "iron-leaves",
+                      "ironvaliant": "iron-valiant", "ironthorns": "iron-thorns", "ironmoth": "iron-moth",
+                      "ironjugulis": "iron-jugulis", "ironhands": "iron-hands", "ironbundle": "iron-bundle",
+                      "irontreads": "iron-treads", "roaringmoon": "roaring-moon", "sandyshocks": "sandy-shocks",
+                      "slitherwing": "slither-wing", "fluttermane": "flutter-mane", "brutebonnet": "brute-bonnet",
+                      "screamtail": "scream-tail", "greattusk": "great-tusk", "walkingwake": "walking-wake",
+                      "ragingbolt": "raging-bolt", "gougingfire": "gouging-fire", "tinglu": "ting-lu",
+                      "chienpao": "chien-pao", "wochien": "wo-chien", "chiyu": "chi-yu", "ogerpon": "ogerpon"
+                  };
+                  if (paradoxFixes[pokeApiName]) pokeApiName = paradoxFixes[pokeApiName];
+                  
+                  fetch(`https://pokeapi.co/api/v2/pokemon/${pokeApiName}`)
+                      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+                      .then(data => {
+                          img.dataset.errState = '2'; // next error means official artwork failed
+                          img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${data.id}.png`;
+                      })
+                      .catch(() => {
+                          img.dataset.errState = '3'; // try gen5
+                          const cleanName = img.dataset.oldSrc.match(/\/([^\/]+)\.gif$/);
+                          if (cleanName && cleanName[1]) {
+                              img.src = `https://play.pokemonshowdown.com/sprites/gen5/${cleanName[1]}.png`;
+                          } else {
+                              img.dataset.errState = 'done';
+                              img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
+                          }
+                      });
+              } else {
+                  img.dataset.errState = '3';
+                  const cleanName = img.dataset.oldSrc.match(/\/([^\/]+)\.gif$/);
+                  if (cleanName && cleanName[1]) {
+                      img.src = `https://play.pokemonshowdown.com/sprites/gen5/${cleanName[1]}.png`;
+                  } else {
+                      img.dataset.errState = 'done';
+                      img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
+                  }
+              }
+          } else if (state === '1') {
+              // PokeAPI placeholder pokeball failed, ignore and wait for fetch to finish.
+              // Or if it failed, errState remains '1', so we do nothing.
+          } else if (state === '2') {
+              // Official artwork failed (probably adblocker or 404). Try Showdown gen5.
+              img.dataset.errState = '3';
+              const cleanName = img.dataset.oldSrc.match(/\/([^\/]+)\.gif$/);
+              if (cleanName && cleanName[1]) {
+                  img.src = `https://play.pokemonshowdown.com/sprites/gen5/${cleanName[1]}.png`;
+              } else {
+                  img.dataset.errState = 'done';
+                  img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
+              }
+          } else if (state === '3') {
+              // Gen 5 failed. Final fallback.
+              img.dataset.errState = 'done';
+              img.src = 'https://play.pokemonshowdown.com/sprites/itemicons/poke-ball.png';
+          }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Custom Titlebar -->
+    <div id="custom-titlebar" class="custom-titlebar">
+      <div class="titlebar-left">
+        <div class="titlebar-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg></div>
+        <div class="titlebar-title">TeamSync</div>
+      </div>
+      <div class="titlebar-right">
+        <button id="tb-forcequit" class="tb-btn tb-forcequit" title="Görev Sonlandır" style="font-family: serif; font-style: italic;">x<sup style="font-size: 10px;">x</sup></button>
+        <button id="tb-min" class="tb-btn" title="Küçült">&#x2014;</button>
+        <button id="tb-max" class="tb-btn" title="Büyüt/Küçült">&#x25A1;</button>
+        <button id="tb-close" class="tb-btn tb-close" title="Kapat">&#x2715;</button>
+      </div>
+    </div>
+  
+    <div id="login" class="login-wrap">
+      <div class="login-card">
+        <h1 style="display:flex; align-items:center; justify-content:center; gap:8px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--pri)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+          TeamSync
+        </h1>
+        <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur, internetten bağlanılabilir</p>
+  
+        <!-- Adım 0: Hesaplar -->
+        <div id="step-accounts" class="hidden">
+          <label>Hesap Seçin</label>
+          <div id="accounts-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; margin: 10px 0 15px; padding-right: 4px;">
