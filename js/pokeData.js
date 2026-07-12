@@ -43,11 +43,11 @@ window.POKEMON_FAMILIES = [
       },
       {
         "name": "Mega Charizard X",
-        "url": "https://play.pokemonshowdown.com/sprites/ani/charizardmegax.gif"
+        "url": "https://play.pokemonshowdown.com/sprites/ani/charizard-megax.gif"
       },
       {
         "name": "Mega Charizard Y",
-        "url": "https://play.pokemonshowdown.com/sprites/ani/charizardmegay.gif"
+        "url": "https://play.pokemonshowdown.com/sprites/ani/charizard-megay.gif"
       }
     ]
   },
@@ -69,6 +69,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Blastoise",
         "url": "https://play.pokemonshowdown.com/sprites/ani/blastoise.gif"
+      },
+      {
+        "name": "Mega Blastoise",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/blastoise-mega.gif"
       }
     ]
   },
@@ -111,6 +115,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Beedrill",
         "url": "https://play.pokemonshowdown.com/sprites/ani/beedrill.gif"
+      },
+      {
+        "name": "Mega Beedrill",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/beedrill-mega.gif"
       }
     ]
   },
@@ -132,6 +140,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Pidgeot",
         "url": "https://play.pokemonshowdown.com/sprites/ani/pidgeot.gif"
+      },
+      {
+        "name": "Mega Pidgeot",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/pidgeot-mega.gif"
       }
     ]
   },
@@ -478,6 +490,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Alakazam",
         "url": "https://play.pokemonshowdown.com/sprites/ani/alakazam.gif"
+      },
+      {
+        "name": "Mega Alakazam",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/alakazam-mega.gif"
       }
     ]
   },
@@ -596,6 +612,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Slowking",
         "url": "https://play.pokemonshowdown.com/sprites/ani/slowking.gif"
+      },
+      {
+        "name": "Mega Slowbro",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/slowbro-mega.gif"
       }
     ]
   },
@@ -723,6 +743,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Gengar",
         "url": "https://play.pokemonshowdown.com/sprites/ani/gengar.gif"
+      },
+      {
+        "name": "Mega Gengar",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/gengar-mega.gif"
       }
     ]
   },
@@ -740,6 +764,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Steelix",
         "url": "https://play.pokemonshowdown.com/sprites/ani/steelix.gif"
+      },
+      {
+        "name": "Mega Steelix",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/steelix-mega.gif"
       }
     ]
   },
@@ -910,6 +938,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Kangaskhan",
         "url": "https://play.pokemonshowdown.com/sprites/ani/kangaskhan.gif"
+      },
+      {
+        "name": "Mega Kangaskhan",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/kangaskhan-mega.gif"
       }
     ]
   },
@@ -986,6 +1018,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Kleavor",
         "url": "https://play.pokemonshowdown.com/sprites/ani/kleavor.gif"
+      },
+      {
+        "name": "Mega Scizor",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/scizor-mega.gif"
       }
     ]
   },
@@ -999,6 +1035,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Pinsir",
         "url": "https://play.pokemonshowdown.com/sprites/ani/pinsir.gif"
+      },
+      {
+        "name": "Mega Pinsir",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/pinsir-mega.gif"
       }
     ]
   },
@@ -1029,6 +1069,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Gyarados",
         "url": "https://play.pokemonshowdown.com/sprites/ani/gyarados.gif"
+      },
+      {
+        "name": "Mega Gyarados",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/gyarados-mega.gif"
       }
     ]
   },
@@ -1168,6 +1212,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Aerodactyl",
         "url": "https://play.pokemonshowdown.com/sprites/ani/aerodactyl.gif"
+      },
+      {
+        "name": "Mega Aerodactyl",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/aerodactyl-mega.gif"
       }
     ]
   },
@@ -1244,11 +1292,11 @@ window.POKEMON_FAMILIES = [
       },
       {
         "name": "Mega Mewtwo X",
-        "url": "https://play.pokemonshowdown.com/sprites/ani/mewtwomegax.gif"
+        "url": "https://play.pokemonshowdown.com/sprites/ani/mewtwo-megax.gif"
       },
       {
         "name": "Mega Mewtwo Y",
-        "url": "https://play.pokemonshowdown.com/sprites/ani/mewtwomegay.gif"
+        "url": "https://play.pokemonshowdown.com/sprites/ani/mewtwo-megay.gif"
       }
     ]
   },
@@ -1532,6 +1580,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Ampharos",
         "url": "https://play.pokemonshowdown.com/sprites/ani/ampharos.gif"
+      },
+      {
+        "name": "Mega Ampharos",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/ampharos-mega.gif"
       }
     ]
   },
@@ -1800,6 +1852,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Heracross",
         "url": "https://play.pokemonshowdown.com/sprites/ani/heracross.gif"
+      },
+      {
+        "name": "Mega Heracross",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/heracross-mega.gif"
       }
     ]
   },
@@ -1957,6 +2013,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Houndoom",
         "url": "https://play.pokemonshowdown.com/sprites/ani/houndoom.gif"
+      },
+      {
+        "name": "Mega Houndoom",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/houndoom-mega.gif"
       }
     ]
   },
@@ -2161,6 +2221,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Tyranitar",
         "url": "https://play.pokemonshowdown.com/sprites/ani/tyranitar.gif"
+      },
+      {
+        "name": "Mega Tyranitar",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/tyranitar-mega.gif"
       }
     ]
   },
@@ -2221,6 +2285,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Sceptile",
         "url": "https://play.pokemonshowdown.com/sprites/ani/sceptile.gif"
+      },
+      {
+        "name": "Mega Sceptile",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/sceptile-mega.gif"
       }
     ]
   },
@@ -2242,6 +2310,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Blaziken",
         "url": "https://play.pokemonshowdown.com/sprites/ani/blaziken.gif"
+      },
+      {
+        "name": "Mega Blaziken",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/blaziken-mega.gif"
       }
     ]
   },
@@ -2263,6 +2335,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Swampert",
         "url": "https://play.pokemonshowdown.com/sprites/ani/swampert.gif"
+      },
+      {
+        "name": "Mega Swampert",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/swampert-mega.gif"
       }
     ]
   },
@@ -2431,6 +2507,14 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Gallade",
         "url": "https://play.pokemonshowdown.com/sprites/ani/gallade.gif"
+      },
+      {
+        "name": "Mega Gardevoir",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/gardevoir-mega.gif"
+      },
+      {
+        "name": "Mega Gallade",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/gallade-mega.gif"
       }
     ]
   },
@@ -2613,6 +2697,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Sableye",
         "url": "https://play.pokemonshowdown.com/sprites/ani/sableye.gif"
+      },
+      {
+        "name": "Mega Sableye",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/sableye-mega.gif"
       }
     ]
   },
@@ -2626,6 +2714,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Mawile",
         "url": "https://play.pokemonshowdown.com/sprites/ani/mawile.gif"
+      },
+      {
+        "name": "Mega Mawile",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/mawile-mega.gif"
       }
     ]
   },
@@ -2647,6 +2739,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Aggron",
         "url": "https://play.pokemonshowdown.com/sprites/ani/aggron.gif"
+      },
+      {
+        "name": "Mega Aggron",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/aggron-mega.gif"
       }
     ]
   },
@@ -2664,6 +2760,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Medicham",
         "url": "https://play.pokemonshowdown.com/sprites/ani/medicham.gif"
+      },
+      {
+        "name": "Mega Medicham",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/medicham-mega.gif"
       }
     ]
   },
@@ -2681,6 +2781,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Manectric",
         "url": "https://play.pokemonshowdown.com/sprites/ani/manectric.gif"
+      },
+      {
+        "name": "Mega Manectric",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/manectric-mega.gif"
       }
     ]
   },
@@ -2767,6 +2871,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Sharpedo",
         "url": "https://play.pokemonshowdown.com/sprites/ani/sharpedo.gif"
+      },
+      {
+        "name": "Mega Sharpedo",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/sharpedo-mega.gif"
       }
     ]
   },
@@ -2801,6 +2909,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Camerupt",
         "url": "https://play.pokemonshowdown.com/sprites/ani/camerupt.gif"
+      },
+      {
+        "name": "Mega Camerupt",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/camerupt-mega.gif"
       }
     ]
   },
@@ -2899,6 +3011,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Altaria",
         "url": "https://play.pokemonshowdown.com/sprites/ani/altaria.gif"
+      },
+      {
+        "name": "Mega Altaria",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/altaria-mega.gif"
       }
     ]
   },
@@ -3096,6 +3212,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Banette",
         "url": "https://play.pokemonshowdown.com/sprites/ani/banette.gif"
+      },
+      {
+        "name": "Mega Banette",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/banette-mega.gif"
       }
     ]
   },
@@ -3143,6 +3263,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Absol",
         "url": "https://play.pokemonshowdown.com/sprites/ani/absol.gif"
+      },
+      {
+        "name": "Mega Absol",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/absol-mega.gif"
       }
     ]
   },
@@ -3181,6 +3305,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Froslass",
         "url": "https://play.pokemonshowdown.com/sprites/ani/froslass.gif"
+      },
+      {
+        "name": "Mega Glalie",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/glalie-mega.gif"
       }
     ]
   },
@@ -3270,6 +3398,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Salamence",
         "url": "https://play.pokemonshowdown.com/sprites/ani/salamence.gif"
+      },
+      {
+        "name": "Mega Salamence",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/salamence-mega.gif"
       }
     ]
   },
@@ -3291,6 +3423,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Metagross",
         "url": "https://play.pokemonshowdown.com/sprites/ani/metagross.gif"
+      },
+      {
+        "name": "Mega Metagross",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/metagross-mega.gif"
       }
     ]
   },
@@ -3343,6 +3479,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Latias",
         "url": "https://play.pokemonshowdown.com/sprites/ani/latias.gif"
+      },
+      {
+        "name": "Mega Latias",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/latias-mega.gif"
       }
     ]
   },
@@ -3356,6 +3496,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Latios",
         "url": "https://play.pokemonshowdown.com/sprites/ani/latios.gif"
+      },
+      {
+        "name": "Mega Latios",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/latios-mega.gif"
       }
     ]
   },
@@ -3369,6 +3513,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Kyogre",
         "url": "https://play.pokemonshowdown.com/sprites/ani/kyogre.gif"
+      },
+      {
+        "name": "Primal Kyogre",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/kyogre-primal.gif"
       }
     ]
   },
@@ -3382,6 +3530,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Groudon",
         "url": "https://play.pokemonshowdown.com/sprites/ani/groudon.gif"
+      },
+      {
+        "name": "Primal Groudon",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/groudon-primal.gif"
       }
     ]
   },
@@ -3395,6 +3547,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Rayquaza",
         "url": "https://play.pokemonshowdown.com/sprites/ani/rayquaza.gif"
+      },
+      {
+        "name": "Mega Rayquaza",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/rayquaza-mega.gif"
       }
     ]
   },
@@ -3751,6 +3907,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Lopunny",
         "url": "https://play.pokemonshowdown.com/sprites/ani/lopunny.gif"
+      },
+      {
+        "name": "Mega Lopunny",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/lopunny-mega.gif"
       }
     ]
   },
@@ -3925,6 +4085,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Garchomp",
         "url": "https://play.pokemonshowdown.com/sprites/ani/garchomp.gif"
+      },
+      {
+        "name": "Mega Garchomp",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/garchomp-mega.gif"
       }
     ]
   },
@@ -3959,6 +4123,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Lucario",
         "url": "https://play.pokemonshowdown.com/sprites/ani/lucario.gif"
+      },
+      {
+        "name": "Mega Lucario",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/lucario-mega.gif"
       }
     ]
   },
@@ -4074,6 +4242,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Abomasnow",
         "url": "https://play.pokemonshowdown.com/sprites/ani/abomasnow.gif"
+      },
+      {
+        "name": "Mega Abomasnow",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/abomasnow-mega.gif"
       }
     ]
   },
@@ -4565,6 +4737,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Audino",
         "url": "https://play.pokemonshowdown.com/sprites/ani/audino.gif"
+      },
+      {
+        "name": "Mega Audino",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/audino-mega.gif"
       }
     ]
   },
@@ -6225,6 +6401,10 @@ window.POKEMON_FAMILIES = [
       {
         "name": "Diancie",
         "url": "https://play.pokemonshowdown.com/sprites/ani/diancie.gif"
+      },
+      {
+        "name": "Mega Diancie",
+        "url": "https://play.pokemonshowdown.com/sprites/ani/diancie-mega.gif"
       }
     ]
   },

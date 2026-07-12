@@ -6,6 +6,29 @@ function initPoke() {
     if (window.pokeActivityHandler) window.pokeActivityHandler(msg);
   };
 
+  // Tooltip Helper
+  window.getMoveTooltip = (move) => {
+     let effects = [];
+     if (move.healing > 0) {
+        effects.push(`Maksimum canın %${move.healing}'i kadar iyileştirir.`);
+     }
+     if (move.stat_changes && move.stat_changes.length > 0) {
+        const isBuff = move.target === 'user' || move.target === 'user-and-allies';
+        move.stat_changes.forEach(sc => {
+           const statName = sc.stat === 'attack' ? 'Saldırı' : 
+                            sc.stat === 'defense' ? 'Savunma' : 
+                            sc.stat === 'speed' ? 'Hız' : 
+                            sc.stat === 'special-attack' ? 'Özel Saldırı' : 
+                            sc.stat === 'special-defense' ? 'Özel Savunma' : sc.stat;
+           effects.push(`${isBuff ? 'Kendi' : 'Rakibin'} ${statName} statını ${Math.abs(sc.change)} kademe ${sc.change > 0 ? 'artırır' : 'düşürür'}.`);
+        });
+     }
+     if (effects.length === 0) {
+        effects.push(move.power === 0 ? "Özel bir etkisi var (Durum hamlesi)." : "Rakibe hasar verir.");
+     }
+     return effects.join("<br/>");
+  };
+
   // State
   window.pokeState = {
     p1: null, // { id, name, type, pokemon, ready }
@@ -38,6 +61,109 @@ function initPoke() {
   steel: ["https://play.pokemonshowdown.com/sprites/ani/magnemite.gif","https://play.pokemonshowdown.com/sprites/ani/magneton.gif","https://play.pokemonshowdown.com/sprites/ani/forretress.gif","https://play.pokemonshowdown.com/sprites/ani/steelix.gif","https://play.pokemonshowdown.com/sprites/ani/scizor.gif","https://play.pokemonshowdown.com/sprites/ani/skarmory.gif","https://play.pokemonshowdown.com/sprites/ani/mawile.gif","https://play.pokemonshowdown.com/sprites/ani/aron.gif","https://play.pokemonshowdown.com/sprites/ani/lairon.gif","https://play.pokemonshowdown.com/sprites/ani/aggron.gif","https://play.pokemonshowdown.com/sprites/ani/beldum.gif","https://play.pokemonshowdown.com/sprites/ani/metang.gif","https://play.pokemonshowdown.com/sprites/ani/metagross.gif","https://play.pokemonshowdown.com/sprites/ani/registeel.gif","https://play.pokemonshowdown.com/sprites/ani/jirachi.gif","https://play.pokemonshowdown.com/sprites/ani/empoleon.gif","https://play.pokemonshowdown.com/sprites/ani/shieldon.gif","https://play.pokemonshowdown.com/sprites/ani/bastiodon.gif","https://play.pokemonshowdown.com/sprites/ani/bronzor.gif","https://play.pokemonshowdown.com/sprites/ani/bronzong.gif","https://play.pokemonshowdown.com/sprites/ani/lucario.gif","https://play.pokemonshowdown.com/sprites/ani/magnezone.gif","https://play.pokemonshowdown.com/sprites/ani/probopass.gif","https://play.pokemonshowdown.com/sprites/ani/dialga.gif","https://play.pokemonshowdown.com/sprites/ani/heatran.gif","https://play.pokemonshowdown.com/sprites/ani/excadrill.gif","https://play.pokemonshowdown.com/sprites/ani/escavalier.gif","https://play.pokemonshowdown.com/sprites/ani/ferroseed.gif","https://play.pokemonshowdown.com/sprites/ani/ferrothorn.gif","https://play.pokemonshowdown.com/sprites/ani/klink.gif","https://play.pokemonshowdown.com/sprites/ani/klang.gif","https://play.pokemonshowdown.com/sprites/ani/klinklang.gif","https://play.pokemonshowdown.com/sprites/ani/pawniard.gif","https://play.pokemonshowdown.com/sprites/ani/bisharp.gif","https://play.pokemonshowdown.com/sprites/ani/durant.gif","https://play.pokemonshowdown.com/sprites/ani/cobalion.gif","https://play.pokemonshowdown.com/sprites/ani/genesect.gif","https://play.pokemonshowdown.com/sprites/ani/honedge.gif","https://play.pokemonshowdown.com/sprites/ani/doublade.gif","https://play.pokemonshowdown.com/sprites/ani/klefki.gif","https://play.pokemonshowdown.com/sprites/ani/togedemaru.gif","https://play.pokemonshowdown.com/sprites/ani/solgaleo.gif","https://play.pokemonshowdown.com/sprites/ani/celesteela.gif","https://play.pokemonshowdown.com/sprites/ani/kartana.gif","https://play.pokemonshowdown.com/sprites/ani/magearna.gif","https://play.pokemonshowdown.com/sprites/ani/stakataka.gif","https://play.pokemonshowdown.com/sprites/ani/meltan.gif","https://play.pokemonshowdown.com/sprites/ani/melmetal.gif","https://play.pokemonshowdown.com/sprites/ani/corviknight.gif","https://play.pokemonshowdown.com/sprites/ani/perrserker.gif","https://play.pokemonshowdown.com/sprites/ani/cufant.gif","https://play.pokemonshowdown.com/sprites/ani/copperajah.gif","https://play.pokemonshowdown.com/sprites/ani/duraludon.gif","https://play.pokemonshowdown.com/sprites/ani/tinkatink.gif","https://play.pokemonshowdown.com/sprites/ani/tinkatuff.gif","https://play.pokemonshowdown.com/sprites/ani/tinkaton.gif","https://play.pokemonshowdown.com/sprites/ani/varoom.gif","https://play.pokemonshowdown.com/sprites/ani/revavroom.gif","https://play.pokemonshowdown.com/sprites/ani/orthworm.gif","https://play.pokemonshowdown.com/sprites/ani/kingambit.gif","https://play.pokemonshowdown.com/sprites/ani/gholdengo.gif","https://play.pokemonshowdown.com/sprites/ani/archaludon.gif"],
   fairy: ["https://play.pokemonshowdown.com/sprites/ani/clefairy.gif","https://play.pokemonshowdown.com/sprites/ani/clefable.gif","https://play.pokemonshowdown.com/sprites/ani/jigglypuff.gif","https://play.pokemonshowdown.com/sprites/ani/wigglytuff.gif","https://play.pokemonshowdown.com/sprites/ani/cleffa.gif","https://play.pokemonshowdown.com/sprites/ani/igglybuff.gif","https://play.pokemonshowdown.com/sprites/ani/togepi.gif","https://play.pokemonshowdown.com/sprites/ani/togetic.gif","https://play.pokemonshowdown.com/sprites/ani/marill.gif","https://play.pokemonshowdown.com/sprites/ani/azumarill.gif","https://play.pokemonshowdown.com/sprites/ani/snubbull.gif","https://play.pokemonshowdown.com/sprites/ani/granbull.gif","https://play.pokemonshowdown.com/sprites/ani/ralts.gif","https://play.pokemonshowdown.com/sprites/ani/kirlia.gif","https://play.pokemonshowdown.com/sprites/ani/gardevoir.gif","https://play.pokemonshowdown.com/sprites/ani/azurill.gif","https://play.pokemonshowdown.com/sprites/ani/mawile.gif","https://play.pokemonshowdown.com/sprites/ani/togekiss.gif","https://play.pokemonshowdown.com/sprites/ani/cottonee.gif","https://play.pokemonshowdown.com/sprites/ani/whimsicott.gif","https://play.pokemonshowdown.com/sprites/ani/flabebe.gif","https://play.pokemonshowdown.com/sprites/ani/floette.gif","https://play.pokemonshowdown.com/sprites/ani/florges.gif","https://play.pokemonshowdown.com/sprites/ani/spritzee.gif","https://play.pokemonshowdown.com/sprites/ani/aromatisse.gif","https://play.pokemonshowdown.com/sprites/ani/swirlix.gif","https://play.pokemonshowdown.com/sprites/ani/slurpuff.gif","https://play.pokemonshowdown.com/sprites/ani/sylveon.gif","https://play.pokemonshowdown.com/sprites/ani/dedenne.gif","https://play.pokemonshowdown.com/sprites/ani/carbink.gif","https://play.pokemonshowdown.com/sprites/ani/klefki.gif","https://play.pokemonshowdown.com/sprites/ani/xerneas.gif","https://play.pokemonshowdown.com/sprites/ani/diancie.gif","https://play.pokemonshowdown.com/sprites/ani/primarina.gif","https://play.pokemonshowdown.com/sprites/ani/cutiefly.gif","https://play.pokemonshowdown.com/sprites/ani/ribombee.gif","https://play.pokemonshowdown.com/sprites/ani/morelull.gif","https://play.pokemonshowdown.com/sprites/ani/shiinotic.gif","https://play.pokemonshowdown.com/sprites/ani/comfey.gif","https://play.pokemonshowdown.com/sprites/ani/magearna.gif","https://play.pokemonshowdown.com/sprites/ani/hatterene.gif","https://play.pokemonshowdown.com/sprites/ani/impidimp.gif","https://play.pokemonshowdown.com/sprites/ani/morgrem.gif","https://play.pokemonshowdown.com/sprites/ani/grimmsnarl.gif","https://play.pokemonshowdown.com/sprites/ani/milcery.gif","https://play.pokemonshowdown.com/sprites/ani/alcremie.gif","https://play.pokemonshowdown.com/sprites/ani/zacian.gif","https://play.pokemonshowdown.com/sprites/ani/fidough.gif","https://play.pokemonshowdown.com/sprites/ani/dachsbun.gif","https://play.pokemonshowdown.com/sprites/ani/tinkatink.gif","https://play.pokemonshowdown.com/sprites/ani/tinkatuff.gif","https://play.pokemonshowdown.com/sprites/ani/tinkaton.gif","https://play.pokemonshowdown.com/sprites/ani/fezandipiti.gif"]
 };
+
+// Mega Evolutions and Primal forms (Aesthetic Skins)
+POKEMONS.normal.push(
+  "https://play.pokemonshowdown.com/sprites/ani/kangaskhan-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/pidgeot-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/lopunny-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/audino-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/meloetta-pirouette.gif"
+);
+POKEMONS.fire.push(
+  "https://play.pokemonshowdown.com/sprites/ani/charizard-megax.gif", "https://play.pokemonshowdown.com/sprites/ani/charizard-megay.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/houndoom-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/blaziken-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/camerupt-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/groudon-primal.gif"
+);
+POKEMONS.water.push(
+  "https://play.pokemonshowdown.com/sprites/ani/blastoise-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/slowbro-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/gyarados-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/swampert-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/sharpedo-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/kyogre-primal.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/greninja-ash.gif", "https://play.pokemonshowdown.com/sprites/ani/keldeo-resolute.gif"
+);
+POKEMONS.electric.push(
+  "https://play.pokemonshowdown.com/sprites/ani/ampharos-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/manectric-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/thundurus-therian.gif"
+);
+POKEMONS.grass.push(
+  "https://play.pokemonshowdown.com/sprites/ani/venusaur-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/sceptile-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/abomasnow-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/shaymin-sky.gif"
+);
+POKEMONS.ice.push(
+  "https://play.pokemonshowdown.com/sprites/ani/glalie-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/abomasnow-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/kyurem-black.gif", "https://play.pokemonshowdown.com/sprites/ani/kyurem-white.gif"
+);
+POKEMONS.fighting.push(
+  "https://play.pokemonshowdown.com/sprites/ani/mewtwo-megax.gif", "https://play.pokemonshowdown.com/sprites/ani/heracross-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/blaziken-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/medicham-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/lopunny-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/lucario-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/gallade-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/keldeo-resolute.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/meloetta-pirouette.gif"
+);
+POKEMONS.poison.push(
+  "https://play.pokemonshowdown.com/sprites/ani/venusaur-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/beedrill-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/gengar-mega.gif"
+);
+POKEMONS.ground.push(
+  "https://play.pokemonshowdown.com/sprites/ani/steelix-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/swampert-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/camerupt-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/garchomp-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/groudon-primal.gif", "https://play.pokemonshowdown.com/sprites/ani/zygarde-complete.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/landorus-therian.gif", "https://play.pokemonshowdown.com/sprites/ani/zygarde-10.gif"
+);
+POKEMONS.flying.push(
+  "https://play.pokemonshowdown.com/sprites/ani/charizard-megay.gif", "https://play.pokemonshowdown.com/sprites/ani/pidgeot-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/pinsir-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/aerodactyl-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/salamence-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/rayquaza-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/shaymin-sky.gif", "https://play.pokemonshowdown.com/sprites/ani/tornadus-therian.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/thundurus-therian.gif", "https://play.pokemonshowdown.com/sprites/ani/landorus-therian.gif"
+);
+POKEMONS.psychic.push(
+  "https://play.pokemonshowdown.com/sprites/ani/alakazam-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/slowbro-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/mewtwo-megax.gif", "https://play.pokemonshowdown.com/sprites/ani/mewtwo-megay.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/gardevoir-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/medicham-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/latias-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/latios-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/metagross-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/gallade-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/deoxys-attack.gif", "https://play.pokemonshowdown.com/sprites/ani/deoxys-speed.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/necrozma-duskmane.gif", "https://play.pokemonshowdown.com/sprites/ani/necrozma-dawnwings.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/necrozma-ultra.gif", "https://play.pokemonshowdown.com/sprites/ani/hoopa-unbound.gif"
+);
+POKEMONS.bug.push(
+  "https://play.pokemonshowdown.com/sprites/ani/beedrill-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/pinsir-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/scizor-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/heracross-mega.gif"
+);
+POKEMONS.rock.push(
+  "https://play.pokemonshowdown.com/sprites/ani/aerodactyl-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/tyranitar-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/diancie-mega.gif"
+);
+POKEMONS.ghost.push(
+  "https://play.pokemonshowdown.com/sprites/ani/gengar-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/sableye-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/banette-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/giratina-origin.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/necrozma-dawnwings.gif", "https://play.pokemonshowdown.com/sprites/ani/aegislash-blade.gif"
+);
+POKEMONS.dragon.push(
+  "https://play.pokemonshowdown.com/sprites/ani/charizard-megax.gif", "https://play.pokemonshowdown.com/sprites/ani/ampharos-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/sceptile-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/altaria-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/salamence-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/latias-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/latios-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/rayquaza-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/garchomp-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/zygarde-complete.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/kyurem-black.gif", "https://play.pokemonshowdown.com/sprites/ani/kyurem-white.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/giratina-origin.gif", "https://play.pokemonshowdown.com/sprites/ani/necrozma-ultra.gif"
+);
+POKEMONS.dark.push(
+  "https://play.pokemonshowdown.com/sprites/ani/gyarados-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/houndoom-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/tyranitar-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/sableye-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/sharpedo-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/absol-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/greninja-ash.gif", "https://play.pokemonshowdown.com/sprites/ani/hoopa-unbound.gif"
+);
+POKEMONS.steel.push(
+  "https://play.pokemonshowdown.com/sprites/ani/steelix-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/scizor-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/mawile-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/aggron-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/metagross-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/lucario-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/necrozma-duskmane.gif", "https://play.pokemonshowdown.com/sprites/ani/aegislash-blade.gif"
+);
+POKEMONS.fairy.push(
+  "https://play.pokemonshowdown.com/sprites/ani/gardevoir-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/mawile-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/altaria-mega.gif", "https://play.pokemonshowdown.com/sprites/ani/audino-mega.gif",
+  "https://play.pokemonshowdown.com/sprites/ani/diancie-mega.gif"
+);
 
   const TYPE_NAMES = { normal: 'NORMAL', fire: 'ATEŞ', water: 'SU', electric: 'ELEKTRİK', grass: 'ÇİMEN', ice: 'BUZ', fighting: 'DÖVÜŞ', poison: 'ZEHİR', ground: 'TOPRAK', flying: 'UÇAN', psychic: 'PSİŞİK', bug: 'BÖCEK', rock: 'KAYA', ghost: 'HAYALET', dragon: 'EJDERHA', dark: 'KARANLIK', steel: 'ÇELİK', fairy: 'PERİ' };
   const TYPE_COLORS = { normal: '#9ca3af', fire: '#ef4444', water: '#3b82f6', electric: '#eab308', grass: '#22c55e', ice: '#38bdf8', fighting: '#f97316', poison: '#a855f7', ground: '#d97706', flying: '#818cf8', psychic: '#f43f5e', bug: '#84cc16', rock: '#78716c', ghost: '#6366f1', dragon: '#3b82f6', dark: '#1e293b', steel: '#94a3b8', fairy: '#ec4899' };
@@ -497,15 +623,88 @@ function initPoke() {
       }, 1000);
   };
 
-  const playBattleAnimation = (attackerSlot, defenderSlot, moveName, moveType, damage, isSuper, isResisted) => {
+  const generateStatusAnimation = (targetSlot, category) => {
+      const area = document.getElementById('poke-effect-area');
+      const targetImg = document.getElementById('poke-' + targetSlot + '-pokemon');
+      if (!area || !targetImg) return;
+      const areaRect = area.getBoundingClientRect();
+      const targetRect = targetImg.getBoundingClientRect();
+      const targetX = (targetRect.left + targetRect.width / 2) - (areaRect.left + areaRect.width / 2);
+      const targetY = (targetRect.top + targetRect.height / 2) - (areaRect.top + areaRect.height / 2);
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.zIndex = '50';
+      container.style.pointerEvents = 'none';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      area.appendChild(container);
+      setTimeout(() => container.remove(), 2500);
+
+      const createParticle = (config) => {
+          const p = document.createElement('div');
+          p.style.position = 'absolute';
+          p.style.left = '50%';
+          p.style.top = '50%';
+          p.style.width = config.w + 'px';
+          p.style.height = config.h + 'px';
+          p.style.background = config.color;
+          p.style.borderRadius = config.radius || '50%';
+          p.style.boxShadow = config.shadow || `0 0 10px ${config.color}`;
+          p.style.opacity = config.opacity !== undefined ? config.opacity : 1;
+          if(config.isText) {
+             p.textContent = config.text;
+             p.style.fontSize = config.fontSize || '24px';
+             p.style.fontWeight = 'bold';
+             p.style.color = config.color;
+             p.style.background = 'transparent';
+             p.style.boxShadow = 'none';
+             p.style.textShadow = config.shadow || '0 0 5px #fff';
+             p.style.width = 'auto'; p.style.height = 'auto';
+          }
+          container.appendChild(p);
+          p.animate([
+              { transform: `translate(calc(-50% + ${config.startX}px), calc(-50% + ${config.startY}px)) scale(${config.scale || 1})`, opacity: p.style.opacity },
+              { transform: `translate(calc(-50% + ${config.targetX}px), calc(-50% + ${config.targetY}px)) scale(${config.endScale || 1})`, opacity: config.endOpacity !== undefined ? config.endOpacity : 0 }
+          ], { duration: config.duration || 1000, easing: 'ease-out', fill: 'forwards', delay: config.delay || 0 });
+      };
+
+      if (category === 'heal') {
+          for(let i=0; i<15; i++) {
+              createParticle({
+                  isText: true, text: '+', color: '#22c55e', shadow: '0 0 5px #000', fontSize: '32px',
+                  startX: targetX + (Math.random() * 40 - 20), startY: targetY + (Math.random() * 40 - 20),
+                  targetX: targetX + (Math.random() * 40 - 20), targetY: targetY - 60 - Math.random() * 40,
+                  delay: i * 100, duration: 1500, opacity: 1, endOpacity: 0
+              });
+          }
+      } else if (category === 'net-good-stats') {
+          for(let i=0; i<30; i++) {
+              createParticle({
+                  w: 8, h: 25, color: '#38bdf8', shadow: '0 0 15px #0ea5e9', radius: '4px',
+                  startX: targetX + (Math.random() * 80 - 40), startY: targetY + 40,
+                  targetX: targetX + (Math.random() * 80 - 40), targetY: targetY - 80 - Math.random() * 40,
+                  delay: Math.random() * 400, duration: 800, opacity: 0.8, endOpacity: 0
+              });
+          }
+      } else {
+          for(let i=0; i<30; i++) {
+              createParticle({
+                  w: 8, h: 25, color: '#a855f7', shadow: '0 0 15px #7e22ce', radius: '4px',
+                  startX: targetX + (Math.random() * 80 - 40), startY: targetY - 40,
+                  targetX: targetX + (Math.random() * 80 - 40), targetY: targetY + 80 + Math.random() * 40,
+                  delay: Math.random() * 400, duration: 800, opacity: 0.8, endOpacity: 0
+              });
+          }
+      }
+  };
+
+  const playBattleAnimation = (attackerSlot, defenderSlot, moveName, moveType, damage, isSuper, isResisted, effectLog, moveCategory, animTarget) => {
     const atkImg = document.getElementById('poke-' + attackerSlot + '-pokemon');
     const defImg = document.getElementById('poke-' + defenderSlot + '-pokemon');
     const proj = document.getElementById('poke-projectile');
     const logBox = document.getElementById('poke-battle-log');
     
-    // UI Setup
-    document.getElementById('poke-selection-panel').classList.add('hidden'); // Hide moves during animation
-    
+    document.getElementById('poke-selection-panel').classList.add('hidden');
     logBox.textContent = pokeState[attackerSlot].name + ", " + moveName + " kullandı!";
     
     atkImg.className = 'poke-idle-anim-' + attackerSlot;
@@ -518,24 +717,33 @@ function initPoke() {
       playPokemonCry(pokeState[attackerSlot].pokemon);
       
       proj.style.display = 'none';
-      generateRealisticAttack(attackerSlot, defenderSlot, moveType);
+      if (!moveCategory || moveCategory.includes('damage') || damage > 0) {
+          generateRealisticAttack(attackerSlot, defenderSlot, moveType);
+      } else {
+          generateStatusAnimation(animTarget || attackerSlot, moveCategory);
+      }
       
       setTimeout(() => {
         proj.style.display = 'none';
-        if (defenderSlot === 'p1') defImg.classList.add('anim-shake-p1');
-        else defImg.classList.add('anim-shake');
         
-        // Apply damage visually
-        pokeState[defenderSlot].hp -= damage;
-        if (pokeState[defenderSlot].hp < 0) pokeState[defenderSlot].hp = 0;
-        
-        updateHpUI(defenderSlot);
+        if (damage > 0) {
+            if (defenderSlot === 'p1') defImg.classList.add('anim-shake-p1');
+            else defImg.classList.add('anim-shake');
+            pokeState[defenderSlot].hp -= damage;
+            if (pokeState[defenderSlot].hp < 0) pokeState[defenderSlot].hp = 0;
+            updateHpUI(defenderSlot);
+        } else if (damage < 0) {
+            pokeState[attackerSlot].hp -= damage;
+            if (pokeState[attackerSlot].hp > pokeState[attackerSlot].maxHp) pokeState[attackerSlot].hp = pokeState[attackerSlot].maxHp;
+            updateHpUI(attackerSlot);
+        }
         
         let effectMsg = "";
-        if (isSuper) effectMsg = " Süper Etkili!";
-        else if (isResisted) effectMsg = " Etkisi Az!";
+        if (isSuper && damage > 0) effectMsg = " Süper Etkili!";
+        else if (isResisted && damage > 0) effectMsg = " Etkisi Az!";
         
-        logBox.textContent = moveName + " " + damage + " hasar verdi." + effectMsg;
+        if (effectLog) logBox.textContent = effectLog;
+        else logBox.textContent = moveName + " " + damage + " hasar verdi." + effectMsg;
         
         setTimeout(() => {
            if (pokeState[defenderSlot].hp <= 0) {
@@ -546,23 +754,18 @@ function initPoke() {
               else atkImg.classList.add('anim-winner');
               endBattle(attackerSlot);
            } else {
-              // Switch turn
               pokeState.turn = pokeState.turn === 1 ? 2 : 1;
-              customRenderBattleArena(); // Renders turn UI
+              customRenderBattleArena();
               window.pokeAnimPlaying = false;
-              
-              // If it's bot's turn, trigger bot
               if (pokeState.turn === 2 && pokeState.p2.id === 'BOT' && state.isLobbyHost) {
                  setTimeout(botPlay, 1500);
               }
            }
         }, 2000);
-        
       }, 500);
     }, 500);
   };
 
-  
     const executeRound = (action1, action2) => {
        window.pokeAnimPlaying = true;
        const m1 = pokeState.p1.moves[action1.moveIdx];
@@ -580,19 +783,49 @@ function initPoke() {
           first = 'p2'; second = 'p1';
           firstMove = m2; secondMove = m1;
        }
+
+       const getStageMultiplier = (stage) => stage >= 0 ? (2 + stage) / 2 : 2 / (2 - Math.abs(stage));
        
        const execSingle = (attacker, defender, move, cb) => {
-          if (pokeState[attacker].hp <= 0) return cb(); // attacker is dead
+          if (pokeState[attacker].hp <= 0) return cb();
           
-          const defType = pokeState[defender].type;
-          let multiplier = 1;
-          if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) multiplier = typeChart[move.type][defType];
+          let dmg = 0, effectLog = null, isSuper = false, isResisted = false, animCategory = move.category || 'damage', animTarget = defender;
+
+          if (move.power > 0) {
+              const defType = pokeState[defender].type;
+              let multiplier = 1;
+              if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) multiplier = typeChart[move.type][defType];
+              
+              isSuper = multiplier > 1.5;
+              isResisted = multiplier < 0.9;
+              let baseDmg = Math.floor(move.power * 0.45 * multiplier * (Math.random() * 0.15 + 0.85));
+              let atkMod = getStageMultiplier(pokeState[attacker].atkStage || 0);
+              let defMod = getStageMultiplier(pokeState[defender].defStage || 0);
+              dmg = Math.floor(baseDmg * atkMod / defMod);
+          } else if (move.damage_class === 'status') {
+              animTarget = (move.target === 'user' || move.target === 'user-and-allies') ? attacker : defender;
+              if (move.healing > 0) {
+                 const healAmount = Math.floor(pokeState[attacker].maxHp * (move.healing / 100));
+                 dmg = -healAmount;
+                 effectLog = pokeState[attacker].name + " " + healAmount + " Can Yeniledi!";
+                 animCategory = 'heal';
+              } else if (move.stat_changes && move.stat_changes.length > 0) {
+                 const isBuff = move.target === 'user' || move.target === 'user-and-allies';
+                 move.stat_changes.forEach(sc => {
+                     const stat = sc.stat, change = sc.change;
+                     if (stat === 'attack' || stat === 'special-attack') pokeState[animTarget].atkStage = Math.max(-6, Math.min(6, (pokeState[animTarget].atkStage || 0) + change));
+                     else if (stat === 'defense' || stat === 'special-defense') pokeState[animTarget].defStage = Math.max(-6, Math.min(6, (pokeState[animTarget].defStage || 0) + change));
+                     else if (stat === 'speed') pokeState[animTarget].spdStage = Math.max(-6, Math.min(6, (pokeState[animTarget].spdStage || 0) + change));
+                 });
+                 effectLog = pokeState[animTarget].name + " Statları " + (isBuff ? "Arttı!" : "Düştü!");
+                 animCategory = isBuff ? 'net-good-stats' : 'debuff';
+              } else {
+                 effectLog = move.name + " kullanıldı!";
+                 animCategory = 'status';
+              }
+          }
           
-          let isSuper = multiplier > 1.5;
-          let isResisted = multiplier < 0.9;
-          let dmg = Math.floor(move.power * multiplier * (Math.random() * 0.2 + 0.9)); // +/- 10%
-          
-          playBattleAnimation(attacker, defender, move.name, move.type, dmg, isSuper, isResisted);
+          playBattleAnimation(attacker, defender, move.name, move.type, dmg, isSuper, isResisted, effectLog, animCategory, animTarget);
           
           setTimeout(() => {
              cb();
@@ -661,19 +894,41 @@ function initPoke() {
        const myMoves = pokeState.p2.moves;
        const targetType = pokeState.p1.type;
        
-       // Find best move
        let bestMoveIdx = 0;
-       let bestDamage = -1;
+       let bestScore = -1000;
        
        for(let i=0; i<myMoves.length; i++) {
           const move = myMoves[i];
-          let multiplier = 1;
-          if (typeChart[move.type] && typeChart[move.type][targetType] !== undefined) {
-            multiplier = typeChart[move.type][targetType];
+          let score = 0;
+          
+          if (move.power > 0) {
+              let multiplier = 1;
+              if (typeChart[move.type] && typeChart[move.type][targetType] !== undefined) multiplier = typeChart[move.type][targetType];
+              score = move.power * multiplier;
+              score += Math.random() * 20; // add slight randomness
+          } else if (move.damage_class === 'status') {
+              if (move.healing > 0) {
+                  const hpPct = pokeState.p2.hp / pokeState.p2.maxHp;
+                  if (hpPct < 0.4) score = 150 + Math.random() * 50; // Priority!
+                  else if (hpPct < 0.7) score = 80 + Math.random() * 20;
+                  else score = -100; // Do not heal if HP is high
+              } else if (move.stat_changes && move.stat_changes.length > 0) {
+                  const isBuff = move.target === 'user' || move.target === 'user-and-allies';
+                  if (isBuff) {
+                      const currentAtkStage = pokeState.p2.atkStage || 0;
+                      const currentDefStage = pokeState.p2.defStage || 0;
+                      if (currentAtkStage < 2 && currentDefStage < 2) score = 90 + Math.random() * 30;
+                      else score = 10;
+                  } else {
+                      const currentP1Atk = pokeState.p1.atkStage || 0;
+                      if (currentP1Atk > 0) score = 100 + Math.random() * 20;
+                      else score = 70 + Math.random() * 30;
+                  }
+              }
           }
-          const estDmg = move.power * multiplier;
-          if (estDmg > bestDamage) {
-             bestDamage = estDmg;
+          
+          if (score > bestScore) {
+             bestScore = score;
              bestMoveIdx = i;
           }
        }
@@ -711,15 +966,28 @@ function initPoke() {
 
   const fetchPokemonStatsAndMoves = async (pokeName, targetType, fullList = false) => {
     try {
-      const pokeApiName = pokeName.toLowerCase().replace(/ /g, '-').replace(/\./g, '').replace(/'/g, '');
+      let pokeApiName = pokeName.toLowerCase().replace(/ /g, '-').replace(/\./g, '').replace(/'/g, '');
+      if (pokeApiName.startsWith('mega-')) {
+          if (pokeApiName.endsWith('-x') || pokeApiName.endsWith('-y')) {
+              pokeApiName = pokeApiName.replace('mega-', '');
+              let parts = pokeApiName.split('-');
+              let suffix = parts.pop();
+              pokeApiName = parts.join('-') + '-mega-' + suffix;
+          } else {
+              pokeApiName = pokeApiName.replace('mega-', '') + '-mega';
+          }
+      } else if (pokeApiName.startsWith('primal-')) {
+          pokeApiName = pokeApiName.replace('primal-', '') + '-primal';
+      }
       const res = await fetch('https://pokeapi.co/api/v2/pokemon/' + pokeApiName);
       const data = await res.json();
       
-      let stats = { hp: 70, speed: 50 };
+      let stats = { hp: 70, speed: 50, attack: 50, defense: 50, 'special-attack': 50, 'special-defense': 50 };
       if (data.stats) {
           data.stats.forEach(s => {
-              if (s.stat.name === 'hp') stats.hp = s.base_stat;
-              if (s.stat.name === 'speed') stats.speed = s.base_stat;
+              if (stats.hasOwnProperty(s.stat.name)) {
+                 stats[s.stat.name] = s.base_stat;
+              }
           });
       }
 
@@ -728,11 +996,16 @@ function initPoke() {
           data.moves.forEach(m => {
               const moveName = m.move.name;
               const dictMove = window.POKEMON_MOVES ? window.POKEMON_MOVES[moveName] : null;
-              if (dictMove && dictMove.power > 0) {
+              if (dictMove && (dictMove.power > 0 || dictMove.damage_class === 'status')) {
                  const mObj = {
                      name: moveName.replace(/-/g, ' ').toUpperCase(),
                      type: dictMove.type,
-                     power: dictMove.power
+                     power: dictMove.power || 0,
+                     damage_class: dictMove.damage_class,
+                     healing: dictMove.healing || 0,
+                     category: dictMove.category,
+                     stat_changes: dictMove.stat_changes || [],
+                     target: dictMove.target
                  };
                  if (!allMoves.find(x => x.name === mObj.name)) {
                      allMoves.push(mObj);
@@ -831,7 +1104,11 @@ function initPoke() {
         d.style.justifyContent = 'center';
         d.style.minWidth = '130px';
         
-        d.innerHTML = `<span style="color:white; font-weight:bold; font-size:15px; text-align:center;">${move.name}</span>
+        let nameHtml = move.name;
+        if (move.power === 0 || move.damage_class === 'status') {
+           nameHtml += `<span class="move-info-icon" style="margin-left:5px;">i<span class="tooltip-text">${window.getMoveTooltip(move)}</span></span>`;
+        }
+        d.innerHTML = `<span style="color:white; font-weight:bold; font-size:15px; text-align:center; display:flex; align-items:center; justify-content:center;">${nameHtml}</span>
                        <span style="font-size:12px; text-align:center; margin-top:4px; color:${TYPE_COLORS[move.type] || '#ccc'};">${move.type.toUpperCase()} | Güç: ${move.power} | Hız: ${moveSpeed}/10</span>`;
         
         d.addEventListener('click', () => {
@@ -937,11 +1214,15 @@ function initPoke() {
         
         // Populate moves
         const moves = pokeState[mySlot].moves;
-        
+
         for (let i=0; i<4; i++) {
            const btn = document.querySelector('.poke-move-btn[data-move="'+i+'"]');
            if (btn && moves[i]) {
-              btn.querySelector('.move-name').textContent = moves[i].name;
+              let nameHtml = moves[i].name;
+              if (moves[i].power === 0 || moves[i].damage_class === 'status') {
+                 nameHtml += `<span class="move-info-icon">i<span class="tooltip-text">${window.getMoveTooltip(moves[i])}</span></span>`;
+              }
+              btn.querySelector('.move-name').innerHTML = nameHtml;
               btn.querySelector('.move-type').textContent = (TYPE_NAMES[moves[i].type] || moves[i].type).toUpperCase();
                 const rawSpeed = (pokeState[mySlot].speed || 50) + (100 - moves[i].power) * 0.5;
                 const calcSpeed = Math.max(1, Math.min(10, Math.round(rawSpeed / 15)));
@@ -984,7 +1265,7 @@ function initPoke() {
       }
     }
     if (data.type === 'poke_join') {
-      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null, hp: 0, maxHp: 0, moves: [] };
+      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null, hp: 0, maxHp: 0, moves: [], atkStage: 0, defStage: 0, spdStage: 0 };
       if (data.slot === 1) pokeState.p1 = pData;
       else if (data.slot === 2) pokeState.p2 = pData;
       renderPokeLobby();
@@ -997,8 +1278,10 @@ function initPoke() {
        document.getElementById('poke-p2-pokemon').className = 'poke-idle-anim-p2';
        renderPokeLobby();
     }
-            if (data.type === 'poke_start') {
+    if (data.type === 'poke_start') {
       pokeState.status = 'selecting';
+      if (pokeState.p1) { pokeState.p1.ready = false; pokeState.p1.atkStage = 0; pokeState.p1.defStage = 0; pokeState.p1.spdStage = 0; }
+      if (pokeState.p2) { pokeState.p2.ready = false; pokeState.p2.atkStage = 0; pokeState.p2.defStage = 0; pokeState.p2.spdStage = 0; }
       document.getElementById('poke-battle-view').classList.remove('hidden');
       document.getElementById('poke-lobby-view').classList.add('hidden');
       customRenderBattleArena();
@@ -1125,6 +1408,7 @@ function initPoke() {
     pokeState.p1.baseName = data.baseName;
     pokeState.p1.type = data.typeStr;
     pokeState.p1.baseReady = true;
+    pokeState.p1.atkStage = 0; pokeState.p1.defStage = 0; pokeState.p1.spdStage = 0;
     const fam1 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
     if(fam1) { pokeState.p1.hp = 250; pokeState.p1.maxHp = 250; }
 }
@@ -1132,6 +1416,7 @@ function initPoke() {
     pokeState.p2.baseName = data.baseName;
     pokeState.p2.type = data.typeStr;
     pokeState.p2.baseReady = true;
+    pokeState.p2.atkStage = 0; pokeState.p2.defStage = 0; pokeState.p2.spdStage = 0;
     const fam2 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
     if(fam2) { pokeState.p2.hp = 250; pokeState.p2.maxHp = 250; }
 }
@@ -1453,7 +1738,21 @@ function initPoke() {
          multiplier = typeChart[move.type][defType];
       }
       
-      const damage = Math.floor(move.power * multiplier * 0.6); // Scaled based on new real HP formula
+      const atkStat = move.damage_class === 'special' ? 'special-attack' : 'attack';
+      const defStat = move.damage_class === 'special' ? 'special-defense' : 'defense';
+      
+      const pAttackerStats = pokeState[attackerSlot].stats || { attack: 50, defense: 50, 'special-attack': 50, 'special-defense': 50 };
+      const pDefenderStats = pokeState[defenderSlot].stats || { attack: 50, defense: 50, 'special-attack': 50, 'special-defense': 50 };
+      
+      const A = pAttackerStats[atkStat] || 50;
+      const D = pDefenderStats[defStat] || 50;
+      
+      const baseDamage = move.power > 0 ? (0.44 * move.power * (A / D) + 2) : 0;
+      let stab = pokeState[attackerSlot].type === move.type ? 1.5 : 1;
+      let randomFactor = (Math.random() * 0.15) + 0.85;
+      
+      const damage = Math.floor(baseDamage * multiplier * stab * randomFactor * 0.8);
+      
       const isSuper = multiplier > 1;
       const isResisted = multiplier < 1;
       
