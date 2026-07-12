@@ -1776,6 +1776,70 @@ POKEMONS.fairy.push(
     }
   }, 1000);
 
+  setTimeout(() => {
+    const searchInput = document.getElementById('poke-search-input');
+    const searchDropdown = document.getElementById('poke-search-dropdown');
+    
+    if (searchInput && searchDropdown) {
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase().trim();
+            if (val.length < 2) {
+                searchDropdown.classList.add('hidden');
+                searchDropdown.innerHTML = '';
+                return;
+            }
+            
+            let matches = window.POKEMON_FAMILIES.filter(fam => 
+                fam.displayName.toLowerCase().includes(val) || fam.baseName.includes(val)
+            );
+            
+            searchDropdown.innerHTML = '';
+            
+            if (matches.length === 0) {
+                searchDropdown.innerHTML = '<div style="padding: 10px; color: #f87171; font-size: 14px; text-align: center;">Sonuç bulunamadı.</div>';
+                searchDropdown.classList.remove('hidden');
+                return;
+            }
+            
+            let titleHtml = '<div style="padding: 5px 10px; font-size: 12px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 5px;">Bunu mu aradınız?</div>';
+            searchDropdown.innerHTML += titleHtml;
+            
+            // Move best match to top
+            const bestMatchIdx = matches.findIndex(f => f.displayName.toLowerCase().startsWith(val));
+            if (bestMatchIdx > 0) {
+               const best = matches.splice(bestMatchIdx, 1)[0];
+               matches.unshift(best);
+            }
+            
+            matches.slice(0, 8).forEach(fam => {
+                const item = document.createElement('div');
+                item.className = 'poke-search-item';
+                item.innerHTML = `
+                    <img src="${fam.evolutions[0].url}" style="width: 30px; height: 30px; object-fit: contain;">
+                    <span>${fam.displayName}</span>
+                    <span style="margin-left: auto; font-size: 11px; background: ${TYPE_COLORS[fam.type] || '#777'}; padding: 2px 6px; border-radius: 4px;">${(TYPE_NAMES[fam.type] || fam.type).toUpperCase()}</span>
+                `;
+                item.onclick = () => {
+                    document.getElementById('poke-base-selection-grid').innerHTML = '';
+                    document.getElementById('poke-waiting-base-msg').style.display = 'block';
+                    broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type });
+                    searchDropdown.classList.add('hidden');
+                    searchInput.value = '';
+                };
+                searchDropdown.appendChild(item);
+            });
+            
+            searchDropdown.classList.remove('hidden');
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+                searchDropdown.classList.add('hidden');
+            }
+        });
+    }
+  }, 1500);
+
   const originalActHandler = window.activityHandler;
   window.activityHandler = (data) => {
     if(originalActHandler) originalActHandler(data);

@@ -130,6 +130,9 @@
     .move-info-icon .tooltip-text { visibility: hidden; width: max-content; max-width: 250px; background-color: rgba(15, 23, 42, 0.95); color: #e2e8f0; text-align: center; border-radius: 8px; padding: 10px 14px; position: absolute; z-index: 9999; bottom: 130%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-size: 13px; font-weight: normal; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: none; line-height: 1.4; font-family: 'Inter', sans-serif; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
     .move-info-icon .tooltip-text::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: rgba(15, 23, 42, 0.95) transparent transparent transparent; }
     .move-info-icon:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
+    .poke-search-item { padding: 10px 15px; border-radius: 8px; cursor: pointer; color: #cbd5e1; transition: all 0.2s; font-size: 15px; display: flex; align-items: center; gap: 10px; }
+    .poke-search-item:hover { background: rgba(59, 130, 246, 0.2); color: white; transform: translateX(5px); }
+    #poke-search-input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 10px rgba(59, 130, 246, 0.6) !important; background: rgba(15, 23, 42, 0.95) !important; }
     .poke-move-btn:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 8px 20px rgba(59,130,246,0.5) !important; border-color: rgba(96,165,250,0.8) !important; background: linear-gradient(135deg, rgba(30,41,59,1), rgba(30,58,138,0.9)) !important; }
     .poke-move-btn:active { transform: translateY(1px) scale(0.98); }
     #poke-vol-control:hover { border-color: rgba(96,165,250,0.6) !important; box-shadow: 0 6px 15px rgba(59,130,246,0.3) !important; }
@@ -991,6 +994,15 @@
 
           <!-- Pokemon Selection Modal -->
           <div id="poke-base-selection-modal" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.98); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px; overflow-y: auto;">
+            
+            <div id="poke-search-container" style="position: absolute; top: 20px; left: 20px; z-index: 1001;">
+               <div style="position: relative;">
+                 <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 18px;">🔍</span>
+                 <input type="text" id="poke-search-input" placeholder="Pokemon Ara..." style="background: rgba(30, 41, 59, 0.8); border: 2px solid rgba(96, 165, 250, 0.5); color: white; padding: 10px 10px 10px 40px; border-radius: 20px; font-size: 16px; width: 250px; outline: none; transition: all 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                 <!-- Autocomplete dropdown -->
+                 <div id="poke-search-dropdown" class="hidden" style="position: absolute; top: 100%; left: 0; right: 0; margin-top: 8px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(96, 165, 250, 0.4); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 8px;"></div>
+               </div>
+            </div>
             <button id="poke-withdraw-selection-btn" class="btn-withdraw" style="position: absolute; top: 20px; right: 20px; background: #dc2626; border: 1px solid #b91c1c; padding: 10px 20px; font-size: 14px; border-radius: 10px; cursor: pointer; color: white; font-weight: bold; transition: transform 0.1s, background 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">Savaştan Çekil</button>
             <h2 style="color: white; font-size: 28px; margin-bottom: 5px; text-shadow: 0 0 10px rgba(255,255,255,0.5);">Pokemonunu Seç</h2>
             <p style="color: #94a3b8; margin-bottom: 20px;">Savaşmak istediğin türü ve ana Pokemonunu belirle.</p>
