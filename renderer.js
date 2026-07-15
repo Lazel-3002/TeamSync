@@ -1291,6 +1291,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false, useGameMode = false) => {
+    roomId = roomId.toLowerCase();
     state.sfwMode = useSFW;
     state.gameMode = useGameMode;
     if (useSFW) {
@@ -1410,7 +1411,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const sName = createName.value.trim() || 'Oyun Odası';
     
     // Gerçek P2P ID mantığı: Cloudflared tüneline gerek kalmadan eşsiz bir ID üretiyoruz
-    const odaId = `TS-${crypto.randomUUID()}`;
+    const odaId = `ts-${crypto.randomUUID()}`;
     
     const useSFW = document.getElementById('create-useSFW').checked;
     const useGameMode = document.getElementById('create-gameMode') ? document.getElementById('create-gameMode').checked : false;
