@@ -1510,20 +1510,36 @@ async function setupLocalAudio() {
   vuSrc.connect(state.gateGainNode);
   
   const dest = vuCtx.createMediaStreamDestination();
-  state.gateGainNode.connect(dest);
-
-  let gatedStream = dest.stream;
 
   if (state.useAI) {
-    try {
-      state.processedStream = await applyAIDenoise(gatedStream);
-    } catch (e) {
-      console.warn('AI denoise başarısız:', e);
-      state.processedStream = gatedStream;
-    }
+    const highpass = vuCtx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = 80;
+
+    const lowpass = vuCtx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 12000;
+
+    const compressor = vuCtx.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.knee.value = 30;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.01;
+    compressor.release.value = 0.25;
+
+    const gainNode = vuCtx.createGain();
+    gainNode.gain.value = 1.0;
+
+    state.gateGainNode.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(compressor);
+    compressor.connect(gainNode);
+    gainNode.connect(dest);
   } else {
-    state.processedStream = gatedStream;
+    state.gateGainNode.connect(dest);
   }
+
+  state.processedStream = dest.stream;
   
   const canvas = document.createElement('canvas');
   canvas.width = 1; canvas.height = 1;
@@ -1533,12 +1549,10 @@ async function setupLocalAudio() {
   
   state.localStream = state.processedStream;
 
-  if (state.gateAudioCtx) {
-    state.uiAnalyser = state.gateAudioCtx.createAnalyser();
-    state.uiAnalyser.fftSize = 512;
-    const finalSrc = state.gateAudioCtx.createMediaStreamSource(state.localStream);
-    finalSrc.connect(state.uiAnalyser);
-  }
+  state.uiAnalyser = vuCtx.createAnalyser();
+  state.uiAnalyser.fftSize = 512;
+  const finalSrc = vuCtx.createMediaStreamSource(state.localStream);
+  finalSrc.connect(state.uiAnalyser);
 
   if (state.peers && state.peers.size > 0) {
     const newAudioTrack = state.localStream.getAudioTracks()[0];
@@ -1552,40 +1566,6 @@ async function setupLocalAudio() {
     state.localStream.getAudioTracks().forEach(t => t.enabled = false);
     if (state.rawMicStream) state.rawMicStream.getAudioTracks().forEach(t => t.enabled = false);
   }
-}
-
-async function applyAIDenoise(stream) {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  state.audioCtx = audioCtx;
-  const source = audioCtx.createMediaStreamSource(stream);
-
-  const highpass = audioCtx.createBiquadFilter();
-  highpass.type = 'highpass';
-  highpass.frequency.value = 80;
-
-  const lowpass = audioCtx.createBiquadFilter();
-  lowpass.type = 'lowpass';
-  lowpass.frequency.value = 12000;
-
-  const compressor = audioCtx.createDynamicsCompressor();
-  compressor.threshold.value = -24;
-  compressor.knee.value = 30;
-  compressor.ratio.value = 4;
-  compressor.attack.value = 0.01;
-  compressor.release.value = 0.25;
-
-  const gainNode = audioCtx.createGain();
-  gainNode.gain.value = 1.0;
-
-  source.connect(highpass);
-  highpass.connect(lowpass);
-  lowpass.connect(compressor);
-  compressor.connect(gainNode);
-
-  const dest = audioCtx.createMediaStreamDestination();
-  gainNode.connect(dest);
-
-  return dest.stream;
 }
 
 function setupVUMeter() {
@@ -1749,6 +1729,8 @@ function removePeer(peerId) {
   if (!peer) return;
   if (peer.pc) peer.pc.close();
   if (peer.dc) peer.dc.close();
+  if (peer.mediaStreamSource) { try { peer.mediaStreamSource.disconnect(); } catch(e) {} }
+  if (peer.analyser) { try { peer.analyser.disconnect(); } catch(e) {} }
   if (peer.audioCtx) { try { peer.audioCtx.close(); } catch(e) {} }
   state.peers.delete(peerId);
   const userEl = document.querySelector(`[data-uid="${peerId}"]`);
@@ -2505,18 +2487,33 @@ async function handleDataMessage(peerId, msg) {
 
 function setupSpeakingDetection(peerId, stream) {
   const peer = state.peers.get(peerId);
-  if (peer && peer.audioCtx) {
-    try { peer.audioCtx.close(); } catch(e) {}
+  if (!state.remoteAudioCtx || state.remoteAudioCtx.state === 'closed') {
+    state.remoteAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (peer) peer.audioCtx = audioCtx;
+  const audioCtx = state.remoteAudioCtx;
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
   const source = audioCtx.createMediaStreamSource(stream);
   const analyser = audioCtx.createAnalyser();
   analyser.fftSize = 512;
   source.connect(analyser);
+
+  if (peer) {
+    peer.mediaStreamSource = source;
+    peer.analyser = analyser;
+  }
+
   const data = new Uint8Array(analyser.frequencyBinCount);
   function check() {
-    if (!state.peers.has(peerId)) return;
+    if (!state.peers.has(peerId)) {
+      try { source.disconnect(); } catch(e) {}
+      try { analyser.disconnect(); } catch(e) {}
+      return;
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
     analyser.getByteFrequencyData(data);
     let sum = 0;
     for (let i = 0; i < data.length; i++) sum += data[i];
@@ -3802,6 +3799,9 @@ function disconnectApp() {
   if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
   if (state.audioCtx && state.audioCtx.state !== 'closed') state.audioCtx.close();
   if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') state.gateAudioCtx.close();
+  if (state.remoteAudioCtx && state.remoteAudioCtx.state !== 'closed') {
+    try { state.remoteAudioCtx.close(); } catch(e) {}
+  }
   
   if (window.electronAPI.stopDiscovery) {
     window.electronAPI.stopDiscovery();

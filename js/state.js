@@ -8,6 +8,7 @@ window.state = {
   screenStream: null,
   processedStream: null,
   audioCtx: null,
+  remoteAudioCtx: null,
   micEnabled: true,
   deafened: false,
   isSharing: false,
