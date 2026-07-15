@@ -1525,49 +1525,69 @@ async function setupLocalAudio() {
   vuSrc.connect(state.gateGainNode);
   
   const dest = vuCtx.createMediaStreamDestination();
+  let highpassNode = null, lowpassNode = null, compressorNode = null, gainNodeInst = null;
 
   if (state.useAI) {
-    const highpass = vuCtx.createBiquadFilter();
-    highpass.type = 'highpass';
-    highpass.frequency.value = 80;
+    highpassNode = vuCtx.createBiquadFilter();
+    highpassNode.type = 'highpass';
+    highpassNode.frequency.value = 80;
 
-    const lowpass = vuCtx.createBiquadFilter();
-    lowpass.type = 'lowpass';
-    lowpass.frequency.value = 12000;
+    lowpassNode = vuCtx.createBiquadFilter();
+    lowpassNode.type = 'lowpass';
+    lowpassNode.frequency.value = 12000;
 
-    const compressor = vuCtx.createDynamicsCompressor();
-    compressor.threshold.value = -24;
-    compressor.knee.value = 30;
-    compressor.ratio.value = 4;
-    compressor.attack.value = 0.01;
-    compressor.release.value = 0.25;
+    compressorNode = vuCtx.createDynamicsCompressor();
+    compressorNode.threshold.value = -24;
+    compressorNode.knee.value = 30;
+    compressorNode.ratio.value = 4;
+    compressorNode.attack.value = 0.01;
+    compressorNode.release.value = 0.25;
 
-    const gainNode = vuCtx.createGain();
-    gainNode.gain.value = 1.0;
+    gainNodeInst = vuCtx.createGain();
+    gainNodeInst.gain.value = 1.0;
 
-    state.gateGainNode.connect(highpass);
-    highpass.connect(lowpass);
-    lowpass.connect(compressor);
-    compressor.connect(gainNode);
-    gainNode.connect(dest);
+    state.gateGainNode.connect(highpassNode);
+    highpassNode.connect(lowpassNode);
+    lowpassNode.connect(compressorNode);
+    compressorNode.connect(gainNodeInst);
+    gainNodeInst.connect(dest);
+
+    state.processedStream = dest.stream;
   } else {
     state.gateGainNode.connect(dest);
+    state.processedStream = raw;
   }
 
-  state.processedStream = dest.stream;
-  
+  // Prevent Garbage Collection of WebAudio processing nodes by V8
+  state.audioNodes = {
+    vuSrc,
+    vuAnalyser: state.vuAnalyser,
+    gateGainNode: state.gateGainNode,
+    dest,
+    highpassNode,
+    lowpassNode,
+    compressorNode,
+    gainNodeInst
+  };
+
   const canvas = document.createElement('canvas');
   canvas.width = 1; canvas.height = 1;
   const blankVideoTrack = canvas.captureStream().getVideoTracks()[0];
   blankVideoTrack.enabled = false;
-  state.processedStream.addTrack(blankVideoTrack);
+
+  const finalStream = new MediaStream();
+  state.processedStream.getAudioTracks().forEach(t => finalStream.addTrack(t));
+  finalStream.addTrack(blankVideoTrack);
   
-  state.localStream = state.processedStream;
+  state.localStream = finalStream;
 
   state.uiAnalyser = vuCtx.createAnalyser();
   state.uiAnalyser.fftSize = 512;
-  const finalSrc = vuCtx.createMediaStreamSource(state.localStream);
-  finalSrc.connect(state.uiAnalyser);
+  if (gainNodeInst) {
+    gainNodeInst.connect(state.uiAnalyser);
+  } else {
+    state.gateGainNode.connect(state.uiAnalyser);
+  }
 
   if (state.peers && state.peers.size > 0) {
     const newAudioTrack = state.localStream.getAudioTracks()[0];
@@ -1843,6 +1863,16 @@ function setMediaBitrates(sdp) {
   return sdp.replace(/a=fmtp:111(.*)/g, 'a=fmtp:111$1;maxaveragebitrate=128000;stereo=1;sprop-stereo=1;cbr=1');
 }
 
+function getVideoSender(pc) {
+  if (!pc) return null;
+  let sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+  if (!sender) {
+    const transceiver = pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'video');
+    if (transceiver) sender = transceiver.sender;
+  }
+  return sender;
+}
+
 async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (state.peers.has(peerId)) return;
   const pc = new RTCPeerConnection({ 
@@ -1854,7 +1884,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     pc.addTrack(track, state.localStream);
   });
 
-  const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+  const sender = getVideoSender(pc);
   if (sender) {
     if (state.isSharing && state.screenStream) {
       sender.replaceTrack(state.screenStream.getVideoTracks()[0]);
@@ -1905,18 +1935,20 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     console.log(`🎵 Track received from ${peerName}:`, e.track.kind);
 
     if (e.track.kind === 'audio') {
-      peer.audioEl.srcObject = e.streams[0];
+      const audioStream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
+      peer.audioEl.srcObject = audioStream;
       peer.audioEl.volume = state.deafened ? 0.0 : 1.0;
       peer.audioEl.muted = state.deafened;
 
       peer.audioEl.play().catch((err) => console.warn('Audio play failed:', err));
-      setupSpeakingDetection(peerId, e.streams[0]);
+      setupSpeakingDetection(peerId, audioStream);
     } else if (e.track.kind === 'video') {
-      peer.videoEl.srcObject = e.streams[0];
+      const videoStream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
+      peer.videoEl.srcObject = videoStream;
       peer.videoEl.play().catch((err) => console.warn('peer.videoEl play failed in ontrack:', err));
       if (state.activeControl && state.activeControl.hostId === peerId) {
         const remoteVid = document.getElementById('remote-vid');
-        remoteVid.srcObject = e.streams[0];
+        remoteVid.srcObject = videoStream;
         remoteVid.play().catch((err) => console.warn('remote-vid play failed:', err));
       }
     }
@@ -2522,22 +2554,20 @@ function setupSpeakingDetection(peerId, stream) {
   if (audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {});
   }
-  let sourceStream = stream;
-  if (stream.getAudioTracks().length > 0) {
-    try {
-      sourceStream = new MediaStream([stream.getAudioTracks()[0].clone()]);
-    } catch(e) {
-      console.warn("Could not clone audio track", e);
-    }
-  }
-  const source = audioCtx.createMediaStreamSource(sourceStream);
+  const source = audioCtx.createMediaStreamSource(stream);
   const analyser = audioCtx.createAnalyser();
   analyser.fftSize = 512;
   source.connect(analyser);
 
+  const silentGain = audioCtx.createGain();
+  silentGain.gain.value = 0;
+  analyser.connect(silentGain);
+  silentGain.connect(audioCtx.destination);
+
   if (peer) {
     peer.mediaStreamSource = source;
     peer.analyser = analyser;
+    peer.silentGain = silentGain;
   }
 
   const data = new Uint8Array(analyser.frequencyBinCount);
@@ -3551,7 +3581,7 @@ async function startScreenShare(sourceId) {
     });
     const track = state.screenStream.getVideoTracks()[0];
     state.peers.forEach(peer => {
-      const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+      const sender = getVideoSender(peer.pc);
       if (sender) sender.replaceTrack(track);
     });
     state.isSharing = true;
@@ -3569,7 +3599,7 @@ function stopScreenShare() {
     state.screenStream.getTracks().forEach(t => t.stop());
   }
   state.peers.forEach(peer => {
-    const sender = peer.pc.getSenders().find(s => s.track?.kind === 'video');
+    const sender = getVideoSender(peer.pc);
     if (sender) {
       const blankTrack = state.localStream ? state.localStream.getVideoTracks()[0] : null;
       sender.replaceTrack(blankTrack || null);

@@ -33,7 +33,7 @@ window.state = {
   cryptoKey: null,
   wbContext: null,
   drawing: false,
-  micThreshold: 20,
+  micThreshold: 3,
   dms: {},
   activeDM: null,
   myAvatar: null,
