@@ -936,10 +936,9 @@ function getIceServers() {
   if (customUrl && customUrl.startsWith('http')) {
     // API modunda gerçek sunucular refreshDynamicTurn() ile state'e yüklenir.
   } else if (customUrl && customUser && customPass) {
-    servers.push({
-      urls: customUrl,
-      username: customUser,
-      credential: customPass
+    // Virgülle ayrılmış birden çok URL desteklenir (aynı kullanıcı adı/şifre ile)
+    customUrl.split(',').map(u => u.trim()).filter(Boolean).forEach(u => {
+      servers.push({ urls: u, username: customUser, credential: customPass });
     });
   }
 
@@ -984,7 +983,9 @@ function getShareableTurn() {
   const customUser = localStorage.getItem('teamsync_turn_user') || '';
   const customPass = localStorage.getItem('teamsync_turn_pass') || '';
   if (customUrl && !customUrl.startsWith('http') && customUser && customPass) {
-    out.push({ urls: customUrl, username: customUser, credential: customPass });
+    customUrl.split(',').map(u => u.trim()).filter(Boolean).forEach(u => {
+      out.push({ urls: u, username: customUser, credential: customPass });
+    });
   }
   if (Array.isArray(state.dynamicTurnServers)) {
     state.dynamicTurnServers.forEach(s => {
