@@ -1290,8 +1290,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false, useGameMode = false) => {
+  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false, useGameMode = false, useRelay = false) => {
     roomId = roomId.toLowerCase();
+    state.useRelay = useRelay;
     state.sfwMode = useSFW;
     state.gameMode = useGameMode;
     if (useSFW) {
@@ -1385,7 +1386,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     btnJoin.disabled = true;
 
     state.isJoining = true;
-    startApp(roomId, joinPw.value, joinAi.checked, joinPtt.checked, "Sunucu " + roomId, true);
+    const useRelay = document.getElementById('join-useRelay') ? document.getElementById('join-useRelay').checked : false;
+    startApp(roomId, joinPw.value, joinAi.checked, joinPtt.checked, "Sunucu " + roomId, true, false, false, useRelay);
 
     // Sunucu var mı kontrolü (15 saniye içinde kimse bulunamazsa iptal et)
     if (state.joinTimeout) clearTimeout(state.joinTimeout);
@@ -1415,7 +1417,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     const useSFW = document.getElementById('create-useSFW').checked;
     const useGameMode = document.getElementById('create-gameMode') ? document.getElementById('create-gameMode').checked : false;
-    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false, useSFW, useGameMode);
+    const useRelay = document.getElementById('create-useRelay') ? document.getElementById('create-useRelay').checked : false;
+    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false, useSFW, useGameMode, useRelay);
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -1844,7 +1847,10 @@ function setMediaBitrates(sdp) {
 
 async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (state.peers.has(peerId)) return;
-  const pc = new RTCPeerConnection({ iceServers: getIceServers() });
+  const pc = new RTCPeerConnection({ 
+    iceServers: getIceServers(),
+    iceTransportPolicy: state.useRelay ? 'relay' : 'all'
+  });
 
   if (state.localStream) state.localStream.getTracks().forEach(track => {
     pc.addTrack(track, state.localStream);
