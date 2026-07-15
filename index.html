@@ -1273,7 +1273,8 @@
         </select>
         
         <label class="lbl-block">Özel TURN Sunucusu (Farklı Ağlar İçin Gerekirse)</label>
-        <input type="text" id="turn-url" class="sel-block" placeholder="Örn: turns:myturn.com:443" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: white;" />
+        <div class="muted" style="font-size: 11px; margin-bottom: 6px; line-height: 1.5;">metered.ca'dan ücretsiz hesap açıp buraya TURN bilgilerinizi girin. Kolay yol: Metered panelindeki "credentials API" adresini (https://...metered.live/api/v1/turn/credentials?apiKey=...) URL alanına yapıştırın, kullanıcı adı/şifre boş kalabilir. Odada TEK kişinin girmesi yeterli — diğerlerine otomatik paylaşılır.</div>
+        <input type="text" id="turn-url" class="sel-block" placeholder="turns:sunucu.com:443 veya https://...apiKey=..." style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: white;" />
         <input type="text" id="turn-user" class="sel-block" placeholder="Kullanıcı Adı" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: white;" />
         <input type="password" id="turn-pass" class="sel-block" placeholder="Şifre" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 16px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: white;" />
         

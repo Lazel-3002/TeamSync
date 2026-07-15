@@ -169,7 +169,8 @@ function setupInternetSignaling(roomId, myId, myName) {
           name: myName,
           avatar: state.myAvatar || null,
           isRoomFounder: state.isRoomFounder,
-          sfwMode: state.sfwMode
+          sfwMode: state.sfwMode,
+          turn: getShareableTurn()
         }));
       }
     }, 3000);
@@ -218,6 +219,7 @@ function setupInternetSignaling(roomId, myId, myName) {
                loadAIFilter();
            }
         }
+        applySharedTurn(data.turn);
         handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder });
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
@@ -930,14 +932,119 @@ function getIceServers() {
   // sunucuları ICE toplamayı yavaşlatıp bağlantıyı geciktirdiği için listeden
   // çıkarıldı. CGNAT/simetrik NAT arkasındaki kullanıcılar için ayarlardan
   // kendi TURN bilgilerinizi girin (ör. metered.ca / expressturn.com ücretsiz hesap).
-  if (customUrl && customUser && customPass) {
+  // TURN URL alanına https://... yazılırsa API'den otomatik çekilir (aşağıya bkz).
+  if (customUrl && customUrl.startsWith('http')) {
+    // API modunda gerçek sunucular refreshDynamicTurn() ile state'e yüklenir.
+  } else if (customUrl && customUser && customPass) {
     servers.push({
       urls: customUrl,
       username: customUser,
       credential: customPass
     });
   }
+
+  // Metered API'den otomatik çekilen sunucular
+  if (Array.isArray(state.dynamicTurnServers)) {
+    state.dynamicTurnServers.forEach(s => { if (s && s.urls) servers.push(s); });
+  }
+
+  // Odadaki başka bir üyenin (ör. kurucunun) paylaştığı TURN bilgileri:
+  // tek kişinin TURN girmesi odadaki herkesin bağlanabilmesine yeter.
+  if (Array.isArray(state.sharedTurn)) {
+    state.sharedTurn.forEach(s => {
+      if (s && typeof s.urls === 'string' && /^turns?:/.test(s.urls)) servers.push(s);
+    });
+  }
   return servers;
+}
+
+// TURN URL alanına bir Metered credential API adresi yazılırsa
+// (https://ORNEK.metered.live/api/v1/turn/credentials?apiKey=XXX)
+// sunucu listesini otomatik indirir.
+async function refreshDynamicTurn() {
+  const customUrl = localStorage.getItem('teamsync_turn_url') || '';
+  if (!customUrl.startsWith('http')) return;
+  try {
+    const res = await fetch(customUrl);
+    const list = await res.json();
+    if (Array.isArray(list)) {
+      state.dynamicTurnServers = list.filter(s => s && typeof s.urls === 'string').slice(0, 8);
+      console.log('🌍 TURN API üzerinden', state.dynamicTurnServers.length, 'sunucu alındı');
+    }
+  } catch (e) {
+    console.warn('TURN API isteği başarısız:', e && e.message ? e.message : e);
+    showToast('TURN API adresinden sunucu listesi alınamadı, ayarları kontrol edin.', 'warn');
+  }
+}
+
+// Paylaşılabilir TURN yapılandırması (hello mesajıyla odaya yayınlanır)
+function getShareableTurn() {
+  const out = [];
+  const customUrl = localStorage.getItem('teamsync_turn_url') || '';
+  const customUser = localStorage.getItem('teamsync_turn_user') || '';
+  const customPass = localStorage.getItem('teamsync_turn_pass') || '';
+  if (customUrl && !customUrl.startsWith('http') && customUser && customPass) {
+    out.push({ urls: customUrl, username: customUser, credential: customPass });
+  }
+  if (Array.isArray(state.dynamicTurnServers)) {
+    state.dynamicTurnServers.forEach(s => {
+      if (s && typeof s.urls === 'string' && /^turns?:/.test(s.urls)) out.push(s);
+    });
+  }
+  return out.length ? out.slice(0, 4) : null;
+}
+
+// Odadaki bir üyeden gelen TURN yapılandırmasını uygula. Kurulmakta olan/
+// başarısız bağlantılar yeni sunucularla yeniden denenir.
+function applySharedTurn(turnList) {
+  if (!Array.isArray(turnList) || !turnList.length) return;
+  const clean = turnList.filter(s =>
+    s && typeof s.urls === 'string' && /^turns?:/.test(s.urls) &&
+    typeof (s.username || '') === 'string' && typeof (s.credential || '') === 'string'
+  ).slice(0, 4);
+  if (!clean.length) return;
+  const serialized = JSON.stringify(clean);
+  if (state.sharedTurnSerialized === serialized) return; // zaten uygulandı
+  state.sharedTurn = clean;
+  state.sharedTurnSerialized = serialized;
+  console.log('🔁 Odadan TURN yapılandırması alındı:', clean.map(s => s.urls).join(', '));
+  showToast('Odadan TURN sunucu bilgisi alındı, bağlantılar güçlendiriliyor...', 'info');
+  state.peers.forEach((peer, peerId) => {
+    const st = peer.pc ? peer.pc.iceConnectionState : null;
+    if (st === 'connected' || st === 'completed') return;
+    try {
+      peer.pc.setConfiguration({
+        iceServers: getIceServers(),
+        iceTransportPolicy: state.useRelay ? 'relay' : 'all'
+      });
+      peer.lastRestartAt = 0; // hemen denemeye izin ver
+      attemptIceRestart(peerId);
+    } catch (e) {
+      console.warn('setConfiguration başarısız:', e && e.message ? e.message : e);
+    }
+  });
+}
+
+// Bağlantı kurulamayınca sebebini kullanıcıya söyle
+async function diagnoseIceFailure(peerId) {
+  const peer = state.peers.get(peerId);
+  if (!peer || !peer.pc) return;
+  try {
+    const stats = await peer.pc.getStats();
+    const types = new Set();
+    stats.forEach(r => {
+      if (r.type === 'local-candidate' && r.candidateType) types.add(r.candidateType);
+    });
+    console.log('🩺 ICE tanı — yerel aday türleri:', [...types].join(', ') || 'yok');
+    const hasTurnConfigured = getIceServers().some(s => typeof s.urls === 'string' && s.urls.startsWith('turn'));
+    if (!types.has('srflx') && !types.has('relay')) {
+      showToast('Ağınız STUN/UDP trafiğini engelliyor görünüyor (güvenlik duvarı/okul-iş ağı). TURN sunucusu şart.', 'danger');
+    } else if (!hasTurnConfigured) {
+      showToast('Doğrudan P2P kurulamadı: muhtemelen iki taraf da kısıtlı NAT/CGNAT arkasında. Ayarlar > TURN bölümüne ücretsiz bir TURN hesabı girin (tek kişinin girmesi yeterli, odaya otomatik paylaşılır).', 'danger');
+    } else if (!types.has('relay')) {
+      showToast('TURN sunucunuza bağlanılamadı, bilgileri kontrol edin.', 'danger');
+    }
+  } catch (e) {}
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -1303,7 +1410,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     roomId = roomId.toLowerCase();
     state.useRelay = useRelay;
     if (useRelay) {
-      const hasCustomTurn = localStorage.getItem('teamsync_turn_url') && localStorage.getItem('teamsync_turn_user') && localStorage.getItem('teamsync_turn_pass');
+      const turnUrl = localStorage.getItem('teamsync_turn_url') || '';
+      const hasCustomTurn = turnUrl.startsWith('http') || (turnUrl && localStorage.getItem('teamsync_turn_user') && localStorage.getItem('teamsync_turn_pass'));
       if (!hasCustomTurn) {
         state.useRelay = false;
         showToast('Relay (TURN) modu için ayarlardan kendi TURN sunucu bilgilerinizi girmelisiniz. Normal modda devam ediliyor.', 'warn');
@@ -1331,6 +1439,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     try {
       state.cryptoKey = await setupCrypto(state.password);
+      await refreshDynamicTurn();
       await setupLocalAudio();
       if (!state.uiBound) {
         bindUI();
@@ -2001,6 +2110,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     } else if (pc.iceConnectionState === 'failed') {
       console.warn(`⚠️ WebRTC connection failed to ${peerName}, ICE restart deneniyor...`);
       showToast(`${peerName} ile sesli/görüntülü bağlantı kurulamadı, yeniden deneniyor...`, 'warn');
+      diagnoseIceFailure(peerId);
       attemptIceRestart(peerId);
     } else if (pc.iceConnectionState === 'disconnected') {
       console.warn(`⚠️ WebRTC disconnected from ${peerName}, 3sn içinde düzelmezse ICE restart...`);
