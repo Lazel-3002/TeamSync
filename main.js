@@ -575,20 +575,24 @@ app.whenReady().then(() => {
   );
 
   // Reklam engelleme kuralı (Ortak Tarayıcı'da reklamları bloklamak için)
-  const { ElectronBlocker } = require('@ghostery/adblocker-electron');
-  const fetch = require('cross-fetch');
-  ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
-    // disable cosmetic filtering to avoid session.registerPreloadScript missing error
-    if (blocker.config) {
-      blocker.config.loadCosmeticFilters = false;
-    } else {
-      blocker.config = { loadCosmeticFilters: false, loadNetworkFilters: true };
-    }
-    blocker.enableBlockingInSession(session.defaultSession);
-    console.log("Adblocker ağı seviyesinde başarıyla aktif edildi.");
-  }).catch((err) => {
-    console.error('Adblocker yüklenirken hata oluştu:', err);
-  });
+  try {
+    const { ElectronBlocker } = require('@ghostery/adblocker-electron');
+    const fetch = require('cross-fetch');
+    ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+      // disable cosmetic filtering to avoid session.registerPreloadScript missing error
+      if (blocker.config) {
+        blocker.config.loadCosmeticFilters = false;
+      } else {
+        blocker.config = { loadCosmeticFilters: false, loadNetworkFilters: true };
+      }
+      blocker.enableBlockingInSession(session.defaultSession);
+      console.log("Adblocker ağı seviyesinde başarıyla aktif edildi.");
+    }).catch((err) => {
+      console.error('Adblocker yüklenirken hata oluştu:', err);
+    });
+  } catch (e) {
+    console.warn('Adblocker modülü yüklenemedi, atlanıyor:', e.message);
+  }
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     let responseHeaders = { ...details.responseHeaders };

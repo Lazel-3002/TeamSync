@@ -227,13 +227,18 @@ function setupInternetSignaling(roomId, myId, myName) {
         }
         if (peer) {
           peer.ip = 'internet';
+          peer.lastSeen = Date.now();
           handleSignal(data.id, 'internet', data.signal);
         }
       } else if (data.type === 'room-broadcast') {
         console.log('📥 MQTT Broadcast alındı:', data.id, data.payload.type, data.payload);
+        const peer = state.peers.get(data.id);
+        if (peer) peer.lastSeen = Date.now();
         handleDataMessage(data.id, data.payload);
       } else if (data.type === 'room-private' && data.target === myId) {
         console.log('📥 MQTT Private alındı:', data.id, data.payload.type, data.payload);
+        const peer = state.peers.get(data.id);
+        if (peer) peer.lastSeen = Date.now();
         handleDataMessage(data.id, data.payload);
       }
     } catch(e) {}
@@ -260,6 +265,7 @@ async function handleSignal(id, ip, signal) {
     peer = state.peers.get(id);
     if (!peer) return;
   }
+  peer.lastSeen = Date.now();
   if (!peer.ip) peer.ip = ip;
   if (!peer.iceQueue) peer.iceQueue = [];
 
@@ -891,7 +897,11 @@ function getIceServers() {
   const servers = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.services.mozilla.com:3478' },
     { urls: 'stun:74.125.250.129:19302' }, // IP fallback
     { urls: 'stun:162.159.207.0:3478' }    // IP fallback
   ];
@@ -1376,7 +1386,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.isJoining = true;
     startApp(roomId, joinPw.value, joinAi.checked, joinPtt.checked, "Sunucu " + roomId, true);
 
-    // Sunucu var mı kontrolü (4 saniye içinde kimse bulunamazsa iptal et)
+    // Sunucu var mı kontrolü (15 saniye içinde kimse bulunamazsa iptal et)
     if (state.joinTimeout) clearTimeout(state.joinTimeout);
     state.joinTimeout = setTimeout(() => {
       btnJoin.textContent = originalText;
@@ -1387,10 +1397,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       // Eğer hiç peer yoksa, sunucu yok demektir (veya boş)
       if (state.peers.size === 0) {
         disconnectApp();
-        document.getElementById('error-text').textContent = "Böyle bir sunucu bulunamadı. Lütfen ID'yi kontrol edin.";
-        document.getElementById('error-modal').classList.add('hidden');
+        document.getElementById('error-text').textContent = "Böyle bir sunucu bulunamadı veya bağlantı zaman aşımına uğradı. Lütfen ID'yi kontrol edin.";
+        document.getElementById('error-modal').classList.remove('hidden');
       }
-    }, 4000);
+    }, 15000);
   });
 
   btnCreate.addEventListener('click', async () => {
@@ -1861,8 +1871,16 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
       removePeer(peerId);
     } else if (pc.iceConnectionState === 'failed') {
       console.warn(`⚠️ WebRTC connection failed to ${peerName}. Voice/Video might not work, falling back to MQTT for data.`);
-      showToast(`${peerName} ile sesli/görüntülü bağlantı kurulamadı (Veri kanalı aktif).`, 'warn');
-    } else if (pc.iceConnectionState === 'connected') {
+      showToast(`${peerName} ile sesli/görüntülü bağlantı kurulamadı (Veri kanalı/MQTT aktif).`, 'warn');
+      if (pc.restartIce) {
+        try { pc.restartIce(); } catch(e) {}
+      }
+    } else if (pc.iceConnectionState === 'disconnected') {
+      console.warn(`⚠️ WebRTC disconnected from ${peerName}, attempting ICE restart...`);
+      if (pc.restartIce) {
+        try { pc.restartIce(); } catch(e) {}
+      }
+    } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
       console.log(`✅ WebRTC connected to ${peerName}`);
     }
   };

@@ -110,6 +110,13 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
     
     const pc = new RTCPeerConnection({
       iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:stun.services.mozilla.com:3478' },
         { urls: 'stun:74.125.250.129:19302' }, // stun.l.google.com
         { urls: 'stun:162.159.207.0:3478' },   // stun.cloudflare.com
         { urls: 'turns:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
