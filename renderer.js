@@ -1510,6 +1510,9 @@ async function setupLocalAudio() {
   state.rawMicStream = raw;
 
   const vuCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (vuCtx.state === 'suspended') {
+    vuCtx.resume().catch(console.error);
+  }
   state.gateAudioCtx = vuCtx;
   const vuSrc = vuCtx.createMediaStreamSource(raw);
   
@@ -1936,7 +1939,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   state.peers.set(peerId, {
     pc,
-    audioEl: (function(){ const a = document.createElement('audio'); a.style.display = 'none'; document.body.appendChild(a); return a; })(),
+    audioEl: (function(){ const a = document.createElement('audio'); a.autoplay = true; a.style.display = 'none'; document.body.appendChild(a); return a; })(),
     videoEl: document.createElement('video'),
     dc,
     name: peerName,
@@ -2515,7 +2518,15 @@ function setupSpeakingDetection(peerId, stream) {
   if (audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {});
   }
-  const source = audioCtx.createMediaStreamSource(stream);
+  let sourceStream = stream;
+  if (stream.getAudioTracks().length > 0) {
+    try {
+      sourceStream = new MediaStream([stream.getAudioTracks()[0].clone()]);
+    } catch(e) {
+      console.warn("Could not clone audio track", e);
+    }
+  }
+  const source = audioCtx.createMediaStreamSource(sourceStream);
   const analyser = audioCtx.createAnalyser();
   analyser.fftSize = 512;
   source.connect(analyser);
