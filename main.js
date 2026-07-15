@@ -194,7 +194,10 @@ function createWindow() {
       sandbox: false,
       webviewTag: true,
       webRTCIPHandlingPolicy: 'default_public_and_private_interfaces',
-      autoplayPolicy: 'no-user-gesture-required'
+      autoplayPolicy: 'no-user-gesture-required',
+      // Pencere arka planda/simge durumundayken zamanlayıcılar kısılırsa
+      // ses kapısı ve sinyalleşme aksar; sesli sohbet uygulaması için kapalı olmalı.
+      backgroundThrottling: false
     },
     backgroundColor: '#1e1f22',
     title: 'TeamSync - P2P',

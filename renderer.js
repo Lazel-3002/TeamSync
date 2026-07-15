@@ -266,6 +266,19 @@ async function handleSignal(id, ip, signal) {
     peer = state.peers.get(id);
     if (!peer) return;
   }
+  // KRİTİK: Aynı sinyal iki kanaldan (UDP + MQTT) neredeyse aynı anda
+  // gelebilir. handleSignal async olduğu için iki işleme iç içe girip
+  // signalingState'i bozuyor ve answer üretimi InvalidStateError ile
+  // çöküyordu. Sinyalleri peer başına SIRAYLA işliyoruz.
+  peer.signalChain = (peer.signalChain || Promise.resolve())
+    .then(() => processSignal(id, ip, signal))
+    .catch(e => console.error('Signal chain error:', e && e.message ? e.message : e));
+  return peer.signalChain;
+}
+
+async function processSignal(id, ip, signal) {
+  const peer = state.peers.get(id);
+  if (!peer || !peer.pc) return;
   peer.lastSeen = Date.now();
   if (!peer.ip) peer.ip = ip;
   if (!peer.iceQueue) peer.iceQueue = [];
@@ -274,6 +287,19 @@ async function handleSignal(id, ip, signal) {
 
   try {
     if (signal.type === 'offer') {
+      // Aynı offer'ın kopyası (iki kanaldan veya karşı tarafın tekrar denemesi):
+      // yeniden uygulamak yerine mevcut cevabı (answer) TEKRAR GÖNDER.
+      // Karşı taraf ilk cevabı kaçırmış olabilir (MQTT aboneliği geç kuruldu,
+      // paket düştü vs.) — sadece atlamak kalıcı kilitlenme yaratıyor.
+      if (peer.pc.signalingState === 'stable' && peer.pc.remoteDescription &&
+          peer.pc.remoteDescription.sdp === signal.sdp.sdp) {
+        if (peer.pc.localDescription && peer.pc.localDescription.type === 'answer') {
+          console.log('Duplicate offer: mevcut answer + adaylar tekrar gönderiliyor.');
+          sendSignalToPeer(id, { type: 'answer', sdp: peer.pc.localDescription });
+          (peer.localCandidates || []).forEach(c => sendSignalToPeer(id, { type: 'ice', candidate: c }));
+        }
+        return;
+      }
       // Update peer IP to the one the signal came from
       peer.ip = ip;
       if (peer.pc.signalingState !== 'stable') {
@@ -284,15 +310,14 @@ async function handleSignal(id, ip, signal) {
       const answer = await peer.pc.createAnswer();
       answer.sdp = setMediaBitrates(answer.sdp);
       await peer.pc.setLocalDescription(answer);
-      if (mqttClient && mqttClient.connected) {
-        sendInternetSignal(id, { type: 'answer', sdp: answer });
-      } else if (peer.ip && peer.ip !== 'internet') {
-        window.electronAPI.sendUDPSignal(peer.ip, { type: 'answer', sdp: answer });
-      }
+      sendSignalToPeer(id, { type: 'answer', sdp: answer });
       // Process queued candidates
       while (peer.iceQueue.length) {
         await peer.pc.addIceCandidate(peer.iceQueue.shift());
       }
+    } else if (signal.type === 'restart-req') {
+      // Initiator olmayan taraf bağlantı kopukluğu fark etti; offer'ı biz üretiriz.
+      if (peer.isInitiator) attemptIceRestart(id);
     } else if (signal.type === 'answer') {
       if (peer.pc.signalingState === 'have-local-offer') {
         await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
@@ -301,7 +326,7 @@ async function handleSignal(id, ip, signal) {
           await peer.pc.addIceCandidate(peer.iceQueue.shift());
         }
       } else {
-        console.warn('Received answer but signaling state is:', peer.pc.signalingState);
+        console.warn('Received answer but signaling state is:', peer.pc.signalingState, '(muhtemelen çift kanal kopyası, atlandı)');
       }
     } else if (signal.type === 'ice') {
       if (signal.candidate) {
@@ -322,7 +347,7 @@ async function handleSignal(id, ip, signal) {
       }
     }
   } catch (e) {
-    console.error('Signal handle error:', e);
+    console.error('Signal handle error:', e && e.message ? e.message : e, '(signal:', signal.type + ', state:', peer.pc.signalingState + ')');
   }
 }
 
@@ -898,33 +923,19 @@ function getIceServers() {
   const servers = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:74.125.250.129:19302' }, // IP fallback
-    { urls: 'stun:162.159.207.0:3478' }    // IP fallback
+    { urls: 'stun:stun.cloudflare.com:3478' }
   ];
 
+  // NOT: openrelay.metered.ca (openrelayproject) servisi kapandı; ölü TURN
+  // sunucuları ICE toplamayı yavaşlatıp bağlantıyı geciktirdiği için listeden
+  // çıkarıldı. CGNAT/simetrik NAT arkasındaki kullanıcılar için ayarlardan
+  // kendi TURN bilgilerinizi girin (ör. metered.ca / expressturn.com ücretsiz hesap).
   if (customUrl && customUser && customPass) {
     servers.push({
       urls: customUrl,
       username: customUser,
       credential: customPass
     });
-  } else {
-    // Varsayılan Metered.ca Open Relay (Public) - Domain ve IP ile
-    servers.push(
-      { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-      // IP fallbacks (unsecure only to avoid TLS certificate mismatch on IP)
-      { urls: 'turn:15.235.47.158:80', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:15.235.47.158:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-    );
   }
   return servers;
 }
@@ -1291,6 +1302,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false, useGameMode = false, useRelay = false) => {
     roomId = roomId.toLowerCase();
     state.useRelay = useRelay;
+    if (useRelay) {
+      const hasCustomTurn = localStorage.getItem('teamsync_turn_url') && localStorage.getItem('teamsync_turn_user') && localStorage.getItem('teamsync_turn_pass');
+      if (!hasCustomTurn) {
+        state.useRelay = false;
+        showToast('Relay (TURN) modu için ayarlardan kendi TURN sunucu bilgilerinizi girmelisiniz. Normal modda devam ediliyor.', 'warn');
+      }
+    }
     state.sfwMode = useSFW;
     state.gameMode = useGameMode;
     if (useSFW) {
@@ -1605,13 +1623,16 @@ async function setupLocalAudio() {
 
 function setupVUMeter() {
   if (!state.vuAnalyser) return;
-  const data = new Uint8Array(state.vuAnalyser.frequencyBinCount);
+  let data;
   let uiData;
   const vuBar = document.getElementById('vu');
   const vuText = document.getElementById('vu-text');
 
   function update() {
     if (!state.vuAnalyser) return;
+    if (!data || data.length !== state.vuAnalyser.frequencyBinCount) {
+      data = new Uint8Array(state.vuAnalyser.frequencyBinCount);
+    }
     state.vuAnalyser.getByteFrequencyData(data);
     let sum = 0;
     for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
@@ -1620,8 +1641,8 @@ function setupVUMeter() {
     const pct = Math.min(100, Math.max(0, (db + 60) * 100 / 60));
 
     const isSpeaking = pct > state.micThreshold;
-    
-    if (state.gateGainNode && state.gateAudioCtx) {
+
+    if (state.gateGainNode && state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') {
       if (!isSpeaking) {
         state.gateGainNode.gain.setTargetAtTime(0, state.gateAudioCtx.currentTime, 0.05);
       } else {
@@ -1654,9 +1675,14 @@ function setupVUMeter() {
       vuBar.classList.toggle('muted-bar', !isSpeaking);
     }
     if (vuText) vuText.textContent = db.toFixed(0) + ' dB';
-    requestAnimationFrame(update);
   }
-  update();
+
+  // DİKKAT: Burada requestAnimationFrame KULLANILMAMALI. Pencere simge durumuna
+  // küçültüldüğünde/oyunun arkasında kaldığında rAF durur ve gürültü kapısı
+  // (gateGainNode) son değerinde donar; 0'da donarsa karşı taraf sizi hiç
+  // duyamaz. setInterval + backgroundThrottling:false ile kapı her zaman işler.
+  if (state.vuInterval) clearInterval(state.vuInterval);
+  state.vuInterval = setInterval(update, 50);
 }
 
 async function setupDeviceList() {
@@ -1755,6 +1781,9 @@ setInterval(() => {
   const now = Date.now();
   state.peers.forEach((peer, id) => {
     if (peer.lastSeen && now - peer.lastSeen > 12000) {
+      // MQTT geçici koparsa bile WebRTC bağlantısı sağlamsa peer'ı düşürme
+      const iceState = peer.pc ? peer.pc.iceConnectionState : null;
+      if (iceState === 'connected' || iceState === 'completed') return;
       console.log('⏳ Peer zaman aşımına uğradı:', peer.name);
       removePeer(id);
     }
@@ -1764,6 +1793,8 @@ setInterval(() => {
 function removePeer(peerId) {
   const peer = state.peers.get(peerId);
   if (!peer) return;
+  if (peer.connWatchdog) clearInterval(peer.connWatchdog);
+  if (peer.pingInterval) clearInterval(peer.pingInterval);
   if (peer.pc) peer.pc.close();
   if (peer.dc) peer.dc.close();
   if (peer.mediaStreamSource) { try { peer.mediaStreamSource.disconnect(); } catch(e) {} }
@@ -1873,6 +1904,65 @@ function getVideoSender(pc) {
   return sender;
 }
 
+function sendSignalToPeer(peerId, signal) {
+  // KRİTİK: RTCSessionDescription/RTCIceCandidate HOST nesnelerdir; kendi
+  // (own) özellikleri yoktur, type/sdp prototip getter'ıdır. Bu nesneler
+  // preload'daki contextBridge'den geçerken {} haline gelir ve karşı tarafta
+  // "type null" hatasıyla LAN/UDP sinyalleşmesini tamamen bozar.
+  // JSON turu (toJSON kullanır) ile düz nesneye çevirerek gönderiyoruz.
+  signal = JSON.parse(JSON.stringify(signal));
+  const peer = state.peers.get(peerId);
+  // Yedeklilik: iki taraftan birinin MQTT'si kopuk olabilir (halka açık broker
+  // güvenilmez). Hem MQTT hem LAN/UDP üzerinden gönderiyoruz; alıcı taraf
+  // çift kopyaları sıralı işleyip ayıklıyor.
+  if (mqttClient && mqttClient.connected) {
+    sendInternetSignal(peerId, signal);
+  }
+  if (peer && peer.ip && peer.ip !== 'internet') {
+    window.electronAPI.sendUDPSignal(peer.ip, signal);
+  }
+}
+
+// pc.restartIce() tek başına yeni bir offer üretip GÖNDERMEZ; onnegotiationneeded
+// dinlenmediği için hiçbir işe yaramıyordu. Bu fonksiyon initiator tarafında
+// gerçek bir iceRestart offer'ı üretip sinyal kanalından yollar. Initiator değilsek
+// karşı taraftan restart isteriz.
+async function attemptIceRestart(peerId) {
+  const peer = state.peers.get(peerId);
+  if (!peer || !peer.pc) return;
+  const now = Date.now();
+  if (peer.lastRestartAt && now - peer.lastRestartAt < 5000) return;
+  peer.lastRestartAt = now;
+
+  if (!peer.isInitiator) {
+    sendSignalToPeer(peerId, { type: 'restart-req' });
+    return;
+  }
+
+  try {
+    // Cevap (answer) henüz gelmediyse yeni offer üretme; mevcut offer'ı
+    // tekrar gönder (sinyal kaybına karşı). Yeni offer üretmek ICE sürecini
+    // sıfırlayıp kurulmakta olan bağlantıyı bozuyor.
+    if (peer.pc.signalingState === 'have-local-offer' && peer.pc.localDescription) {
+      console.log(`🔁 Cevap bekleniyor, mevcut offer + adaylar tekrar gönderiliyor → ${peer.name}`);
+      sendSignalToPeer(peerId, { type: 'offer', sdp: peer.pc.localDescription });
+      (peer.localCandidates || []).forEach(c => sendSignalToPeer(peerId, { type: 'ice', candidate: c }));
+      return;
+    }
+    if (peer.pc.signalingState !== 'stable') {
+      try { await peer.pc.setLocalDescription({ type: 'rollback' }); } catch (e) {}
+    }
+    const offer = await peer.pc.createOffer({ iceRestart: true });
+    offer.sdp = setMediaBitrates(offer.sdp);
+    peer.localCandidates = []; // ICE restart yeni ufrag üretir; eski adaylar geçersiz
+    await peer.pc.setLocalDescription(offer);
+    console.log(`🔄 ICE restart offer gönderiliyor → ${peer.name}`);
+    sendSignalToPeer(peerId, { type: 'offer', sdp: peer.pc.localDescription });
+  } catch (e) {
+    console.warn('ICE restart başarısız:', e && e.message ? e.message : e);
+  }
+}
+
 async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   if (state.peers.has(peerId)) return;
   const pc = new RTCPeerConnection({ 
@@ -1893,15 +1983,14 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
-      if (mqttClient && mqttClient.connected) {
-        sendInternetSignal(peerId, { type: 'ice', candidate: e.candidate });
-      } else {
-        const peer = state.peers.get(peerId);
-        const ip = peer ? peer.ip : peerIp;
-        if (ip && ip !== 'internet') {
-          window.electronAPI.sendUDPSignal(ip, { type: 'ice', candidate: e.candidate });
-        }
+      // Adayları sakla: karşı taraf ilk gönderimi kaçırırsa (abonelik gecikmesi,
+      // paket kaybı) offer/answer tekrarıyla birlikte yeniden gönderilirler.
+      const p = state.peers.get(peerId);
+      if (p) {
+        p.localCandidates = p.localCandidates || [];
+        try { p.localCandidates.push(JSON.parse(JSON.stringify(e.candidate))); } catch (err) {}
       }
+      sendSignalToPeer(peerId, { type: 'ice', candidate: e.candidate });
     }
   };
 
@@ -1910,16 +1999,17 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     if (pc.iceConnectionState === 'closed') {
       removePeer(peerId);
     } else if (pc.iceConnectionState === 'failed') {
-      console.warn(`⚠️ WebRTC connection failed to ${peerName}. Voice/Video might not work, falling back to MQTT for data.`);
-      showToast(`${peerName} ile sesli/görüntülü bağlantı kurulamadı (Veri kanalı/MQTT aktif).`, 'warn');
-      if (pc.restartIce) {
-        try { pc.restartIce(); } catch(e) {}
-      }
+      console.warn(`⚠️ WebRTC connection failed to ${peerName}, ICE restart deneniyor...`);
+      showToast(`${peerName} ile sesli/görüntülü bağlantı kurulamadı, yeniden deneniyor...`, 'warn');
+      attemptIceRestart(peerId);
     } else if (pc.iceConnectionState === 'disconnected') {
-      console.warn(`⚠️ WebRTC disconnected from ${peerName}, attempting ICE restart...`);
-      if (pc.restartIce) {
-        try { pc.restartIce(); } catch(e) {}
-      }
+      console.warn(`⚠️ WebRTC disconnected from ${peerName}, 3sn içinde düzelmezse ICE restart...`);
+      setTimeout(() => {
+        const p = state.peers.get(peerId);
+        if (p && p.pc === pc && pc.iceConnectionState === 'disconnected') {
+          attemptIceRestart(peerId);
+        }
+      }, 3000);
     } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
       console.log(`✅ WebRTC connected to ${peerName}`);
     }
@@ -1976,13 +2066,14 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
   state.peers.set(peerId, {
     pc,
     audioEl: (function(){ const a = document.createElement('audio'); a.autoplay = true; a.style.display = 'none'; document.body.appendChild(a); return a; })(),
-    videoEl: document.createElement('video'),
+    videoEl: (function(){ const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; return v; })(),
     dc,
     name: peerName,
     mic: true,
     deaf: false,
     sharing: false,
     ip: peerIp,
+    isInitiator,
     lastSeen: Date.now()
   });
 
@@ -1990,12 +2081,29 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     const offer = await pc.createOffer();
     offer.sdp = setMediaBitrates(offer.sdp);
     await pc.setLocalDescription(offer);
-    if (mqttClient && mqttClient.connected) {
-      sendInternetSignal(peerId, { type: 'offer', sdp: offer });
-    } else if (peerIp && peerIp !== 'internet') {
-      window.electronAPI.sendUDPSignal(peerIp, { type: 'offer', sdp: offer });
-    }
+    sendSignalToPeer(peerId, { type: 'offer', sdp: offer });
   }
+
+  // Sinyal kaybına karşı bekçi: offer/answer MQTT/UDP üzerinde kaybolursa
+  // bağlantı sonsuza dek "new/checking"de kalıyordu. Initiator bağlantı
+  // kurulana kadar periyodik olarak yeni offer üretip tekrar dener.
+  const peerRef = state.peers.get(peerId);
+  peerRef.connWatchdog = setInterval(() => {
+    const p = state.peers.get(peerId);
+    if (!p || p.pc !== pc) { clearInterval(peerRef.connWatchdog); return; }
+    const st = pc.iceConnectionState;
+    if (st === 'connected' || st === 'completed') { p.checkingSince = null; return; }
+    if (pc.connectionState === 'closed') { clearInterval(peerRef.connWatchdog); return; }
+    // 'checking' sürecine karışma; ICE aday denemeleri 30sn'ye kadar sürebilir.
+    if (st === 'checking') {
+      if (!p.checkingSince) p.checkingSince = Date.now();
+      if (Date.now() - p.checkingSince < 30000) return;
+    } else {
+      p.checkingSince = null;
+    }
+    console.log(`⏱️ ${peerName} ile hâlâ bağlantı yok (${st}), yeniden deneniyor...`);
+    attemptIceRestart(peerId);
+  }, 10000);
 }
 
 function getActiveActivity() {
@@ -3859,10 +3967,11 @@ function limitVideoBitrate(sender) {
 
 function disconnectApp() {
   if (window.electronAPI && window.electronAPI.stopCloudflared) window.electronAPI.stopCloudflared();
-  if (state.localStream) if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
+  if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
   const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'none';
   if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
   if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
+  if (state.rawMicStream) { state.rawMicStream.getTracks().forEach(t => t.stop()); state.rawMicStream = null; }
   if (state.audioCtx && state.audioCtx.state !== 'closed') state.audioCtx.close();
   if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') state.gateAudioCtx.close();
   if (state.remoteAudioCtx && state.remoteAudioCtx.state !== 'closed') {
