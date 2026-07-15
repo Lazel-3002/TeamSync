@@ -258,6 +258,7 @@ function sendInternetSignal(targetId, signal) {
 }
 
 async function handleSignal(id, ip, signal) {
+  if (!id || id === state.myId) return;
   let peer = state.peers.get(id);
   if (!peer) {
     console.log(`📨 Signal received but peer not found, creating peer connection for id=${id}, ip=${ip}`);
@@ -901,7 +902,6 @@ function getIceServers() {
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.services.mozilla.com:3478' },
     { urls: 'stun:74.125.250.129:19302' }, // IP fallback
     { urls: 'stun:162.159.207.0:3478' }    // IP fallback
   ];
@@ -1652,6 +1652,8 @@ async function setupDeviceList() {
 }
 
 async function handlePeerDiscovered(peer) {
+  if (!peer || !peer.id || peer.id === state.myId) return;
+  
   if (state.sfwMode) {
     const cleaned = cleanText(peer.name);
     if (cleaned !== peer.name) peer.name = "Anonim";
