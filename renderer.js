@@ -920,9 +920,7 @@ function getIceServers() {
       { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
       { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
       { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-      // IP fallbacks
-      { urls: 'turns:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turns:15.235.47.158:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+      // IP fallbacks (unsecure only to avoid TLS certificate mismatch on IP)
       { urls: 'turn:15.235.47.158:80', username: 'openrelayproject', credential: 'openrelayproject' },
       { urls: 'turn:15.235.47.158:443', username: 'openrelayproject', credential: 'openrelayproject' },
       { urls: 'turn:15.235.47.158:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }

@@ -3,6 +3,7 @@ app.name = 'TeamSync';
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 app.commandLine.appendSwitch('allow-loopback-in-peer-connection');
+app.commandLine.appendSwitch('disable-async-dns');
 const path = require('path');
 const dgram = require('dgram');
 const os = require('os');
