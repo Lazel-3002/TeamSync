@@ -110,6 +110,25 @@ module.exports = async function run() {
     await waitFor(b.client, webviewUrlExpr('/while-typing'), 20000, 'guest followed while typing');
     const typedKept = await evalJS(b.client, `document.getElementById('sb-url').value`);
     assert.strictEqual(typedKept, 'kullanici-yaziyor', 'sb-nav adres çubuğundaki yazıyı ezdi');
+
+    // 7/24 katılım: misafir Kapat'a basar -> SADECE kendisi çıkar, host'un
+    // oturumu yaşamaya devam eder (eskiden herkesinki kapanıyordu)
+    await evalJS(b.client, `document.getElementById('sb-close').click(); 1`);
+    await new Promise(r => setTimeout(r, 2000));
+    assert.strictEqual(
+      await evalJS(b.client, `document.getElementById('sb-card').classList.contains('hidden')`),
+      true, 'misafir Kapat sonrası kendi kartı kapanmadı');
+    assert.strictEqual(
+      await evalJS(a.client, `document.getElementById('sb-card').classList.contains('hidden')`),
+      false, 'misafirin Kapat\'ı host\'un oturumunu da kapattı');
+
+    // Host'un 5 sn'lik sb-state beacon'ı misafire host'u ve güncel adresi
+    // yeniden öğretir -> Aktiviteler'den her an tekrar katılabilir
+    const hostId = await evalJS(a.client, `state.myId`);
+    await waitFor(b.client, `state.sb.host === ${JSON.stringify(hostId)} ? 'yes' : null`, 15000, 'beacon host bilgisini getirdi');
+    await evalJS(b.client, `document.getElementById('act-sb').click(); 1`);
+    await waitFor(b.client, `!document.getElementById('sb-card').classList.contains('hidden') && state.sb.joinedActivity ? 'yes' : null`, 10000, 'misafir yeniden katıldı');
+    await waitFor(b.client, webviewUrlExpr('/while-typing'), 20000, 'misafir yeniden katılınca güncel sayfaya geldi');
   } finally {
     cleanupPeer(a);
     cleanupPeer(b);

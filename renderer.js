@@ -2415,8 +2415,8 @@ function setupDataChannel(peerId, dc) {
               dc.send(JSON.stringify({ type: 'wt-load', vid: match[1] }));
             }
           } else if (activeAct === 'sb' && state.sb.host === state.myId) {
-            dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: true }));
             const currentUrl = document.getElementById('sb-url')?.value || '';
+            dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl }));
             if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl }));
           } else if (activeAct === 'uno' && state.uno.host === state.myId) {
             if (!state.uno.started) {
@@ -2640,8 +2640,8 @@ async function handleDataMessage(peerId, msg) {
             broadcastTo(msg.peerId, { type: 'poke_sync', state: window.pokeState });
           }
         } else if (lob.activity === 'sb') {
-          broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: true });
           const currentUrl = document.getElementById('sb-url')?.value || '';
+          broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl });
           if (currentUrl) {
             broadcastTo(msg.peerId, { type: 'sb-nav', url: currentUrl });
           }
@@ -4209,6 +4209,7 @@ function closeAllCards(leaveLobby = false, except = null) {
   if (state.sb && except !== 'sb-card') {
     state.sb.joinedActivity = false;
     state.sb.host = null;
+    state.sb.startedAt = 0;
     state.sb.lastUrl = '';
     // Reset gezinmesi yayınlanmasın diye "uzaktan uygulanmış" say
     state.sb.appliedRemoteUrl = 'https://duckduckgo.com';

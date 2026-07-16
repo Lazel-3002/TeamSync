@@ -49,8 +49,9 @@ function initSharedBrowser() {
 
     // İzleyici (spectate) modu kaldırıldı: katılan herkes tıklayıp gezinebilir.
     state.sb.host = state.myId;
+    state.sb.startedAt = Date.now();
     document.getElementById('sb-url').disabled = false;
-    broadcast({ type: 'sb-start', host: state.myId, interactive: true });
+    broadcast({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: sbCurrentUrl() });
   });
 
   const sbWebview = document.getElementById('sb-webview');
@@ -58,7 +59,9 @@ function initSharedBrowser() {
   
   document.getElementById('sb-close').addEventListener('click', (e) => {
     e.stopPropagation();
-    broadcast({ type: 'sb-close' });
+    // Sadece host oturumu herkes için bitirir; misafirin Kapat'ı yalnızca
+    // kendisini çıkarır (eskiden herhangi biri kapatınca herkesinki kapanıyordu)
+    if (state.sb.host === state.myId) broadcast({ type: 'sb-close' });
     closeAllCards(true); // CLEAN AND RESETS
   });
 
@@ -428,6 +431,17 @@ function initSharedBrowser() {
     }
   }, 1000);
 
+  // 7/24 katılım beacon'ı: host, oturum açık olduğu sürece kim olduğunu ve
+  // güncel adresi 5 sn'de bir yayınlar. sb-start'ı kaçıranlar (QoS 0 MQTT),
+  // odaya geç gelenler ve kartı kapatıp geri dönmek isteyenler host'u buradan
+  // öğrenir; Aktiviteler > Ortak Tarayıcı her an katılınabilir kalır.
+  setInterval(() => {
+    const card = document.getElementById('sb-card');
+    if (!card || card.classList.contains('hidden')) return;
+    if (state.sb.host !== state.myId) return;
+    broadcast({ type: 'sb-state', host: state.myId, startedAt: state.sb.startedAt, url: sbCurrentUrl() });
+  }, 5000);
+
   // Advanced Visual AI (Thumbnail Scanner)
   let lastScan = 0;
   setInterval(async () => {
@@ -479,8 +493,28 @@ function initSharedBrowser() {
 }
 
 function handleSBMessage(peerId, msg) {
-  if (msg.type === 'sb-start') {
+  if (msg.type === 'sb-start' || msg.type === 'sb-state') {
+    if (msg.host === state.myId) return;
+
+    // Çift-host çakışması (ikisi de aynı anda açtıysa / sb-start kaybolduysa):
+    // daha erken başlayan kazanır, kaybeden misafire döner. Host'un 5 sn'lik
+    // sb-state beacon'ı sayesinde bu kendini en geç 5 sn'de onarır.
+    if (state.sb.host === state.myId && state.sb.joinedActivity) {
+      const theirStart = Number(msg.startedAt) || 0;
+      if (!theirStart || (state.sb.startedAt || 0) <= theirStart) return; // ben kazandım
+      state.sb.host = msg.host;
+      state.sb.startedAt = 0;
+      if (msg.url) { state.sb.lastUrl = msg.url; sbApplyRemoteNav(msg.url); }
+      return;
+    }
+
     state.sb.host = msg.host;
+    if (msg.url && !state.sb.joinedActivity) state.sb.lastUrl = msg.url;
+
+    // Beacon kartı zorla açmaz: kullanıcı kartı kapattıysa rahatsız etmeyiz,
+    // ama host/adres bilgisi güncel kalır — Aktiviteler'den her an katılabilir.
+    if (msg.type === 'sb-state') return;
+
     closeAllCards(false, 'sb-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     const sbCard = document.getElementById('sb-card');
     sbCard.classList.remove('hidden');
@@ -526,6 +560,8 @@ function handleSBMessage(peerId, msg) {
       }
     }
   } else if (msg.type === 'sb-close') {
-    closeAllCards(true); // CLEAN AND RESETS
+    // Sadece host'un kapatması oturumu bitirir; misafirin kapatması
+    // (artık yayınlanmıyor ama eski istemciler için) yok sayılır
+    if (peerId === state.sb.host) closeAllCards(true);
   }
 }
