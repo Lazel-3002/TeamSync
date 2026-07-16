@@ -495,18 +495,25 @@ function handleSBMessage(peerId, msg) {
     document.getElementById('sb-webview').src = msg.url;
     document.getElementById('sb-url').value = msg.url;
   } else if (msg.type === 'sb-video-sync') {
-    if (state.sb.host !== state.myId && state.sb.joinedActivity) {
+    if (state.sb.host !== state.myId && state.sb.joinedActivity && peerId === state.sb.host) {
+      const currentTime = Number(msg.currentTime);
+      const ts = Number(msg.ts);
+      const paused = !!msg.paused;
+      if (!Number.isFinite(currentTime) || !Number.isFinite(ts)) return;
       const sbWebview = document.getElementById('sb-webview');
       if (sbWebview) {
+        // currentTime/ts/paused are sanitized above (finite numbers / boolean)
+        // and re-serialized with JSON.stringify so they can only ever appear
+        // as safe literals here, never as injected script.
         const syncScript = `(() => {
           const v = document.querySelector('video');
           if (!v) return;
-          const targetTime = ${msg.currentTime} + (Date.now() - ${msg.ts}) / 1000;
+          const targetTime = ${JSON.stringify(currentTime)} + (Date.now() - ${JSON.stringify(ts)}) / 1000;
           if (Math.abs(v.currentTime - targetTime) > 2) {
             v.currentTime = targetTime;
           }
-          if (${msg.paused} && !v.paused) v.pause();
-          if (!${msg.paused} && v.paused) v.play().catch(e => {});
+          if (${JSON.stringify(paused)} && !v.paused) v.pause();
+          if (!${JSON.stringify(paused)} && v.paused) v.play().catch(e => {});
         })()`;
         sbWebview.executeJavaScript(syncScript).catch(e => {});
       }
