@@ -1736,7 +1736,10 @@ async function setupLocalAudio() {
       noiseSuppression: { ideal: true },
       autoGainControl: { ideal: true },
       sampleRate: { ideal: 48000 },
-      channelCount: { ideal: 2 }
+      // Yankı iptali (AEC) Chromium'da yalnızca mono yakalamada güvenilir
+      // çalışır; stereo istek AEC'yi sessizce devre dışı bırakabiliyor
+      // (crbug 1071108). Sesli sohbet için stereonun bir faydası da yok.
+      channelCount: { ideal: 1 }
     }
   });
 
@@ -1856,11 +1859,17 @@ function setupVUMeter() {
 
     const isSpeaking = pct > state.micThreshold;
 
+    // Yankı Kalkanı: karşı taraf konuşurken (sesi bizim hoparlörden çalıp
+    // mikrofona geri sızabilirken) mikrofonu kıs. AEC'nin kaçırdığı yankıyı
+    // keser; kullanıcı belirgin şekilde yüksek konuşursa (barge-in) kısılmaz.
+    const echoDuck = state.echoShield && state.speakingPeers && state.speakingPeers.size > 0 &&
+      pct < state.micThreshold + 15;
+
     if (state.gateGainNode && state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') {
       if (!isSpeaking) {
         state.gateGainNode.gain.setTargetAtTime(0, state.gateAudioCtx.currentTime, 0.05);
       } else {
-        state.gateGainNode.gain.setTargetAtTime(1, state.gateAudioCtx.currentTime, 0.05);
+        state.gateGainNode.gain.setTargetAtTime(echoDuck ? 0.1 : 1, state.gateAudioCtx.currentTime, 0.05);
       }
     }
 
@@ -3519,6 +3528,19 @@ function bindUI() {
     micThresh.addEventListener('input', e => {
       state.micThreshold = parseInt(e.target.value);
     });
+  }
+
+  const echoShield = document.getElementById('echo-shield');
+  if (echoShield) {
+    state.echoShield = localStorage.getItem('teamsync_echo_shield') === '1';
+    echoShield.checked = state.echoShield;
+    echoShield.onchange = () => {
+      state.echoShield = echoShield.checked;
+      localStorage.setItem('teamsync_echo_shield', state.echoShield ? '1' : '0');
+      showToast(state.echoShield
+        ? 'Yankı Kalkanı açık: karşı taraf konuşurken mikrofonun kısılır'
+        : 'Yankı Kalkanı kapalı', 'info');
+    };
   }
 
   mic.addEventListener('click', () => {
