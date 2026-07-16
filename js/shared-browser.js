@@ -1,12 +1,43 @@
+// Uzaktan gelen gezinmeleri güvenle uygular ve yankı (echo) döngüsünü kırar:
+// zaten o adresteysek src'yi yeniden set etmeyiz (yoksa her sb-nav tam sayfa
+// reload'a, her reload da yeni sb-nav'a dönüşüp sonsuz yenileme yaratıyordu).
+function sbNormUrl(u) {
+  return (u || '').replace(/\/+$/, '');
+}
+
+function sbCurrentUrl() {
+  const wv = document.getElementById('sb-webview');
+  if (!wv) return '';
+  try { return (typeof wv.getURL === 'function' && wv.getURL()) || wv.src || ''; }
+  catch (e) { return wv.src || ''; }
+}
+
+function sbApplyRemoteNav(url) {
+  if (!/^https?:\/\//i.test(url || '')) return; // javascript:/file: gibi şemaları asla yükleme
+  const sbUrl = document.getElementById('sb-url');
+  if (sbUrl && document.activeElement !== sbUrl) sbUrl.value = url;
+  if (sbNormUrl(sbCurrentUrl()) === sbNormUrl(url)) return; // zaten oradayız
+  state.sb.appliedRemoteUrl = url;
+  state.sb.remoteNavTs = Date.now();
+  document.getElementById('sb-webview').src = url;
+}
+
 function initSharedBrowser() {
   document.getElementById('act-sb').addEventListener('click', () => {
     document.getElementById('activities-modal').classList.add('hidden');
     const sbCard = document.getElementById('sb-card');
-    
+
     if (state.sb.host && state.sb.host !== state.myId) {
+      // Misafir: ev sahibinin tarayıcısına katıl. Kartı burada da görünür yap;
+      // eskiden sb-start mesajı beklenirdi ve kaybolursa misafir hiçbir şey görmezdi.
       const btn = sbCard.querySelector('.inactive-overlay button');
-      if (btn) btn.click();
-      else if (!focusedCard) toggleFocus(sbCard);
+      if (btn) { btn.click(); return; }
+      closeAllCards(false, 'sb-card');
+      state.sb.joinedActivity = true;
+      sbCard.classList.remove('hidden');
+      makeCardFocusable(sbCard);
+      if (!focusedCard) toggleFocus(sbCard);
+      if (state.sb.lastUrl) sbApplyRemoteNav(state.sb.lastUrl);
       return;
     }
 
@@ -15,23 +46,11 @@ function initSharedBrowser() {
     sbCard.classList.remove('hidden');
     makeCardFocusable(sbCard);
     if (!focusedCard) toggleFocus(sbCard);
-    
-    const confirmModal = document.getElementById('custom-confirm');
-    confirmModal.classList.remove('hidden');
-    confirmModal.style.display = 'flex';
-    
-    const finishSbSetup = (interactive) => {
-      confirmModal.classList.add('hidden');
-      confirmModal.style.display = 'none';
-      state.sb.interactive = interactive;
-      state.sb.host = state.myId;
-      document.getElementById('sb-overlay').style.display = 'none';
-      document.getElementById('sb-url').disabled = false;
-      broadcast({ type: 'sb-start', host: state.myId, interactive: state.sb.interactive });
-    };
 
-    document.getElementById('btn-confirm-yes').onclick = () => finishSbSetup(true);
-    document.getElementById('btn-confirm-no').onclick = () => finishSbSetup(false);
+    // İzleyici (spectate) modu kaldırıldı: katılan herkes tıklayıp gezinebilir.
+    state.sb.host = state.myId;
+    document.getElementById('sb-url').disabled = false;
+    broadcast({ type: 'sb-start', host: state.myId, interactive: true });
   });
 
   const sbWebview = document.getElementById('sb-webview');
@@ -51,6 +70,13 @@ function initSharedBrowser() {
     }
   });
 
+  // Kullanıcının bilinçli gezinmeleri her zaman yayınlanmalı; uzak gezinme
+  // sonrası kurulan yankı-bastırma penceresini temizle
+  const clearNavSuppression = () => {
+    state.sb.appliedRemoteUrl = '';
+    state.sb.remoteNavTs = 0;
+  };
+
   document.getElementById('sb-go').addEventListener('click', (e) => {
     e.stopPropagation();
     let url = sbUrl.value.trim();
@@ -64,6 +90,7 @@ function initSharedBrowser() {
       }
     }
 
+    clearNavSuppression();
     sbWebview.src = url;
   });
   sbUrl.addEventListener('click', () => {
@@ -81,11 +108,11 @@ function initSharedBrowser() {
 
   document.getElementById('sb-back').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (sbWebview.canGoBack()) sbWebview.goBack();
+    if (sbWebview.canGoBack()) { clearNavSuppression(); sbWebview.goBack(); }
   });
   document.getElementById('sb-forward').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (sbWebview.canGoForward()) sbWebview.goForward();
+    if (sbWebview.canGoForward()) { clearNavSuppression(); sbWebview.goForward(); }
   });
   document.getElementById('sb-refresh').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -99,7 +126,9 @@ function initSharedBrowser() {
   
   // Webview DOM hazır olduğunda keyboard input'u aktif et ve eklentileri yükle
   sbWebview.addEventListener('dom-ready', () => {
-    sbWebview.focus();
+    // Adres çubuğunda yazan kullanıcının focus'unu çalma (uzaktan gelen bir
+    // gezinme sayfayı yüklerken yazmayı imkânsız hâle getiriyordu)
+    if (document.activeElement !== sbUrl) sbWebview.focus();
 
     // Aile Dostu (SFW) Yapay Zeka Koruması
     sbWebview.executeJavaScript(`
@@ -281,33 +310,25 @@ function initSharedBrowser() {
     }
   });
 
-  sbWebview.addEventListener('did-navigate', (e) => {
+  // Tek bir gezinme birden çok did-navigate / did-navigate-in-page olayı
+  // üretebilir (yönlendirme zinciri, SPA gezinmesi). Eski tek seferlik
+  // ignoreNextNav bayrağı yalnızca ilk olayı susturuyordu; kalanlar karşıya
+  // geri yayınlanıp iki taraf arasında sonsuz reload ping-pongu başlatıyordu.
+  const onLocalNav = (e) => {
     state.sb.lastVideoState = null;
     if (document.activeElement !== sbUrl) {
       sbUrl.value = e.url;
     }
-    if (state.sb.ignoreNextNav) {
-      state.sb.ignoreNextNav = false;
-      return;
-    }
-    if (state.sb.host === state.myId || state.sb.interactive) {
-      broadcast({ type: 'sb-nav', url: e.url });
-    }
-  });
-
-  sbWebview.addEventListener('did-navigate-in-page', (e) => {
-    state.sb.lastVideoState = null;
-    if (document.activeElement !== sbUrl) {
-      sbUrl.value = e.url;
-    }
-    if (state.sb.ignoreNextNav) {
-      state.sb.ignoreNextNav = false;
-      return;
-    }
-    if (state.sb.host === state.myId || state.sb.interactive) {
-      broadcast({ type: 'sb-nav', url: e.url });
-    }
-  });
+    // Uzaktan uygulanan gezinmenin kendisini ve hemen ardındaki
+    // yönlendirmelerini geri yayınlama
+    if (sbNormUrl(e.url) === sbNormUrl(state.sb.appliedRemoteUrl)) return;
+    if (Date.now() - (state.sb.remoteNavTs || 0) < 2500) return;
+    if (!state.sb.joinedActivity || !state.sb.host) return;
+    state.sb.lastUrl = e.url;
+    broadcast({ type: 'sb-nav', url: e.url });
+  };
+  sbWebview.addEventListener('did-navigate', onLocalNav);
+  sbWebview.addEventListener('did-navigate-in-page', onLocalNav);
 
   sbWebview.addEventListener('new-window', (e) => {
     // Popup veya yeni sekme açmak isteyen linkleri aynı webview içinde aç
@@ -460,40 +481,26 @@ function initSharedBrowser() {
 function handleSBMessage(peerId, msg) {
   if (msg.type === 'sb-start') {
     state.sb.host = msg.host;
-    state.sb.interactive = msg.interactive;
     closeAllCards(false, 'sb-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     const sbCard = document.getElementById('sb-card');
     sbCard.classList.remove('hidden');
     makeCardFocusable(sbCard);
-    
+
     if (!state.sb.joinedActivity) {
       showInactiveOverlay('sb-card', 'Ortak Tarayıcı', () => {
          state.sb.joinedActivity = true;
          removeInactiveOverlay('sb-card');
          if (!focusedCard) toggleFocus(sbCard);
-         if (state.sb.lastUrl) {
-            state.sb.ignoreNextNav = true;
-            document.getElementById('sb-webview').src = state.sb.lastUrl;
-            document.getElementById('sb-url').value = state.sb.lastUrl;
-         }
+         if (state.sb.lastUrl) sbApplyRemoteNav(state.sb.lastUrl);
       });
     }
-    
-    const sUrl = document.getElementById('sb-url');
-    const sOverlay = document.getElementById('sb-overlay');
-    if (!state.sb.interactive && state.sb.host !== state.myId) {
-      sUrl.disabled = true;
-      sOverlay.style.display = 'block';
-    } else {
-      sUrl.disabled = false;
-      sOverlay.style.display = 'none';
-    }
+
+    // İzleyici modu kaldırıldı: herkes etkileşimli, adres çubuğu hep açık.
+    document.getElementById('sb-url').disabled = false;
   } else if (msg.type === 'sb-nav') {
     state.sb.lastUrl = msg.url;
     if (!state.sb.joinedActivity) return;
-    state.sb.ignoreNextNav = true;
-    document.getElementById('sb-webview').src = msg.url;
-    document.getElementById('sb-url').value = msg.url;
+    sbApplyRemoteNav(msg.url);
   } else if (msg.type === 'sb-video-sync') {
     if (state.sb.host !== state.myId && state.sb.joinedActivity && peerId === state.sb.host) {
       const currentTime = Number(msg.currentTime);

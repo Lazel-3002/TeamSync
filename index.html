@@ -549,18 +549,7 @@
          <button id="focus-fullscreen-btn" class="hidden" style="position: absolute; bottom: 20px; right: 20px; z-index: 9999; padding: 10px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(5px); transition: transform 0.2s, background 0.2s; display:flex; align-items:center; justify-content:center;" title="Ekranı Küçült"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></button>
       </div>
       <div id="grid" class="grid">
-        <div id="custom-confirm" class="modal hidden" style="z-index: 10000; align-items: center; justify-content: center;">
-      <div class="mcard" style="width: 400px; padding: 24px; text-align: center;">
-        <h3 style="margin-bottom: 15px; display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg> Ortak Tarayıcı</h3>
-        <p style="margin-bottom: 20px; color: #ccc;">Ortak Tarayıcıyı başlatıyorsunuz. Diğer kullanıcılar tarayıcıyla etkileşime girebilsin mi (tıklama, klavye)?</p>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-          <button id="btn-confirm-yes" class="btn-pri" style="flex: 1;">Evet (Herkes)</button>
-          <button id="btn-confirm-no" class="btn-sec" style="flex: 1;">Hayır (Sadece Ben)</button>
-        </div>
-      </div>
-    </div>
-    
-    <div id="empty-state" class="empty">
+        <div id="empty-state" class="empty">
           <h2>👋 Bağlantı Bekleniyor</h2>
           <p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>
         </div>
@@ -612,7 +601,6 @@
           </div>
           <div id="sb-player-container" style="flex: 1; width: 100%; position: relative; background: #fff; overflow: hidden;">
             <webview id="sb-webview" partition="persist:teamsync-ai" src="https://duckduckgo.com/" allowpopups style="width: 100%; height: 100%; border: none; margin: 0; padding: 0; box-sizing: border-box;"></webview>
-            <div id="sb-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.1); z-index: 100; cursor: not-allowed; display: none;" title="Etkileşim izniniz yok."></div>
           </div>
         </div>
 

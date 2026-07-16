@@ -2415,7 +2415,7 @@ function setupDataChannel(peerId, dc) {
               dc.send(JSON.stringify({ type: 'wt-load', vid: match[1] }));
             }
           } else if (activeAct === 'sb' && state.sb.host === state.myId) {
-            dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: state.sb.interactive }));
+            dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: true }));
             const currentUrl = document.getElementById('sb-url')?.value || '';
             if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl }));
           } else if (activeAct === 'uno' && state.uno.host === state.myId) {
@@ -2640,7 +2640,7 @@ async function handleDataMessage(peerId, msg) {
             broadcastTo(msg.peerId, { type: 'poke_sync', state: window.pokeState });
           }
         } else if (lob.activity === 'sb') {
-          broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: state.sb.interactive });
+          broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: true });
           const currentUrl = document.getElementById('sb-url')?.value || '';
           if (currentUrl) {
             broadcastTo(msg.peerId, { type: 'sb-nav', url: currentUrl });
@@ -2722,7 +2722,11 @@ async function handleDataMessage(peerId, msg) {
                         ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
 
   if (isActivityMsg) {
-    if (msg.lobbyId !== state.activeLobbyId) {
+    // Lobisiz (doğrudan butonla açılan) aktivitelerde msg.lobbyId undefined,
+    // alıcıda activeLobbyId null olur; katı !== karşılaştırması bu ikisini
+    // farklı sayıp mesajı sessizce düşürüyordu (misafir Ortak Tarayıcı'ya
+    // hiç gelemiyordu). İkisini de null'a normalize et.
+    if ((msg.lobbyId || null) !== (state.activeLobbyId || null)) {
       return;
     }
   }
@@ -4204,6 +4208,11 @@ function closeAllCards(leaveLobby = false, except = null) {
   }
   if (state.sb && except !== 'sb-card') {
     state.sb.joinedActivity = false;
+    state.sb.host = null;
+    state.sb.lastUrl = '';
+    // Reset gezinmesi yayınlanmasın diye "uzaktan uygulanmış" say
+    state.sb.appliedRemoteUrl = 'https://duckduckgo.com';
+    state.sb.remoteNavTs = Date.now();
     const sbWebview = document.getElementById('sb-webview');
     if (sbWebview) sbWebview.src = 'https://duckduckgo.com'; // Her zaman duckduckgo kalacak
   }
@@ -5026,7 +5035,7 @@ window.renderLobbiesList = function(activity) {
       </div>
       <div style="display:flex; gap:8px;">
         ${lob.status === 'waiting' && playerCount < maxPlayers ? `<button class="btn-pri btn-sm join-btn" style="padding:4px 10px; font-size:12px;">Katıl</button>` : ''}
-        <button class="btn-sec btn-sm spectate-btn" style="padding:4px 10px; font-size:12px;">İzle</button>
+        ${lob.activity !== 'sb' ? `<button class="btn-sec btn-sm spectate-btn" style="padding:4px 10px; font-size:12px;">İzle</button>` : ''}
       </div>
     `;
 
@@ -5157,21 +5166,9 @@ window.checkSpectatorUI = function() {
   if (wtLoad) wtLoad.classList.toggle('hidden', isSpec);
   if (wtContainer) wtContainer.style.pointerEvents = isSpec ? 'none' : 'auto';
   
-  // Shared Browser
-  const sbOverlay = document.getElementById('sb-overlay');
-  const sbUrl = document.getElementById('sb-url');
-  const sbGo = document.getElementById('sb-go');
-  const sbBack = document.getElementById('sb-back');
-  const sbForward = document.getElementById('sb-forward');
-  const sbRefresh = document.getElementById('sb-refresh');
-  
-  if (sbOverlay) sbOverlay.style.display = isSpec ? 'block' : 'none';
-  if (sbUrl) sbUrl.disabled = isSpec;
-  if (sbGo) sbGo.classList.toggle('hidden', isSpec);
-  if (sbBack) sbBack.classList.toggle('hidden', isSpec);
-  if (sbForward) sbForward.classList.toggle('hidden', isSpec);
-  if (sbRefresh) sbRefresh.classList.toggle('hidden', isSpec);
-  
+  // Shared Browser: izleyici (spectate) modu kaldırıldı — katılan herkes
+  // etkileşimli olduğundan burada hiçbir sb kontrolü kilitlenmez.
+
   // Poll
   const pollSetup = document.getElementById('poll-setup');
   const pollEnd = document.getElementById('poll-end');

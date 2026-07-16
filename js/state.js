@@ -40,7 +40,7 @@ window.state = {
   myAvatarHash: null,
   act: { wt: false, uno: false },
   wt: { player: null, isReady: false, lastAction: 0, ignoreNextEvent: false, joinedActivity: false },
-  sb: { host: null, interactive: false, ignoreNextNav: false, joinedActivity: false, lastUrl: '', lastVideoState: null },
+  sb: { host: null, appliedRemoteUrl: '', remoteNavTs: 0, joinedActivity: false, lastUrl: '', lastVideoState: null },
   uno: {
     host: null,
     players: new Map(),
