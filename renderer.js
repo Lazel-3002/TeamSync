@@ -1683,7 +1683,7 @@ async function setupLocalAudio() {
     state.processedStream = dest.stream;
   } else {
     state.gateGainNode.connect(dest);
-    state.processedStream = raw;
+    state.processedStream = dest.stream;
   }
 
   // Prevent Garbage Collection of WebAudio processing nodes by V8
