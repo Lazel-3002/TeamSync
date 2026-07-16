@@ -1444,7 +1444,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       await setupLocalAudio();
       if (!state.uiBound) {
         bindUI();
-        initWhiteboard();
         initFileTransfer();
         setupVUMeter();
         await setupDeviceList();
