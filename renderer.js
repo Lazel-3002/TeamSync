@@ -954,7 +954,96 @@ function getIceServers() {
       if (s && typeof s.urls === 'string' && /^turns?:/.test(s.urls)) servers.push(s);
     });
   }
-  return servers;
+  return expandTurnWithIpVariants(servers);
+}
+
+// ---- TURN DNS dayanıklılığı (WARP/VPN/DPI araçlarına karşı) ----
+// Cloudflare WARP gibi araçlar yerel DNS'i bozabiliyor (socket_manager
+// errorcode -105: TURN sunucu adı çözülemiyor). Bu durumda TURN hiç
+// devreye giremediği için bağlantı tamamen düşüyor. Çözüm: sunucu adları
+// DoH ile (IP-literal uç noktalar üzerinden, yerel DNS'e hiç dokunmadan)
+// çözülüp turn: URL'lerinin IP tabanlı kopyaları listeye eklenir.
+// turns: (TLS) sertifika ana bilgisayar adı doğrulaması gerektirdiğinden
+// IP'ye çevrilmez; TLS yedeği zaten ad tabanlı girişte duruyor.
+
+function getTurnIpCache() {
+  try { return JSON.parse(localStorage.getItem('teamsync_turn_ip_cache') || '{}'); } catch (e) { return {}; }
+}
+
+function parseTurnHost(url) {
+  const m = /^(turns?):([^:?\/]+)(:\d+)?(\?.*)?$/.exec((url || '').trim());
+  if (!m) return null;
+  return { scheme: m[1], host: m[2], port: m[3] || '', query: m[4] || '' };
+}
+
+function isIpLiteral(host) {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes('[');
+}
+
+function expandTurnWithIpVariants(servers) {
+  const cache = getTurnIpCache();
+  const seen = new Set(servers.map(s => typeof s.urls === 'string' ? s.urls : ''));
+  const out = servers.slice();
+  servers.forEach(s => {
+    if (!s || typeof s.urls !== 'string') return;
+    const p = parseTurnHost(s.urls);
+    // Sadece turn: (TLS'siz) URL'ler IP'ye çevrilebilir
+    if (!p || p.scheme !== 'turn' || isIpLiteral(p.host)) return;
+    const entry = cache[p.host];
+    if (!entry || !Array.isArray(entry.ips)) return;
+    entry.ips.slice(0, 2).forEach(ip => {
+      const url = `turn:${ip}${p.port}${p.query}`;
+      if (seen.has(url)) return;
+      seen.add(url);
+      out.push({ urls: url, username: s.username, credential: s.credential });
+    });
+  });
+  return out;
+}
+
+// Ana bilgisayar adını yerel DNS'i atlayarak çözer. Uç noktalar IP-literal
+// olduğu için bozuk yerel DNS bu isteği etkileyemez.
+async function dohResolve(host) {
+  const endpoints = [
+    { url: `https://1.1.1.1/dns-query?name=${encodeURIComponent(host)}&type=A`, headers: { accept: 'application/dns-json' } },
+    { url: `https://8.8.8.8/resolve?name=${encodeURIComponent(host)}&type=A`, headers: {} }
+  ];
+  for (const ep of endpoints) {
+    try {
+      const res = await fetch(ep.url, { headers: ep.headers, signal: AbortSignal.timeout(4000) });
+      const data = await res.json();
+      const ips = (data.Answer || [])
+        .filter(a => a && a.type === 1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(a.data))
+        .map(a => a.data);
+      if (ips.length) return ips;
+    } catch (e) {}
+  }
+  return [];
+}
+
+// Yapılandırılmış tüm TURN ana bilgisayar adlarını DoH ile çözüp önbelleğe
+// yazar. Çözüm başarısız olursa eski önbellek (son bilinen IP'ler) kalır.
+async function resolveTurnHostsViaDoH() {
+  const hosts = new Set();
+  const collect = u => {
+    const p = parseTurnHost(u);
+    if (p && p.scheme === 'turn' && !isIpLiteral(p.host)) hosts.add(p.host);
+  };
+  (localStorage.getItem('teamsync_turn_url') || '').split(',').forEach(collect);
+  if (Array.isArray(state.dynamicTurnServers)) state.dynamicTurnServers.forEach(s => s && collect(s.urls));
+  if (Array.isArray(state.sharedTurn)) state.sharedTurn.forEach(s => s && collect(s.urls));
+  if (!hosts.size) return;
+  const cache = getTurnIpCache();
+  let changed = false;
+  for (const host of hosts) {
+    const ips = await dohResolve(host);
+    if (ips.length) {
+      cache[host] = { ips: ips.slice(0, 3), ts: Date.now() };
+      changed = true;
+      console.log(`🧭 TURN DoH çözümü: ${host} → ${ips.slice(0, 3).join(', ')}`);
+    }
+  }
+  if (changed) localStorage.setItem('teamsync_turn_ip_cache', JSON.stringify(cache));
 }
 
 // TURN URL alanına bir Metered credential API adresi yazılırsa
@@ -1010,6 +1099,20 @@ function applySharedTurn(turnList) {
   state.sharedTurnSerialized = serialized;
   console.log('🔁 Odadan TURN yapılandırması alındı:', clean.map(s => s.urls).join(', '));
   showToast('Odadan TURN sunucu bilgisi alındı, bağlantılar güçlendiriliyor...', 'info');
+  // Paylaşılan sunucu adlarını da DoH ile çöz; tamamlanınca bağlanamayan
+  // peer'lara IP varyantlarını da içeren güncel yapılandırma uygulanır.
+  resolveTurnHostsViaDoH().then(() => {
+    state.peers.forEach((peer, peerId) => {
+      const st = peer.pc ? peer.pc.iceConnectionState : null;
+      if (st === 'connected' || st === 'completed') return;
+      try {
+        peer.pc.setConfiguration({
+          iceServers: getIceServers(),
+          iceTransportPolicy: state.useRelay ? 'relay' : 'all'
+        });
+      } catch (e) {}
+    });
+  }).catch(() => {});
   state.peers.forEach((peer, peerId) => {
     const st = peer.pc ? peer.pc.iceConnectionState : null;
     if (st === 'connected' || st === 'completed') return;
@@ -1043,7 +1146,7 @@ async function diagnoseIceFailure(peerId) {
     } else if (!hasTurnConfigured) {
       showToast('Doğrudan P2P kurulamadı: muhtemelen iki taraf da kısıtlı NAT/CGNAT arkasında. Ayarlar > TURN bölümüne ücretsiz bir TURN hesabı girin (tek kişinin girmesi yeterli, odaya otomatik paylaşılır).', 'danger');
     } else if (!types.has('relay')) {
-      showToast('TURN sunucunuza bağlanılamadı, bilgileri kontrol edin.', 'danger');
+      showToast('TURN sunucunuza bağlanılamadı. VPN/WARP/DPI aracı (ör. Cloudflare WARP) kullanıyorsanız kapatıp tekrar deneyin; yoksa TURN bilgilerini kontrol edin.', 'danger');
     }
   } catch (e) {}
 }
@@ -1442,6 +1545,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       state.cryptoKey = await setupCrypto(state.password);
       await refreshDynamicTurn();
+      await resolveTurnHostsViaDoH();
       await setupLocalAudio();
       if (!state.uiBound) {
         bindUI();
