@@ -1910,6 +1910,8 @@ function removePeer(peerId) {
   if (peer.mediaStreamSource) { try { peer.mediaStreamSource.disconnect(); } catch(e) {} }
   if (peer.analyser) { try { peer.analyser.disconnect(); } catch(e) {} }
   if (peer.audioCtx) { try { peer.audioCtx.close(); } catch(e) {} }
+  if (peer.audioEl) { try { peer.audioEl.srcObject = null; peer.audioEl.remove(); } catch(e) {} }
+  if (peer.videoEl) { try { peer.videoEl.srcObject = null; peer.videoEl.remove(); } catch(e) {} }
   state.peers.delete(peerId);
   const userEl = document.querySelector(`[data-uid="${peerId}"]`);
   if (userEl) userEl.remove();
