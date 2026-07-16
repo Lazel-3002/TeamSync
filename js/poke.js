@@ -950,11 +950,6 @@ POKEMONS.fairy.push(
   });
 });
 
-  // Next Round
-  document.getElementById('poke-next-round-btn')?.addEventListener('click', () => {
-    broadcastPokeMsg({ type: 'poke_lobby' });
-  });
-
   const getPokemonNameFromUrl = (url) => {
     if (!url) return "Pokemon";
     const parts = url.split('/');
