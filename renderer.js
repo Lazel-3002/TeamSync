@@ -1899,6 +1899,18 @@ function setupVUMeter() {
   state.vuInterval = setInterval(update, 50);
 }
 
+// Seçili ses çıkış cihazını (hoparlör/kulaklık) bir medya elementine uygular.
+// Boş id = sistem varsayılanı (setSinkId('') varsayılana döner).
+function applySpeakerTo(el) {
+  if (!el || typeof el.setSinkId !== 'function') return;
+  const id = localStorage.getItem('teamsync_speaker_id') || '';
+  el.setSinkId(id).catch(e => console.warn('setSinkId başarısız:', e && e.message ? e.message : e));
+}
+
+function applySpeakerToAll() {
+  document.querySelectorAll('audio, video').forEach(applySpeakerTo);
+}
+
 async function setupDeviceList() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -1910,9 +1922,36 @@ async function setupDeviceList() {
       opt.textContent = d.label || 'Mikrofon ' + (sel.children.length + 1);
       sel.appendChild(opt);
     });
-    sel.addEventListener('change', async () => {
+    sel.onchange = async () => {
       await setupLocalAudio();
-    });
+    };
+
+    // Çıkış cihazı seçimi: yankı genelde ses hoparlörden çalıp mikrofona
+    // geri girince oluşur; kulaklığı buradan seçmek bunu keser.
+    const spk = document.getElementById('speaker-select');
+    if (spk) {
+      spk.innerHTML = '';
+      const def = document.createElement('option');
+      def.value = '';
+      def.textContent = 'Varsayılan Çıkış';
+      spk.appendChild(def);
+      devices.filter(d => d.kind === 'audiooutput' && d.deviceId && d.deviceId !== 'default').forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || 'Hoparlör ' + spk.children.length;
+        spk.appendChild(opt);
+      });
+      const saved = localStorage.getItem('teamsync_speaker_id') || '';
+      if (saved && [...spk.options].some(o => o.value === saved)) spk.value = saved;
+      else if (saved) { localStorage.removeItem('teamsync_speaker_id'); } // cihaz artık yok
+      spk.onchange = () => {
+        if (spk.value) localStorage.setItem('teamsync_speaker_id', spk.value);
+        else localStorage.removeItem('teamsync_speaker_id');
+        applySpeakerToAll();
+        showToast('Ses çıkış cihazı değiştirildi', 'info');
+      };
+      applySpeakerToAll();
+    }
   } catch (e) {}
 }
 
@@ -2282,8 +2321,8 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   state.peers.set(peerId, {
     pc,
-    audioEl: (function(){ const a = document.createElement('audio'); a.autoplay = true; a.style.display = 'none'; document.body.appendChild(a); return a; })(),
-    videoEl: (function(){ const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; return v; })(),
+    audioEl: (function(){ const a = document.createElement('audio'); a.autoplay = true; a.style.display = 'none'; applySpeakerTo(a); document.body.appendChild(a); return a; })(),
+    videoEl: (function(){ const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; applySpeakerTo(v); return v; })(),
     dc,
     name: peerName,
     mic: true,
@@ -3107,6 +3146,17 @@ function updateEmptyGrid() {
 
 let focusedCard = null;
 
+// Kilit düğmesinin görünümünü state.focusLocked ile eşitler. Kilit,
+// closeAllCards gibi düğme dışı yollardan da sıfırlanabildiği için
+// görünüm güncellemesi tek yerden yapılmalı.
+function updateFocusLockBtn() {
+  const btn = document.getElementById('focus-lock-btn');
+  if (!btn) return;
+  btn.innerHTML = state.focusLocked ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>';
+  btn.style.background = state.focusLocked ? 'rgba(220, 38, 38, 0.8)' : 'rgba(0,0,0,0.6)';
+  btn.style.borderColor = state.focusLocked ? 'rgba(239, 68, 68, 1)' : 'rgba(255,255,255,0.2)';
+}
+
 function toggleFocus(card) {
   if (state.focusLocked) return;
   const main = document.querySelector('.main');
@@ -3114,6 +3164,9 @@ function toggleFocus(card) {
   const grid = document.getElementById('grid');
 
   if (focusedCard === card) {
+    // Odak alanı tam ekrandayken gizlenirse görünmez bir tam ekran katmanı
+    // olarak kalıp tüm tıklamaları yutuyor — önce tam ekrandan çık.
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     grid.appendChild(card);
     focusedCard = null;
     main.classList.remove('focus-mode');
@@ -3826,10 +3879,7 @@ function bindUI() {
   document.getElementById('focus-lock-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     state.focusLocked = !state.focusLocked;
-    const btn = document.getElementById('focus-lock-btn');
-    btn.innerHTML = state.focusLocked ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>' : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>';
-    btn.style.background = state.focusLocked ? 'rgba(220, 38, 38, 0.8)' : 'rgba(0,0,0,0.6)';
-    btn.style.borderColor = state.focusLocked ? 'rgba(239, 68, 68, 1)' : 'rgba(255,255,255,0.2)';
+    updateFocusLockBtn();
     showToast(state.focusLocked ? 'Odak Kilitlendi' : 'Odak Kilidi Açıldı', 'info');
   });
 
@@ -4097,6 +4147,14 @@ function closeAllCards(leaveLobby = false, except = null) {
 
   // Odak modunu sıfırla ki boş kalıp UI'ı bloke etmesin
   state.focusLocked = false;
+  updateFocusLockBtn();
+
+  // Kapanan kart tam ekran odaktaysa tam ekranı da bırak; yoksa gizlenmiş
+  // odak alanı görünmez bir tam ekran katmanı olarak tüm tıklamaları yutar
+  // (UNO'yu tam ekran + kilitliyken kapatınca UI'ın donması bunun sonucuydu).
+  if (document.fullscreenElement && !(except && focusedCard && focusedCard.id === except)) {
+    document.exitFullscreen().catch(() => {});
+  }
 
   ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card', 'poke-card'].forEach(id => {
     if (id === except) return;
