@@ -853,13 +853,6 @@ function startUnoRound() {
   renderUnoGame();
 }
 
-document.getElementById('uno-next-round-btn').onclick = () => {
-    if (state.uno.host === state.myId) {
-        broadcast({ type: 'uno-start-round' });
-        startUnoRound();
-    }
-};
-
 function renderUnoGame() {
   try {
     doRenderUnoGame();
