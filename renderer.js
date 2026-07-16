@@ -1130,9 +1130,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.friendId = `KNK-${crypto.randomUUID().toUpperCase()}`;
     displayName.textContent = n;
     document.getElementById('my-friend-id').textContent = state.friendId;
-    
+
     saveProfile();
-    
+    setupGlobalMQTT();
+
     stepName.classList.add('hidden');
     stepAction.classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
   });
@@ -4437,21 +4438,21 @@ window.sendDMFile = (file) => {
   }
   
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     const base64Data = e.target.result;
     const isImage = file.type.startsWith('image/');
     const msgType = isImage ? 'image' : 'file';
-    
+
     // Local store
     if (!state.dms[friendId]) state.dms[friendId] = [];
     state.dms[friendId].push({ sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
     saveDMs();
     renderDMs();
-    
+
     const CHUNK_SIZE = 60000; // ~60KB
     const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
     const fileId = crypto.randomUUID();
-    
+
     state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
       type: 'dm_file_start',
       fromId: state.myId,
@@ -4460,7 +4461,11 @@ window.sendDMFile = (file) => {
       fileName: file.name,
       totalChunks: totalChunks
     }));
-    
+
+    // Ücretsiz/genel MQTT broker QoS 0 kullanıyor (teslim garantisi yok); art arda
+    // gönderilen çok sayıda mesaj broker tarafında kısıtlanıp sessizce kaybolabiliyor.
+    // Parçalar arasına küçük bir gecikme koymak (oda içi dosya transferindeki gibi)
+    // bu riski azaltır.
     for (let i = 0; i < totalChunks; i++) {
       const chunk = base64Data.substr(i * CHUNK_SIZE, CHUNK_SIZE);
       state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
@@ -4470,6 +4475,7 @@ window.sendDMFile = (file) => {
         chunkIndex: i,
         data: chunk
       }));
+      await new Promise(r => setTimeout(r, 15));
     }
   };
   reader.readAsDataURL(file);
