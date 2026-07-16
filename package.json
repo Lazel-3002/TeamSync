@@ -8,7 +8,8 @@
     "dev:react": "cross-env REACT_DEV=true concurrently \"vite\" \"electron .\"",
     "build:react": "vite build",
     "build": "electron-builder --win portable --x64",
-    "build-full": "electron-builder --win --x64"
+    "build-full": "electron-builder --win --x64",
+    "test:e2e": "node test/e2e/run-all.js"
   },
   "author": "TeamSync",
   "license": "MIT",
