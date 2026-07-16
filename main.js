@@ -465,7 +465,7 @@ ipcMain.on('tray-action-quit', () => {
 
 ipcMain.on('set-remote-control', (event, active) => {
   remoteControlActive = !!active;
-  console.log('鼠标 Uzaktan kontrol:', remoteControlActive ? 'AKTİF' : 'KAPALI');
+  console.log('Uzaktan kontrol:', remoteControlActive ? 'AKTİF' : 'KAPALI');
 });
 
 ipcMain.on('remote-input', (event, data) => {
