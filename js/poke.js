@@ -752,15 +752,12 @@ POKEMONS.fairy.push(
               else defImg.classList.add('anim-death');
               if (attackerSlot === 'p1') atkImg.classList.add('anim-winner-p1');
               else atkImg.classList.add('anim-winner');
-              endBattle(attackerSlot);
-           } else {
-              pokeState.turn = pokeState.turn === 1 ? 2 : 1;
-              customRenderBattleArena();
-              window.pokeAnimPlaying = false;
-              if (pokeState.turn === 2 && pokeState.p2.id === 'BOT' && state.isLobbyHost) {
-                 setTimeout(botPlay, 1500);
-              }
            }
+           // Round/turn transitions and endBattle() are owned exclusively by
+           // executeRound()'s own callback chain (the current simultaneous-move
+           // system). This function no longer drives pokeState.turn or
+           // schedules botPlay() itself, since doing so raced executeRound's
+           // handling and could double-fire botPlay or corrupt the next round.
         }, 2000);
       }, 500);
     }, 500);
@@ -1717,47 +1714,6 @@ POKEMONS.fairy.push(
       }
 
 
-      if (data.type === 'poke_attack') {
-      if (pokeState.status !== 'revealed') return;
-      if (window.pokeAnimPlaying) return;
-      
-      const isP1 = pokeState.turn === 1;
-      const attackerSlot = isP1 ? 'p1' : 'p2';
-      const defenderSlot = isP1 ? 'p2' : 'p1';
-      
-      // Verify user has right to attack
-      if (pokeState[attackerSlot].id !== data.id && data.id !== 'BOT') return;
-      
-      window.pokeAnimPlaying = true;
-      
-      const move = pokeState[attackerSlot].moves[data.moveIdx];
-      const defType = pokeState[defenderSlot].type; // Note: We use the type assigned originally, which matches the list it came from.
-      
-      let multiplier = 1;
-      if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) {
-         multiplier = typeChart[move.type][defType];
-      }
-      
-      const atkStat = move.damage_class === 'special' ? 'special-attack' : 'attack';
-      const defStat = move.damage_class === 'special' ? 'special-defense' : 'defense';
-      
-      const pAttackerStats = pokeState[attackerSlot].stats || { attack: 50, defense: 50, 'special-attack': 50, 'special-defense': 50 };
-      const pDefenderStats = pokeState[defenderSlot].stats || { attack: 50, defense: 50, 'special-attack': 50, 'special-defense': 50 };
-      
-      const A = pAttackerStats[atkStat] || 50;
-      const D = pDefenderStats[defStat] || 50;
-      
-      const baseDamage = move.power > 0 ? (0.44 * move.power * (A / D) + 2) : 0;
-      let stab = pokeState[attackerSlot].type === move.type ? 1.5 : 1;
-      let randomFactor = (Math.random() * 0.15) + 0.85;
-      
-      const damage = Math.floor(baseDamage * multiplier * stab * randomFactor * 0.8);
-      
-      const isSuper = multiplier > 1;
-      const isResisted = multiplier < 1;
-      
-      playBattleAnimation(attackerSlot, defenderSlot, move.name, move.type, damage, isSuper, isResisted);
-    }
   };
 
   // Add into global activity handler override
