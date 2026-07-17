@@ -3545,8 +3545,12 @@ function broadcast(msg) {
   if (state.activeLobbyId) {
     msg.lobbyId = state.activeLobbyId;
     
-    // Automatically transition lobby status to playing on match start messages
-    if (state.isLobbyHost && (msg.type === 'uno-sync' || msg.type === 'wt-load' || msg.type === 'sb-start' || msg.type === 'poll_start' || msg.type === 'wheel_ready')) {
+    // Automatically transition lobby status to playing on match start messages.
+    // sb-start (Ortak Tarayıcı) HARİÇ: paylaşımlı tarayıcı her an katılınabilir
+    // olacak şekilde tasarlandı (host beacon, 7/24 katılım), "maç başladı"
+    // kavramı yok — dahil edilirse lobi oluşturulur oluşturulmaz Katıl butonu
+    // kayboluyordu (status hemen 'playing' oluyordu).
+    if (state.isLobbyHost && (msg.type === 'uno-sync' || msg.type === 'wt-load' || msg.type === 'poll_start' || msg.type === 'wheel_ready')) {
       const lob = state.lobbies.find(l => l.id === state.activeLobbyId);
       if (lob && lob.status === 'waiting') {
         lob.status = 'playing';
