@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startCloudflared: (port) => ipcRenderer.invoke('start-cloudflared', port),
   stopCloudflared: () => ipcRenderer.send('stop-cloudflared'),
   getLocalIPs: () => ipcRenderer.invoke('get-local-ips'),
+  detectWarp: () => ipcRenderer.invoke('detect-warp'),
   startDiscovery: (peerId, name, room) => ipcRenderer.send('start-discovery', { peerId, name, room }),
   stopDiscovery: () => ipcRenderer.send('stop-discovery'),
   sendUDPSignal: (ip, signal) => ipcRenderer.send('send-udp-signal', { ip, signal }),

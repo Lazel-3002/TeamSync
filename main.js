@@ -282,6 +282,25 @@ function createWindow() {
 
 ipcMain.handle('get-local-ips', () => getLocalIPs());
 
+// Cloudflare WARP tespiti: 1.1.1.1/cdn-cgi/trace yanıtındaki warp=on/plus
+// alanı, isteğin WARP tünelinden çıktığını söyler. Renderer'dan fetch ile
+// yapılamıyor (endpoint CORS başlığı göndermiyor); ana süreç CORS'a tabi
+// değil. IP-literal olduğu için WARP'ın bozabileceği DNS'e de bağımlı değil.
+ipcMain.handle('detect-warp', () => {
+  return new Promise((resolve) => {
+    const req = require('https').get({ host: '1.1.1.1', path: '/cdn-cgi/trace', timeout: 5000 }, (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => {
+        const m = /(?:^|\n)warp=(on|plus)(?:\n|$)/.exec(data);
+        resolve(m ? m[1] : null);
+      });
+    });
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.on('error', () => resolve(null));
+  });
+});
+
 ipcMain.handle('toggle-fullscreen', () => {
   if (mainWindow) {
     const isFull = mainWindow.isFullScreen();

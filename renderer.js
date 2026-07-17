@@ -954,7 +954,38 @@ function getIceServers() {
       if (s && typeof s.urls === 'string' && /^turns?:/.test(s.urls)) servers.push(s);
     });
   }
-  return expandTurnWithIpVariants(servers);
+  return expandTurnWithIpVariants(expandTurnFamily(servers));
+}
+
+// Yapılandırılmış her TURN ana bilgisayarı için tüm taşıma varyantlarını
+// üretir: udp:80, udp:443, tcp:80, tcp:443 ve tls:443. WARP gibi VPN/tünel
+// araçları bazı günler UDP'yi (CreatePermission 600), bazı günler DNS'i
+// (-105) bozuyor; kullanıcının kayıtlı listesinde çoğu zaman tek taşıma
+// türü var ve o tür bozulunca hiçbir çalışan yol kalmıyordu. Var olmayan
+// kombinasyonlar (ör. Metered'de düz TCP:443) sadece aday üretmez, ICE
+// toplamayı bloklamaz. Ardından expandTurnWithIpVariants, tcp varyantları
+// dahil turn: URL'lerinin IP-literal kopyalarını ekler — böylece DNS ve UDP
+// AYNI ANDA bozuk olsa bile turn:IP:80?transport=tcp yolu ayakta kalır.
+function expandTurnFamily(servers) {
+  const seen = new Set(servers.map(s => (s && typeof s.urls === 'string') ? s.urls : ''));
+  const out = servers.slice();
+  servers.forEach(s => {
+    if (!s || typeof s.urls !== 'string' || !s.username || !s.credential) return;
+    const p = parseTurnHost(s.urls);
+    if (!p || isIpLiteral(p.host)) return;
+    [
+      `turn:${p.host}:80`,
+      `turn:${p.host}:443`,
+      `turn:${p.host}:80?transport=tcp`,
+      `turn:${p.host}:443?transport=tcp`,
+      `turns:${p.host}:443?transport=tcp`
+    ].forEach(url => {
+      if (seen.has(url)) return;
+      seen.add(url);
+      out.push({ urls: url, username: s.username, credential: s.credential });
+    });
+  });
+  return out;
 }
 
 // ---- TURN DNS dayanıklılığı (WARP/VPN/DPI araçlarına karşı) ----
@@ -1025,9 +1056,12 @@ async function dohResolve(host) {
 // yazar. Çözüm başarısız olursa eski önbellek (son bilinen IP'ler) kalır.
 async function resolveTurnHostsViaDoH() {
   const hosts = new Set();
+  // turns: hostları da toplanır: kullanıcı SADECE turns: girmiş olsa bile
+  // expandTurnFamily o hosttan turn: (udp/tcp) varyantları üretir ve bunların
+  // IP-literal kopyaları için çözülmüş IP gerekir.
   const collect = u => {
     const p = parseTurnHost(u);
-    if (p && p.scheme === 'turn' && !isIpLiteral(p.host)) hosts.add(p.host);
+    if (p && !isIpLiteral(p.host)) hosts.add(p.host);
   };
   (localStorage.getItem('teamsync_turn_url') || '').split(',').forEach(collect);
   if (Array.isArray(state.dynamicTurnServers)) state.dynamicTurnServers.forEach(s => s && collect(s.urls));
@@ -1129,6 +1163,28 @@ function applySharedTurn(turnList) {
   });
 }
 
+// Cloudflare WARP (veya benzeri, trafiği Cloudflare'den geçiren bir tünel)
+// açık mı? 1.1.1.1/cdn-cgi/trace IP-literal olduğu için bozuk DNS'ten
+// etkilenmez; yanıttaki warp=on/plus alanı isteğin WARP tünelinden çıktığını
+// söyler. Amaç: kullanıcıyı erken uyarmak ve tanı mesajlarını isabetli kılmak
+// (WARP altında doğrudan P2P neredeyse hep düşer, TURN şart).
+async function detectTunnelInterference() {
+  try {
+    // Ana süreç üzerinden: /cdn-cgi/trace CORS başlığı göndermediği için
+    // renderer fetch'i "Failed to fetch" ile düşer, main process düşmez.
+    const warp = (window.electronAPI && window.electronAPI.detectWarp)
+      ? await window.electronAPI.detectWarp()
+      : null;
+    if (!warp) { state.warpDetected = false; return; }
+    state.warpDetected = true;
+    console.warn('🛡️ Cloudflare WARP algılandı (warp=' + warp + ') — doğrudan P2P büyük olasılıkla çalışmaz, TURN yolları önceliklendirilecek');
+    const hasTurn = getIceServers().some(s => typeof s.urls === 'string' && /^turns?:/.test(s.urls) && s.username);
+    showToast(hasTurn
+      ? '🛡️ Cloudflare WARP algılandı — bağlantı TURN üzerinden kurulacak, sorun olursa otomatik onarılır'
+      : '🛡️ Cloudflare WARP algılandı — sesli bağlantı için Ayarlar > TURN bölümüne bir TURN hesabı girin (odada tek kişinin girmesi yeterli)', 'warn');
+  } catch (e) {}
+}
+
 // Bağlantı kurulamayınca sebebini kullanıcıya söyle
 async function diagnoseIceFailure(peerId) {
   const peer = state.peers.get(peerId);
@@ -1144,9 +1200,13 @@ async function diagnoseIceFailure(peerId) {
     if (!types.has('srflx') && !types.has('relay')) {
       showToast('Ağınız STUN/UDP trafiğini engelliyor görünüyor (güvenlik duvarı/okul-iş ağı). TURN sunucusu şart.', 'danger');
     } else if (!hasTurnConfigured) {
-      showToast('Doğrudan P2P kurulamadı: muhtemelen iki taraf da kısıtlı NAT/CGNAT arkasında. Ayarlar > TURN bölümüne ücretsiz bir TURN hesabı girin (tek kişinin girmesi yeterli, odaya otomatik paylaşılır).', 'danger');
+      showToast(state.warpDetected
+        ? 'WARP açıkken doğrudan P2P kurulamaz; Ayarlar > TURN bölümüne bir TURN hesabı girin (tek kişinin girmesi yeterli, odaya otomatik paylaşılır).'
+        : 'Doğrudan P2P kurulamadı: muhtemelen iki taraf da kısıtlı NAT/CGNAT arkasında. Ayarlar > TURN bölümüne ücretsiz bir TURN hesabı girin (tek kişinin girmesi yeterli, odaya otomatik paylaşılır).', 'danger');
     } else if (!types.has('relay')) {
-      showToast('TURN sunucunuza bağlanılamadı. VPN/WARP/DPI aracı (ör. Cloudflare WARP) kullanıyorsanız kapatıp tekrar deneyin; yoksa TURN bilgilerini kontrol edin.', 'danger');
+      showToast(state.warpDetected
+        ? 'TURN sunucusuna WARP tüneli üzerinden ulaşılamadı. Tüm taşıma varyantları (UDP/TCP/TLS + IP) denenmeye devam ediyor; düzelmezse WARP\'ı kapatın.'
+        : 'TURN sunucunuza bağlanılamadı. VPN/WARP/DPI aracı (ör. Cloudflare WARP) kullanıyorsanız kapatıp tekrar deneyin; yoksa TURN bilgilerini kontrol edin.', 'danger');
     }
   } catch (e) {}
 }
@@ -1544,6 +1604,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     try {
       state.cryptoKey = await setupCrypto(state.password);
+      detectTunnelInterference(); // await yok: girişte bloklamasın, toast async gelsin
       await refreshDynamicTurn();
       await resolveTurnHostsViaDoH();
       await setupLocalAudio();
@@ -2225,6 +2286,23 @@ async function attemptIceRestart(peerId) {
     if (peer.pc.signalingState !== 'stable') {
       try { await peer.pc.setLocalDescription({ type: 'rollback' }); } catch (e) {}
     }
+    // Kademeli tırmanma: 2+ başarısız denemeden sonra ve elde TURN varsa
+    // relay-zorunlu dene. WARP/VPN altında "yaşıyor görünen ama ölü"
+    // doğrudan yollar tekrar tekrar seçilip bağlantıyı düşürebiliyor;
+    // relay bunları tamamen eler. TURN'ün kendisi ulaşılamaz çıkarsa
+    // kilitlenmemek için 2 relay denemesinden sonra tekrar 'all'a dönülür
+    // (4'lük döngü: all, all, relay, relay, all, ...). Karşı taraf 'all'da
+    // kalır; tek taraflı relay adayı bile çalışan bir çift kurmaya yeter.
+    peer.restartCount = (peer.restartCount || 0) + 1;
+    if (!state.useRelay) {
+      const servers = getIceServers();
+      const hasTurn = servers.some(s => typeof s.urls === 'string' && /^turns?:/.test(s.urls) && s.username);
+      const wantRelay = hasTurn && (peer.restartCount % 4) >= 2;
+      try {
+        peer.pc.setConfiguration({ iceServers: servers, iceTransportPolicy: wantRelay ? 'relay' : 'all' });
+        if (wantRelay) console.log(`🛰️ ${peer.name}: doğrudan yollar tutmuyor, relay-zorunlu ICE restart denenecek (deneme ${peer.restartCount})`);
+      } catch (e) {}
+    }
     const offer = await peer.pc.createOffer({ iceRestart: true });
     offer.sdp = setMediaBitrates(offer.sdp);
     peer.localCandidates = []; // ICE restart yeni ufrag üretir; eski adaylar geçersiz
@@ -2285,6 +2363,12 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
         }
       }, 3000);
     } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      const pr = state.peers.get(peerId);
+      // audioStallRestarts BİLEREK burada sıfırlanmıyor: karşı tarafta hiç
+      // ses track'i yoksa her restart yine "connected"la biter; sayaç burada
+      // sıfırlansaydı üst sınır işlevsiz kalır, sonsuz restart döngüsü olurdu.
+      // Sayaç yalnızca ses gerçekten akınca (bekçide) sıfırlanır.
+      if (pr) pr.restartCount = 0;
       console.log(`✅ WebRTC connected to ${peerName}`);
     }
   };
@@ -2366,7 +2450,38 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     const p = state.peers.get(peerId);
     if (!p || p.pc !== pc) { clearInterval(peerRef.connWatchdog); return; }
     const st = pc.iceConnectionState;
-    if (st === 'connected' || st === 'completed') { p.checkingSince = null; return; }
+    if (st === 'connected' || st === 'completed') {
+      p.checkingSince = null;
+      // "Bağlı görünüyor ama ses akmıyor" bekçisi: WARP/VPN tünellerinde ICE
+      // başarılı sayılan ama medyayı taşımayan yollar seçilebiliyor. Karşı
+      // taraf mikrofonunu kapatsa bile WebRTC sessizlik paketleri gönderir
+      // (track.enabled=false, DTX yok) — sağlıklı bağlantıda inbound-rtp
+      // audio baytları HER ZAMAN artar. ~20 sn hiç artmazsa ICE restart
+      // (relay tırmanması attemptIceRestart içinde). Karşı tarafta hiç ses
+      // track'i yoksa (mikrofon açılamamış) restart çare olmaz; sonsuz
+      // döngüye girmemek için üst sınır var.
+      pc.getStats().then((stats) => {
+        let bytes = 0;
+        stats.forEach(r => { if (r.type === 'inbound-rtp' && r.kind === 'audio') bytes += (r.bytesReceived || 0); });
+        const pp = state.peers.get(peerId);
+        if (!pp || pp.pc !== pc) return;
+        if (pp.lastAudioBytes != null && bytes <= pp.lastAudioBytes) {
+          pp.audioStallTicks = (pp.audioStallTicks || 0) + 1;
+          if (pp.audioStallTicks >= 2 && (pp.audioStallRestarts || 0) < 3) {
+            console.warn(`🔇 ${peerName} bağlı görünüyor ama ses akmıyor (${bytes} bayt), ICE restart deneniyor...`);
+            pp.audioStallTicks = 0;
+            pp.audioStallRestarts = (pp.audioStallRestarts || 0) + 1;
+            pp.lastRestartAt = 0;
+            attemptIceRestart(peerId);
+          }
+        } else {
+          pp.audioStallTicks = 0;
+          if (bytes > (pp.lastAudioBytes || 0)) pp.audioStallRestarts = 0;
+        }
+        pp.lastAudioBytes = bytes;
+      }).catch(() => {});
+      return;
+    }
     if (pc.connectionState === 'closed') { clearInterval(peerRef.connWatchdog); return; }
     // 'checking' sürecine karışma; ICE aday denemeleri 30sn'ye kadar sürebilir.
     if (st === 'checking') {
