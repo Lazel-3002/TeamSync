@@ -399,7 +399,8 @@ function handleUnoMessage(peerId, msg) {
     }
     state.uno.discard = [msg.firstCard];
     state.uno.currentColor = msg.firstCard.color;
-    
+    state.uno.pendingDrawCount = 0;
+
     document.getElementById('uno-lobby').classList.add('hidden');
     document.getElementById('uno-game').classList.remove('hidden');
     document.getElementById('uno-game-over').classList.add('hidden');
@@ -420,29 +421,6 @@ function handleUnoMessage(peerId, msg) {
     if (state.uno.host === state.myId) {
       state.uno.waitingForKeepOrPlay = null;
       if (state.uno.botTimeout) clearTimeout(state.uno.botTimeout);
-      
-      if (pId !== state.myId && msg.drawCount > 0 && !msg.isKombo) {
-        if (state.uno.rules && (state.uno.rules.stacking || state.uno.rules.mirror)) {
-          state.uno.pendingDrawCount = (state.uno.pendingDrawCount || 0) + msg.drawCount;
-          broadcast({ type: 'uno-pending-draw', count: state.uno.pendingDrawCount });
-        } else {
-          setTimeout(() => {
-            const victimIndex = getNextTurn(1, msg.oldTurnIndex, state.uno.direction);
-            const victimId = state.uno.turnOrder[victimIndex];
-            if (msg.card.val === '+4') {
-                state.uno.challengePending = { attacker: pId, victim: victimId, hadMatchingColor: msg.hadMatchingColor };
-                broadcast({ type: 'uno-challenge-offer', attacker: pId, victim: victimId });
-                if (victimId.startsWith('bot-')) {
-                    setTimeout(() => {
-                        broadcast({ type: 'uno-challenge-decision', victim: victimId, challenge: false });
-                    }, 1500);
-                }
-            } else {
-                forceDrawCards(victimId, msg.drawCount);
-            }
-          }, 500);
-        }
-      }
     }
     state.uno.triggerDiscardAnim = true;
 
@@ -469,40 +447,16 @@ function handleUnoMessage(peerId, msg) {
         return;
       }
       
-      let specialRuleTriggered = false;
-      if (msg.card.val === '0' && state.uno.rules && state.uno.rules.zeroPass) {
-          state.uno.zeroPassPending = true;
-          state.uno.collectedHands = {};
-          broadcast({ type: 'uno-req-hands' });
-          state.uno.collectedHands[state.myId] = [...state.uno.myHand];
-          for (let id in state.uno.botHands) state.uno.collectedHands[id] = [...state.uno.botHands[id]];
-          specialRuleTriggered = true;
-      }
-      if (msg.card.val === '7' && state.uno.rules && state.uno.rules.sevenSwap) {
-          state.uno.sevenSwapPending = true;
-          state.uno.sevenSwapInitiator = msg.botId || peerId;
-          state.uno.collectedHands = {};
-          broadcast({ type: 'uno-req-hands' });
-          state.uno.collectedHands[state.myId] = [...state.uno.myHand];
-          for (let id in state.uno.botHands) state.uno.collectedHands[id] = [...state.uno.botHands[id]];
-          specialRuleTriggered = true;
-      }
-      
+      const specialRuleTriggered = resolveHostPlayEffects(msg.card, pId, {
+        direction: msg.direction,
+        oldTurnIndex: msg.oldTurnIndex,
+        drawCount: msg.drawCount,
+        isKombo: msg.isKombo,
+        hadMatchingColor: msg.hadMatchingColor
+      });
+
       if (!specialRuleTriggered && Object.keys(state.uno.collectedHands || {}).length === state.uno.players.size) {
          checkAndProcessCollectedHands();
-      }
-      
-      if (msg.drawCount > 0 && !msg.isKombo) {
-        if (state.uno.rules && (state.uno.rules.stacking || state.uno.rules.mirror)) {
-            state.uno.pendingDrawCount = (state.uno.pendingDrawCount || 0) + msg.drawCount;
-            broadcast({ type: 'uno-pending-draw', count: state.uno.pendingDrawCount });
-        } else {
-            setTimeout(() => {
-              const victimIndex = getNextTurn(1, msg.oldTurnIndex, msg.direction);
-              const victimId = state.uno.turnOrder[victimIndex];
-              forceDrawCards(victimId, msg.drawCount);
-            }, 500);
-        }
       }
     }
 
@@ -510,18 +464,7 @@ function handleUnoMessage(peerId, msg) {
       state.uno.pendingDrawCount = msg.count;
   } else if (msg.type === 'uno-take-pending') {
       hideUnoCatch();
-      if (state.uno.host === state.myId) {
-          const count = state.uno.pendingDrawCount;
-          state.uno.pendingDrawCount = 0;
-          broadcast({ type: 'uno-pending-draw', count: 0 });
-          forceDrawCards(peerId, count);
-          
-          setTimeout(() => {
-              state.uno.turnIndex = getNextTurn(1);
-              broadcast({ type: 'uno-end-turn-sync', nextTurnIndex: state.uno.turnIndex });
-              renderUnoGame();
-          }, 800);
-      }
+      takePendingDraw(peerId);
   } else if (msg.type === 'uno-end-turn') {
     if (state.uno.host === state.myId) {
       processUnoEndTurn(peerId);
@@ -610,6 +553,89 @@ function handleUnoMessage(peerId, msg) {
        }
     }
   }
+}
+
+// HOST-ONLY. Bir kart oynandıktan SONRA (discard/turnIndex/currentColor zaten güncellendi)
+// tetiklenmesi gereken TÜM özel kural ve ceza mantığının TEK kaynağı.
+//
+// Önceden bu mantık playCard() (kendi hamlen), botPlay() (bot hamlesi) ve
+// handleUnoMessage()'ın 'uno-play' dalı (uzak oyuncu hamlesi) içinde üç ayrı kopya
+// halinde duruyordu ve birbirinden sapmıştı:
+//   - Host kendi 0/7 kartını oynadığında ya da bir bot 0/7 oynadığında "0 Karmaşası"
+//     ve "7 Takası" kuralları HİÇ tetiklenmiyordu (sadece uzak bir oyuncu oynadığında).
+//   - handleUnoMessage() içinde aynı yığılma/meydan-okuma bloğu YANLIŞLIKLA İKİ KEZ
+//     yazılmıştı: host +2/+4 içeren bir hamle mesajı aldığında ceza mantığı iki kez
+//     çalışıyordu (Yığılma açıkken ceza iki katına çıkıyor, kapalıyken ise kurban önce
+//     meydan okuma teklifi alıp 500ms sonra ikinci kopyanın onu yine de zorla kart
+//     çektirmesiyle karşılaşıyordu).
+// Artık tüm çağrı noktaları TEK SEFER buraya yönleniyor.
+function resolveHostPlayEffects(card, playerId, { direction, oldTurnIndex, drawCount, isKombo, hadMatchingColor }) {
+  if (state.uno.host !== state.myId) return false;
+
+  if (card.val === '0' && state.uno.rules && state.uno.rules.zeroPass) {
+    state.uno.zeroPassPending = true;
+    state.uno.collectedHands = {};
+    broadcast({ type: 'uno-req-hands' });
+    state.uno.collectedHands[state.myId] = [...state.uno.myHand];
+    for (let id in state.uno.botHands) state.uno.collectedHands[id] = [...state.uno.botHands[id]];
+    checkAndProcessCollectedHands();
+    return true;
+  }
+  if (card.val === '7' && state.uno.rules && state.uno.rules.sevenSwap) {
+    state.uno.sevenSwapPending = true;
+    state.uno.sevenSwapInitiator = playerId;
+    state.uno.collectedHands = {};
+    broadcast({ type: 'uno-req-hands' });
+    state.uno.collectedHands[state.myId] = [...state.uno.myHand];
+    for (let id in state.uno.botHands) state.uno.collectedHands[id] = [...state.uno.botHands[id]];
+    checkAndProcessCollectedHands();
+    return true;
+  }
+
+  if (drawCount > 0 && !isKombo) {
+    if (state.uno.rules && (state.uno.rules.stacking || state.uno.rules.mirror)) {
+      state.uno.pendingDrawCount = (state.uno.pendingDrawCount || 0) + drawCount;
+      broadcast({ type: 'uno-pending-draw', count: state.uno.pendingDrawCount });
+      renderUnoGame();
+    } else {
+      setTimeout(() => {
+        const victimIndex = getNextTurn(1, oldTurnIndex, direction);
+        const victimId = state.uno.turnOrder[victimIndex];
+        // "Serbest Atış" açıkken +4 asla meydan okunamaz, ceza direkt uygulanır.
+        if (card.val === '+4' && !(state.uno.rules && state.uno.rules.noBluff)) {
+          state.uno.challengePending = { attacker: playerId, victim: victimId, hadMatchingColor };
+          broadcast({ type: 'uno-challenge-offer', attacker: playerId, victim: victimId });
+          if (victimId.startsWith('bot-')) {
+            setTimeout(() => {
+              broadcast({ type: 'uno-challenge-decision', victim: victimId, challenge: false });
+            }, 1500);
+          }
+        } else {
+          forceDrawCards(victimId, drawCount);
+        }
+      }, 500);
+    }
+  }
+  return false;
+}
+
+// HOST-ONLY. Yığılmış cezayı (Yığılma/Ayna) hedefe uygular ve sırayı ilerletir.
+// Hem uzak bir oyuncunun 'uno-take-pending' isteğinden hem de hostun KENDİSİ
+// cezanın hedefiyken deste tıklamasından çağrılır (host kendi broadcast'ini asla
+// geri almadığı için bu ikinci durum ayrı ele alınmak ZORUNDA — aksi halde host
+// üstünde biriken cezayı hiçbir zaman temizleyemez ve oyun kilitlenir).
+function takePendingDraw(targetId) {
+  if (state.uno.host !== state.myId) return;
+  const count = state.uno.pendingDrawCount;
+  state.uno.pendingDrawCount = 0;
+  broadcast({ type: 'uno-pending-draw', count: 0 });
+  forceDrawCards(targetId, count);
+
+  setTimeout(() => {
+    state.uno.turnIndex = getNextTurn(1);
+    broadcast({ type: 'uno-end-turn-sync', nextTurnIndex: state.uno.turnIndex });
+    renderUnoGame();
+  }, 800);
 }
 
 function checkAndProcessCollectedHands() {
@@ -842,7 +868,8 @@ function startUnoRound() {
   }
   state.uno.discard = [firstCard];
   state.uno.currentColor = firstCard.color;
-  
+  state.uno.pendingDrawCount = 0;
+
   broadcast(startMsg);
   
   document.getElementById('uno-lobby').classList.add('hidden');
@@ -879,6 +906,16 @@ function doRenderUnoGame() {
   }
   
   document.getElementById('uno-dir-indicator').textContent = state.uno.direction === 1 ? '🔃' : '🔄';
+
+  const pendingBadge = document.getElementById('uno-pending-badge');
+  if (pendingBadge) {
+    if (state.uno.pendingDrawCount > 0) {
+      pendingBadge.textContent = `+${state.uno.pendingDrawCount} Kart Bekliyor!`;
+      pendingBadge.classList.remove('hidden');
+    } else {
+      pendingBadge.classList.add('hidden');
+    }
+  }
   
   const topCard = state.uno.discard[state.uno.discard.length - 1];
   
@@ -1017,10 +1054,17 @@ function doRenderUnoGame() {
     if (state.uno.turnOrder[state.uno.turnIndex] === state.myId) {
       hideUnoCatch();
       if (state.uno.pendingDrawCount > 0) {
-          broadcast({ type: 'uno-take-pending' });
+          // Host kendi broadcast'ini asla geri almaz: host'un kendisi ceza hedefiyse
+          // 'uno-take-pending' yayınlayıp cevap beklemek yerine cezayı DOĞRUDAN
+          // uygulamak zorundayız, yoksa host üstündeki ceza hiç temizlenmez ve oyun kilitlenir.
+          if (state.uno.host === state.myId) {
+            takePendingDraw(state.myId);
+          } else {
+            broadcast({ type: 'uno-take-pending' });
+          }
           return;
       }
-      
+
       const deckDiv = document.getElementById('uno-deck');
       deckDiv.style.transform = 'scale(0.9)';
       setTimeout(() => { deckDiv.style.transform = 'scale(1)'; }, 150);
@@ -1195,10 +1239,19 @@ function playCard(index, chosenColor = null, isJumpIn = false) {
     const card = state.uno.myHand.splice(index, 1)[0];
     const p = state.uno.players.get(state.myId);
     if (p) p.cardCount--;
-    
+
+    // +4 "meydan okuma" (bluff-call) mekaniği, kartın üstüne oynandığı ESKİ renge göre
+    // değerlendirilmeli. Bunu currentColor yeni renkle güncellenmeden ÖNCE hesaplıyoruz;
+    // aksi halde oyuncunun az önce KENDİ SEÇTİĞİ renkle elini karşılaştırmış oluyorduk ve
+    // "yasadışı +4" neredeyse hiçbir zaman yakalanamıyordu.
+    let hadMatchingColor = false;
+    if (card.val === '+4') {
+      hadMatchingColor = state.uno.myHand.some(c => c.color === state.uno.currentColor);
+    }
+
     state.uno.discard.push(card);
     state.uno.currentColor = chosenColor || card.color;
-    
+
     if (isJumpIn) {
       state.uno.turnIndex = state.uno.turnOrder.indexOf(state.myId);
     }
@@ -1246,42 +1299,11 @@ function playCard(index, chosenColor = null, isJumpIn = false) {
       document.getElementById('uno-end-turn-btn').classList.add('hidden');
     }
     
-    let hadMatchingColor = false;
-    if (card.val === '+4') {
-        for (let c of state.uno.myHand) {
-            if (c !== card && c.color === state.uno.currentColor) {
-                hadMatchingColor = true;
-                break;
-            }
-        }
-    }
-    
     broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, oldTurnIndex, drawCount, saidUno, isJumpIn, isKombo, hadMatchingColor });
     renderUnoGame();
-    
-    if (state.uno.host === state.myId && drawCount > 0 && !isKombo) {
-      if (state.uno.rules && (state.uno.rules.stacking || state.uno.rules.mirror)) {
-        state.uno.pendingDrawCount = (state.uno.pendingDrawCount || 0) + drawCount;
-        broadcast({ type: 'uno-pending-draw', count: state.uno.pendingDrawCount });
-      } else {
-        setTimeout(() => {
-          const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
-          const victimId = state.uno.turnOrder[victimIndex];
-          if (card.val === '+4') {
-              state.uno.challengePending = { attacker: state.myId, victim: victimId, hadMatchingColor: hadMatchingColor };
-              broadcast({ type: 'uno-challenge-offer', attacker: state.myId, victim: victimId });
-              if (victimId.startsWith('bot-')) {
-                  setTimeout(() => {
-                      broadcast({ type: 'uno-challenge-decision', victim: victimId, challenge: false });
-                  }, 1500);
-              }
-          } else {
-              forceDrawCards(victimId, drawCount);
-          }
-        }, 500);
-      }
-    }
-    
+
+    resolveHostPlayEffects(card, state.myId, { direction: state.uno.direction, oldTurnIndex, drawCount, isKombo, hadMatchingColor });
+
     if (state.uno.myHand.length === 0) {
       if (state.uno.host === state.myId) {
         setTimeout(() => endUnoGame(), 800);
@@ -1318,7 +1340,14 @@ function botPlay(botId) {
     const card = botHand.splice(validIndex, 1)[0];
     const p = state.uno.players.get(botId);
     if (p) p.cardCount--;
-    
+
+    // playCard() ile aynı sebepten: +4 meydan okuma kontrolü ESKİ renkle yapılmalı,
+    // botun az önce seçtiği yeni renkle değil.
+    let hadMatchingColor = false;
+    if (card.val === '+4') {
+      hadMatchingColor = botHand.some(c => c.color === state.uno.currentColor);
+    }
+
     state.uno.discard.push(card);
     let chosenColor = card.color;
     if (chosenColor === 'black') {
@@ -1326,7 +1355,7 @@ function botPlay(botId) {
       chosenColor = colors[Math.floor(Math.random() * colors.length)];
     }
     state.uno.currentColor = chosenColor;
-    
+
     let skip = 1;
     if (card.val === 'Rev') {
       state.uno.direction *= -1;
@@ -1336,36 +1365,51 @@ function botPlay(botId) {
     if (card.val === 'Skip') skip = 2;
     if (card.val === '+2') { skip = 2; drawCount = 2; }
     if (card.val === '+4') { skip = 2; drawCount = 4; }
-    
+
     const oldTurnIndex = state.uno.turnIndex;
     state.uno.turnIndex = getNextTurn(skip);
-    
+
     let saidUno = false;
     if (botHand.length === 1) saidUno = Math.random() > 0.3; // Bot %70 ihtimalle UNO der
     if (saidUno) {
       broadcast({ type: 'uno-said' });
       showFloatingEmoji(botId, "UNO!");
     }
-    
-    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, botId, oldTurnIndex, drawCount, saidUno });
+
+    broadcast({ type: 'uno-play', card, color: chosenColor, direction: state.uno.direction, nextTurnIndex: state.uno.turnIndex, botId, oldTurnIndex, drawCount, saidUno, hadMatchingColor });
     playPopSound();
     animateRemotePlay(botId, card);
     state.uno.triggerDiscardAnim = true;
     setTimeout(() => renderUnoGame(), 300);
-    
-    if (drawCount > 0) {
-      setTimeout(() => {
-        const victimIndex = getNextTurn(1, oldTurnIndex, state.uno.direction);
-        const victimId = state.uno.turnOrder[victimIndex];
-        forceDrawCards(victimId, drawCount);
-      }, 500);
+
+    // Bot 1 karta düştüğünde de diğer oyunculardaki "yakalama" penceresiyle aynı
+    // mekanik uygulanmalı — önceden bu sadece UZAK bir oyuncu bunu gözlemlediğinde
+    // (handleUnoMessage üzerinden) çalışıyordu; host botu izlerken hiç çalışmıyordu.
+    if (p && p.cardCount === 1 && !saidUno) {
+      if (state.uno.catchTimeout) clearTimeout(state.uno.catchTimeout);
+      state.uno.pendingCatchTarget = botId;
+      state.uno.catchTimeout = setTimeout(() => {
+        if (state.uno.players.get(botId)?.cardCount === 1) {
+          state.uno.catchTarget = botId;
+          document.getElementById('uno-catch-btn').classList.remove('hidden');
+        }
+      }, 1000);
     }
-    
+
+    resolveHostPlayEffects(card, botId, { direction: state.uno.direction, oldTurnIndex, drawCount, isKombo: false, hadMatchingColor });
+
     if (botHand.length === 0) {
       setTimeout(() => endUnoGame(), 800);
       return;
     }
   } else {
+    // Üstünde biriken bir Yığılma/Ayna cezası varsa bot bunu STANDART 1 kartlık
+    // çekişle değil, cezanın tamamıyla karşılamalı — aksi halde pendingDrawCount
+    // hiç sıfırlanmadan kalıyor ve Yığılma kuralı o maçın geri kalanında bozuluyordu.
+    if (state.uno.pendingDrawCount > 0) {
+      takePendingDraw(botId);
+      return;
+    }
     if (state.uno.deck.length === 0 && state.uno.discard.length > 1) {
        const topDiscard = state.uno.discard.pop();
        state.uno.deck = state.uno.discard.sort(() => Math.random() - 0.5);
