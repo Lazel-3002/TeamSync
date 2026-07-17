@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   windowMax: () => ipcRenderer.send('window-max'),
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
   windowClose: () => ipcRenderer.send('window-close'),
+  onWindowVisibility: (cb) => ipcRenderer.on('window-visibility', (e, visible) => cb(visible)),
   appQuitForce: () => ipcRenderer.send('app-quit-force')
 });
 

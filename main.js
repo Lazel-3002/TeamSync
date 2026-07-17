@@ -265,6 +265,16 @@ function createWindow() {
     }
   });
 
+  // Pencere tray'e gizlenince renderer haber alsın: Ortak Tarayıcı'daki video
+  // sesi pencere kapalıyken de çalmaya devam ediyordu — renderer bu sinyalle
+  // webview sesini susturur (sesli sohbete dokunulmaz), pencere dönünce açar.
+  mainWindow.on('hide', () => {
+    try { mainWindow.webContents.send('window-visibility', false); } catch (e) {}
+  });
+  mainWindow.on('show', () => {
+    try { mainWindow.webContents.send('window-visibility', true); } catch (e) {}
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

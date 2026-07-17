@@ -22,6 +22,153 @@ function sbApplyRemoteNav(url) {
   document.getElementById('sb-webview').src = url;
 }
 
+// ---- Yetkilendirme (kurucu + yetkili kullanıcılar) ----
+// Kurucu (host) her zaman tam yetkilidir ve "Yetkilendir" butonuyla diğer
+// katılımcılara etkileşim yetkisi verebilir. Yetkisi olmayanlar sayfayı
+// sadece izler: tıklayamaz, yazamaz, gezinemez — ama kartı büyütüp
+// küçültebilir ve kendi tarafında kapatabilir.
+function sbIsHost() {
+  return !!state.sb.host && state.sb.host === state.myId;
+}
+
+function sbCanInteract() {
+  // Oturum yokken (host bilinmiyor) kısıtlama uygulanmaz; kurucu hep serbest
+  if (!state.sb.host || sbIsHost()) return true;
+  return (state.sb.authorized || []).includes(state.myId);
+}
+
+function sbPeerCanInteract(peerId) {
+  if (!state.sb.host) return true; // host henüz öğrenilmediyse eski davranış
+  if (peerId === state.sb.host) return true;
+  return (state.sb.authorized || []).includes(peerId);
+}
+
+// Yetki durumuna göre üst çubuğu ve webview kilidini günceller.
+// Büyüt (sb-focus) ve Kapat (sb-close) bilerek HİÇ kilitlenmez:
+// herkes videoyu büyütüp küçültebilmeli ve kendi kartını kapatabilmeli.
+function sbUpdateControlsUI() {
+  const isHost = sbIsHost();
+  const can = sbCanInteract();
+
+  const wrap = document.getElementById('sb-auth-wrap');
+  if (wrap) wrap.style.display = isHost ? 'block' : 'none';
+  if (!isHost) {
+    const panel = document.getElementById('sb-auth-panel');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  ['sb-back', 'sb-forward', 'sb-refresh', 'sb-go'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = !can;
+      btn.style.opacity = can ? '' : '0.35';
+    }
+  });
+  const sbUrl = document.getElementById('sb-url');
+  if (sbUrl) sbUrl.disabled = !can;
+
+  const guard = document.getElementById('sb-guard');
+  if (guard) guard.classList.toggle('hidden', can);
+}
+
+function sbBroadcastAuth() {
+  state.sb.authTs = Date.now();
+  broadcast({ type: 'sb-auth', list: (state.sb.authorized || []).slice(), ts: state.sb.authTs });
+}
+
+function sbRenderAuthPanel() {
+  const panel = document.getElementById('sb-auth-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = 'Yetkilendirme';
+  title.style.cssText = 'font-size:12px; font-weight:bold; color:#a1a1aa; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;';
+  panel.appendChild(title);
+
+  if (state.peers.size === 0) {
+    const empty = document.createElement('div');
+    empty.textContent = 'Odada başka kimse yok';
+    empty.style.cssText = 'font-size:13px; color:#71717a; padding:6px 0;';
+    panel.appendChild(empty);
+    return;
+  }
+
+  state.peers.forEach((peer, id) => {
+    const isAuth = (state.sb.authorized || []).includes(id);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);';
+
+    const name = document.createElement('span');
+    name.textContent = peer.name || 'Bilinmeyen';
+    name.style.cssText = 'font-size:13px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+
+    const btn = document.createElement('button');
+    btn.textContent = isAuth ? '✓ Yetkili' : 'Yetki Ver';
+    btn.style.cssText = 'flex-shrink:0; font-size:12px; padding:4px 10px; border-radius:12px; border:none; cursor:pointer; color:#fff; background:' + (isAuth ? '#22c55e' : 'rgba(255,255,255,0.12)') + ';';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!sbIsHost()) return;
+      if (!Array.isArray(state.sb.authorized)) state.sb.authorized = [];
+      if (isAuth) {
+        state.sb.authorized = state.sb.authorized.filter(x => x !== id);
+        showToast('🔒 ' + (peer.name || '') + ' yetkisi alındı', 'warn');
+      } else {
+        state.sb.authorized.push(id);
+        showToast('🔓 ' + (peer.name || '') + ' yetkilendirildi', 'info');
+      }
+      sbBroadcastAuth();
+      sbRenderAuthPanel();
+    });
+
+    row.appendChild(name);
+    row.appendChild(btn);
+    panel.appendChild(row);
+  });
+}
+
+// Kurucu ayrıldığında oturum HERKES için kapanmaz: yetkililer arasından
+// deterministik-rastgele biri yeni kurucu seçilir (tohum = ayrılanın id'si,
+// böylece tüm istemciler AYNI kişiyi seçer). Hiç yetkili kalmadıysa odadaki
+// herkes aday olur ki kimse atılmasın. Yeni kurucu hemen sb-state yayınlar;
+// olası bir görüş ayrılığı da mevcut çift-host çözümüyle kendini onarır.
+function sbHandleHostLeft(departedId) {
+  if (state.sb.host !== departedId) return;
+  state.sb.authorized = (state.sb.authorized || []).filter(id => id !== departedId);
+
+  const connected = (id) => id === state.myId || state.peers.has(id);
+  let candidates = state.sb.authorized.filter(connected);
+  if (!candidates.length) {
+    candidates = [state.myId, ...state.peers.keys()].filter(connected);
+  }
+  if (!candidates.length) {
+    state.sb.host = null;
+    sbUpdateControlsUI();
+    return;
+  }
+
+  candidates.sort();
+  let h = 0;
+  const seed = String(departedId);
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const successor = candidates[h % candidates.length];
+
+  state.sb.host = successor;
+  if (!state.sb.startedAt) state.sb.startedAt = Date.now();
+
+  if (successor === state.myId) {
+    const card = document.getElementById('sb-card');
+    if (card && !card.classList.contains('hidden') && state.sb.joinedActivity) {
+      showToast('👑 Kurucu ayrıldı — Ortak Tarayıcı\'nın yeni kurucusu sensin', 'info');
+      broadcast({ type: 'sb-state', host: state.myId, startedAt: state.sb.startedAt, url: sbCurrentUrl(), auth: (state.sb.authorized || []).slice() });
+    }
+  } else if (state.sb.joinedActivity) {
+    const p = state.peers.get(successor);
+    showToast('👑 Kurucu ayrıldı — yeni kurucu: ' + (p && p.name ? p.name : 'seçildi'), 'info');
+  }
+  sbUpdateControlsUI();
+}
+
 function initSharedBrowser() {
   document.getElementById('act-sb').addEventListener('click', () => {
     document.getElementById('activities-modal').classList.add('hidden');
@@ -38,6 +185,7 @@ function initSharedBrowser() {
       makeCardFocusable(sbCard);
       if (!focusedCard) toggleFocus(sbCard);
       if (state.sb.lastUrl) sbApplyRemoteNav(state.sb.lastUrl);
+      sbUpdateControlsUI();
       return;
     }
 
@@ -50,7 +198,10 @@ function initSharedBrowser() {
     // İzleyici (spectate) modu kaldırıldı: katılan herkes tıklayıp gezinebilir.
     state.sb.host = state.myId;
     state.sb.startedAt = Date.now();
-    document.getElementById('sb-url').disabled = false;
+    // Yeni oturum: yetki listesi sıfırdan başlar, sadece kurucu tam yetkili
+    state.sb.authorized = [];
+    state.sb.authTs = Date.now();
+    sbUpdateControlsUI();
     // webview'in HTML'de statik bir src'si YOK (bkz. sbWebview.src atamasının
     // hemen altındaki not): kartı ilk kez açan host için varsayılan sayfayı
     // burada, kontrollü bir şekilde biz yüklüyoruz. Statik src eskiden
@@ -65,8 +216,53 @@ function initSharedBrowser() {
     if (!sbCurrentUrl() || sbCurrentUrl() === 'about:blank') {
       document.getElementById('sb-webview').src = 'https://duckduckgo.com/';
     }
-    broadcast({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: sbCurrentUrl() });
+    broadcast({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: sbCurrentUrl(), auth: [] });
   });
+
+  // Yetkilendir paneli: sadece kurucuda görünür (sbUpdateControlsUI gizler/gösterir)
+  const sbAuthBtn = document.getElementById('sb-auth-btn');
+  if (sbAuthBtn) {
+    sbAuthBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!sbIsHost()) return;
+      const panel = document.getElementById('sb-auth-panel');
+      if (!panel) return;
+      if (panel.classList.contains('hidden')) {
+        sbRenderAuthPanel();
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    });
+    // Panel dışına tıklanınca paneli kapat
+    document.addEventListener('click', (e) => {
+      const panel = document.getElementById('sb-auth-panel');
+      if (panel && !panel.classList.contains('hidden') && !e.target.closest('#sb-auth-wrap')) {
+        panel.classList.add('hidden');
+      }
+    });
+  }
+
+  // Yetkisiz kullanıcı için webview üstündeki tıklama kilidi: sayfaya
+  // tıklamayı/yazmayı engeller ama kart büyütme/kapatma butonlarına dokunmaz
+  const sbGuard = document.getElementById('sb-guard');
+  if (sbGuard) {
+    sbGuard.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showToast('🔒 Etkileşim için kurucudan yetki almalısın', 'warn');
+    });
+  }
+
+  // Pencere tray'e gizlenince Ortak Tarayıcı sesini sustur, geri gelince aç.
+  // (Sesli sohbet bilerek susturulmaz; sadece webview'deki video sesi.)
+  if (window.electronAPI && window.electronAPI.onWindowVisibility) {
+    window.electronAPI.onWindowVisibility((visible) => {
+      const wv = document.getElementById('sb-webview');
+      if (wv && typeof wv.setAudioMuted === 'function') {
+        try { wv.setAudioMuted(!visible); } catch (e) {}
+      }
+    });
+  }
 
   const sbWebview = document.getElementById('sb-webview');
   const sbUrl = document.getElementById('sb-url');
@@ -96,6 +292,7 @@ function initSharedBrowser() {
 
   document.getElementById('sb-go').addEventListener('click', (e) => {
     e.stopPropagation();
+    if (!sbCanInteract()) { showToast('🔒 Gezinmek için kurucudan yetki almalısın', 'warn'); return; }
     let url = sbUrl.value.trim();
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) {
@@ -360,6 +557,9 @@ function initSharedBrowser() {
       if (Date.now() - (state.sb.remoteNavTs || 0) < 2500) return;
     }
     if (!state.sb.joinedActivity || !state.sb.host) return;
+    // Yetkisiz kullanıcının (guard'ı aşan bir yönlendirme vb.) gezinmesi
+    // asla yayınlanmaz — oturumu sadece kurucu ve yetkililer yönlendirebilir
+    if (!sbCanInteract()) return;
     state.sb.lastUrl = e.url;
     // ts damgası: iki kişi neredeyse aynı anda farklı adreslere gezinirse
     // (host A'ya, misafir B'ye), damgasız sistemde herkes "en son işlediği"
@@ -475,7 +675,12 @@ function initSharedBrowser() {
           // remoteNavTs bastırma penceresiyle aynı fikir.
           const echoingRemote = (Date.now() - (state.sb.remoteVideoSyncTs || 0)) < 1500;
 
-          if (!echoingRemote && (!state.sb.lastVideoState ||
+          // Yetkisiz kullanıcının video durumu yayınlanmaz (izleyici kalır);
+          // lastVideoState yine güncellenir ki sonradan yetki alırsa eski
+          // durumu "yeni eylem" sanıp ani bir senkron patlaması yapmasın.
+          if (!sbCanInteract()) {
+            state.sb.lastVideoState = vState;
+          } else if (!echoingRemote && (!state.sb.lastVideoState ||
               state.sb.lastVideoState.paused !== vState.paused ||
               Math.abs(state.sb.lastVideoState.currentTime - vState.currentTime) > 2)) {
 
@@ -501,7 +706,9 @@ function initSharedBrowser() {
     const card = document.getElementById('sb-card');
     if (!card || card.classList.contains('hidden')) return;
     if (state.sb.host !== state.myId) return;
-    broadcast({ type: 'sb-state', host: state.myId, startedAt: state.sb.startedAt, url: sbCurrentUrl() });
+    // auth listesi beacon'la taşınır: sb-auth mesajını kaçıranlar ve geç
+    // katılanlar yetki durumunu en geç 5 sn'de buradan öğrenir
+    broadcast({ type: 'sb-state', host: state.myId, startedAt: state.sb.startedAt, url: sbCurrentUrl(), auth: (state.sb.authorized || []).slice() });
   }, 5000);
 
   // Advanced Visual AI (Thumbnail Scanner)
@@ -555,6 +762,7 @@ function initSharedBrowser() {
 }
 
 function handleSBMessage(peerId, msg) {
+  const couldInteractBefore = sbCanInteract();
   if (msg.type === 'sb-start' || msg.type === 'sb-state') {
     if (msg.host === state.myId) return;
 
@@ -566,12 +774,25 @@ function handleSBMessage(peerId, msg) {
       if (!theirStart || (state.sb.startedAt || 0) <= theirStart) return; // ben kazandım
       state.sb.host = msg.host;
       state.sb.startedAt = 0;
+      if (Array.isArray(msg.auth)) state.sb.authorized = msg.auth.filter(x => typeof x === 'string');
       if (msg.url) { state.sb.lastUrl = msg.url; sbApplyRemoteNav(msg.url); }
+      sbUpdateControlsUI();
       return;
     }
 
     state.sb.host = msg.host;
+    // startedAt saklanır: kurucu ayrılırsa halef, oturumun orijinal başlangıç
+    // damgasını devralır (çift-host çözümünde "en erken başlayan kazanır")
+    if (msg.startedAt) state.sb.startedAt = Number(msg.startedAt) || 0;
+    if (Array.isArray(msg.auth)) state.sb.authorized = msg.auth.filter(x => typeof x === 'string');
     if (msg.url && !state.sb.joinedActivity) state.sb.lastUrl = msg.url;
+
+    // Yetki durumum değiştiyse haber ver (sb-auth kaybolsa bile beacon getirir)
+    const canNow = sbCanInteract();
+    if (state.sb.joinedActivity && canNow !== couldInteractBefore) {
+      showToast(canNow ? '🔓 Ortak Tarayıcı\'da yetkilendirildin' : '🔒 Ortak Tarayıcı yetkin alındı', canNow ? 'info' : 'warn');
+    }
+    sbUpdateControlsUI();
 
     // Beacon kartı zorla açmaz: kullanıcı kartı kapattıysa rahatsız etmeyiz,
     // ama host/adres bilgisi güncel kalır — Aktiviteler'den her an katılabilir.
@@ -588,12 +809,24 @@ function handleSBMessage(peerId, msg) {
          removeInactiveOverlay('sb-card');
          if (!focusedCard) toggleFocus(sbCard);
          if (state.sb.lastUrl) sbApplyRemoteNav(state.sb.lastUrl);
+         sbUpdateControlsUI();
       });
     }
-
-    // İzleyici modu kaldırıldı: herkes etkileşimli, adres çubuğu hep açık.
-    document.getElementById('sb-url').disabled = false;
+  } else if (msg.type === 'sb-auth') {
+    // Yetki listesini SADECE mevcut kurucu değiştirebilir
+    if (peerId !== state.sb.host) return;
+    const ts = Number(msg.ts) || 0;
+    if (ts && state.sb.authTs && ts < state.sb.authTs) return; // eski liste, yok say
+    state.sb.authTs = ts || Date.now();
+    if (Array.isArray(msg.list)) state.sb.authorized = msg.list.filter(x => typeof x === 'string');
+    const canNow = sbCanInteract();
+    if (state.sb.joinedActivity && canNow !== couldInteractBefore) {
+      showToast(canNow ? '🔓 Ortak Tarayıcı\'da yetkilendirildin — artık tıklayıp yazabilirsin' : '🔒 Ortak Tarayıcı yetkin alındı', canNow ? 'info' : 'warn');
+    }
+    sbUpdateControlsUI();
   } else if (msg.type === 'sb-nav') {
+    // Sadece kurucu ve yetkililerin gezinmesi uygulanır
+    if (!sbPeerCanInteract(peerId)) return;
     // Eş-zamanlı gezinme yarışı: iki kişi aynı anda farklı adreslere giderse
     // (host A'ya, misafir B'ye) damgasız eski kod her ikisinin de karşısının
     // adresine geçmesine izin verip kalıcı ters-senkrona yol açabiliyordu.
@@ -613,6 +846,7 @@ function handleSBMessage(peerId, msg) {
     // gerçekten en son olduğuna karar verir (sb-nav'daki desenle aynı),
     // böylece iki kişi neredeyse aynı anda oynat/duraklat yaparsa kalıcı
     // bir çelişki değil, tek bir tutarlı sonuç oluşur.
+    if (!sbPeerCanInteract(peerId)) return; // yetkisizin video eylemi uygulanmaz
     if (state.sb.joinedActivity) {
       const currentTime = Number(msg.currentTime);
       const ts = Number(msg.ts) || 0;
@@ -649,8 +883,9 @@ function handleSBMessage(peerId, msg) {
       }
     }
   } else if (msg.type === 'sb-close') {
-    // Sadece host'un kapatması oturumu bitirir; misafirin kapatması
-    // (artık yayınlanmıyor ama eski istemciler için) yok sayılır
-    if (peerId === state.sb.host) closeAllCards(true);
+    // Kurucunun çıkışı artık oturumu HERKES için bitirmez: kalanlar arasından
+    // yeni bir kurucu seçilir ve tarayıcı açık kalır. Misafirin kapatması
+    // (artık yayınlanmıyor ama eski istemciler için) yok sayılır.
+    if (peerId === state.sb.host) sbHandleHostLeft(peerId);
   }
 }

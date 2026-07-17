@@ -1,8 +1,12 @@
 // Ortak Tarayıcı regresyon testi: iki gerçek kullanıcı aynı odada.
 //  - Ev sahibi tarayıcıyı açar (onay modalı yok), misafir katıl butonuyla gelir
-//  - Gezinme misafire senkronize olur, misafir de gezinebilir (spectate yok)
+//  - Yetki modeli: misafir varsayılan olarak İZLEYİCİDİR (gezinemez/yazamaz);
+//    kurucu Yetkilendir ile yetki verince tam etkileşimli olur
+//  - Gezinme misafire senkronize olur, yetkili misafir de gezinebilir
 //  - Yankı fırtınası yok: senkron sonrası hiçbir taraf kendiliğinden yeniden
 //    yüklenmez (eskiden did-navigate yankısı sonsuz reload ping-pongu yapardı)
+//  - Kurucu çıkınca oturum herkes için KAPANMAZ: yetkililerden biri yeni
+//    kurucu seçilir ve Yetkilendir butonuna erişir
 const assert = require('assert');
 const http = require('http');
 const { spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected, evalJS, waitFor } = require('./lib/harness');
@@ -111,6 +115,21 @@ module.exports = async function run() {
     await evalJS(b.client, `document.querySelector('#sb-card .inactive-overlay button').click(); 1`);
     await waitFor(b.client, `state.sb.joinedActivity ? 'yes' : null`, 5000, 'guest joined');
 
+    // Yetki modeli: misafir varsayılan olarak SADECE izleyici. Adres çubuğu
+    // kilitli, webview üstünde tıklama kalkanı (sb-guard) var ve Yetkilendir
+    // butonu yalnızca kurucuda görünür.
+    assert.strictEqual(await evalJS(b.client, `document.getElementById('sb-url').disabled`), true,
+      'yetkisiz misafirin adres çubuğu kilitli değil');
+    assert.strictEqual(await evalJS(b.client, `document.getElementById('sb-guard').classList.contains('hidden')`), false,
+      'yetkisiz misafirde webview tıklama kalkanı (sb-guard) görünmüyor');
+    assert.strictEqual(await evalJS(b.client, `document.getElementById('sb-auth-wrap').style.display`), 'none',
+      'Yetkilendir butonu misafirde de görünüyor (sadece kurucuda olmalı)');
+    assert.notStrictEqual(await evalJS(a.client, `document.getElementById('sb-auth-wrap').style.display`), 'none',
+      'Yetkilendir butonu kurucuda görünmüyor');
+    // Herkes kartı büyütüp küçültebilmeli: Büyüt butonu yetkisizken de serbest
+    assert.strictEqual(await evalJS(b.client, `document.getElementById('sb-focus').disabled`), false,
+      'yetkisiz misafirin Büyüt butonu kilitlenmiş (herkes büyütebilmeli)');
+
     // Ev sahibi gezinir -> misafir takip etmeli
     await navigateVia(a, 'http://127.0.0.1:9877/host-page');
     await waitFor(b.client, webviewUrlExpr('/host-page'), 20000, 'guest followed host nav');
@@ -126,7 +145,30 @@ module.exports = async function run() {
     assert.strictEqual(navsA, 0, `ev sahibi kendiliğinden yenileniyor (8sn'de ${navsA} gezinme)`);
     assert.strictEqual(navsB, 0, `misafir kendiliğinden yenileniyor (8sn'de ${navsB} gezinme)`);
 
-    // Misafir de gezinebilmeli (spectate kaldırıldı) -> ev sahibi takip eder
+    // Yetkisiz misafirin gezinme denemesi hiçbir yere gitmemeli
+    await evalJS(b.client, `(() => {
+      document.getElementById('sb-url').value = 'http://127.0.0.1:9877/unauthorized-nav';
+      document.getElementById('sb-go').click(); // disabled — handler zaten sbCanInteract ile de korunuyor
+      return 1;
+    })()`);
+    await new Promise(r => setTimeout(r, 2500));
+    assert.strictEqual(
+      await evalJS(a.client, `(() => { try { return document.getElementById('sb-webview').getURL().includes('/unauthorized-nav'); } catch (e) { return false; } })()`),
+      false, 'yetkisiz misafirin gezinmesi host\'a uygulandı');
+
+    // Kurucu misafiri yetkilendirir -> misafir artık tam etkileşimli
+    const guestId = await evalJS(b.client, `state.myId`);
+    await evalJS(a.client, `(() => {
+      state.sb.authorized.push(${JSON.stringify(guestId)});
+      sbBroadcastAuth();
+      return 1;
+    })()`);
+    await waitFor(b.client, `state.sb.authorized.includes(state.myId) ? 'yes' : null`, 10000, 'misafir yetkilendirilemedi');
+    await waitFor(b.client, `!document.getElementById('sb-url').disabled ? 'yes' : null`, 5000, 'yetki sonrası adres çubuğu açılmadı');
+    assert.strictEqual(await evalJS(b.client, `document.getElementById('sb-guard').classList.contains('hidden')`), true,
+      'yetki sonrası webview tıklama kalkanı kalkmadı');
+
+    // Yetkili misafir gezinebilmeli -> ev sahibi takip eder
     await navigateVia(b, 'http://127.0.0.1:9877/guest-page');
     await waitFor(a.client, webviewUrlExpr('/guest-page'), 20000, 'host followed guest nav');
 
@@ -254,6 +296,19 @@ module.exports = async function run() {
     const raceGuestUrl = await evalJS(b.client, `(() => { try { return document.getElementById('sb-webview').getURL(); } catch (e) { return null; } })()`);
     assert.strictEqual(raceHostUrl, raceGuestUrl,
       `eş-zamanlı gezinme yarışı sonrası taraflar farklı sayfalarda kaldı (split-brain): host=${raceHostUrl} misafir=${raceGuestUrl}`);
+
+    // Kurucu çıkınca oturum HERKES için kapanmamalı: yetkili misafir yeni
+    // kurucu seçilir, kartı açık kalır ve Yetkilendir butonuna erişir.
+    await evalJS(a.client, `document.getElementById('sb-close').click(); 1`);
+    await waitFor(b.client, `state.sb.host === state.myId ? 'yes' : null`, 10000,
+      'kurucu çıkınca yetkili misafir yeni kurucu olmadı');
+    assert.strictEqual(
+      await evalJS(b.client, `document.getElementById('sb-card').classList.contains('hidden')`),
+      false, 'kurucu çıkınca misafirin kartı da kapandı (herkes atılıyor regresyonu)');
+    await waitFor(b.client, `document.getElementById('sb-auth-wrap').style.display !== 'none' ? 'yes' : null`, 5000,
+      'yeni kurucu Yetkilendir butonunu göremiyor');
+    assert.strictEqual(await evalJS(b.client, `document.getElementById('sb-url').disabled`), false,
+      'yeni kurucunun adres çubuğu kilitli kaldı');
   } finally {
     cleanupPeer(a);
     cleanupPeer(b);

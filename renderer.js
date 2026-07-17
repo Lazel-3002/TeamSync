@@ -2119,6 +2119,15 @@ function removePeer(peerId) {
     syncLobbiesList();
   }
 
+  // Ortak Tarayıcı: bağlantısı kopan kurucuysa halef seç (kimseyi atmadan),
+  // değilse sadece yetki listesinden düş
+  if (state.sb && state.sb.host === peerId) {
+    if (typeof sbHandleHostLeft === 'function') sbHandleHostLeft(peerId);
+  } else if (state.sb && Array.isArray(state.sb.authorized) && state.sb.authorized.includes(peerId)) {
+    state.sb.authorized = state.sb.authorized.filter(id => id !== peerId);
+    if (state.sb.host === state.myId && typeof sbBroadcastAuth === 'function') sbBroadcastAuth();
+  }
+
   // Activity-specific cleanup on peer disconnect
   if (state.uno.players.has(peerId)) {
     state.uno.players.delete(peerId);
@@ -2416,7 +2425,7 @@ function setupDataChannel(peerId, dc) {
             }
           } else if (activeAct === 'sb' && state.sb.host === state.myId) {
             const currentUrl = document.getElementById('sb-url')?.value || '';
-            dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl }));
+            dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl, auth: (state.sb.authorized || []).slice() }));
             if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl, ts: Date.now() }));
           } else if (activeAct === 'uno' && state.uno.host === state.myId) {
             if (!state.uno.started) {
@@ -2587,6 +2596,7 @@ async function handleDataMessage(peerId, msg) {
           state.uno.host = activeLob.hostId;
         } else if (activeLob.activity === 'sb') {
           state.sb.host = activeLob.hostId;
+          if (typeof sbUpdateControlsUI === 'function') sbUpdateControlsUI();
         }
       }
     }
@@ -2641,7 +2651,7 @@ async function handleDataMessage(peerId, msg) {
           }
         } else if (lob.activity === 'sb') {
           const currentUrl = document.getElementById('sb-url')?.value || '';
-          broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl });
+          broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl, auth: (state.sb.authorized || []).slice() });
           if (currentUrl) {
             broadcastTo(msg.peerId, { type: 'sb-nav', url: currentUrl, ts: Date.now() });
           }
@@ -4241,6 +4251,29 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
+// Ortak Tarayıcı durumunu ve webview'i tamamen sıfırlar. Hem kart kapanışında
+// (closeAllCards) hem odadan çıkışta (disconnectApp) çağrılır: webview src'si
+// sıfırlanmazsa kart gizli kalsa bile içindeki video sesi çalmaya devam ediyor.
+function resetSharedBrowserState() {
+  if (!state.sb) return;
+  state.sb.joinedActivity = false;
+  state.sb.host = null;
+  state.sb.startedAt = 0;
+  state.sb.lastUrl = '';
+  state.sb.lastNavTs = 0;
+  state.sb.lastVideoSyncTs = 0;
+  state.sb.remoteVideoSyncTs = 0;
+  state.sb.lastVideoState = null;
+  state.sb.authorized = [];
+  state.sb.authTs = 0;
+  // Reset gezinmesi yayınlanmasın diye "uzaktan uygulanmış" say
+  state.sb.appliedRemoteUrl = 'https://duckduckgo.com';
+  state.sb.remoteNavTs = Date.now();
+  const sbWebview = document.getElementById('sb-webview');
+  if (sbWebview) sbWebview.src = 'https://duckduckgo.com'; // Her zaman duckduckgo kalacak
+  if (typeof sbUpdateControlsUI === 'function') sbUpdateControlsUI();
+}
+
 function closeAllCards(leaveLobby = false, except = null) {
   if (leaveLobby) {
     leaveActiveLobby();
@@ -4286,19 +4319,7 @@ function closeAllCards(leaveLobby = false, except = null) {
     state.wt.joinedActivity = false;
   }
   if (state.sb && except !== 'sb-card') {
-    state.sb.joinedActivity = false;
-    state.sb.host = null;
-    state.sb.startedAt = 0;
-    state.sb.lastUrl = '';
-    state.sb.lastNavTs = 0;
-    state.sb.lastVideoSyncTs = 0;
-    state.sb.remoteVideoSyncTs = 0;
-    state.sb.lastVideoState = null;
-    // Reset gezinmesi yayınlanmasın diye "uzaktan uygulanmış" say
-    state.sb.appliedRemoteUrl = 'https://duckduckgo.com';
-    state.sb.remoteNavTs = Date.now();
-    const sbWebview = document.getElementById('sb-webview');
-    if (sbWebview) sbWebview.src = 'https://duckduckgo.com'; // Her zaman duckduckgo kalacak
+    resetSharedBrowserState();
   }
   if (state.uno && except !== 'uno-card') {
     state.uno.joinedActivity = false;
@@ -4356,6 +4377,10 @@ function limitVideoBitrate(sender) {
 }
 
 function disconnectApp() {
+  // Odadan çıkarken Ortak Tarayıcı'yı sıfırla — kart aşağıda sadece
+  // GİZLENİYOR; webview boşaltılmazsa izlenen videonun sesi odadan
+  // çıktıktan sonra da arka planda çalmaya devam ediyordu.
+  resetSharedBrowserState();
   if (window.electronAPI && window.electronAPI.stopCloudflared) window.electronAPI.stopCloudflared();
   if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
   const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'none';
@@ -5091,8 +5116,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (act === 'sb') {
       state.sb.host = state.myId;
       state.sb.joinedActivity = true;
+      state.sb.authorized = [];
+      state.sb.authTs = Date.now();
+      if (typeof sbUpdateControlsUI === 'function') sbUpdateControlsUI();
     }
-    
+
     updateActivityCounts();
     syncLobbiesList();
     
@@ -5229,6 +5257,7 @@ window.joinLobby = function(lobbyId, spectate = false) {
   } else if (lob.activity === 'sb') {
     state.sb.host = lob.hostId;
     state.sb.joinedActivity = true;
+    if (typeof sbUpdateControlsUI === 'function') sbUpdateControlsUI();
     // Host'un video senkron döngüsü yalnızca oynatma durumu değiştiğinde yayın
     // yapar; lobi üzerinden katılan bir misafir de aynı "geç katılan hiç
     // senkronlanamıyor" sorununu yaşamasın diye host'a haber ver.
