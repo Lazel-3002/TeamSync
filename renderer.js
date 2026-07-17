@@ -1061,17 +1061,24 @@ async function dohResolve(host) {
     { url: `https://1.1.1.1/dns-query?name=${encodeURIComponent(host)}&type=A`, headers: { accept: 'application/dns-json' } },
     { url: `https://8.8.8.8/resolve?name=${encodeURIComponent(host)}&type=A`, headers: {} }
   ];
-  for (const ep of endpoints) {
-    try {
-      const res = await fetch(ep.url, { headers: ep.headers, signal: AbortSignal.timeout(4000) });
-      const data = await res.json();
-      const ips = (data.Answer || [])
-        .filter(a => a && a.type === 1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(a.data))
-        .map(a => a.data);
-      if (ips.length) return ips;
-    } catch (e) {}
+  // Metered gibi servislerin DNS'i her sorguda TEK (ve her seferinde farklı)
+  // relay düğümü dönebiliyor; düğümlerin sağlığı da birbirinden bağımsız.
+  // Tek IP'ye mahkûm kalmamak için iki uçtan da sorup benzersiz IP'leri
+  // biriktiriyoruz — bozuk bir düğüme denk gelirsek diğerleri kurtarır.
+  const ips = new Set();
+  for (let round = 0; round < 2 && ips.size < 2; round++) {
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep.url, { headers: ep.headers, signal: AbortSignal.timeout(4000) });
+        const data = await res.json();
+        (data.Answer || [])
+          .filter(a => a && a.type === 1 && /^\d{1,3}(\.\d{1,3}){3}$/.test(a.data))
+          .forEach(a => ips.add(a.data));
+      } catch (e) {}
+      if (ips.size >= 4) break;
+    }
   }
-  return [];
+  return [...ips];
 }
 
 // Yapılandırılmış tüm TURN ana bilgisayar adlarını DoH ile çözüp önbelleğe
@@ -1094,9 +1101,14 @@ async function resolveTurnHostsViaDoH() {
   for (const host of hosts) {
     const ips = await dohResolve(host);
     if (ips.length) {
-      cache[host] = { ips: ips.slice(0, 3), ts: Date.now() };
+      // Eski önbellekteki IP'lerle birleştir (yeniler önde): düğüm sağlığı
+      // zamanla değişiyor, bilinen alternatif düğümleri elde tutmak tek
+      // bozuk düğüme kilitlenmeyi önler.
+      const prev = (cache[host] && Array.isArray(cache[host].ips)) ? cache[host].ips : [];
+      const merged = [...new Set([...ips, ...prev])].slice(0, 4);
+      cache[host] = { ips: merged, ts: Date.now() };
       changed = true;
-      console.log(`🧭 TURN DoH çözümü: ${host} → ${ips.slice(0, 3).join(', ')}`);
+      console.log(`🧭 TURN DoH çözümü: ${host} → ${merged.join(', ')}`);
     }
   }
   if (changed) localStorage.setItem('teamsync_turn_ip_cache', JSON.stringify(cache));
@@ -2052,6 +2064,12 @@ async function setupDeviceList() {
         showToast('Ses çıkış cihazı değiştirildi', 'info');
       };
       applySpeakerToAll();
+      // Cihaz takılıp çıkarıldığında sink'leri yeniden uygula: kulaklık
+      // çekilince element sessizce ölü bir çıkışta kalabiliyor
+      if (!state.deviceChangeHooked) {
+        state.deviceChangeHooked = true;
+        navigator.mediaDevices.addEventListener('devicechange', () => applySpeakerToAll());
+      }
     }
   } catch (e) {}
 }
@@ -2549,6 +2567,10 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     const st = pc.iceConnectionState;
     if (st === 'connected' || st === 'completed') {
       p.checkingSince = null;
+      // 30 sn'de bir ses yolu fotoğrafı: teşhis logu + oynatma kendini onarır
+      // (ör. ses verisi geldiği halde oynatıcı durmuşsa play ile diriltilir)
+      p.voiceReportTick = (p.voiceReportTick || 0) + 1;
+      if (p.voiceReportTick % 3 === 0) logVoicePathReport(peerId, 'periyodik');
       // "Bağlı görünüyor ama ses akmıyor" bekçisi: WARP/VPN tünellerinde ICE
       // başarılı sayılan ama medyayı taşımayan yollar seçilebiliyor. Karşı
       // taraf mikrofonunu kapatsa bile WebRTC sessizlik paketleri gönderir
