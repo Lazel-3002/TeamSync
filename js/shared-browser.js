@@ -439,9 +439,25 @@ function initSharedBrowser() {
       })()`);
     } catch (e) {}
 
-    // 2. Video Playback Synchronization (Host broadcasts state)
-    if (state.sb.host === state.myId) {
-      try {
+    // 2. Video Playback Synchronization — HERKES yayınlar, sadece host değil.
+    // Önceden sadece host'un video durumu yayınlanıyordu; bir MİSAFİR videoyu
+    // durdurduğunda/oynattığında bu hiçbir yere gitmiyordu ("videoyu durdurdum
+    // ama başkasında durmadı" şikayetinin kök nedeni — Ortak Tarayıcı zaten
+    // "herkes etkileşimli" (spectate yok) tasarımı, video kontrolü de öyle
+    // olmalı). ts damgalı son-yazan-kazanır ile kimin gönderdiği önemsiz,
+    // yalnızca EN YENİ eylem uygulanır (sb-nav'daki yarış-önleme ile aynı desen).
+    //
+    // Reklam gösterilirken ASLA okuma/yayın yapılmaz: reklamın kendi zaman
+    // çizelgesi (genelde birkaç saniye, saniyede 1x hız) asıl içeriğin
+    // zamanıyla alakasız — reklam süresini "gerçek video pozisyonu" sanıp
+    // yayınlarsak, reklamı görmeyen/farklı reklam gören taraf o anlamsız
+    // zamana atlatılır ve reklam bitince İÇERİK gerçek pozisyonundan devam
+    // ederken bu taraf yanlış yerde kalır ("reklam gören geride kalıyor").
+    try {
+      const adShowing = await sbWebview.executeJavaScript(
+        `!!document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')`
+      );
+      if (!adShowing) {
         const vState = await sbWebview.executeJavaScript(`(() => {
           const v = document.querySelector('video');
           if (!v) return null;
@@ -453,21 +469,28 @@ function initSharedBrowser() {
         })()`);
 
         if (vState) {
-          if (!state.sb.lastVideoState ||
+          // Az önce UZAKTAN uygulanan bir senkronun kendi tetiklediği
+          // paused/currentTime değişimini "yeni yerel eylem" sanıp hemen geri
+          // yayınlamayı önle (echo/gereksiz trafik) — nav tarafındaki
+          // remoteNavTs bastırma penceresiyle aynı fikir.
+          const echoingRemote = (Date.now() - (state.sb.remoteVideoSyncTs || 0)) < 1500;
+
+          if (!echoingRemote && (!state.sb.lastVideoState ||
               state.sb.lastVideoState.paused !== vState.paused ||
-              Math.abs(state.sb.lastVideoState.currentTime - vState.currentTime) > 2) {
-            
+              Math.abs(state.sb.lastVideoState.currentTime - vState.currentTime) > 2)) {
+
             state.sb.lastVideoState = vState;
+            state.sb.lastVideoSyncTs = Date.now();
             broadcast({
               type: 'sb-video-sync',
               paused: vState.paused,
               currentTime: vState.currentTime,
-              ts: Date.now()
+              ts: state.sb.lastVideoSyncTs
             });
           }
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
   }, 1000);
 
   // 7/24 katılım beacon'ı: host, oturum açık olduğu sürece kim olduğunu ve
@@ -583,20 +606,35 @@ function handleSBMessage(peerId, msg) {
     if (!state.sb.joinedActivity) return;
     sbApplyRemoteNav(msg.url);
   } else if (msg.type === 'sb-video-sync') {
-    if (state.sb.host !== state.myId && state.sb.joinedActivity && peerId === state.sb.host) {
+    // Önceden sadece host'tan (peerId===state.sb.host) gelen video-sync kabul
+    // ediliyordu; artık HERKES yayınlayabildiği için (yukarıdaki interval'a
+    // bakın — misafirin durdur/oynat/atlaması artık başkalarına da gidiyor)
+    // bu kısıtlama kaldırıldı. ts damgalı son-yazan-kazanır hangi eylemin
+    // gerçekten en son olduğuna karar verir (sb-nav'daki desenle aynı),
+    // böylece iki kişi neredeyse aynı anda oynat/duraklat yaparsa kalıcı
+    // bir çelişki değil, tek bir tutarlı sonuç oluşur.
+    if (state.sb.joinedActivity) {
       const currentTime = Number(msg.currentTime);
-      const ts = Number(msg.ts);
+      const ts = Number(msg.ts) || 0;
       const paused = !!msg.paused;
-      if (!Number.isFinite(currentTime) || !Number.isFinite(ts)) return;
+      if (!Number.isFinite(currentTime)) return;
+      if (ts && state.sb.lastVideoSyncTs && ts < state.sb.lastVideoSyncTs) return; // eski/geride kalmış eylem, yok say
+      state.sb.lastVideoSyncTs = ts || Date.now();
       const sbWebview = document.getElementById('sb-webview');
       if (sbWebview) {
+        const effectiveTs = ts || Date.now();
         // currentTime/ts/paused are sanitized above (finite numbers / boolean)
         // and re-serialized with JSON.stringify so they can only ever appear
         // as safe literals here, never as injected script.
         const syncScript = `(() => {
+          // Reklam gösterilirken kendi videomuzu göndericinin GERÇEK içerik
+          // zamanına zorlamaya çalışmayalım: reklam genelde seek edilemez
+          // (no-op/hata) ve reklam süresi zaten gönderenin İÇERİK zamanıyla
+          // alakasız bir referans olurdu.
+          if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')) return;
           const v = document.querySelector('video');
           if (!v) return;
-          const targetTime = ${JSON.stringify(currentTime)} + (Date.now() - ${JSON.stringify(ts)}) / 1000;
+          const targetTime = ${JSON.stringify(currentTime)} + (Date.now() - ${JSON.stringify(effectiveTs)}) / 1000;
           if (Math.abs(v.currentTime - targetTime) > 2) {
             v.currentTime = targetTime;
           }
@@ -604,6 +642,10 @@ function handleSBMessage(peerId, msg) {
           if (!${JSON.stringify(paused)} && v.paused) v.play().catch(e => {});
         })()`;
         sbWebview.executeJavaScript(syncScript).catch(e => {});
+        // Yerel senkron-yayın döngüsünün bu uygulamayı "yeni bir yerel eylem"
+        // sanıp hemen geri yayınlamasını önle (nav tarafındaki remoteNavTs
+        // bastırma penceresiyle aynı fikir).
+        state.sb.remoteVideoSyncTs = Date.now();
       }
     }
   } else if (msg.type === 'sb-close') {

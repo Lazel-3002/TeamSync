@@ -4291,6 +4291,9 @@ function closeAllCards(leaveLobby = false, except = null) {
     state.sb.startedAt = 0;
     state.sb.lastUrl = '';
     state.sb.lastNavTs = 0;
+    state.sb.lastVideoSyncTs = 0;
+    state.sb.remoteVideoSyncTs = 0;
+    state.sb.lastVideoState = null;
     // Reset gezinmesi yayınlanmasın diye "uzaktan uygulanmış" say
     state.sb.appliedRemoteUrl = 'https://duckduckgo.com';
     state.sb.remoteNavTs = Date.now();

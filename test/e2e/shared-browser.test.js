@@ -11,6 +11,7 @@ const { spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected, eval
 // <video> elemanı: sb-video-sync döngüsü sadece document.querySelector('video')
 // üzerinden currentTime/paused okur/yazar, gerçek bir medya dosyasına ihtiyaç yok.
 const FAKE_VIDEO_PAGE = `<html><body>
+<div id="adbox"></div>
 <video id="v"></video>
 <script>
   const v = document.getElementById('v');
@@ -22,6 +23,7 @@ const FAKE_VIDEO_PAGE = `<html><body>
   v.pause = () => { paused = true; };
   setInterval(() => { if (!paused) t += 1; }, 1000);
   window.__getT = () => t;
+  window.__isPaused = () => paused;
 </script>
 </body></html>`;
 
@@ -186,6 +188,36 @@ module.exports = async function run() {
     const hostTNow = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
     assert.ok(Math.abs(guestT - hostTNow) <= 3,
       `geç katılan misafir host'un video pozisyonuna senkronlanmadı: misafir=${guestT} host(katılım öncesi)=${hostTBeforeRejoin} host(şimdi)=${hostTNow}`);
+
+    // Misafir de video durumunu yayınlayabilmeli (sadece host değil): misafir
+    // videoyu durdurunca host'takinin de durması lazım. Eskiden video-sync
+    // sadece host'tan yayınlanıyordu; bir misafirin durdur/oynat aksiyonu
+    // hiçbir yere gitmiyordu, üstelik host'un rutin senkron yayını misafirin
+    // KENDİ duraklatmasını bile geri açabiliyordu.
+    await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').pause()")`, true);
+    await new Promise(r => setTimeout(r, 3000));
+    const hostPausedAfterGuestPause = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__isPaused()")`, true);
+    assert.strictEqual(hostPausedAfterGuestPause, true,
+      'misafirin video durdurması host\'a hiç yansımadı (video-sync hâlâ sadece host\'tan mı yayınlanıyor?)');
+    // Devam eden testler için tekrar oynat
+    await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').play()")`, true);
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Reklam sırasında video-sync YAYINLANMAMALI/UYGULANMAMALI: reklamın
+    // kendi zaman çizelgesi asıl içerikle alakasız bir referans. Eskiden
+    // ad-skip'in çılgınca ileri sardığı reklam zamanı "gerçek video pozisyonu"
+    // sanılıp diğer tarafa yayınlanıyordu — reklamı görmeyen taraf o anlamsız
+    // zamana ışınlanıyordu ("reklam gören geride/ileride kalıyor" şikayeti).
+    const guestTBeforeAd = await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript(\`
+      document.getElementById('adbox').className = 'ad-showing';
+      document.getElementById('v').currentTime = 9999;
+    \`)`, true);
+    await new Promise(r => setTimeout(r, 3000));
+    const guestTDuringAd = await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    assert.ok(guestTDuringAd < guestTBeforeAd + 20,
+      `host'un reklam süresi (9999) misafire sızdı, misafir anlamsız bir zamana ışınlandı: ${guestTDuringAd}`);
+    await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript(\`document.getElementById('adbox').className = '';\`)`, true);
 
     // Yankı-bastırma penceresi (2.5sn) YALNIZCA gerçek uzak-senkron
     // yankısını susturmalı — bir senkron az önce oturduktan hemen sonra
