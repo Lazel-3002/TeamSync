@@ -278,6 +278,27 @@ async function handleSignal(id, ip, signal) {
   return peer.signalChain;
 }
 
+// Teredo (2001:0::/32), link-local (fe80::) ve loopback ICE adayları hem
+// gönderilirken hem alınırken elenir. Bunlar iki eş arasında gerçek bir yol
+// oluşturamaz ama iki ciddi zarar veriyorlar:
+//  - TURN CreatePermission bu adreslere izin isteyince sunucu hata (saha
+//    loglarında code=600) dönebiliyor ve Chromium hatada TÜM TURN bağlantısını
+//    buduyor ("pruned connection") — tek bir çöp aday, WARP altında tek
+//    çalışan yol olan kendi relay tahsisimizi öldürüyor (TURN üzerinden
+//    inen veri kendi açtığımız soketten geldiği için VPN'in bozduğu
+//    dışarıdan-içeri yönünden etkilenmeyen TEK yol relay'dir);
+//  - ICE kontrol matrisini şişirip kurulumUu yavaşlatıyorlar (kullanıcıda
+//    Radmin/WSL/Teredo gibi bir sürü sanal arayüz var).
+function isJunkIceCandidate(cand) {
+  const line = ((cand && cand.candidate) || '').toLowerCase();
+  if (!line) return false;
+  const addr = line.split(' ')[4] || '';
+  if (addr.startsWith('127.') || addr === '::1') return true;       // loopback
+  if (addr.startsWith('fe80:')) return true;                        // link-local
+  if (addr.startsWith('2001:0:') || addr.startsWith('2001:0000:')) return true; // Teredo
+  return false;
+}
+
 async function processSignal(id, ip, signal) {
   const peer = state.peers.get(id);
   if (!peer || !peer.pc) return;
@@ -336,6 +357,7 @@ async function processSignal(id, ip, signal) {
         if (signal.candidate.sdpMid === null && signal.candidate.sdpMLineIndex === null && !signal.candidate.candidate) {
           return;
         }
+        if (isJunkIceCandidate(signal.candidate)) return; // çöp aday (teredo/loopback/link-local)
         try {
           const iceCand = new RTCIceCandidate(signal.candidate);
           if (peer.pc.remoteDescription && peer.pc.remoteDescription.type) {
@@ -1974,7 +1996,16 @@ function setupVUMeter() {
 function applySpeakerTo(el) {
   if (!el || typeof el.setSinkId !== 'function') return;
   const id = localStorage.getItem('teamsync_speaker_id') || '';
-  el.setSinkId(id).catch(e => console.warn('setSinkId başarısız:', e && e.message ? e.message : e));
+  el.setSinkId(id).catch(e => {
+    // Kayıtlı cihaz artık yok/değişmiş (cihaz id'leri kalıcı değildir):
+    // varsayılana dönmezsek ses "geliyor ama duyulmuyor" gibi görünür.
+    console.warn('setSinkId başarısız, varsayılan hoparlöre dönülüyor:', e && e.message ? e.message : e);
+    if (id) {
+      localStorage.removeItem('teamsync_speaker_id');
+      el.setSinkId('').catch(() => {});
+      showToast('Kayıtlı ses çıkış cihazı bulunamadı, varsayılan hoparlöre dönüldü', 'warn');
+    }
+  });
 }
 
 function applySpeakerToAll() {
@@ -2281,6 +2312,57 @@ function applyIceEscalationPolicy(peer) {
   } catch (e) {}
 }
 
+// Ses yolunun uçtan uca fotoğrafı: seçili aday çifti, gelen/giden RTP
+// sayaçları, alıcı track durumu ve oynatıcı (audioEl) durumu tek satırda
+// loglanır — "duymuyorum" şikayetinde sorunun ağda mı (gelen paket yok)
+// yoksa oynatmada mı (paket var ama element çalmıyor) olduğunu kesin söyler.
+// Ayrıca kendini onarır: veri geldiği halde oynatıcı duruyorsa yeniden başlatır.
+async function logVoicePathReport(peerId, tag) {
+  const peer = state.peers.get(peerId);
+  if (!peer || !peer.pc) return;
+  try {
+    const stats = await peer.pc.getStats();
+    const byId = {};
+    stats.forEach(r => { byId[r.id] = r; });
+    let pairId = null;
+    stats.forEach(r => { if (r.type === 'transport' && r.selectedCandidatePairId) pairId = r.selectedCandidatePairId; });
+    if (!pairId) stats.forEach(r => { if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') pairId = r.id; });
+    let pair = 'yok';
+    if (pairId && byId[pairId]) {
+      const cp = byId[pairId];
+      const l = byId[cp.localCandidateId] || {};
+      const rm = byId[cp.remoteCandidateId] || {};
+      pair = `${l.candidateType || '?'}/${l.protocol || '?'}<->${rm.candidateType || '?'}/${rm.protocol || '?'}`;
+    }
+    let inAudio = null, outAudio = null;
+    stats.forEach(r => {
+      if (r.type === 'inbound-rtp' && r.kind === 'audio') inAudio = r;
+      if (r.type === 'outbound-rtp' && r.kind === 'audio') outAudio = r;
+    });
+    const recv = peer.pc.getReceivers().find(r => r.track && r.track.kind === 'audio');
+    const track = recv && recv.track;
+    const el = peer.audioEl;
+    console.log(`🩺 SES YOLU [${peer.name}] (${tag}): pair=${pair}` +
+      ` | gelen=${inAudio ? `${inAudio.packetsReceived}pkt/${inAudio.bytesReceived}B` : 'YOK'}` +
+      ` | giden=${outAudio ? `${outAudio.packetsSent}pkt` : 'YOK'}` +
+      ` | track=${track ? `${track.readyState}${track.muted ? '/RTP-YOK(muted)' : ''}` : 'YOK'}` +
+      ` | oynatıcı=${el ? `paused=${el.paused} vol=${el.volume} muted=${el.muted} sink=${el.sinkId || 'default'} src=${el.srcObject ? 'var' : 'YOK'}` : 'YOK'}` +
+      ` | deafen=${state.deafened}`);
+    // Kendini onar: ses verisi GELİYOR ama oynatıcı çalmıyor
+    if (inAudio && inAudio.bytesReceived > 0 && el && !state.deafened &&
+        (el.paused || el.muted || el.volume === 0 || !el.srcObject)) {
+      console.warn(`🔈 [${peer.name}] ses verisi geliyor ama oynatıcı çalmıyordu — oynatma yeniden başlatılıyor`);
+      showToast(`${peer.name} sesi oynatılamıyordu, oynatıcı yeniden başlatıldı`, 'warn');
+      try {
+        if (!el.srcObject && track) el.srcObject = new MediaStream([track]);
+        el.muted = false;
+        el.volume = 1.0;
+        await el.play();
+      } catch (e) {}
+    }
+  } catch (e) {}
+}
+
 // pc.restartIce() tek başına yeni bir offer üretip GÖNDERMEZ; onnegotiationneeded
 // dinlenmediği için hiçbir işe yaramıyordu. Bu fonksiyon initiator tarafında
 // gerçek bir iceRestart offer'ı üretip sinyal kanalından yollar. Initiator değilsek
@@ -2345,6 +2427,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
+      if (isJunkIceCandidate(e.candidate)) return; // çöp adayı hiç yayınlama
       // Adayları sakla: karşı taraf ilk gönderimi kaçırırsa (abonelik gecikmesi,
       // paket kaybı) offer/answer tekrarıyla birlikte yeniden gönderilirler.
       const p = state.peers.get(peerId);
@@ -2381,6 +2464,9 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
       // Sayaç yalnızca ses gerçekten akınca (bekçide) sıfırlanır.
       if (pr) pr.restartCount = 0;
       console.log(`✅ WebRTC connected to ${peerName}`);
+      // Bağlantıdan 15 sn sonra ses yolunun fotoğrafını logla (sorun
+      // bildirimlerinde "ağ mı, oynatma mı" ayrımını kesinleştirir)
+      setTimeout(() => logVoicePathReport(peerId, 'bağlantı+15sn'), 15000);
     }
   };
 
@@ -2485,6 +2571,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
             }
             pp.audioStallTicks = 0;
             pp.audioStallRestarts = (pp.audioStallRestarts || 0) + 1;
+            logVoicePathReport(peerId, 'ses-kesintisi-' + pp.audioStallRestarts);
             // Kullanıcı zaten ~20 sn sessizlik bekledi: sayaç döngüsünü
             // beklemeden İLK denemede relay'e zorla. Kritik: bağlantı her
             // restart'ta "başarılı" görünüp restartCount'u sıfırlattığı için

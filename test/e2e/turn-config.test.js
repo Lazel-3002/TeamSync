@@ -56,6 +56,24 @@ module.exports = async function run() {
     // açık olup olmadığından bağımsız — CI/normal makinede false döner)
     const warp = await evalJS(p.client, `(async () => { await detectTunnelInterference(); return typeof state.warpDetected; })()`, true);
     assert.strictEqual(warp, 'boolean', 'detectTunnelInterference state.warpDetected boolean bırakmadı');
+
+    // Çöp aday filtresi: Teredo/link-local/loopback elenmeli, gerçek adaylar
+    // (host/srflx/relay, mDNS dahil) elenMEmeli. Çöp adaylar TURN
+    // CreatePermission 600 hatası tetikleyip tüm relay bağlantısını
+    // budatabiliyor (saha logundan; WARP altında tek çalışan yol relay).
+    const junkResults = await evalJS(p.client, `JSON.stringify([
+      isJunkIceCandidate({ candidate: 'candidate:1 1 udp 2113937151 2001:0:14c9:d804:3019:b5eb:97e3:5b98 55570 typ host' }),
+      isJunkIceCandidate({ candidate: 'candidate:2 1 udp 2113937151 fe80::1234:5678:9abc:def0 55571 typ host' }),
+      isJunkIceCandidate({ candidate: 'candidate:3 1 udp 2113937151 127.0.0.1 55563 typ host' }),
+      isJunkIceCandidate({ candidate: 'candidate:4 1 udp 2113937151 ::1 55564 typ host' }),
+      isJunkIceCandidate({ candidate: 'candidate:5 1 udp 2113937151 192.168.1.5 55567 typ host' }),
+      isJunkIceCandidate({ candidate: 'candidate:6 1 udp 1677729535 104.28.164.103 55568 typ srflx raddr 0.0.0.0 rport 0' }),
+      isJunkIceCandidate({ candidate: 'candidate:7 1 udp 41885695 49.13.142.65 20621 typ relay raddr 0.0.0.0 rport 0' }),
+      isJunkIceCandidate({ candidate: 'candidate:8 1 udp 2113937151 a1b2c3d4-e5f6.local 55569 typ host' }),
+      isJunkIceCandidate({ candidate: '' })
+    ])`);
+    assert.strictEqual(junkResults, JSON.stringify([true, true, true, true, false, false, false, false, false]),
+      'isJunkIceCandidate yanlış sınıflandırma yaptı: ' + junkResults);
   } finally {
     cleanupPeer(p);
   }
