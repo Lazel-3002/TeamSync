@@ -2257,6 +2257,30 @@ function sendSignalToPeer(peerId, signal) {
   }
 }
 
+// Kademeli tırmanma: 2+ başarısız denemeden sonra (veya ses-bekçisi
+// forceRelayNext işaretlediyse) ve elde TURN varsa yerel aday politikası
+// relay-zorunluya çekilir. WARP/VPN altında "yaşıyor görünen ama ölü"
+// doğrudan yollar tekrar tekrar seçilebiliyor; relay bunları tamamen eler.
+// Politika yalnızca KENDİ adaylarımızı filtreler, bu yüzden İKİ ROL İÇİN DE
+// uygulanır: relay-only'ye çekilen taraf, karşı tarafın sürümü/rolü ne
+// olursa olsun kendi GELEN yönünü kendi TURN relay'inden geçmeye zorlar —
+// "o beni duyuyor ama ben onu duyamıyorum" asimetrisinin panzehiri budur
+// (karşı taraf artık bize sadece relay adresimizden ulaşabilir). TURN'ün
+// kendisi ulaşılamaz çıkarsa kilitlenmemek için 2 relay denemesinden sonra
+// tekrar 'all'a dönülür (4'lük döngü: all, all, relay, relay, ...).
+function applyIceEscalationPolicy(peer) {
+  peer.restartCount = (peer.restartCount || 0) + 1;
+  if (state.useRelay) return; // kullanıcı zaten kalıcı relay modunda
+  const servers = getIceServers();
+  const hasTurn = servers.some(s => typeof s.urls === 'string' && /^turns?:/.test(s.urls) && s.username);
+  const wantRelay = hasTurn && (peer.forceRelayNext || (peer.restartCount % 4) >= 2);
+  peer.forceRelayNext = false;
+  try {
+    peer.pc.setConfiguration({ iceServers: servers, iceTransportPolicy: wantRelay ? 'relay' : 'all' });
+    if (wantRelay) console.log(`🛰️ ${peer.name}: yerel adaylar relay-zorunluya çekildi (deneme ${peer.restartCount})`);
+  } catch (e) {}
+}
+
 // pc.restartIce() tek başına yeni bir offer üretip GÖNDERMEZ; onnegotiationneeded
 // dinlenmediği için hiçbir işe yaramıyordu. Bu fonksiyon initiator tarafında
 // gerçek bir iceRestart offer'ı üretip sinyal kanalından yollar. Initiator değilsek
@@ -2269,6 +2293,9 @@ async function attemptIceRestart(peerId) {
   peer.lastRestartAt = now;
 
   if (!peer.isInitiator) {
+    // Restart'ı karşı taraf başlatacak ama KENDİ politikamızı şimdi ayarlarız:
+    // gelecek offer'a vereceğimiz cevap yalnızca bu politikadaki adayları içerir.
+    applyIceEscalationPolicy(peer);
     sendSignalToPeer(peerId, { type: 'restart-req' });
     return;
   }
@@ -2286,23 +2313,7 @@ async function attemptIceRestart(peerId) {
     if (peer.pc.signalingState !== 'stable') {
       try { await peer.pc.setLocalDescription({ type: 'rollback' }); } catch (e) {}
     }
-    // Kademeli tırmanma: 2+ başarısız denemeden sonra ve elde TURN varsa
-    // relay-zorunlu dene. WARP/VPN altında "yaşıyor görünen ama ölü"
-    // doğrudan yollar tekrar tekrar seçilip bağlantıyı düşürebiliyor;
-    // relay bunları tamamen eler. TURN'ün kendisi ulaşılamaz çıkarsa
-    // kilitlenmemek için 2 relay denemesinden sonra tekrar 'all'a dönülür
-    // (4'lük döngü: all, all, relay, relay, all, ...). Karşı taraf 'all'da
-    // kalır; tek taraflı relay adayı bile çalışan bir çift kurmaya yeter.
-    peer.restartCount = (peer.restartCount || 0) + 1;
-    if (!state.useRelay) {
-      const servers = getIceServers();
-      const hasTurn = servers.some(s => typeof s.urls === 'string' && /^turns?:/.test(s.urls) && s.username);
-      const wantRelay = hasTurn && (peer.restartCount % 4) >= 2;
-      try {
-        peer.pc.setConfiguration({ iceServers: servers, iceTransportPolicy: wantRelay ? 'relay' : 'all' });
-        if (wantRelay) console.log(`🛰️ ${peer.name}: doğrudan yollar tutmuyor, relay-zorunlu ICE restart denenecek (deneme ${peer.restartCount})`);
-      } catch (e) {}
-    }
+    applyIceEscalationPolicy(peer);
     const offer = await peer.pc.createOffer({ iceRestart: true });
     offer.sdp = setMediaBitrates(offer.sdp);
     peer.localCandidates = []; // ICE restart yeni ufrag üretir; eski adaylar geçersiz
@@ -2468,15 +2479,31 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
         if (pp.lastAudioBytes != null && bytes <= pp.lastAudioBytes) {
           pp.audioStallTicks = (pp.audioStallTicks || 0) + 1;
           if (pp.audioStallTicks >= 2 && (pp.audioStallRestarts || 0) < 3) {
-            console.warn(`🔇 ${peerName} bağlı görünüyor ama ses akmıyor (${bytes} bayt), ICE restart deneniyor...`);
+            console.warn(`🔇 ${peerName} bağlı görünüyor ama ses akmıyor (${bytes} bayt), relay-zorunlu ICE restart deneniyor...`);
+            if ((pp.audioStallRestarts || 0) === 0) {
+              showToast(`${peerName} tarafından ses alınamıyor, bağlantı relay üzerinden onarılıyor...`, 'warn');
+            }
             pp.audioStallTicks = 0;
             pp.audioStallRestarts = (pp.audioStallRestarts || 0) + 1;
+            // Kullanıcı zaten ~20 sn sessizlik bekledi: sayaç döngüsünü
+            // beklemeden İLK denemede relay'e zorla. Kritik: bağlantı her
+            // restart'ta "başarılı" görünüp restartCount'u sıfırlattığı için
+            // sayaç tabanlı tırmanma sessiz-ama-bağlı vakalarında ASLA
+            // devreye giremiyordu ("o beni duydu, ben onu duyamadım").
+            pp.forceRelayNext = true;
             pp.lastRestartAt = 0;
             attemptIceRestart(peerId);
           }
         } else {
           pp.audioStallTicks = 0;
-          if (bytes > (pp.lastAudioBytes || 0)) pp.audioStallRestarts = 0;
+          if (bytes > (pp.lastAudioBytes || 0)) {
+            if (pp.audioStallRestarts) {
+              console.log(`🔊 ${peerName} tarafından ses tekrar akıyor (onarım başarılı)`);
+              showToast(`${peerName} ile ses bağlantısı onarıldı`, 'info');
+            }
+            pp.audioStallRestarts = 0;
+            pp.forceRelayNext = false;
+          }
         }
         pp.lastAudioBytes = bytes;
       }).catch(() => {});
