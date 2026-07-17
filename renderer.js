@@ -2788,6 +2788,22 @@ async function handleDataMessage(peerId, msg) {
       if (!res.ok) isCensored = true;
     }
     appendChat(peerId, peer.name, msg.text || '', isCensored);
+    
+    // Supabase Kayıt (Gelen Oda Mesajı)
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('mesaj').insert([
+        {
+          gonderen_id: peerId,
+          gonderen_adi: peer.name || 'Anonim',
+          tip: 'oda',
+          oda_adi: state.room || '',
+          icerik: msg.text || '',
+          is_censored: isCensored
+        }
+      ]).then(({ error }) => {
+        if (error) console.error('Supabase room message insert error:', error);
+      });
+    }
   } else if (msg.type === 'chat-enc') {
     let isCensored = msg.isCensored || false;
     if (state.cryptoKey) {
@@ -2798,6 +2814,22 @@ async function handleDataMessage(peerId, msg) {
             if (!res.ok) isCensored = true;
          }
          appendChat(peerId, peer.name, dec || '', isCensored);
+         
+         // Supabase Kayıt (Gelen Şifreli Oda Mesajı - Çözülmüş Hali)
+         if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+           supabaseClient.from('mesaj').insert([
+             {
+               gonderen_id: peerId,
+               gonderen_adi: peer.name || 'Anonim',
+               tip: 'oda',
+               oda_adi: state.room || '',
+               icerik: dec || '',
+               is_censored: isCensored
+             }
+            ]).then(({ error }) => {
+              if (error) console.error('Supabase room encrypted message insert error:', error);
+            });
+         }
       } else {
          appendChat(peerId, peer.name, '🔒 [Şifre Çözülemedi]');
       }
@@ -3381,26 +3413,35 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   appendChat('self', state.myName, textToSend, isCensored);
   input.value = '';
 
-  // Supabase Kayıt
+  // Supabase Kayıt (Oda Mesajı Gönderimi)
+  console.log('cform submit triggered, message:', textToSend);
+  console.log('supabaseClient exists?', !!supabaseClient);
   if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    console.log('Attempting to insert room message into Supabase...');
     supabaseClient.from('mesaj').insert([
-      { icerik: textToSend, kullanici_adi: state.myName || 'Anonim' }
-    ]).then(({ error }) => {
-      if (error) console.error('Supabase mesaj kayıt hatası:', error);
-      else console.log('Mesaj Supabase e kaydedildi.');
-    });
+      {
+        gonderen_id: state.myId || 'Anonim',
+        gonderen_adi: state.myName || 'Anonim',
+        tip: 'oda',
+        oda_adi: state.room || '',
+        icerik: textToSend,
+        is_censored: isCensored
+      }
+    ]).then(
+      (result) => {
+        console.log('Supabase room insert resolved:', result);
+        if (result.error) console.error('Supabase room insert error:', result.error);
+        else console.log('Oda mesajı Supabase\'e başarıyla kaydedildi.');
+      },
+      (error) => {
+        console.error('Supabase room insert rejected:', error);
+      }
+    );
   }
   });
 
 function saveChatToLocal(uid, name, text, isCensored) {
-  try {
-    let history = JSON.parse(localStorage.getItem('chat_history_' + state.room) || '[]');
-    history.push({ uid, name, text, isCensored, time: Date.now() });
-    if (history.length > 500) history = history.slice(history.length - 500);
-    localStorage.setItem('chat_history_' + state.room, JSON.stringify(history));
-  } catch(e) {
-    console.error('Local chat save error:', e);
-  }
+  // Oda sohbetlerini yerel depolamaya (localStorage) kaydetmiyoruz (Geçici oda sohbeti)
 }
 
 function loadLocalChatHistory() {
@@ -4612,6 +4653,23 @@ window.sendDMText = async (text) => {
   saveDMs();
   renderDMs();
   
+  // Supabase Kayıt (Giden DM)
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    supabaseClient.from('mesaj').insert([
+      {
+        gonderen_id: state.myId || 'Anonim',
+        gonderen_adi: state.myName || 'Anonim',
+        alici_id: friendId,
+        alici_adi: state.friends[friendId]?.name || 'Arkadaş',
+        tip: 'dm',
+        icerik: textToSend,
+        is_censored: isCensored
+      }
+    ]).then(({ error }) => {
+      if (error) console.error('Supabase DM send error:', error);
+    });
+  }
+
   // MQTT send
   state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
     type: 'dm_msg',
@@ -4642,6 +4700,23 @@ window.sendDMFile = (file) => {
     state.dms[friendId].push({ sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
     saveDMs();
     renderDMs();
+
+    // Supabase Kayıt (Giden DM Dosyası)
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('mesaj').insert([
+        {
+          gonderen_id: state.myId || 'Anonim',
+          gonderen_adi: state.myName || 'Anonim',
+          alici_id: friendId,
+          alici_adi: state.friends[friendId]?.name || 'Arkadaş',
+          tip: 'dm',
+          icerik: `[${msgType === 'image' ? 'Görsel' : 'Dosya'}: ${file.name}] ${base64Data}`,
+          is_censored: false
+        }
+      ]).then(({ error }) => {
+        if (error) console.error('Supabase DM file send error:', error);
+      });
+    }
 
     const CHUNK_SIZE = 60000; // ~60KB
     const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
@@ -4691,6 +4766,23 @@ window.receiveDM = async (fromId, data) => {
     saveDMs();
     if (state.activeDM === fromId) renderDMs();
     else showToast(`${state.friends[fromId]?.name || 'Biri'} sana mesaj gönderdi.`, 'info');
+
+    // Supabase Kayıt (Gelen DM)
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('mesaj').insert([
+        {
+          gonderen_id: fromId,
+          gonderen_adi: state.friends[fromId]?.name || 'Arkadaş',
+          alici_id: state.myId || 'Anonim',
+          alici_adi: state.myName || 'Anonim',
+          tip: 'dm',
+          icerik: data.content,
+          is_censored: isCensored
+        }
+      ]).then(({ error }) => {
+        if (error) console.error('Supabase DM receive error:', error);
+      });
+    }
   } 
   else if (data.type === 'dm_file_start') {
     state.incomingDMFiles[data.fileId] = {
@@ -4713,6 +4805,23 @@ window.receiveDM = async (fromId, data) => {
         
         if (state.activeDM === fromId) renderDMs();
         else showToast(`${state.friends[fromId]?.name || 'Biri'} sana bir dosya gönderdi.`, 'info');
+
+        // Supabase Kayıt (Gelen DM Dosyası)
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+          supabaseClient.from('mesaj').insert([
+            {
+              gonderen_id: fromId,
+              gonderen_adi: state.friends[fromId]?.name || 'Arkadaş',
+              alici_id: state.myId || 'Anonim',
+              alici_adi: state.myName || 'Anonim',
+              tip: 'dm',
+              icerik: `[${fileData.msgType === 'image' ? 'Görsel' : 'Dosya'}: ${fileData.fileName}] ${fullBase64}`,
+              is_censored: false
+            }
+          ]).then(({ error }) => {
+            if (error) console.error('Supabase DM file receive error:', error);
+          });
+        }
       }
     }
   }
