@@ -2417,7 +2417,7 @@ function setupDataChannel(peerId, dc) {
           } else if (activeAct === 'sb' && state.sb.host === state.myId) {
             const currentUrl = document.getElementById('sb-url')?.value || '';
             dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl }));
-            if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl }));
+            if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl, ts: Date.now() }));
           } else if (activeAct === 'uno' && state.uno.host === state.myId) {
             if (!state.uno.started) {
               dc.send(JSON.stringify({ type: 'uno-lobby', host: state.myId }));
@@ -2643,7 +2643,7 @@ async function handleDataMessage(peerId, msg) {
           const currentUrl = document.getElementById('sb-url')?.value || '';
           broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl });
           if (currentUrl) {
-            broadcastTo(msg.peerId, { type: 'sb-nav', url: currentUrl });
+            broadcastTo(msg.peerId, { type: 'sb-nav', url: currentUrl, ts: Date.now() });
           }
         } else if (lob.activity === 'poll') {
           if (window.pollState) {
@@ -4290,6 +4290,7 @@ function closeAllCards(leaveLobby = false, except = null) {
     state.sb.host = null;
     state.sb.startedAt = 0;
     state.sb.lastUrl = '';
+    state.sb.lastNavTs = 0;
     // Reset gezinmesi yayınlanmasın diye "uzaktan uygulanmış" say
     state.sb.appliedRemoteUrl = 'https://duckduckgo.com';
     state.sb.remoteNavTs = Date.now();
@@ -5225,6 +5226,10 @@ window.joinLobby = function(lobbyId, spectate = false) {
   } else if (lob.activity === 'sb') {
     state.sb.host = lob.hostId;
     state.sb.joinedActivity = true;
+    // Host'un video senkron döngüsü yalnızca oynatma durumu değiştiğinde yayın
+    // yapar; lobi üzerinden katılan bir misafir de aynı "geç katılan hiç
+    // senkronlanamıyor" sorununu yaşamasın diye host'a haber ver.
+    broadcast({ type: 'sb-joined' });
   }
 
   broadcast({

@@ -51,6 +51,20 @@ function initSharedBrowser() {
     state.sb.host = state.myId;
     state.sb.startedAt = Date.now();
     document.getElementById('sb-url').disabled = false;
+    // webview'in HTML'de statik bir src'si YOK (bkz. sbWebview.src atamasının
+    // hemen altındaki not): kartı ilk kez açan host için varsayılan sayfayı
+    // burada, kontrollü bir şekilde biz yüklüyoruz. Statik src eskiden
+    // sayfa daha DOM'a girer girmez gerçek bir internet isteği başlatıyordu;
+    // biri (host ya da misafir) bu iç yükleme daha bitmeden webview'e farklı
+    // bir adrese gitmesini söylerse, gecikmiş "duckduckgo tamamlandı" olayı
+    // az sonra bizim gezinmemizin ÜSTÜNE binip onu sessizce geçersiz
+    // kılabiliyordu (herkes farklı sayfalarda kalıyordu, hatasız/loglanmadan).
+    // Şimdi ilk yükleme SADECE kullanıcı Ortak Tarayıcı'yı gerçekten açtığında,
+    // bilerek ve tek seferde başlatılıyor; artık aynı anda yarışan iki
+    // gezinme yok.
+    if (!sbCurrentUrl() || sbCurrentUrl() === 'about:blank') {
+      document.getElementById('sb-webview').src = 'https://duckduckgo.com/';
+    }
     broadcast({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: sbCurrentUrl() });
   });
 
@@ -313,22 +327,47 @@ function initSharedBrowser() {
     }
   });
 
+  // will-navigate SADECE gerçek kullanıcı/sayfa kaynaklı gezinmede ateşlenir
+  // (bir linke tıklama, sayfa içi window.location değişimi); bizim kendi
+  // .src= atamalarımızda (hem adres çubuğundan gezinme hem uzaktan gelen
+  // senkronu uygulama) HİÇ ateşlenmez (Electron dokümantasyonu). Bu yüzden
+  // güvenilir bir "bu gerçek bir kullanıcı tıklaması" imzası olarak kullanılabilir.
+  let sbUserGestureNav = false;
+  sbWebview.addEventListener('will-navigate', () => { sbUserGestureNav = true; });
+
   // Tek bir gezinme birden çok did-navigate / did-navigate-in-page olayı
   // üretebilir (yönlendirme zinciri, SPA gezinmesi). Eski tek seferlik
   // ignoreNextNav bayrağı yalnızca ilk olayı susturuyordu; kalanlar karşıya
   // geri yayınlanıp iki taraf arasında sonsuz reload ping-pongu başlatıyordu.
   const onLocalNav = (e) => {
+    const isUserGesture = sbUserGestureNav;
+    sbUserGestureNav = false;
     state.sb.lastVideoState = null;
     if (document.activeElement !== sbUrl) {
       sbUrl.value = e.url;
     }
-    // Uzaktan uygulanan gezinmenin kendisini ve hemen ardındaki
-    // yönlendirmelerini geri yayınlama
-    if (sbNormUrl(e.url) === sbNormUrl(state.sb.appliedRemoteUrl)) return;
-    if (Date.now() - (state.sb.remoteNavTs || 0) < 2500) return;
+    // Uzaktan uygulanan gezinmenin kendisini ve hemen ardındaki yönlendirme
+    // zincirini geri yayınlama — AMA bu bastırma yalnızca gerçekten bir
+    // uzak-senkron echo'suysa uygulanmalı. Önceden 2.5sn'lik pencere kör bir
+    // şekilde HERKESİ (gerçek bir link tıklamasını bile) susturuyordu: biri
+    // senkronlanan sayfada bir linke tıklarsa ve bu 2.5sn içine denk gelirse,
+    // tıklaması hiç yayınlanmıyor, o kişi sessizce herkesten kopup kendi
+    // başına farklı bir sayfada kalıyordu ("biri youtube'da biri google'da").
+    // will-navigate ile işaretlenmiş gerçek kullanıcı gezinmeleri bu
+    // bastırmayı hep atlar.
+    if (!isUserGesture) {
+      if (sbNormUrl(e.url) === sbNormUrl(state.sb.appliedRemoteUrl)) return;
+      if (Date.now() - (state.sb.remoteNavTs || 0) < 2500) return;
+    }
     if (!state.sb.joinedActivity || !state.sb.host) return;
     state.sb.lastUrl = e.url;
-    broadcast({ type: 'sb-nav', url: e.url });
+    // ts damgası: iki kişi neredeyse aynı anda farklı adreslere gezinirse
+    // (host A'ya, misafir B'ye), damgasız sistemde herkes "en son işlediği"
+    // mesaja göre karar verir ve iki taraf birbirinin adresine geçip kalıcı
+    // olarak TERS senkron (A<->B yer değiştirmiş) kalabilir. En yeni damgayı
+    // izleyerek herkesin gerçekten en son yapılan geziye yakınsamasını sağlarız.
+    state.sb.lastNavTs = Date.now();
+    broadcast({ type: 'sb-nav', url: e.url, ts: state.sb.lastNavTs });
   };
   sbWebview.addEventListener('did-navigate', onLocalNav);
   sbWebview.addEventListener('did-navigate-in-page', onLocalNav);
@@ -532,6 +571,14 @@ function handleSBMessage(peerId, msg) {
     // İzleyici modu kaldırıldı: herkes etkileşimli, adres çubuğu hep açık.
     document.getElementById('sb-url').disabled = false;
   } else if (msg.type === 'sb-nav') {
+    // Eş-zamanlı gezinme yarışı: iki kişi aynı anda farklı adreslere giderse
+    // (host A'ya, misafir B'ye) damgasız eski kod her ikisinin de karşısının
+    // adresine geçmesine izin verip kalıcı ters-senkrona yol açabiliyordu.
+    // En yeni damgalı gezinme her zaman kazanır, böylece tüm istemciler aynı
+    // (gerçekten en son yapılan) adrese yakınsar.
+    const navTs = Number(msg.ts) || 0;
+    if (navTs && state.sb.lastNavTs && navTs < state.sb.lastNavTs) return; // eski/geride kalmış gezinme, yok say
+    state.sb.lastNavTs = navTs || Date.now();
     state.sb.lastUrl = msg.url;
     if (!state.sb.joinedActivity) return;
     sbApplyRemoteNav(msg.url);

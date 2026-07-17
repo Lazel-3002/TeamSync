@@ -7,10 +7,32 @@ const assert = require('assert');
 const http = require('http');
 const { spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected, evalJS, waitFor } = require('./lib/harness');
 
+// Gerçek medya çözme gerektirmeyen, JS ile kontrol edilebilir sahte bir
+// <video> elemanı: sb-video-sync döngüsü sadece document.querySelector('video')
+// üzerinden currentTime/paused okur/yazar, gerçek bir medya dosyasına ihtiyaç yok.
+const FAKE_VIDEO_PAGE = `<html><body>
+<video id="v"></video>
+<script>
+  const v = document.getElementById('v');
+  let t = 0;
+  let paused = false;
+  Object.defineProperty(v, 'currentTime', { get: () => t, set: (val) => { t = val; } });
+  Object.defineProperty(v, 'paused', { get: () => paused, configurable: true });
+  v.play = () => { paused = false; return Promise.resolve(); };
+  v.pause = () => { paused = true; };
+  setInterval(() => { if (!paused) t += 1; }, 1000);
+  window.__getT = () => t;
+</script>
+</body></html>`;
+
 function startLocalSite(port) {
   const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html' });
-    res.end(`<html><head><title>${req.url}</title></head><body>page ${req.url}</body></html>`);
+    if (req.url.startsWith('/fake-video')) {
+      res.end(FAKE_VIDEO_PAGE);
+    } else {
+      res.end(`<html><head><title>${req.url}</title></head><body>page ${req.url}</body></html>`);
+    }
   });
   return new Promise(resolve => server.listen(port, '127.0.0.1', () => resolve(server)));
 }
@@ -55,6 +77,22 @@ module.exports = async function run() {
       assert.strictEqual(
         await evalJS(p.client, `document.getElementById('custom-confirm') === null && document.getElementById('sb-overlay') === null`),
         true, 'spectate kalıntısı (custom-confirm / sb-overlay) hâlâ DOM\'da'
+      );
+    }
+
+    // sb-webview'de statik bir src="..." OLMAMALI. Böyle bir attribute varsa,
+    // webview daha kimse Ortak Tarayıcı'yı açmadan HEMEN gerçek bir internet
+    // isteği başlatır; host/misafir kısa süre sonra webview'i başka bir
+    // adrese yönlendirirse, gecikmiş "varsayılan sayfa yüklendi" olayı bizim
+    // gezinmemizin üstüne binip onu sessizce geçersiz kılabiliyordu (herkes
+    // farklı sayfalarda kalıyordu, hiçbir hata/log olmadan). Varsayılan sayfa
+    // artık SADECE kullanıcı Ortak Tarayıcı'yı gerçekten açtığında, kontrollü
+    // bir şekilde JS ile yükleniyor (initSharedBrowser'daki act-sb host dalı).
+    for (const p of [a, b]) {
+      assert.strictEqual(
+        await evalJS(p.client, `document.getElementById('sb-webview').getAttribute('src')`),
+        null,
+        'sb-webview statik bir src attribute\'üne sahip - bu, ilk gezinmeyle yarışan gizli bir arka plan yüklemesi başlatıp senkronu bozabilir'
       );
     }
 
@@ -129,6 +167,61 @@ module.exports = async function run() {
     await evalJS(b.client, `document.getElementById('act-sb').click(); 1`);
     await waitFor(b.client, `!document.getElementById('sb-card').classList.contains('hidden') && state.sb.joinedActivity ? 'yes' : null`, 10000, 'misafir yeniden katıldı');
     await waitFor(b.client, webviewUrlExpr('/while-typing'), 20000, 'misafir yeniden katılınca güncel sayfaya geldi');
+
+    // Geç katılan video senkronu: video senkron döngüsü sadece oynatma durumu
+    // ÖNCEKİ ölçüme göre DEĞİŞTİĞİNDE yayın yapar (sürekli oynayan bir videoda
+    // durum hemen hemen hiç değişmez). Host'un videosu bir süredir oynarken
+    // (yayın durmuş/stabilize olmuşken) katılan biri bu yüzden host bir
+    // sonraki duraklat/oynat/atlama yapana kadar HİÇ senkronlanamıyor, videoyu
+    // baştan/yanlış bir noktadan izliyordu. sb-joined mesajı bunu düzeltir.
+    await navigateVia(a, 'http://127.0.0.1:9877/fake-video');
+    await waitFor(b.client, webviewUrlExpr('/fake-video'), 20000, 'misafir sahte-video sayfasına geldi');
+    await evalJS(b.client, `document.getElementById('sb-close').click(); 1`); // misafir çıkar, host oynatmaya devam eder
+    await new Promise(r => setTimeout(r, 6000)); // host'un videosu bir süre "oynasın", lastVideoState stabilize olsun
+    const hostTBeforeRejoin = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    await evalJS(b.client, `document.getElementById('act-sb').click(); 1`); // misafir geç katılır (sb-joined tetiklenir)
+    await waitFor(b.client, webviewUrlExpr('/fake-video'), 20000, 'misafir geç katılınca video sayfasına geldi');
+    await new Promise(r => setTimeout(r, 3000)); // sb-joined -> lastVideoState sıfırlama -> bir sonraki 1sn'lik tık round-trip'i
+    const guestT = await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    const hostTNow = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    assert.ok(Math.abs(guestT - hostTNow) <= 3,
+      `geç katılan misafir host'un video pozisyonuna senkronlanmadı: misafir=${guestT} host(katılım öncesi)=${hostTBeforeRejoin} host(şimdi)=${hostTNow}`);
+
+    // Yankı-bastırma penceresi (2.5sn) YALNIZCA gerçek uzak-senkron
+    // yankısını susturmalı — bir senkron az önce oturduktan hemen sonra
+    // sayfadaki bir linke tıklanırsa (page-initiated navigation, will-navigate
+    // ile işaretlenir) bu bastırmadan MUAF olmalı. Eskiden herhangi bir yerel
+    // gezinme bu pencereye denk gelirse sessizce yayınlanmıyordu ve tıklayan
+    // kişi kimseye haber vermeden farklı bir sayfada tek başına kalıyordu.
+    await navigateVia(a, 'http://127.0.0.1:9877/click-sync-landing');
+    await waitFor(b.client, webviewUrlExpr('/click-sync-landing'), 20000, 'guest senkrona indi');
+    await evalJS(b.client, `
+      document.getElementById('sb-webview').executeJavaScript("window.location.href = 'http://127.0.0.1:9877/click-after-sync';")
+    `, true);
+    await waitFor(a.client, webviewUrlExpr('/click-after-sync'), 10000,
+      'host, senkrondan hemen sonra misafirin linke tıklamasını görmedi (bastırma penceresi gerçek tıklamayı da yutuyor)');
+
+    // Eş-zamanlı çakışan gezinme yarışı: host ve misafir neredeyse aynı anda
+    // farklı adreslere giderse (host->/race-host, misafir->/race-guest),
+    // damgasız (ts'siz) eski koddaki mesaj-varış-sırasına bağlı çözüm iki
+    // tarafı KALICI OLARAK farklı sayfalarda bırakabiliyordu (split-brain).
+    // En yeni damga her zaman kazanmalı, böylece ikisi de aynı adrese yakınsar.
+    await evalJS(a.client, `(() => {
+      document.getElementById('sb-url').value = 'http://127.0.0.1:9877/race-host';
+      document.getElementById('sb-go').click();
+      return 1;
+    })()`);
+    await new Promise(r => setTimeout(r, 40));
+    await evalJS(b.client, `(() => {
+      document.getElementById('sb-url').value = 'http://127.0.0.1:9877/race-guest';
+      document.getElementById('sb-go').click();
+      return 1;
+    })()`);
+    await new Promise(r => setTimeout(r, 6000));
+    const raceHostUrl = await evalJS(a.client, `(() => { try { return document.getElementById('sb-webview').getURL(); } catch (e) { return null; } })()`);
+    const raceGuestUrl = await evalJS(b.client, `(() => { try { return document.getElementById('sb-webview').getURL(); } catch (e) { return null; } })()`);
+    assert.strictEqual(raceHostUrl, raceGuestUrl,
+      `eş-zamanlı gezinme yarışı sonrası taraflar farklı sayfalarda kaldı (split-brain): host=${raceHostUrl} misafir=${raceGuestUrl}`);
   } finally {
     cleanupPeer(a);
     cleanupPeer(b);
