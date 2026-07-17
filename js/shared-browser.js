@@ -540,6 +540,9 @@ function initSharedBrowser() {
     const isUserGesture = sbUserGestureNav;
     sbUserGestureNav = false;
     state.sb.lastVideoState = null;
+    // Yeni sayfa = yeni video: eylem kalkanı sıfırlanır ki kurucunun rutin
+    // drift düzeltmesi (geç katılan senkronu) beklemeden uygulanabilsin
+    state.sb.lastActionTs = 0;
     if (document.activeElement !== sbUrl) {
       sbUrl.value = e.url;
     }
@@ -639,59 +642,95 @@ function initSharedBrowser() {
       })()`);
     } catch (e) {}
 
-    // 2. Video Playback Synchronization — HERKES yayınlar, sadece host değil.
-    // Önceden sadece host'un video durumu yayınlanıyordu; bir MİSAFİR videoyu
-    // durdurduğunda/oynattığında bu hiçbir yere gitmiyordu ("videoyu durdurdum
-    // ama başkasında durmadı" şikayetinin kök nedeni — Ortak Tarayıcı zaten
-    // "herkes etkileşimli" (spectate yok) tasarımı, video kontrolü de öyle
-    // olmalı). ts damgalı son-yazan-kazanır ile kimin gönderdiği önemsiz,
-    // yalnızca EN YENİ eylem uygulanır (sb-nav'daki yarış-önleme ile aynı desen).
+    // 2. Video Playback Synchronization — iki ayrı kanal:
     //
-    // Reklam gösterilirken ASLA okuma/yayın yapılmaz: reklamın kendi zaman
-    // çizelgesi (genelde birkaç saniye, saniyede 1x hız) asıl içeriğin
-    // zamanıyla alakasız — reklam süresini "gerçek video pozisyonu" sanıp
-    // yayınlarsak, reklamı görmeyen/farklı reklam gören taraf o anlamsız
-    // zamana atlatılır ve reklam bitince İÇERİK gerçek pozisyonundan devam
-    // ederken bu taraf yanlış yerde kalır ("reklam gören geride kalıyor").
+    //   a) EYLEM yayını (yetkili herkes): SADECE gerçek bir kullanıcı eylemi
+    //      tespit edilince — duraklat/oynat değişimi ya da gerçek bir sarma
+    //      (beklenen doğal oynatma pozisyonundan >3.5 sn sapma). Eski kod
+    //      video normal oynarken bile ~3 sn'de bir "rutin ilerleme" yayınlıyordu
+    //      (mutlak fark >2 sn tetikleniyordu); herkesin bu gevezeliği, gerçek
+    //      bir sarma eylemiyle son-yazan-kazanır yarışına giriyor ve daha yeni
+    //      damgalı sıradan bir "ben 0:03'teyim" mesajı, senin "5. dakikaya
+    //      sardım" eylemini ezebiliyordu ("ileri aldım ama ona alınmadı"
+    //      şikayetinin kök nedeni). Ayrıca makineler arası saat kayması,
+    //      geride kalan saatli kullanıcının eylemlerini kalıcı olarak "bayat"
+    //      gösterip düşürebiliyordu. Eylemler artık nadir olduğundan damga
+    //      yarışına girecek rakipleri de kalmadı.
+    //
+    //   b) RUTİN drift düzeltmesi (SADECE kurucu, 3 sn'de bir): geç katılan
+    //      pozisyonu buradan öğrenir, yavaş kaymalar buradan düzelir. Alıcı,
+    //      yakın zamanda bir eylem gördüyse rutini uygulamaz (sb-video-sync
+    //      handler'ındaki eylem kalkanı) — böylece yoldaki eski bir rutin,
+    //      taze bir sarmayı geri çekemez.
+    //
+    // Reklam gösterilirken ASLA okuma/yayın yapılmaz (reklam zamanı içerik
+    // zamanıyla alakasız); ölçüm sondası (lastVideoState) da sıfırlanır ki
+    // reklam bitince "video reklam süresi kadar geri sıçradı" sanılıp sahte
+    // bir sarma eylemi yayınlanmasın. Aynı koruma tamponlanma (buffering,
+    // readyState<3) için de geçerli: donmuş video "geri sarma" değildir.
     try {
       const adShowing = await sbWebview.executeJavaScript(
         `!!document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')`
       );
-      if (!adShowing) {
+      if (adShowing) {
+        state.sb.lastVideoState = null;
+      } else {
         const vState = await sbWebview.executeJavaScript(`(() => {
           const v = document.querySelector('video');
           if (!v) return null;
           return {
             paused: v.paused,
             currentTime: v.currentTime,
-            url: window.location.href
+            rate: v.playbackRate || 1,
+            readyState: v.readyState
           };
         })()`);
 
         if (vState) {
-          // Az önce UZAKTAN uygulanan bir senkronun kendi tetiklediği
-          // paused/currentTime değişimini "yeni yerel eylem" sanıp hemen geri
-          // yayınlamayı önle (echo/gereksiz trafik) — nav tarafındaki
-          // remoteNavTs bastırma penceresiyle aynı fikir.
-          const echoingRemote = (Date.now() - (state.sb.remoteVideoSyncTs || 0)) < 1500;
+          const now = Date.now();
+          if (typeof vState.readyState === 'number' && vState.readyState < 3) {
+            // Tamponlanıyor/yükleniyor: zaman ilerlemiyor diye sarma sanma
+            state.sb.lastVideoState = null;
+          } else {
+            const probe = state.sb.lastVideoState;
+            // Sonda HER tıkta güncellenir (eski kod sadece yayın anında
+            // güncelliyordu; uzak bir senkron uygulandıktan sonra eski sonda
+            // "büyük fark var" diye gereksiz geri-yayın kaskadı yaratıyordu)
+            state.sb.lastVideoState = { paused: vState.paused, currentTime: vState.currentTime, rate: vState.rate, wallTs: now };
 
-          // Yetkisiz kullanıcının video durumu yayınlanmaz (izleyici kalır);
-          // lastVideoState yine güncellenir ki sonradan yetki alırsa eski
-          // durumu "yeni eylem" sanıp ani bir senkron patlaması yapmasın.
-          if (!sbCanInteract()) {
-            state.sb.lastVideoState = vState;
-          } else if (!echoingRemote && (!state.sb.lastVideoState ||
-              state.sb.lastVideoState.paused !== vState.paused ||
-              Math.abs(state.sb.lastVideoState.currentTime - vState.currentTime) > 2)) {
+            // Az önce UZAKTAN uygulanan bir senkronun kendi tetiklediği
+            // paused/currentTime değişimini "yeni yerel eylem" sanma
+            const echoingRemote = (now - (state.sb.remoteVideoSyncTs || 0)) < 1500;
 
-            state.sb.lastVideoState = vState;
-            state.sb.lastVideoSyncTs = Date.now();
-            broadcast({
-              type: 'sb-video-sync',
-              paused: vState.paused,
-              currentTime: vState.currentTime,
-              ts: state.sb.lastVideoSyncTs
-            });
+            if (probe && !echoingRemote && sbCanInteract()) {
+              const pausedChanged = probe.paused !== vState.paused;
+              const expected = probe.paused
+                ? probe.currentTime
+                : probe.currentTime + ((now - probe.wallTs) / 1000) * (probe.rate || 1);
+              const seeked = Math.abs(vState.currentTime - expected) > 3.5;
+              if (pausedChanged || seeked) {
+                state.sb.lastVideoSyncTs = now;
+                state.sb.lastActionTs = now;
+                broadcast({
+                  type: 'sb-video-sync',
+                  paused: vState.paused,
+                  currentTime: vState.currentTime,
+                  ts: now
+                });
+              }
+            }
+
+            // Kurucunun rutin drift düzeltme yayını
+            if (sbIsHost() && now - (state.sb.lastRoutineSyncTs || 0) >= 3000) {
+              state.sb.lastRoutineSyncTs = now;
+              broadcast({
+                type: 'sb-video-sync',
+                routine: true,
+                paused: vState.paused,
+                currentTime: vState.currentTime,
+                ts: now
+              });
+            }
           }
         }
       }
@@ -851,35 +890,61 @@ function handleSBMessage(peerId, msg) {
       const currentTime = Number(msg.currentTime);
       const ts = Number(msg.ts) || 0;
       const paused = !!msg.paused;
+      const isRoutine = !!msg.routine;
       if (!Number.isFinite(currentTime)) return;
-      if (ts && state.sb.lastVideoSyncTs && ts < state.sb.lastVideoSyncTs) return; // eski/geride kalmış eylem, yok say
-      state.sb.lastVideoSyncTs = ts || Date.now();
+
+      if (isRoutine) {
+        // Rutin drift düzeltmesi SADECE kurucudan kabul edilir; yakın zamanda
+        // bir eylem görüldüyse (yerel ya da uzak) uygulanmaz — yoldaki eski
+        // bir rutin "ben 0:03'teyim" mesajı, az önce yapılan "5. dakikaya
+        // sar" eylemini geri çekemesin. Rutinler eylem saat damgalarını da
+        // ASLA günceller/kıyaslamaz: makineler arası saat kayması, gerçek
+        // eylemlerin "bayat" sanılıp düşürülmesine yol açmasın.
+        if (peerId !== state.sb.host) return;
+        if (Date.now() - (state.sb.lastActionTs || 0) < 12000) return;
+      } else {
+        if (ts && state.sb.lastVideoSyncTs && ts < state.sb.lastVideoSyncTs) return; // eski/geride kalmış eylem, yok say
+        state.sb.lastVideoSyncTs = ts || Date.now();
+        state.sb.lastActionTs = Date.now();
+      }
+
       const sbWebview = document.getElementById('sb-webview');
       if (sbWebview) {
-        const effectiveTs = ts || Date.now();
-        // currentTime/ts/paused are sanitized above (finite numbers / boolean)
-        // and re-serialized with JSON.stringify so they can only ever appear
-        // as safe literals here, never as injected script.
+        // Hedef zamanda saat-damgası telafisi bilerek YOK: (Date.now() - ts)
+        // farklı makinelerin duvar saatlerini kıyaslıyordu ve birkaç saniyelik
+        // saat kayması her hedefi o kadar kaydırıyordu. P2P iletim gecikmesi
+        // (<1 sn) toleransların zaten içinde. Rutin için tolerans daha geniş:
+        // ufak doğal kaymalar için sürekli mikro-sıçrama yapma.
+        const tolerance = isRoutine ? 3.5 : 2;
+        // currentTime/paused/tolerance are sanitized above (finite numbers /
+        // boolean) and re-serialized with JSON.stringify so they can only
+        // ever appear as safe literals here, never as injected script.
         const syncScript = `(() => {
           // Reklam gösterilirken kendi videomuzu göndericinin GERÇEK içerik
           // zamanına zorlamaya çalışmayalım: reklam genelde seek edilemez
           // (no-op/hata) ve reklam süresi zaten gönderenin İÇERİK zamanıyla
           // alakasız bir referans olurdu.
-          if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')) return;
+          if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')) return false;
           const v = document.querySelector('video');
-          if (!v) return;
-          const targetTime = ${JSON.stringify(currentTime)} + (Date.now() - ${JSON.stringify(effectiveTs)}) / 1000;
-          if (Math.abs(v.currentTime - targetTime) > 2) {
+          if (!v) return false;
+          let changed = false;
+          const targetTime = ${JSON.stringify(currentTime)};
+          if (Math.abs(v.currentTime - targetTime) > ${JSON.stringify(tolerance)}) {
             v.currentTime = targetTime;
+            changed = true;
           }
-          if (${JSON.stringify(paused)} && !v.paused) v.pause();
-          if (!${JSON.stringify(paused)} && v.paused) v.play().catch(e => {});
+          if (${JSON.stringify(paused)} && !v.paused) { v.pause(); changed = true; }
+          if (!${JSON.stringify(paused)} && v.paused) { v.play().catch(e => {}); changed = true; }
+          return changed;
         })()`;
-        sbWebview.executeJavaScript(syncScript).catch(e => {});
-        // Yerel senkron-yayın döngüsünün bu uygulamayı "yeni bir yerel eylem"
-        // sanıp hemen geri yayınlamasını önle (nav tarafındaki remoteNavTs
-        // bastırma penceresiyle aynı fikir).
-        state.sb.remoteVideoSyncTs = Date.now();
+        // Yankı kalkanı SADECE uzak senkron gerçekten bir şey değiştirdiyse
+        // kurulur. Kurucunun 3 sn'lik rutini çoğunlukla no-op'tur; eski gibi
+        // her uygulamada kalkan kurulsaydı 1.5 sn'lik pencere neredeyse hep
+        // açık kalır ve misafirin KENDİ duraklat/sarma eylemi "uzak yankı"
+        // sanılıp hiç yayınlanmayabilirdi.
+        sbWebview.executeJavaScript(syncScript).then((changed) => {
+          if (changed) state.sb.remoteVideoSyncTs = Date.now();
+        }).catch(e => {});
       }
     }
   } else if (msg.type === 'sb-close') {

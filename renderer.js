@@ -4264,6 +4264,8 @@ function resetSharedBrowserState() {
   state.sb.lastVideoSyncTs = 0;
   state.sb.remoteVideoSyncTs = 0;
   state.sb.lastVideoState = null;
+  state.sb.lastActionTs = 0;
+  state.sb.lastRoutineSyncTs = 0;
   state.sb.authorized = [];
   state.sb.authTs = 0;
   // Reset gezinmesi yayınlanmasın diye "uzaktan uygulanmış" say

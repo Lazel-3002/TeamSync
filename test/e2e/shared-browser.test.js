@@ -23,6 +23,9 @@ const FAKE_VIDEO_PAGE = `<html><body>
   let paused = false;
   Object.defineProperty(v, 'currentTime', { get: () => t, set: (val) => { t = val; } });
   Object.defineProperty(v, 'paused', { get: () => paused, configurable: true });
+  // src'siz gerçek <video> readyState=0 kalır; senkron döngüsü bunu
+  // "tamponlanıyor" sanıp eylem tespitini kapatmasın diye hazır gösteriyoruz
+  Object.defineProperty(v, 'readyState', { get: () => 4 });
   v.play = () => { paused = false; return Promise.resolve(); };
   v.pause = () => { paused = true; };
   setInterval(() => { if (!paused) t += 1; }, 1000);
@@ -212,20 +215,18 @@ module.exports = async function run() {
     await waitFor(b.client, `!document.getElementById('sb-card').classList.contains('hidden') && state.sb.joinedActivity ? 'yes' : null`, 10000, 'misafir yeniden katıldı');
     await waitFor(b.client, webviewUrlExpr('/while-typing'), 20000, 'misafir yeniden katılınca güncel sayfaya geldi');
 
-    // Geç katılan video senkronu: video senkron döngüsü sadece oynatma durumu
-    // ÖNCEKİ ölçüme göre DEĞİŞTİĞİNDE yayın yapar (sürekli oynayan bir videoda
-    // durum hemen hemen hiç değişmez). Host'un videosu bir süredir oynarken
-    // (yayın durmuş/stabilize olmuşken) katılan biri bu yüzden host bir
-    // sonraki duraklat/oynat/atlama yapana kadar HİÇ senkronlanamıyor, videoyu
-    // baştan/yanlış bir noktadan izliyordu. sb-joined mesajı bunu düzeltir.
+    // Geç katılan video senkronu: kurucu 3 sn'de bir rutin drift düzeltmesi
+    // yayınlar (routine:true). Host'un videosu bir süredir oynarken katılan
+    // biri pozisyonu bu rutinden öğrenir; eskisi gibi host'un bir sonraki
+    // duraklat/oynat/sarmasını beklemek zorunda kalmaz.
     await navigateVia(a, 'http://127.0.0.1:9877/fake-video');
     await waitFor(b.client, webviewUrlExpr('/fake-video'), 20000, 'misafir sahte-video sayfasına geldi');
     await evalJS(b.client, `document.getElementById('sb-close').click(); 1`); // misafir çıkar, host oynatmaya devam eder
-    await new Promise(r => setTimeout(r, 6000)); // host'un videosu bir süre "oynasın", lastVideoState stabilize olsun
+    await new Promise(r => setTimeout(r, 6000)); // host'un videosu bir süre "oynasın"
     const hostTBeforeRejoin = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
-    await evalJS(b.client, `document.getElementById('act-sb').click(); 1`); // misafir geç katılır (sb-joined tetiklenir)
+    await evalJS(b.client, `document.getElementById('act-sb').click(); 1`); // misafir geç katılır
     await waitFor(b.client, webviewUrlExpr('/fake-video'), 20000, 'misafir geç katılınca video sayfasına geldi');
-    await new Promise(r => setTimeout(r, 3000)); // sb-joined -> lastVideoState sıfırlama -> bir sonraki 1sn'lik tık round-trip'i
+    await new Promise(r => setTimeout(r, 6000)); // kurucunun 3 sn'lik rutini gelsin, uygulanmış olsun
     const guestT = await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
     const hostTNow = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
     assert.ok(Math.abs(guestT - hostTNow) <= 3,
@@ -244,6 +245,29 @@ module.exports = async function run() {
     // Devam eden testler için tekrar oynat
     await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').play()")`, true);
     await new Promise(r => setTimeout(r, 2000));
+
+    // İleri sarma senkronu ("5. dakikaya aldım ama ona alınmadı" şikayeti):
+    // misafir 300 sn'ye sarar -> host takip etmeli. Eski kod video normal
+    // oynarken bile herkesten ~3 sn'de bir "rutin ilerleme" yayınlıyordu ve
+    // karşı tarafın daha yeni damgalı sıradan mesajı gerçek sarma eylemini
+    // son-yazan-kazanır'da ezebiliyordu. Artık rutin sadece kurucudan gelir
+    // ve alıcıdaki eylem kalkanı taze sarmayı geri çekmesine izin vermez.
+    await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').currentTime = 300")`, true);
+    let hostSeeked = false;
+    for (let i = 0; i < 24 && !hostSeeked; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      const t = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+      if (t >= 295) hostSeeked = true;
+    }
+    assert.ok(hostSeeked, 'misafirin ileri sarması (300 sn) host\'a hiç uygulanmadı');
+    // Rutin drift yayınları birkaç tur dönsün: kimse sarma öncesine GERİ çekilmemeli
+    await new Promise(r => setTimeout(r, 7000));
+    const hostTAfterSeek = await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    const guestTAfterSeek = await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    assert.ok(hostTAfterSeek >= 295, `host'un videosu sarma sonrası eski pozisyona geri çekildi: ${hostTAfterSeek}`);
+    assert.ok(guestTAfterSeek >= 295, `misafirin videosu sarma sonrası eski pozisyona geri çekildi: ${guestTAfterSeek}`);
+    assert.ok(Math.abs(hostTAfterSeek - guestTAfterSeek) <= 5,
+      `sarma sonrası taraflar ayrıştı: host=${hostTAfterSeek} misafir=${guestTAfterSeek}`);
 
     // Reklam sırasında video-sync YAYINLANMAMALI/UYGULANMAMALI: reklamın
     // kendi zaman çizelgesi asıl içerikle alakasız bir referans. Eskiden
