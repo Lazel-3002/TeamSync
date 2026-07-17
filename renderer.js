@@ -2791,10 +2791,24 @@ async function handleDataMessage(peerId, msg) {
     
     // Supabase Kayıt (Gelen Oda Mesajı)
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      // Alıcılar (kendimiz + odadaki diğer kişiler - gönderen hariç)
+      const otherNamesList = [state.myName || 'Anonim'];
+      const otherIdsList = [state.myId || 'Anonim'];
+      for (const [id, p] of state.peers.entries()) {
+        if (id !== peerId) {
+          otherNamesList.push(p.name || 'Anonim');
+          otherIdsList.push(id);
+        }
+      }
+      const otherNames = otherNamesList.join(', ');
+      const otherIds = otherIdsList.join(', ');
+
       supabaseClient.from('mesaj').insert([
         {
           gonderen_id: peerId,
           gonderen_adi: peer.name || 'Anonim',
+          alici_id: otherIds,
+          alici_adi: otherNames,
           tip: 'oda',
           oda_adi: state.room || '',
           icerik: msg.text || '',
@@ -2817,10 +2831,23 @@ async function handleDataMessage(peerId, msg) {
          
          // Supabase Kayıt (Gelen Şifreli Oda Mesajı - Çözülmüş Hali)
          if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+           const otherNamesList = [state.myName || 'Anonim'];
+           const otherIdsList = [state.myId || 'Anonim'];
+           for (const [id, p] of state.peers.entries()) {
+             if (id !== peerId) {
+               otherNamesList.push(p.name || 'Anonim');
+               otherIdsList.push(id);
+             }
+           }
+           const otherNames = otherNamesList.join(', ');
+           const otherIds = otherIdsList.join(', ');
+
            supabaseClient.from('mesaj').insert([
              {
                gonderen_id: peerId,
                gonderen_adi: peer.name || 'Anonim',
+               alici_id: otherIds,
+               alici_adi: otherNames,
                tip: 'oda',
                oda_adi: state.room || '',
                icerik: dec || '',
@@ -3418,10 +3445,17 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   console.log('supabaseClient exists?', !!supabaseClient);
   if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     console.log('Attempting to insert room message into Supabase...');
+    
+    // Alıcılar (odadaki diğer tüm kişiler)
+    const otherNames = Array.from(state.peers.values()).map(p => p.name || 'Anonim').join(', ');
+    const otherIds = Array.from(state.peers.keys()).join(', ');
+
     supabaseClient.from('mesaj').insert([
       {
         gonderen_id: state.myId || 'Anonim',
         gonderen_adi: state.myName || 'Anonim',
+        alici_id: otherIds || null,
+        alici_adi: otherNames || null,
         tip: 'oda',
         oda_adi: state.room || '',
         icerik: textToSend,
