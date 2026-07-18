@@ -23,11 +23,66 @@ function sbStopPlayback() {
   if (!wv) return;
   try { if (typeof wv.setAudioMuted === 'function') wv.setAudioMuted(true); } catch (e) {}
   try {
-    wv.executeJavaScript(`document.querySelectorAll('video,audio').forEach(m => {
-      try { m.pause(); m.removeAttribute('src'); m.load(); } catch (e) {}
-    })`).catch(() => {});
+    // Tek seferlik pause yetmiyor: YouTube oynatıcısı boşaltılan <video>'yu
+    // "takıldı" sanıp kendi kendine toparlıyor ve oynatmayı YENİDEN başlatıyordu
+    // ("kapattım ama arka planda tekrar başladı"). Bu yüzden sayfa içinde hem
+    // YouTube'un resmi API'siyle (pauseVideo) hem medya elemanlarıyla birkaç
+    // saniye boyunca tekrar tekrar durduruyoruz — toparlanma her seferinde
+    // yeniden ezilir; bu arada sbEnsureParked sayfadan tamamen çıkarır.
+    wv.executeJavaScript(`(() => {
+      const kill = () => {
+        try {
+          const p = document.getElementById('movie_player');
+          if (p && typeof p.pauseVideo === 'function') p.pauseVideo();
+        } catch (e) {}
+        document.querySelectorAll('video,audio').forEach(m => {
+          try { m.pause(); m.muted = true; m.removeAttribute('src'); m.load(); } catch (e) {}
+        });
+      };
+      kill();
+      [400, 1000, 2000, 3500, 5000].forEach(d => setTimeout(kill, d));
+    })()`).catch(() => {});
   } catch (e) {}
   try { if (typeof wv.stop === 'function') wv.stop(); } catch (e) {}
+}
+
+// Kapatma sonrası webview'in GERÇEKTEN park sayfasına (duckduckgo) gittiğini
+// doğrular. Gizli webview'de tek seferlik src ataması her zaman tutmuyor;
+// sayfa YouTube'da kaldığı sürece oynatıcı videoyu diriltebiliyor. Park
+// edilene kadar 1.2 sn arayla yeniden dener; kart bu arada yeniden açılırsa
+// kullanıcıya karışmadan kendini iptal eder.
+function sbEnsureParked(attempt) {
+  const card = document.getElementById('sb-card');
+  if (card && !card.classList.contains('hidden')) return; // tekrar açıldı, dokunma
+  const wv = document.getElementById('sb-webview');
+  if (!wv) return;
+  let cur = '';
+  try { cur = (typeof wv.getURL === 'function' && wv.getURL()) || wv.src || ''; }
+  catch (e) { cur = wv.src || ''; }
+  const parked = !cur || cur === 'about:blank' || /^https?:\/\/([^\/]*\.)?duckduckgo\.com/i.test(cur);
+  if (parked) return;
+  try { if (typeof wv.setAudioMuted === 'function') wv.setAudioMuted(true); } catch (e) {}
+  try {
+    wv.executeJavaScript(`document.querySelectorAll('video,audio').forEach(m => { try { m.pause(); m.muted = true; } catch (e) {} })`).catch(() => {});
+  } catch (e) {}
+  // Park hedefi bilerek about:blank, duckduckgo DEĞİL: uzak bir sitenin
+  // yüklenmesi gecikebiliyor ve o gecikmiş yükleme, kullanıcı kartı yeniden
+  // açıp başka sayfaya gittikten SONRA commit olup onun gezinmesini ezebiliyordu
+  // (misafir yeniden katılınca duckduckgo'ya düşüyordu). about:blank anında
+  // commit olur: sayfayı hem kesin öldürür hem böyle bir yarış bırakmaz.
+  // Yeniden açılış zaten about:blank'i ele alıyor (host açarken duckduckgo'yu
+  // kendisi yükler, misafir kurucunun adresine gider).
+  try {
+    if (typeof wv.loadURL === 'function') {
+      const p = wv.loadURL('about:blank');
+      if (p && p.catch) p.catch(() => {});
+    } else {
+      wv.src = 'about:blank';
+    }
+  } catch (e) {
+    try { wv.src = 'about:blank'; } catch (e2) {}
+  }
+  if ((attempt || 0) < 8) setTimeout(() => sbEnsureParked((attempt || 0) + 1), 1200);
 }
 
 // Kapatırken susturulan webview sesini yeniden açar (kart tekrar açılınca)
@@ -37,6 +92,31 @@ function sbResumeAudio() {
   try { if (typeof wv.setAudioMuted === 'function') wv.setAudioMuted(false); } catch (e) {}
 }
 
+// Webview'i doğrula-ve-yeniden-dene ile gezindirir. Kart display:none'dan
+// yeni çıktığında webview guest'i yeniden bağlanır (re-attach) ve o penceredeki
+// src ataması SESSİZCE kaybolur — guest, attribute'taki eski about:blank'i
+// yükleyip üstüne biner (E2E'de yakalandı: misafir yeniden katılınca boş
+// sayfada kalıyordu). Bu yüzden atamadan sonra kontrol edilir: webview hâlâ
+// boşsa (hiç gezinmemiş) aynı adres tekrar denenir. Yönlendirme zincirlerine
+// karışmamak için SADECE "hiç uygulanmadı" (boş/about:blank) durumunda
+// yeniden denenir; bu arada başka bir gezinme istendiyse kendini iptal eder.
+function sbNavigateWebview(url, attempt) {
+  const wv = document.getElementById('sb-webview');
+  if (!wv) return;
+  state.sb.desiredUrl = url;
+  try { wv.src = url; } catch (e) {}
+  const n = attempt || 0;
+  if (n >= 10) return;
+  setTimeout(() => {
+    if (state.sb.desiredUrl !== url) return; // daha yeni bir gezinme istendi
+    const card = document.getElementById('sb-card');
+    if (!card || card.classList.contains('hidden')) return; // kart kapandı
+    let cur = '';
+    try { cur = (typeof wv.getURL === 'function' && wv.getURL()) || ''; } catch (e) { cur = ''; }
+    if (!cur || cur === 'about:blank') sbNavigateWebview(url, n + 1);
+  }, 900);
+}
+
 function sbApplyRemoteNav(url) {
   if (!/^https?:\/\//i.test(url || '')) return; // javascript:/file: gibi şemaları asla yükleme
   const sbUrl = document.getElementById('sb-url');
@@ -44,7 +124,7 @@ function sbApplyRemoteNav(url) {
   if (sbNormUrl(sbCurrentUrl()) === sbNormUrl(url)) return; // zaten oradayız
   state.sb.appliedRemoteUrl = url;
   state.sb.remoteNavTs = Date.now();
-  document.getElementById('sb-webview').src = url;
+  sbNavigateWebview(url);
 }
 
 // ---- Yetkilendirme (kurucu + yetkili kullanıcılar) ----
@@ -244,7 +324,9 @@ function initSharedBrowser() {
     // bilerek ve tek seferde başlatılıyor; artık aynı anda yarışan iki
     // gezinme yok.
     if (!sbCurrentUrl() || sbCurrentUrl() === 'about:blank') {
-      document.getElementById('sb-webview').src = 'https://duckduckgo.com/';
+      // sbNavigateWebview: kart yeniden açılırken webview guest'i yeniden
+      // bağlanıyor olabilir ve tek seferlik src ataması kaybolabilir
+      sbNavigateWebview('https://duckduckgo.com/');
     }
     broadcast({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: sbCurrentUrl(), auth: [] });
   });
@@ -289,7 +371,14 @@ function initSharedBrowser() {
     window.electronAPI.onWindowVisibility((visible) => {
       const wv = document.getElementById('sb-webview');
       if (wv && typeof wv.setAudioMuted === 'function') {
-        try { wv.setAudioMuted(!visible); } catch (e) {}
+        // Sesi SADECE kart gerçekten açıkken geri aç. Eskiden pencere her
+        // görünür olduğunda koşulsuz unmute ediliyordu; Ortak Tarayıcı
+        // kapatıldıktan sonra tray'e gidip geri gelmek, arka planda hâlâ
+        // yaşayan sayfanın sesini yeniden açıyordu ("kapattım ama video
+        // arka planda yeniden başladı" vakalarından biri buydu).
+        const card = document.getElementById('sb-card');
+        const cardOpen = card && !card.classList.contains('hidden');
+        try { wv.setAudioMuted(!visible || !cardOpen); } catch (e) {}
       }
     });
   }

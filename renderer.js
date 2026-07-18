@@ -4528,7 +4528,16 @@ function resetSharedBrowserState() {
     // olabiliyor ve gizli webview'de src ataması güvenilir değil — eskiden
     // video arka planda sesiyle birlikte çalmaya devam edebiliyordu.
     if (typeof sbStopPlayback === 'function') sbStopPlayback();
-    try { sbWebview.src = 'https://duckduckgo.com'; } catch (e) {} // Her zaman duckduckgo kalacak
+    // Park hedefi about:blank (duckduckgo değil): anında commit olur, sayfayı
+    // kesin öldürür ve gecikmiş bir uzak yüklemenin, kullanıcının sonraki
+    // gezinmesini ezmesi gibi bir yarış bırakmaz. Host kartı yeniden açarken
+    // duckduckgo'yu zaten kendisi yükler (act-sb handler'ındaki about:blank
+    // kontrolü), misafir de kurucunun adresine gider.
+    try { sbWebview.src = 'about:blank'; } catch (e) {}
+    // Gezinmenin gerçekten tuttuğunu doğrula; tutmadıysa park edene dek dene
+    // (gizli webview'de src ataması sessizce başarısız olabiliyor ve YouTube
+    // oynatıcısı arka planda videoyu yeniden başlatabiliyordu)
+    if (typeof sbEnsureParked === 'function') setTimeout(() => sbEnsureParked(0), 800);
   }
   if (typeof sbUpdateControlsUI === 'function') sbUpdateControlsUI();
 }
