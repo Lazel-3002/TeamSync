@@ -2758,3 +2758,46 @@ input:checked + .slider:before {
 .btn.off .icon-on { display: none; }
 .btn.off .icon-off { display: block; }
 
+/* Auth CSS Styles */
+.auth-tabs {
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+}
+.auth-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 12px;
+  color: var(--txt-mut);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  font-family: 'Inter', sans-serif;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+  outline: none;
+}
+.auth-tab-btn:hover {
+  color: var(--txt-main);
+}
+.auth-tab-btn.active {
+  color: white;
+  border-bottom: 2px solid var(--acc);
+}
+
+#auth-login-form, #auth-register-form {
+  animation: formFadeIn 0.4s ease;
+}
+
+@keyframes formFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

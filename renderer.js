@@ -582,6 +582,23 @@ async function saveProfile() {
   localStorage.setItem('teamsync_profile', JSON.stringify(profileData));
   await updateAccountInList(profileData);
   renderFriends();
+
+  if (supabaseClient) {
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        await supabaseClient.from('profiles').update({
+          name: state.myName,
+          avatar: state.myAvatar,
+          friends: state.friends,
+          requests: state.friendRequests,
+          updated_at: new Date().toISOString()
+        }).eq('id', session.user.id);
+      }
+    } catch (e) {
+      console.error("Supabase profile sync error:", e);
+    }
+  }
 }
 
 function loadDMs() {
@@ -908,7 +925,7 @@ function setupGlobalMQTT() {
           if (state.myAvatar) {
             state.globalMqtt.publish(`teamsync/user/${data.fromId}/events`, JSON.stringify({
               type: 'res_avatar',
-              fromId: state.myId,
+              fromId: state.friendId,
               avatar: state.myAvatar
             }));
           }
@@ -1286,40 +1303,250 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) {}
 
-  const isSecond = await window.electronAPI.isSecondInstance();
-  const accountsList = await getAccounts();
-  const defaultAcc = !isSecond ? accountsList.find(acc => acc.isDefault) : null;
-  
-  if (defaultAcc) {
-    loginWithAccount(defaultAcc);
-  } else {
-    const savedProfile = localStorage.getItem('teamsync_profile');
-    if (savedProfile) {
-      try {
-        const data = JSON.parse(savedProfile);
-        const existing = accountsList.find(a => a.id === data.id);
-        if (existing) {
-          loginWithAccount(existing);
-        } else {
-          loginWithAccount(data);
-        }
-      } catch(e) {
-        await showAccountsOrNameSetup();
+  // --- Supabase Auth Entegrasyonu ---
+  const tabLogin = document.getElementById('tab-login');
+  const tabRegister = document.getElementById('tab-register');
+  const loginForm = document.getElementById('auth-login-form');
+  const registerForm = document.getElementById('auth-register-form');
+
+  tabLogin.addEventListener('click', () => {
+    tabLogin.classList.add('active');
+    tabRegister.classList.remove('active');
+    tabLogin.style.borderColor = 'var(--acc)';
+    tabRegister.style.borderColor = 'transparent';
+    tabLogin.style.color = 'white';
+    tabRegister.style.color = 'var(--txt-mut)';
+    loginForm.classList.remove('hidden');
+    registerForm.classList.add('hidden');
+  });
+
+  tabRegister.addEventListener('click', () => {
+    tabRegister.classList.add('active');
+    tabLogin.classList.remove('active');
+    tabRegister.style.borderColor = 'var(--acc)';
+    tabLogin.style.borderColor = 'transparent';
+    tabRegister.style.color = 'white';
+    tabLogin.style.color = 'var(--txt-mut)';
+    registerForm.classList.remove('hidden');
+    loginForm.classList.add('hidden');
+  });
+
+  async function checkSession() {
+    if (!supabaseClient) {
+      console.warn("Supabase client is not initialized.");
+      document.getElementById('step-auth').classList.remove('hidden');
+      return;
+    }
+    try {
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      if (error) throw error;
+      if (session) {
+        console.log("Active Supabase session found:", session.user.email);
+        await loadSupabaseProfile(session.user.id);
+      } else {
+        console.log("No active Supabase session.");
+        document.getElementById('step-auth').classList.remove('hidden');
       }
-    } else {
-      await showAccountsOrNameSetup();
+    } catch (e) {
+      console.error("Session check error:", e);
+      document.getElementById('step-auth').classList.remove('hidden');
     }
   }
 
-  async function showAccountsOrNameSetup() {
-    const accList = await getAccounts();
-    if (accList.length > 0) {
-      document.getElementById('step-accounts').classList.remove('hidden');
-      await renderAccountsList();
-    } else {
-      document.getElementById('step-name').classList.remove('hidden');
+  async function loadSupabaseProfile(userId) {
+    try {
+      let { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      // Retry once if not found (in case database trigger is running)
+      if ((error || !profile) && error?.code === 'PGRST116') {
+        console.log("Profile not found immediately, retrying in 500ms...");
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const retryResult = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        if (retryResult.data) {
+          profile = retryResult.data;
+          error = null;
+        }
+      }
+
+      if (error || !profile) {
+        console.warn("Profile not found in database, creating a default one.");
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        const nickname = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Anonim';
+        const newFriendId = `KNK-${crypto.randomUUID().toUpperCase()}`;
+        
+        const newProfile = {
+          id: userId,
+          name: nickname,
+          friend_id: newFriendId,
+          avatar: null,
+          friends: {},
+          requests: []
+        };
+        
+        const { error: insertError } = await supabaseClient
+          .from('profiles')
+          .insert([newProfile]);
+        
+        if (insertError) {
+          console.warn("Insert failed, trying one last fetch:", insertError);
+          const finalResult = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          if (finalResult.data) {
+            loginWithProfileData(finalResult.data);
+            return;
+          }
+          throw insertError;
+        }
+        
+        loginWithProfileData(newProfile);
+      } else {
+        loginWithProfileData(profile);
+      }
+    } catch (e) {
+      console.error("Load profile error:", e);
+      showToast("Profil yüklenirken hata oluştu: " + e.message, "danger");
+      document.getElementById('step-auth').classList.remove('hidden');
     }
   }
+
+  function loginWithProfileData(profile) {
+    state.myName = profile.name;
+    state.friendId = profile.friend_id;
+    state.myAvatar = profile.avatar || null;
+    state.myAvatarHash = null;
+    state.friends = profile.friends || {};
+    state.friendRequests = profile.requests || [];
+
+    localStorage.setItem('teamsync_profile', JSON.stringify({
+      name: state.myName,
+      id: state.friendId,
+      avatar: state.myAvatar,
+      avatarHash: state.myAvatarHash,
+      friends: state.friends,
+      requests: state.friendRequests
+    }));
+
+    document.getElementById('display-name').textContent = state.myName;
+    document.getElementById('my-friend-id').textContent = state.friendId;
+
+    if (state.myAvatar) {
+      document.getElementById('my-avatar-img').src = state.myAvatar;
+      document.getElementById('my-avatar-img').style.display = 'block';
+      document.getElementById('my-avatar-default').style.display = 'none';
+    } else {
+      document.getElementById('my-avatar-img').style.display = 'none';
+      document.getElementById('my-avatar-default').style.display = 'block';
+    }
+
+    document.getElementById('step-auth').classList.add('hidden');
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('step-name').classList.add('hidden');
+    document.getElementById('step-action').classList.remove('hidden');
+    document.querySelector('.login-card').classList.add('expanded');
+
+    renderFriends();
+    setupGlobalMQTT();
+  }
+
+  const btnSubmitLogin = document.getElementById('btn-submit-login');
+  btnSubmitLogin.addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password-field').value;
+
+    if (!email || !password) {
+      return showToast("Lütfen e-posta ve şifre girin.", "warn");
+    }
+
+    btnSubmitLogin.disabled = true;
+    btnSubmitLogin.textContent = "Giriş yapılıyor...";
+
+    try {
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) throw error;
+
+      console.log("Logged in successfully:", data.user.email);
+      showToast("Başarıyla giriş yapıldı!", "ok");
+      await loadSupabaseProfile(data.user.id);
+    } catch (e) {
+      console.error("Login error:", e);
+      showToast("Giriş hatası: " + e.message, "danger");
+    } finally {
+      btnSubmitLogin.disabled = false;
+      btnSubmitLogin.textContent = "Giriş Yap";
+    }
+  });
+
+  const btnSubmitRegister = document.getElementById('btn-submit-register');
+  btnSubmitRegister.addEventListener('click', async () => {
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password-field').value;
+    const name = document.getElementById('register-name').value.trim();
+
+    if (!email || !password || !name) {
+      return showToast("Lütfen tüm alanları doldurun.", "warn");
+    }
+
+    if (password.length < 6) {
+      return showToast("Şifre en az 6 karakter olmalıdır.", "warn");
+    }
+
+    btnSubmitRegister.disabled = true;
+    btnSubmitRegister.textContent = "Kayıt olunuyor...";
+
+    try {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: name
+          }
+        }
+      });
+
+      if (error) throw error;
+      
+      const user = data.user;
+      if (!user) {
+        throw new Error("Kayıt olunamadı. Lütfen bilgileri kontrol edin.");
+      }
+
+      console.log("Signed up successfully:", user.email);
+
+      // E-posta doğrulama aktifse veya değilse
+      if (data.session) {
+        showToast("Kayıt ve giriş başarılı!", "ok");
+        await loadSupabaseProfile(user.id);
+      } else {
+        showToast("Kayıt başarılı! Lütfen e-postanıza gönderilen onay bağlantısına tıklayın, ardından Giriş Yapın.", "info");
+        tabLogin.click();
+      }
+    } catch (e) {
+      console.error("Register error:", e);
+      showToast("Kayıt hatası: " + e.message, "danger");
+    } finally {
+      btnSubmitRegister.disabled = false;
+      btnSubmitRegister.textContent = "Kayıt Ol";
+    }
+  });
+
+  // Start checkSession
+  await checkSession();
 
   btnNextName.addEventListener('click', () => {
     const n = nameInp.value.trim() || 'Anonim';
@@ -1375,6 +1602,15 @@ window.addEventListener('DOMContentLoaded', async () => {
       state.globalMqtt = null;
     }
     
+    // Supabase Sign Out
+    if (supabaseClient) {
+      try {
+        await supabaseClient.auth.signOut();
+      } catch (e) {
+        console.error("Supabase signOut error:", e);
+      }
+    }
+
     localStorage.removeItem('teamsync_profile');
     
     state.myName = '';
@@ -1386,8 +1622,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     document.getElementById('step-action').classList.add('hidden');
     document.querySelector('.login-card').classList.remove('expanded');
-    document.getElementById('step-accounts').classList.remove('hidden');
-    await renderAccountsList();
+    document.getElementById('step-auth').classList.remove('hidden');
   });
 
   document.getElementById('my-friend-id').addEventListener('click', () => {
@@ -4992,7 +5227,7 @@ window.sendDMText = async (text) => {
   if (typeof supabaseClient !== 'undefined' && supabaseClient) {
     supabaseClient.from('mesaj').insert([
       {
-        gonderen_id: state.myId || 'Anonim',
+        gonderen_id: state.friendId || 'Anonim',
         gonderen_adi: state.myName || 'Anonim',
         alici_id: friendId,
         alici_adi: state.friends[friendId]?.name || 'Arkadaş',
@@ -5008,7 +5243,7 @@ window.sendDMText = async (text) => {
   // MQTT send
   state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
     type: 'dm_msg',
-    fromId: state.myId,
+    fromId: state.friendId,
     msgType: 'text',
     content: textToSend,
     isCensored: isCensored
@@ -5040,7 +5275,7 @@ window.sendDMFile = (file) => {
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
       supabaseClient.from('mesaj').insert([
         {
-          gonderen_id: state.myId || 'Anonim',
+          gonderen_id: state.friendId || 'Anonim',
           gonderen_adi: state.myName || 'Anonim',
           alici_id: friendId,
           alici_adi: state.friends[friendId]?.name || 'Arkadaş',
@@ -5059,22 +5294,18 @@ window.sendDMFile = (file) => {
 
     state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
       type: 'dm_file_start',
-      fromId: state.myId,
+      fromId: state.friendId,
       fileId: fileId,
       msgType: msgType,
       fileName: file.name,
       totalChunks: totalChunks
     }));
 
-    // Ücretsiz/genel MQTT broker QoS 0 kullanıyor (teslim garantisi yok); art arda
-    // gönderilen çok sayıda mesaj broker tarafında kısıtlanıp sessizce kaybolabiliyor.
-    // Parçalar arasına küçük bir gecikme koymak (oda içi dosya transferindeki gibi)
-    // bu riski azaltır.
     for (let i = 0; i < totalChunks; i++) {
       const chunk = base64Data.substr(i * CHUNK_SIZE, CHUNK_SIZE);
       state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
         type: 'dm_file_chunk',
-        fromId: state.myId,
+        fromId: state.friendId,
         fileId: fileId,
         chunkIndex: i,
         data: chunk
@@ -5108,7 +5339,7 @@ window.receiveDM = async (fromId, data) => {
         {
           gonderen_id: fromId,
           gonderen_adi: state.friends[fromId]?.name || 'Arkadaş',
-          alici_id: state.myId || 'Anonim',
+          alici_id: state.friendId || 'Anonim',
           alici_adi: state.myName || 'Anonim',
           tip: 'dm',
           icerik: data.content,
@@ -5147,7 +5378,7 @@ window.receiveDM = async (fromId, data) => {
             {
               gonderen_id: fromId,
               gonderen_adi: state.friends[fromId]?.name || 'Arkadaş',
-              alici_id: state.myId || 'Anonim',
+              alici_id: state.friendId || 'Anonim',
               alici_adi: state.myName || 'Anonim',
               tip: 'dm',
               icerik: `[${fileData.msgType === 'image' ? 'Görsel' : 'Dosya'}: ${fileData.fileName}] ${fullBase64}`,

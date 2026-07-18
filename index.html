@@ -247,6 +247,37 @@
       </h1>
       <p class="muted">P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur, internetten bağlanılabilir</p>
 
+      <!-- Adım Auth: Giriş & Kayıt -->
+      <div id="step-auth">
+        <div class="auth-tabs" style="display: flex; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px;">
+          <button id="tab-login" class="auth-tab-btn active" style="flex: 1; background: none; border: none; padding: 10px; color: white; cursor: pointer; font-weight: 600; font-size: 15px; border-bottom: 2px solid var(--acc); transition: all 0.3s;">Giriş Yap</button>
+          <button id="tab-register" class="auth-tab-btn" style="flex: 1; background: none; border: none; padding: 10px; color: var(--txt-mut); cursor: pointer; font-weight: 600; font-size: 15px; border-bottom: 2px solid transparent; transition: all 0.3s;">Kayıt Ol</button>
+        </div>
+
+        <div id="auth-login-form">
+          <label>E-posta</label>
+          <input id="login-email" type="text" placeholder="ornek@teamsync.com" autocomplete="email" />
+          
+          <label>Şifre</label>
+          <input id="login-password-field" type="password" placeholder="••••••••" autocomplete="current-password" />
+          
+          <button id="btn-submit-login">Giriş Yap</button>
+        </div>
+
+        <div id="auth-register-form" class="hidden">
+          <label>E-posta</label>
+          <input id="register-email" type="text" placeholder="ornek@teamsync.com" autocomplete="email" />
+          
+          <label>Şifre</label>
+          <input id="register-password-field" type="password" placeholder="••••••••" autocomplete="new-password" />
+
+          <label>Görünür İsim (Nick)</label>
+          <input id="register-name" type="text" placeholder="Lütfen adınızı girin" maxlength="20" />
+          
+          <button id="btn-submit-register">Kayıt Ol</button>
+        </div>
+      </div>
+
       <!-- Adım 0: Hesaplar -->
       <div id="step-accounts" class="hidden">
         <label>Hesap Seçin</label>
@@ -257,7 +288,7 @@
       </div>
 
       <!-- Adım 1: İsim -->
-      <div id="step-name">
+      <div id="step-name" class="hidden">
         <label>Adın</label>
         <input id="name" type="text" placeholder="TeamSync" maxlength="20" />
         <button id="btn-next-name">İleri</button>
