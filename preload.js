@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadAccounts: () => ipcRenderer.invoke('load-accounts'),
   saveAccounts: (accounts) => ipcRenderer.invoke('save-accounts', accounts),
   isSecondInstance: () => ipcRenderer.invoke('is-second-instance'),
+  getDeviceCredentials: (slot) => ipcRenderer.invoke('get-device-credentials', slot),
   getEnv: () => ({
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY

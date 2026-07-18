@@ -48,6 +48,7 @@
       "!yapaydenetliyici.md"
     ],
     "win": {
+      "icon": "assets/icon.png",
       "target": [
         {
           "target": "portable",

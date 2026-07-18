@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage } = require('electron');
 app.name = 'TeamSync';
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
@@ -7,7 +7,7 @@ app.commandLine.appendSwitch('disable-async-dns');
 const path = require('path');
 const dgram = require('dgram');
 const os = require('os');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 let cloudflaredProcess = null;
 
 const fs = require('fs');
@@ -201,6 +201,7 @@ function createWindow() {
     },
     backgroundColor: '#1e1f22',
     title: 'TeamSync - P2P',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     autoHideMenuBar: true,
     webSecurity: true,
     frame: false
@@ -334,6 +335,51 @@ ipcMain.handle('save-accounts', (event, accounts) => {
 
 ipcMain.handle('is-second-instance', () => {
   return isSecondInstance;
+});
+
+// ─── Cihaz Kimliği ───────────────────────────────────────────────────────────
+// İlk açılışta bir kez üretilir: 256-bit kriptografik rastgele gizli anahtar.
+// Dosya safeStorage (Windows DPAPI) ile şifrelenir; yalnızca bu Windows
+// kullanıcı hesabı çözebilir. Ham anahtar renderer'a hiç verilmez — Supabase
+// giriş bilgileri SHA-256 ile tek yönlü türetilip IPC üzerinden döner.
+const nodeCrypto = require('crypto');
+const deviceIdentityFile = path.join(baseUserData, 'device-identity.bin');
+
+function loadOrCreateDeviceSecret() {
+  try {
+    if (fs.existsSync(deviceIdentityFile)) {
+      const raw = fs.readFileSync(deviceIdentityFile);
+      return safeStorage.isEncryptionAvailable()
+        ? safeStorage.decryptString(raw)
+        : raw.toString('utf8');
+    }
+  } catch (e) {
+    console.error('Cihaz kimliği çözülemedi, yenisi üretilecek:', e.message);
+  }
+  const secret = nodeCrypto.randomBytes(32).toString('hex');
+  const payload = safeStorage.isEncryptionAvailable()
+    ? safeStorage.encryptString(secret)
+    : Buffer.from(secret, 'utf8');
+  // Windows'ta gizli (+h) dosyanın üzerine writeFileSync EPERM verir —
+  // yazmadan önce gizliliği kaldır, yazınca geri koy.
+  try { spawnSync('attrib', ['-h', deviceIdentityFile]); } catch (e) {}
+  fs.writeFileSync(deviceIdentityFile, payload);
+  try { spawnSync('attrib', ['+h', deviceIdentityFile]); } catch (e) {}
+  return secret;
+}
+
+// slot: aynı cihazda birden çok hesap. Hepsi aynı cihaz kimliğini (deviceId)
+// paylaşır; slot 0'ın türetimi ilk sürümle birebir aynı kalmalı (geriye uyum).
+ipcMain.handle('get-device-credentials', (event, slot) => {
+  const s = Number.isInteger(slot) && slot > 0 ? slot : 0;
+  const secret = loadOrCreateDeviceSecret();
+  const deviceId = nodeCrypto.createHash('sha256').update('teamsync-device-id:' + secret).digest('hex').slice(0, 40);
+  const pwSource = s === 0
+    ? 'teamsync-device-pw:' + secret
+    : 'teamsync-device-pw:' + s + ':' + secret;
+  const password = nodeCrypto.createHash('sha256').update(pwSource).digest('base64');
+  const emailLocal = s === 0 ? 'd-' + deviceId : 'd-' + deviceId + '-' + s;
+  return { email: emailLocal + '@device.teamsync.app', password, deviceId, slot: s };
 });
 
 ipcMain.handle('start-cloudflared', async (event, port) => {
@@ -690,7 +736,7 @@ app.whenReady().then(() => {
 
   createWindow();
   
-  tray = new Tray(nativeImage.createEmpty()); // Placeholder until flag is generated
+  tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')).resize({ width: 32, height: 32 })); // Bayrak üretilene dek logo
   tray.setToolTip('TeamSync');
 
   // Custom CSS Tray Menu Window

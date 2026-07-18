@@ -581,6 +581,7 @@ async function saveProfile() {
   };
   localStorage.setItem('teamsync_profile', JSON.stringify(profileData));
   await updateAccountInList(profileData);
+  if (window.syncActiveDeviceAccount) window.syncActiveDeviceAccount();
   renderFriends();
 
   if (supabaseClient) {
@@ -794,22 +795,29 @@ let pingInterval = null;
 
 function setupGlobalMQTT() {
   if (state.globalMqtt) return;
-  state.globalMqtt = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+  const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
     clientId: 'glob-' + state.friendId + '-' + state.myId,
     keepalive: 60,
     reconnectPeriod: 1000
   });
+  state.globalMqtt = client;
 
-  state.globalMqtt.on('error', (err) => {
+  client.on('error', (err) => {
     console.error('MQTT global connection error:', err);
   });
-  
-  state.globalMqtt.on('connect', () => {
+
+  client.on('connect', () => {
+    // Hesap değiştirme yarışı: çıkışta state.globalMqtt null'lanır ama eski
+    // istemcinin geciken connect'i hâlâ ateşlenebilir — artık bizim değilse kapat.
+    if (state.globalMqtt !== client) {
+      try { client.end(true); } catch (e) {}
+      return;
+    }
     console.log('🔗 Global MQTT (Arkadaşlık) bağlandı');
-    state.globalMqtt.subscribe(`teamsync/user/${state.friendId}/events`);
-    
+    client.subscribe(`teamsync/user/${state.friendId}/events`);
+
     Object.keys(state.friends).forEach(fId => {
-      state.globalMqtt.subscribe(`teamsync/user/${fId}/presence`);
+      client.subscribe(`teamsync/user/${fId}/presence`);
     });
     
     if (presenceInterval) clearInterval(presenceInterval);
@@ -828,7 +836,8 @@ function setupGlobalMQTT() {
     // Removed global MQTT ping logic for serverless operation
   });
   
-  state.globalMqtt.on('message', (topic, message) => {
+  client.on('message', (topic, message) => {
+    if (state.globalMqtt !== client) return; // eski hesabın istemcisi, yok say
     try {
       const data = JSON.parse(message.toString());
       if (topic.endsWith('/presence')) {
@@ -1303,53 +1312,150 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) {}
 
-  // --- Supabase Auth Entegrasyonu ---
-  const tabLogin = document.getElementById('tab-login');
-  const tabRegister = document.getElementById('tab-register');
-  const loginForm = document.getElementById('auth-login-form');
-  const registerForm = document.getElementById('auth-register-form');
+  // --- Cihaza Bağlı Otomatik Kimlik (Supabase) ---
+  // E-posta/şifre formu kaldırıldı. İlk açılışta main süreci 256-bit rastgele
+  // bir cihaz gizli anahtarı üretir ve DPAPI ile şifreli saklar; giriş
+  // bilgileri o anahtardan türetilir, kullanıcıya hiçbir yerde gösterilmez.
+  const authStatusText = document.getElementById('auth-status-text');
+  const btnRetryAuth = document.getElementById('btn-retry-auth');
+  const authVisual = document.getElementById('auth-visual');
 
-  tabLogin.addEventListener('click', () => {
-    tabLogin.classList.add('active');
-    tabRegister.classList.remove('active');
-    tabLogin.style.borderColor = 'var(--acc)';
-    tabRegister.style.borderColor = 'transparent';
-    tabLogin.style.color = 'white';
-    tabRegister.style.color = 'var(--txt-mut)';
-    loginForm.classList.remove('hidden');
-    registerForm.classList.add('hidden');
-  });
+  function setAuthStatus(msg, isError = false) {
+    if (authStatusText) {
+      authStatusText.textContent = msg;
+      authStatusText.style.color = isError ? '#f87171' : '';
+    }
+    if (authVisual) authVisual.classList.toggle('error', isError);
+    if (btnRetryAuth) btnRetryAuth.classList.toggle('hidden', !isError);
+  }
 
-  tabRegister.addEventListener('click', () => {
-    tabRegister.classList.add('active');
-    tabLogin.classList.remove('active');
-    tabRegister.style.borderColor = 'var(--acc)';
-    tabLogin.style.borderColor = 'transparent';
-    tabRegister.style.color = 'white';
-    tabLogin.style.color = 'var(--txt-mut)';
-    registerForm.classList.remove('hidden');
-    loginForm.classList.add('hidden');
-  });
+  // Aynı cihazdaki hesaplar: hepsi tek cihaz kimliğini paylaşır, slot numarası
+  // ile ayrılır. Kayıt defteri sadece görünüm içindir (isim/avatar); kimlik
+  // bilgileri her zaman main sürecinden türetilir.
+  const DEVICE_ACCOUNTS_KEY = 'teamsync_device_accounts';
+  const ACTIVE_SLOT_KEY = 'teamsync_active_slot';
+
+  function getDeviceAccounts() {
+    try { return JSON.parse(localStorage.getItem(DEVICE_ACCOUNTS_KEY)) || []; } catch (e) { return []; }
+  }
+  function saveDeviceAccounts(list) {
+    localStorage.setItem(DEVICE_ACCOUNTS_KEY, JSON.stringify(list));
+  }
+  function getActiveSlot() {
+    const s = parseInt(localStorage.getItem(ACTIVE_SLOT_KEY), 10);
+    return Number.isInteger(s) && s >= 0 ? s : 0;
+  }
+  function upsertDeviceAccount(slot, patch) {
+    const list = getDeviceAccounts();
+    const idx = list.findIndex(a => a.slot === slot);
+    if (idx !== -1) list[idx] = { ...list[idx], ...patch };
+    else list.push({ slot, name: 'Anonim', avatar: null, ...patch });
+    list.sort((a, b) => a.slot - b.slot);
+    saveDeviceAccounts(list);
+  }
+  window.syncActiveDeviceAccount = () => {
+    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar });
+  };
+
+  async function deviceLogin(slot) {
+    if (!Number.isInteger(slot) || slot < 0) slot = getActiveSlot();
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('step-name').classList.add('hidden');
+    document.getElementById('step-auth').classList.remove('hidden');
+    if (!supabaseClient) {
+      setAuthStatus('Sunucu yapılandırması eksik (.env dosyasını kontrol edin).', true);
+      return;
+    }
+    if (!window.electronAPI || !window.electronAPI.getDeviceCredentials) {
+      setAuthStatus('Cihaz kimliği API bulunamadı (preload güncel değil).', true);
+      return;
+    }
+    setAuthStatus('Cihaz kimliği doğrulanıyor...');
+    try {
+      const creds = await window.electronAPI.getDeviceCredentials(slot);
+      let { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: creds.email,
+        password: creds.password
+      });
+      if (error) {
+        // Bu slotun hesabı henüz yok — bir kez oluşturulur.
+        setAuthStatus('Bu cihaz için yeni hesap oluşturuluyor...');
+        const signUpRes = await supabaseClient.auth.signUp({
+          email: creds.email,
+          password: creds.password,
+          options: { data: { display_name: 'Anonim' } }
+        });
+        if (signUpRes.error) throw signUpRes.error;
+        data = signUpRes.data;
+        if (!data.session) {
+          throw new Error('Sunucu e-posta onayı bekliyor; Supabase panelinden "Confirm email" kapatılmalı.');
+        }
+      }
+      localStorage.setItem(ACTIVE_SLOT_KEY, String(slot));
+      await loadSupabaseProfile(data.user.id);
+    } catch (e) {
+      console.error('Device login error:', e);
+      setAuthStatus('Giriş yapılamadı: ' + (e.message || e), true);
+    }
+  }
+
+  if (btnRetryAuth) btnRetryAuth.addEventListener('click', () => deviceLogin());
+
+  // "Hesap Değiştir" ekranı: bu cihazda açılmış hesapların listesi
+  async function renderDeviceAccounts() {
+    const container = document.getElementById('accounts-list');
+    if (!container) return;
+    document.getElementById('step-auth').classList.add('hidden');
+    document.getElementById('step-name').classList.add('hidden');
+    document.getElementById('step-accounts').classList.remove('hidden');
+    container.innerHTML = '';
+
+    const list = getDeviceAccounts();
+    if (!list.length) {
+      await deviceLogin(0);
+      return;
+    }
+    const activeSlot = getActiveSlot();
+    list.forEach(acc => {
+      const row = document.createElement('div');
+      row.className = 'account-row';
+      const avatarHtml = acc.avatar
+        ? `<img class="account-row-avatar" src="${acc.avatar}" />`
+        : `<div class="account-row-avatar">👤</div>`;
+      row.innerHTML = `
+        ${avatarHtml}
+        <div class="account-row-info">
+          <div class="account-row-name">${escapeHtml(acc.name || 'Anonim')}</div>
+          <div class="account-row-id">Bu cihazın kimliği · Hesap #${acc.slot + 1}${acc.slot === activeSlot ? ' · son kullanılan' : ''}</div>
+        </div>
+      `;
+      if (acc.slot === activeSlot) {
+        row.style.border = '1px solid var(--acc)';
+      }
+      row.onclick = () => deviceLogin(acc.slot);
+      container.appendChild(row);
+    });
+  }
 
   async function checkSession() {
     if (!supabaseClient) {
       console.warn("Supabase client is not initialized.");
       document.getElementById('step-auth').classList.remove('hidden');
+      setAuthStatus('Sunucu yapılandırması eksik (.env dosyasını kontrol edin).', true);
       return;
     }
     try {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
       if (error) throw error;
       if (session) {
-        console.log("Active Supabase session found:", session.user.email);
+        console.log("Active Supabase session found.");
         await loadSupabaseProfile(session.user.id);
       } else {
-        console.log("No active Supabase session.");
-        document.getElementById('step-auth').classList.remove('hidden');
+        await deviceLogin();
       }
     } catch (e) {
       console.error("Session check error:", e);
-      document.getElementById('step-auth').classList.remove('hidden');
+      await deviceLogin();
     }
   }
 
@@ -1417,6 +1523,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       console.error("Load profile error:", e);
       showToast("Profil yüklenirken hata oluştu: " + e.message, "danger");
       document.getElementById('step-auth').classList.remove('hidden');
+      setAuthStatus('Profil yüklenemedi: ' + e.message, true);
     }
   }
 
@@ -1455,95 +1562,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('step-action').classList.remove('hidden');
     document.querySelector('.login-card').classList.add('expanded');
 
+    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar });
+
     renderFriends();
     setupGlobalMQTT();
   }
-
-  const btnSubmitLogin = document.getElementById('btn-submit-login');
-  btnSubmitLogin.addEventListener('click', async () => {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password-field').value;
-
-    if (!email || !password) {
-      return showToast("Lütfen e-posta ve şifre girin.", "warn");
-    }
-
-    btnSubmitLogin.disabled = true;
-    btnSubmitLogin.textContent = "Giriş yapılıyor...";
-
-    try {
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
-
-      console.log("Logged in successfully:", data.user.email);
-      showToast("Başarıyla giriş yapıldı!", "ok");
-      await loadSupabaseProfile(data.user.id);
-    } catch (e) {
-      console.error("Login error:", e);
-      showToast("Giriş hatası: " + e.message, "danger");
-    } finally {
-      btnSubmitLogin.disabled = false;
-      btnSubmitLogin.textContent = "Giriş Yap";
-    }
-  });
-
-  const btnSubmitRegister = document.getElementById('btn-submit-register');
-  btnSubmitRegister.addEventListener('click', async () => {
-    const email = document.getElementById('register-email').value.trim();
-    const password = document.getElementById('register-password-field').value;
-    const name = document.getElementById('register-name').value.trim();
-
-    if (!email || !password || !name) {
-      return showToast("Lütfen tüm alanları doldurun.", "warn");
-    }
-
-    if (password.length < 6) {
-      return showToast("Şifre en az 6 karakter olmalıdır.", "warn");
-    }
-
-    btnSubmitRegister.disabled = true;
-    btnSubmitRegister.textContent = "Kayıt olunuyor...";
-
-    try {
-      const { data, error } = await supabaseClient.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            display_name: name
-          }
-        }
-      });
-
-      if (error) throw error;
-      
-      const user = data.user;
-      if (!user) {
-        throw new Error("Kayıt olunamadı. Lütfen bilgileri kontrol edin.");
-      }
-
-      console.log("Signed up successfully:", user.email);
-
-      // E-posta doğrulama aktifse veya değilse
-      if (data.session) {
-        showToast("Kayıt ve giriş başarılı!", "ok");
-        await loadSupabaseProfile(user.id);
-      } else {
-        showToast("Kayıt başarılı! Lütfen e-postanıza gönderilen onay bağlantısına tıklayın, ardından Giriş Yapın.", "info");
-        tabLogin.click();
-      }
-    } catch (e) {
-      console.error("Register error:", e);
-      showToast("Kayıt hatası: " + e.message, "danger");
-    } finally {
-      btnSubmitRegister.disabled = false;
-      btnSubmitRegister.textContent = "Kayıt Ol";
-    }
-  });
 
   // Start checkSession
   await checkSession();
@@ -1563,6 +1586,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btn-new-account').addEventListener('click', () => {
+    if (supabaseClient) {
+      // Aynı cihaz kimliği altında yeni slot aç
+      const list = getDeviceAccounts();
+      const nextSlot = list.length ? Math.max(...list.map(a => a.slot)) + 1 : 0;
+      deviceLogin(nextSlot);
+      return;
+    }
     document.getElementById('step-accounts').classList.add('hidden');
     document.getElementById('step-name').classList.remove('hidden');
     document.getElementById('btn-back-accounts').classList.remove('hidden');
@@ -1622,7 +1652,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     document.getElementById('step-action').classList.add('hidden');
     document.querySelector('.login-card').classList.remove('expanded');
-    document.getElementById('step-auth').classList.remove('hidden');
+    // Hesap seçici: bu cihazda açılmış hesaplar listelenir, yenisi oluşturulabilir
+    await renderDeviceAccounts();
   });
 
   document.getElementById('my-friend-id').addEventListener('click', () => {
@@ -3426,7 +3457,7 @@ async function handleDataMessage(peerId, msg) {
           aDl.href = url;
           aDl.download = f.meta.name;
           aDl.className = 'text-dl';
-          aDl.innerHTML = `⬇️ İndir`;
+          aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> İndir`;
           btnGroup.appendChild(aDl);
           
           if (f.meta.mime.startsWith('text/') || f.meta.mime === 'application/pdf') {
@@ -3434,7 +3465,7 @@ async function handleDataMessage(peerId, msg) {
             aView.href = url;
             aView.target = '_blank';
             aView.className = 'text-dl view-btn';
-            aView.innerHTML = `👁️ İçine Bak`;
+            aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> İçine Bak`;
             btnGroup.appendChild(aView);
           }
           
@@ -3612,7 +3643,7 @@ function showUserContextMenu(e, targetId, targetName) {
   friendBtn.className = 'user-context-menu-item';
   if (isFriend) {
     friendBtn.classList.add('danger');
-    friendBtn.innerHTML = '👥 Arkadaşı Sil';
+    friendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="23" y1="11" x2="17" y2="11"></line></svg> Arkadaşı Sil';
     friendBtn.addEventListener('click', async () => {
       if (await window.showConfirm('⚠️ Arkadaşı Sil', `"${targetName}" arkadaşını silmek istediğinize emin misiniz?`)) {
         removeFriend(targetId);
@@ -3621,7 +3652,7 @@ function showUserContextMenu(e, targetId, targetName) {
       menu.remove();
     });
   } else {
-    friendBtn.innerHTML = '➕ Arkadaş Ekle';
+    friendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg> Arkadaş Ekle';
     friendBtn.addEventListener('click', () => {
       if (state.globalMqtt && state.globalMqtt.connected) {
         state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
@@ -3641,7 +3672,7 @@ function showUserContextMenu(e, targetId, targetName) {
   // Message Button
   const msgBtn = document.createElement('button');
   msgBtn.className = 'user-context-menu-item';
-  msgBtn.innerHTML = '💬 Mesaj Gönder';
+  msgBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> Mesaj Gönder';
   msgBtn.addEventListener('click', () => {
     if (!state.friends[targetId]) {
       state.friends[targetId] = { name: targetName, online: true, temporary: true };
@@ -3655,7 +3686,7 @@ function showUserContextMenu(e, targetId, targetName) {
   // Remote Control Button
   const ctrlBtn = document.createElement('button');
   ctrlBtn.className = 'user-context-menu-item';
-  ctrlBtn.innerHTML = '🖥️ Uzaktan Kontrol İste';
+  ctrlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> Uzaktan Kontrol İste';
   ctrlBtn.addEventListener('click', () => {
     requestControl(targetId);
     menu.remove();
@@ -4368,7 +4399,7 @@ function bindUI() {
         
         const muteBtn = document.createElement('button');
         muteBtn.className = 'btn-sec btn-sm';
-        muteBtn.textContent = '🔇 Sustur';
+        muteBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12"></path><path d="M15 9.34V4a3 3 0 0 0-5.94-.6"></path><path d="M17 16.95A7 7 0 0 1 5 12v-2"></path><path d="M19 10v2a7 7 0 0 1-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Sustur';
         muteBtn.style.padding = '4px 8px';
         muteBtn.style.fontSize = '12px';
         muteBtn.onclick = () => {
@@ -4380,7 +4411,7 @@ function bindUI() {
         
         const kickBtn = document.createElement('button');
         kickBtn.className = 'btn-sec btn-sm';
-        kickBtn.textContent = '👢 At';
+        kickBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> At';
         kickBtn.style.padding = '4px 8px';
         kickBtn.style.fontSize = '12px';
         kickBtn.style.color = 'var(--danger)';
@@ -4917,7 +4948,7 @@ function disconnectApp() {
     const empty = document.createElement('div');
     empty.id = 'empty-state';
     empty.className = 'empty';
-    empty.innerHTML = '<h2>👋 Bağlantı Bekleniyor</h2><p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>';
+    empty.innerHTML = '<h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49"></path><path d="M7.76 16.24a6 6 0 0 1 0-8.49"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path></svg> Bağlantı Bekleniyor</h2><p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>';
     grid.prepend(empty);
   }
   
@@ -5084,7 +5115,7 @@ async function sendFile(file) {
       aDl.href = url;
       aDl.download = file.name;
       aDl.className = 'text-dl';
-      aDl.innerHTML = `⬇️ İndir`;
+      aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> İndir`;
       btnGroup.appendChild(aDl);
       
       if (file.type.startsWith('text/') || file.type === 'application/pdf') {
@@ -5092,7 +5123,7 @@ async function sendFile(file) {
         aView.href = url;
         aView.target = '_blank';
         aView.className = 'text-dl view-btn';
-        aView.innerHTML = `👁️ İçine Bak`;
+        aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> İçine Bak`;
         btnGroup.appendChild(aView);
       }
       
