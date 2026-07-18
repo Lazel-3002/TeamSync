@@ -12,6 +12,31 @@ function sbCurrentUrl() {
   catch (e) { return wv.src || ''; }
 }
 
+// Kapat'a basınca video arka planda çalmaya devam ediyordu: kart önce
+// display:none oluyor, SONRA resetSharedBrowserState src'yi değiştirmeye
+// çalışıyordu — gizlenmiş webview'de bu gezinme güvenilir değil ve sekme
+// arka planda sesiyle birlikte yaşamaya devam edebiliyordu. Bu yüzden
+// oynatmayı kart HÂLÂ görünürken, üç ayrı emniyetle durduruyoruz:
+// sesi kapat + sayfadaki tüm medyayı boşalt + yüklemeyi durdur.
+function sbStopPlayback() {
+  const wv = document.getElementById('sb-webview');
+  if (!wv) return;
+  try { if (typeof wv.setAudioMuted === 'function') wv.setAudioMuted(true); } catch (e) {}
+  try {
+    wv.executeJavaScript(`document.querySelectorAll('video,audio').forEach(m => {
+      try { m.pause(); m.removeAttribute('src'); m.load(); } catch (e) {}
+    })`).catch(() => {});
+  } catch (e) {}
+  try { if (typeof wv.stop === 'function') wv.stop(); } catch (e) {}
+}
+
+// Kapatırken susturulan webview sesini yeniden açar (kart tekrar açılınca)
+function sbResumeAudio() {
+  const wv = document.getElementById('sb-webview');
+  if (!wv) return;
+  try { if (typeof wv.setAudioMuted === 'function') wv.setAudioMuted(false); } catch (e) {}
+}
+
 function sbApplyRemoteNav(url) {
   if (!/^https?:\/\//i.test(url || '')) return; // javascript:/file: gibi şemaları asla yükleme
   const sbUrl = document.getElementById('sb-url');
@@ -184,8 +209,12 @@ function initSharedBrowser() {
       sbCard.classList.remove('hidden');
       makeCardFocusable(sbCard);
       if (!focusedCard) toggleFocus(sbCard);
+      sbResumeAudio();
       if (state.sb.lastUrl) sbApplyRemoteNav(state.sb.lastUrl);
       sbUpdateControlsUI();
+      // Katılır katılmaz kurucudan anlık pozisyon iste: kurucu 30. saniyedeyse
+      // misafir de videoya 30. saniyeden başlasın (3 sn'lik rutin beklemeden)
+      broadcast({ type: 'sb-sync-req' });
       return;
     }
 
@@ -194,6 +223,7 @@ function initSharedBrowser() {
     sbCard.classList.remove('hidden');
     makeCardFocusable(sbCard);
     if (!focusedCard) toggleFocus(sbCard);
+    sbResumeAudio();
 
     // İzleyici (spectate) modu kaldırıldı: katılan herkes tıklayıp gezinebilir.
     state.sb.host = state.myId;
@@ -272,6 +302,7 @@ function initSharedBrowser() {
     // Sadece host oturumu herkes için bitirir; misafirin Kapat'ı yalnızca
     // kendisini çıkarır (eskiden herhangi biri kapatınca herkesinki kapanıyordu)
     if (state.sb.host === state.myId) broadcast({ type: 'sb-close' });
+    sbStopPlayback(); // kart gizlenmeden ÖNCE: video/ses arka planda kalmasın
     closeAllCards(true); // CLEAN AND RESETS
   });
 
@@ -344,12 +375,53 @@ function initSharedBrowser() {
     // gezinme sayfayı yüklerken yazmayı imkânsız hâle getiriyordu)
     if (document.activeElement !== sbUrl) sbWebview.focus();
 
+    // Hızlı sayfa-içi reklam atlatıcı: eski sistem reklamı dışarıdaki 1 sn'lik
+    // interval'dan atlıyordu, o yüzden reklam ~1 sn görünür kalıyordu. Artık
+    // atlama mantığı sayfanın İÇİNDE 200 ms'de bir çalışıyor ve reklam
+    // oynarken video CSS ile tamamen gizleniyor — reklam pratikte hiç görünmez.
+    // (Not: Trusted Types uygulayan sitelerde innerHTML ataması hata fırlatır;
+    // bu yüzden stil textContent ile basılıyor ve her şey try/catch içinde.)
+    sbWebview.executeJavaScript(`
+      (() => {
+        try {
+          if (window.__adskip_injected) return;
+          window.__adskip_injected = true;
+          const st = document.createElement('style');
+          st.textContent = '.ad-showing video, .ad-interrupting video { opacity: 0 !important; } .ad-showing .ytp-ad-player-overlay, .ytp-ad-overlay-slot { opacity: 0 !important; }';
+          (document.head || document.documentElement).appendChild(st);
+          setInterval(() => {
+            try {
+              const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern, .ytp-ad-overlay-close-button');
+              if (skipBtn) skipBtn.click();
+              const ad = document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay');
+              const v = document.querySelector('video');
+              if (ad && v) {
+                v.muted = true;
+                v.playbackRate = 16.0;
+                if (!isNaN(v.duration) && v.duration > 0) v.currentTime = v.duration - 0.1;
+              } else if (v && v.muted && window.__adskip_muted) {
+                v.muted = false;
+              }
+              window.__adskip_muted = !!(ad && v);
+            } catch (e) {}
+          }, 200);
+        } catch (e) {}
+      })();
+    `).catch(() => {});
+
+    // Misafir: sayfa yüklendi, kurucudan güncel video pozisyonunu iste —
+    // videoya kurucunun bulunduğu saniyeden başlamak için (sb-sync-req)
+    if (state.sb.joinedActivity && state.sb.host && state.sb.host !== state.myId) {
+      broadcast({ type: 'sb-sync-req' });
+    }
+
     // Aile Dostu (SFW) Yapay Zeka Koruması
     sbWebview.executeJavaScript(`
       (() => {
+        try {
         if (window.__sfw_injected) return;
         window.__sfw_injected = true;
-        
+
         if (window.location.hostname.includes('youtube.com')) {
           document.cookie = "PREF=f2=8000000; domain=.youtube.com; path=/; max-age=31536000";
         }
@@ -358,7 +430,9 @@ function initSharedBrowser() {
         const badWords = rawBadWords.map(w => w.toLocaleLowerCase('tr-TR'));
         
         const style = document.createElement('style');
-        style.innerHTML = \`
+        // textContent: innerHTML ataması Trusted Types'lı sitelerde (DuckDuckGo,
+        // YouTube) TypeError fırlatıp TÜM scripti öldürüyordu (SFW Error logları)
+        style.textContent = \`
           .ai-sfw-blur { filter: blur(30px) !important; pointer-events: none !important; opacity: 0.1 !important; }
           .ai-sfw-hidden { display: none !important; width: 0 !important; height: 0 !important; opacity: 0 !important; pointer-events: none !important; position: absolute !important; }
           #ai-scan-overlay {
@@ -391,7 +465,10 @@ function initSharedBrowser() {
             let isBad = badWords.some(w => text.includes(w) || html.includes('/@' + w) || html.includes('"' + w + '"'));
             if (isBad) {
               if (node.tagName && node.tagName.includes('RENDERER')) {
-                node.innerHTML = '<div style="padding:10px;text-align:center;color:#ef4444;font-size:12px;font-weight:bold;">🛡️ AI Tarafından Silindi</div>';
+                const del = document.createElement('div');
+                del.style.cssText = 'padding:10px;text-align:center;color:#ef4444;font-size:12px;font-weight:bold;';
+                del.textContent = '🛡️ AI Tarafından Silindi';
+                node.replaceChildren(del);
                 node.classList.add('ai-sfw-hidden');
               } else {
                 node.classList.add('ai-sfw-blur');
@@ -404,7 +481,9 @@ function initSharedBrowser() {
           if (document.body.classList.contains('ai-sfw-active')) {
             const overlay = document.createElement('div');
             overlay.id = 'ai-scan-overlay';
-            overlay.innerHTML = '<div style="margin-bottom:20px; text-align:center;">🛡️ Aile Dostu Yapay Zeka<br>Analiz Ediyor...</div><div style="font-size:16px;color:#aaa;">(İçerik Taranıyor)</div>';
+            const mkLine = (txt, css) => { const d = document.createElement('div'); d.style.cssText = css; d.textContent = txt; return d; };
+            overlay.appendChild(mkLine('🛡️ Aile Dostu Yapay Zeka — Analiz Ediyor...', 'margin-bottom:20px; text-align:center;'));
+            overlay.appendChild(mkLine('(İçerik Taranıyor)', 'font-size:16px;color:#aaa;'));
             document.body.appendChild(overlay);
             
             setTimeout(() => {
@@ -413,7 +492,10 @@ function initSharedBrowser() {
                 if (titleNode && titleNode.innerText) {
                    let text = titleNode.innerText.toLocaleLowerCase('tr-TR');
                    if (badWords.some(w => text.includes(w))) {
-                     overlay.innerHTML = '<div style="color:#ef4444; text-align:center;">🚫 Bu Video Yapay Zeka Tarafından Engellendi.</div><div style="font-size:16px;">(Sakıncalı İçerik)</div>';
+                     overlay.replaceChildren(
+                       mkLine('🚫 Bu Video Yapay Zeka Tarafından Engellendi.', 'color:#ef4444; text-align:center;'),
+                       mkLine('(Sakıncalı İçerik)', 'font-size:16px;')
+                     );
                      const v = document.querySelector('video');
                      if (v) v.remove();
                      return;
@@ -431,6 +513,7 @@ function initSharedBrowser() {
              document.querySelectorAll('ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-reel-video-renderer').forEach(checkNode);
            } catch(e) {}
         }, ${state.gameMode ? '4500' : '1500'});
+        } catch (e) {}
       })();
     `).catch(e => console.warn("SFW Error", e));
 
@@ -847,8 +930,11 @@ function handleSBMessage(peerId, msg) {
          state.sb.joinedActivity = true;
          removeInactiveOverlay('sb-card');
          if (!focusedCard) toggleFocus(sbCard);
+         sbResumeAudio();
          if (state.sb.lastUrl) sbApplyRemoteNav(state.sb.lastUrl);
          sbUpdateControlsUI();
+         // Kurucunun anlık video pozisyonunu hemen iste (geç katılan senkronu)
+         broadcast({ type: 'sb-sync-req' });
       });
     }
   } else if (msg.type === 'sb-auth') {
@@ -908,14 +994,30 @@ function handleSBMessage(peerId, msg) {
         state.sb.lastActionTs = Date.now();
       }
 
-      const sbWebview = document.getElementById('sb-webview');
-      if (sbWebview) {
-        // Hedef zamanda saat-damgası telafisi bilerek YOK: (Date.now() - ts)
-        // farklı makinelerin duvar saatlerini kıyaslıyordu ve birkaç saniyelik
-        // saat kayması her hedefi o kadar kaydırıyordu. P2P iletim gecikmesi
-        // (<1 sn) toleransların zaten içinde. Rutin için tolerans daha geniş:
-        // ufak doğal kaymalar için sürekli mikro-sıçrama yapma.
-        const tolerance = isRoutine ? 3.5 : 2;
+      // Hedef zamanda makineler-arası saat-damgası telafisi bilerek YOK:
+      // (Date.now() - ts) farklı makinelerin duvar saatlerini kıyaslıyordu ve
+      // birkaç saniyelik saat kayması her hedefi o kadar kaydırıyordu. P2P
+      // iletim gecikmesi (<1 sn) toleransların zaten içinde. Rutin için
+      // tolerans daha geniş: ufak doğal kaymalar için sürekli mikro-sıçrama yok.
+      //
+      // YENİDEN DENEME: eskiden sayfa daha yüklenirken (video yok) ya da
+      // reklam oynarken gelen senkron sessizce kayboluyordu — geç katılan
+      // misafir bir sonraki rutini 3 sn bekliyordu, reklam yiyen misafir hiç
+      // yakalayamayabiliyordu. Artık hedef saklanır ve video hazır olana dek
+      // 1 sn arayla tekrar denenir; oynayan video için geçen süre SADECE yerel
+      // saatle telafi edilir (saat kayması sorunu yok). Daha yeni bir senkron
+      // gelirse eskisinin denemeleri seq kontrolüyle kendini iptal eder.
+      const tolerance = isRoutine ? 3.5 : 2;
+      const recvWall = Date.now();
+      state.sb.syncApplySeq = (state.sb.syncApplySeq || 0) + 1;
+      const mySeq = state.sb.syncApplySeq;
+      const applySync = (attempt) => {
+        if (state.sb.syncApplySeq !== mySeq) return; // daha yeni senkron geldi
+        const sbWebview = document.getElementById('sb-webview');
+        const sbCard = document.getElementById('sb-card');
+        if (!sbWebview || !sbCard || sbCard.classList.contains('hidden')) return;
+        const elapsed = paused ? 0 : (Date.now() - recvWall) / 1000;
+        const targetTime = currentTime + elapsed;
         // currentTime/paused/tolerance are sanitized above (finite numbers /
         // boolean) and re-serialized with JSON.stringify so they can only
         // ever appear as safe literals here, never as injected script.
@@ -923,12 +1025,12 @@ function handleSBMessage(peerId, msg) {
           // Reklam gösterilirken kendi videomuzu göndericinin GERÇEK içerik
           // zamanına zorlamaya çalışmayalım: reklam genelde seek edilemez
           // (no-op/hata) ve reklam süresi zaten gönderenin İÇERİK zamanıyla
-          // alakasız bir referans olurdu.
-          if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')) return false;
+          // alakasız bir referans olurdu. Reklamda 'retry' dönüp bekleriz.
+          if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')) return 'retry';
           const v = document.querySelector('video');
-          if (!v) return false;
+          if (!v) return 'retry';
           let changed = false;
-          const targetTime = ${JSON.stringify(currentTime)};
+          const targetTime = ${JSON.stringify(targetTime)};
           if (Math.abs(v.currentTime - targetTime) > ${JSON.stringify(tolerance)}) {
             v.currentTime = targetTime;
             changed = true;
@@ -942,11 +1044,38 @@ function handleSBMessage(peerId, msg) {
         // her uygulamada kalkan kurulsaydı 1.5 sn'lik pencere neredeyse hep
         // açık kalır ve misafirin KENDİ duraklat/sarma eylemi "uzak yankı"
         // sanılıp hiç yayınlanmayabilirdi.
-        sbWebview.executeJavaScript(syncScript).then((changed) => {
-          if (changed) state.sb.remoteVideoSyncTs = Date.now();
+        sbWebview.executeJavaScript(syncScript).then((res) => {
+          if (res === true) state.sb.remoteVideoSyncTs = Date.now();
+          else if (res === 'retry' && attempt < 15) setTimeout(() => applySync(attempt + 1), 1000);
         }).catch(e => {});
-      }
+      };
+      applySync(0);
     }
+  } else if (msg.type === 'sb-sync-req') {
+    // Geç katılan misafir güncel video pozisyonunu istiyor: kurucu 3 sn'lik
+    // rutin turunu beklemeden HEMEN bir rutin senkron yayınlar — misafir
+    // böylece videoya kurucunun bulunduğu saniyeden başlar.
+    if (!sbIsHost() || !state.sb.joinedActivity) return;
+    const reqWv = document.getElementById('sb-webview');
+    if (!reqWv) return;
+    try {
+      reqWv.executeJavaScript(`(() => {
+        if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')) return null;
+        const v = document.querySelector('video');
+        if (!v || (typeof v.readyState === 'number' && v.readyState < 3)) return null;
+        return { paused: v.paused, currentTime: v.currentTime };
+      })()`).then((vs) => {
+        if (!vs || !Number.isFinite(Number(vs.currentTime))) return;
+        state.sb.lastRoutineSyncTs = Date.now();
+        broadcast({
+          type: 'sb-video-sync',
+          routine: true,
+          paused: !!vs.paused,
+          currentTime: Number(vs.currentTime),
+          ts: Date.now()
+        });
+      }).catch(() => {});
+    } catch (e) {}
   } else if (msg.type === 'sb-close') {
     // Kurucunun çıkışı artık oturumu HERKES için bitirmez: kalanlar arasından
     // yeni bir kurucu seçilir ve tarayıcı açık kalır. Misafirin kapatması

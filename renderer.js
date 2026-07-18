@@ -4523,7 +4523,13 @@ function resetSharedBrowserState() {
   state.sb.appliedRemoteUrl = 'https://duckduckgo.com';
   state.sb.remoteNavTs = Date.now();
   const sbWebview = document.getElementById('sb-webview');
-  if (sbWebview) sbWebview.src = 'https://duckduckgo.com'; // Her zaman duckduckgo kalacak
+  if (sbWebview) {
+    // Önce çalan medyayı kesin durdur: kart bu noktada çoktan display:none
+    // olabiliyor ve gizli webview'de src ataması güvenilir değil — eskiden
+    // video arka planda sesiyle birlikte çalmaya devam edebiliyordu.
+    if (typeof sbStopPlayback === 'function') sbStopPlayback();
+    try { sbWebview.src = 'https://duckduckgo.com'; } catch (e) {} // Her zaman duckduckgo kalacak
+  }
   if (typeof sbUpdateControlsUI === 'function') sbUpdateControlsUI();
 }
 

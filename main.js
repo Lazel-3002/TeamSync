@@ -619,6 +619,14 @@ app.whenReady().then(() => {
         blocker.config = { loadCosmeticFilters: false, loadNetworkFilters: true };
       }
       blocker.enableBlockingInSession(session.defaultSession);
+      // Ortak Tarayıcı webview'i AYRI bir oturumda yaşıyor (persist:teamsync-ai).
+      // Engelleyici sadece defaultSession'a takılıydı; webview'deki YouTube
+      // reklamları bu yüzden ağ seviyesinde HİÇ engellenmiyordu.
+      try {
+        blocker.enableBlockingInSession(session.fromPartition('persist:teamsync-ai'));
+      } catch (e) {
+        console.warn('Adblocker webview oturumuna takılamadı:', e.message);
+      }
       console.log("Adblocker ağı seviyesinde başarıyla aktif edildi.");
     }).catch((err) => {
       console.error('Adblocker yüklenirken hata oluştu:', err);
