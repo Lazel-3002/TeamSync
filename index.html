@@ -1207,41 +1207,43 @@
     <!-- Founder Settings Modal -->
     <div id="founder-settings-modal" class="modal hidden">
       <div class="mcard" style="width: 420px; max-width: 90vw;">
-        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fbbf24;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path><path d="M5 20h14"></path></svg> Kurucu Ayarları</h3>
-        <p class="muted">Sadece sunucuyu kuran kişi bu ayarları görebilir.</p>
-        <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
-          <label style="font-weight:bold;">Sadece Arkadaşlar Katılabilir</label>
-          <label class="switch">
-            <input type="checkbox" id="founder-friends-only">
-            <span class="slider round"></span>
-          </label>
-        </div>
-        <p class="muted" style="margin-top:10px; font-size:12px;">Aktif olduğunda, yalnızca şu an sunucuda bulunan herhangi bir kişinin arkadaş listesinde olanlar katılabilir. Yabancıların bağlantısı anında reddedilir.</p>
+        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fbbf24;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path><path d="M5 20h14"></path></svg> <span id="founder-modal-title-text">Kurucu Ayarları</span></h3>
+        <p class="muted" id="founder-modal-subtitle">Sadece sunucuyu kuran kişi bu ayarları görebilir.</p>
+        <div id="founder-owner-only-settings">
+          <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
+            <label style="font-weight:bold;">Sadece Arkadaşlar Katılabilir</label>
+            <label class="switch">
+              <input type="checkbox" id="founder-friends-only">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <p class="muted" style="margin-top:10px; font-size:12px;">Aktif olduğunda, yalnızca şu an sunucuda bulunan herhangi bir kişinin arkadaş listesinde olanlar katılabilir. Yabancıların bağlantısı anında reddedilir.</p>
 
-        <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
-          <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
-             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-             Yapay Zeka Koruması (+18/Küfür Engelleyici)
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="founder-sfw-mode">
-            <span class="slider round"></span>
-          </label>
-        </div>
-        <p class="muted" style="margin-top:10px; font-size:12px;">Tüm katılımcıların sohbet mesajları ve profil fotoğrafları AI ile denetlenir.</p>
+          <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
+            <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
+               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+               Yapay Zeka Koruması (+18/Küfür Engelleyici)
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="founder-sfw-mode">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <p class="muted" style="margin-top:10px; font-size:12px;">Tüm katılımcıların sohbet mesajları ve profil fotoğrafları AI ile denetlenir.</p>
 
-        <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
-          <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
-             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-             Oyun Modu (Hafif Sürüm)
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="founder-game-mode">
-            <span class="slider round"></span>
-          </label>
+          <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
+            <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
+               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+               Oyun Modu (Hafif Sürüm)
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="founder-game-mode">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <p class="muted" style="margin-top:10px; font-size:12px;">RAM/CPU kullanımını minimize eder (Ekran paylaşımlarını 15 FPS'e kilitler ve AI taramasını yavaşlatır).</p>
         </div>
-        <p class="muted" style="margin-top:10px; font-size:12px;">RAM/CPU kullanımını minimize eder (Ekran paylaşımlarını 15 FPS'e kilitler ve AI taramasını yavaşlatır).</p>
-        
+
         <h4 style="margin-top:20px; font-weight:bold; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Oyuncu Yönetimi</h4>
         <div id="founder-player-list" style="margin-top: 10px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
           <!-- Players will be listed here dynamically -->

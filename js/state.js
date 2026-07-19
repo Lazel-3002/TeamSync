@@ -79,5 +79,8 @@ window.state = {
   selectedLobbyActivity: null,
   sfwMode: false,
   aiModel: null,
-  gameMode: false
+  gameMode: false,
+  moderators: new Set(),
+  founderId: null,
+  roomName: null
 };

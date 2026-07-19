@@ -67,23 +67,38 @@
     const titleEl = document.getElementById('notif-title');
     const bodyEl = document.getElementById('notif-body');
     let hideTimeout = null;
- 
+    let lastNotif = null; // { title, body, count }
+
     window.notifyAPI.onShowNotification(({ title, body }) => {
       // Pencereyi gösterme işini zaten main.js -> notificationWindow.showInactive()
       // çağrısı yapıyor, burada ekstra Node/remote erişimine gerek yok.
+
+      // Aynı bildirim (aynı başlık+içerik) hâlâ ekrandayken art arda gelirse
+      // yeni bir pencere/animasyon açmak yerine sayaç ile üstüne yığ.
+      if (lastNotif && lastNotif.title === title && lastNotif.body === body && container.classList.contains('show')) {
+        lastNotif.count++;
+        titleEl.textContent = `${title} (${lastNotif.count})`;
+        if (hideTimeout) clearTimeout(hideTimeout);
+        hideTimeout = setTimeout(() => {
+          container.classList.remove('show');
+        }, 3000);
+        return;
+      }
+
+      lastNotif = { title, body, count: 1 };
       titleEl.textContent = title;
       bodyEl.textContent = body;
-      
+
       // Reset animation
       container.classList.remove('show');
-      
+
       // Trigger reflow
       void container.offsetWidth;
-      
+
       container.classList.add('show');
-      
+
       if (hideTimeout) clearTimeout(hideTimeout);
-      
+
       hideTimeout = setTimeout(() => {
         container.classList.remove('show');
       }, 3000);
