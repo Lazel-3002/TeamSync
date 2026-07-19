@@ -351,6 +351,10 @@ body { padding-top: 35px; } /* Prevent overlap */
   align-items: stretch;
   position: relative;
 }
+.menu-layout.dm-open {
+  /* Keep the conversation inside the viewport so its message list can scroll. */
+  height: min(440px, calc(100vh - 190px));
+}
 .global-ping {
   position: fixed;
   top: 12px;
@@ -388,6 +392,7 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: none;
   flex-direction: column;
   min-width: 320px;
+  min-height: 0;
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -502,8 +507,11 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 .dm-messages {
   flex: 1;
+  min-height: 0;
   padding: 12px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: 8px;
