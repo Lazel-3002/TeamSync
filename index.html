@@ -282,6 +282,9 @@
         <div id="global-ping-display" class="global-ping" title="İnternet Sunucusu Gecikmesi" style="display: none; align-items:center; gap:4px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg> <span id="global-ping-ms">--</span> ms
         </div>
+        <button id="btn-show-updates" class="global-ping" title="Güncelleme Günlüğü" style="right: 12px; left: auto; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        </button>
         <div class="menu-left">
           <div class="menu-profile-card">
             <div class="profile-avatar-wrapper" id="btn-edit-avatar" style="position: relative; cursor: pointer;">
@@ -300,7 +303,7 @@
                 <span id="my-friend-id" class="menu-id-value">------</span>
                 <button id="btn-copy-friend-id" class="icon-btn sm" title="ID'yi Kopyala" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
               </div>
-              <button id="btn-logout" class="btn-sec btn-sm" style="margin-top: 8px; font-size: 11px; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 6px; color: var(--txt-mut); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; justify-content:center; gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"></path><path d="M21 12A9 9 0 0 0 6 5.3L3 8"></path><path d="M21 22v-6h-6"></path><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"></path></svg> Hesap Değiştir</button>
+              <button id="btn-logout" class="btn-sec btn-sm" style="margin-top: 8px; font-size: 11px; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 6px; color: var(--txt-mut); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; justify-content:center; gap:4px;"><img src="assets/icon.png" width="12" height="12" style="border-radius:3px; vertical-align:-2px;" alt="" /> Hesap Değiştir</button>
             </div>
           </div>
 
@@ -381,24 +384,11 @@
             <div class="premium-option-desc">Arka plan seslerini ve hışırtıları temizler.</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
-            <input type="radio" name="join-mode" id="join-useAI" checked />
+            <input type="checkbox" id="join-useAI" checked />
             <span class="slider round"></span>
           </label>
         </div>
-        <div class="premium-option" onclick="document.getElementById('join-usePTT').click()">
-          <div class="premium-option-info">
-            <div class="premium-option-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><line x1="9" x2="15" y1="12" y2="12"/></svg>
-              Push-to-Talk (Bas Konuş)
-            </div>
-            <div class="premium-option-desc">Sadece SPACE tuşuna basılıyken ses iletir.</div>
-          </div>
-          <label class="switch" onclick="event.stopPropagation()">
-            <input type="radio" name="join-mode" id="join-usePTT" />
-            <span class="slider round"></span>
-          </label>
-        </div>
-        
+
         <div class="premium-option" onclick="document.getElementById('join-useRelay').click()">
           <div class="premium-option-info">
             <div class="premium-option-title">
@@ -434,20 +424,7 @@
             <div class="premium-option-desc">Arka plan seslerini ve hışırtıları temizler.</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
-            <input type="radio" name="create-mode" id="create-useAI" checked />
-            <span class="slider round"></span>
-          </label>
-        </div>
-        <div class="premium-option" onclick="document.getElementById('create-usePTT').click()">
-          <div class="premium-option-info">
-            <div class="premium-option-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><line x1="9" x2="15" y1="12" y2="12"/></svg>
-              Push-to-Talk (Bas Konuş)
-            </div>
-            <div class="premium-option-desc">Sadece SPACE tuşuna basılıyken ses iletir.</div>
-          </div>
-          <label class="switch" onclick="event.stopPropagation()">
-            <input type="radio" name="create-mode" id="create-usePTT" />
+            <input type="checkbox" id="create-useAI" checked />
             <span class="slider round"></span>
           </label>
         </div>
@@ -1280,6 +1257,19 @@
     <div id="settings-modal" class="modal hidden">
       <div class="mcard" style="width: 420px;">
         <h3 style="display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Ayarlar</h3>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 4px;">
+          <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><line x1="9" x2="15" y1="12" y2="12"/></svg>
+            Push-to-Talk (Bas Konuş)
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="settings-ptt">
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <div class="muted" style="font-size: 12px; margin-bottom: 16px;">Sadece SPACE tuşuna basılıyken ses iletir. Tüm sunucularda geçerli olan kişisel bir tercihtir.</div>
+
         <label class="lbl-block">Kamera / Ekran Kalitesi</label>
         <select id="quality-select" class="sel-block" style="margin-bottom: 12px; width: 100%;">
           <option value="high">Yüksek (1080p, 60 FPS)</option>
@@ -1453,6 +1443,52 @@
         <div class="mactions" style="justify-content: center;">
           <button id="error-ok" class="btn-pri" style="background: var(--warn); padding: 12px 32px; font-size: 15px; color: #000;">Tamam</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Güncelleme Günlüğü Modali (body seviyesi - hem login hem app'ten erişilebilir) -->
+  <div id="update-log-modal" class="modal hidden">
+    <div class="mcard" style="width: 460px; max-width: 92vw;">
+      <h3 style="display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> Güncelleme Günlüğü</h3>
+      <div style="max-height: 55vh; overflow-y: auto; margin: 8px 0 4px; padding-right: 4px;">
+        <div style="margin-bottom: 18px;">
+          <div style="font-weight:bold; color:#fff; margin-bottom:6px;">Yeni Logo &amp; Cihaz Kimliği Girişi</div>
+          <ul class="muted" style="margin:0; padding-left:18px; font-size:13px; line-height:1.7;">
+            <li>E-posta/şifre ile kayıt kaldırıldı — her cihaz kendi güvenli kimliğiyle otomatik giriş yapıyor.</li>
+            <li>Aynı bilgisayarda birden fazla hesap arasında geçiş yapılabiliyor.</li>
+            <li>Yeni şeffaf logo, menülerdeki emojilerin çoğu ikonlarla değiştirildi.</li>
+            <li>Etkinlik seçme ekranındaki takılmalar giderildi.</li>
+          </ul>
+        </div>
+        <div style="margin-bottom: 18px;">
+          <div style="font-weight:bold; color:#fff; margin-bottom:6px;">Ortak Tarayıcı İyileştirmeleri</div>
+          <ul class="muted" style="margin:0; padding-left:18px; font-size:13px; line-height:1.7;">
+            <li>Kart kapatılınca video artık arka planda çalmaya devam etmiyor.</li>
+            <li>Reklam atlama hızlandırıldı, geç katılanlar senkrona anında yakalanıyor.</li>
+            <li>Kurucu ayrılınca yetki otomatik devrediliyor, kimse odada mahsur kalmıyor.</li>
+          </ul>
+        </div>
+        <div style="margin-bottom: 18px;">
+          <div style="font-weight:bold; color:#fff; margin-bottom:6px;">Ses ve Bağlantı Sağlamlaştırmaları</div>
+          <ul class="muted" style="margin:0; padding-left:18px; font-size:13px; line-height:1.7;">
+            <li>WARP/VPN açıkken bağlanamama sorunu çözüldü.</li>
+            <li>Bozuk yerel DNS'lerde TURN sunucusuna otomatik yedek yol bulma eklendi.</li>
+            <li>Tek yönlü ses ve sessiz-ama-bağlı durumları için periyodik ses-yolu onarımı eklendi.</li>
+            <li>Yankı Kalkanı ve mono mikrofon yakalamayla kalıcı yankı sorunu giderildi.</li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-weight:bold; color:#fff; margin-bottom:6px;">Diğer</div>
+          <ul class="muted" style="margin:0; padding-left:18px; font-size:13px; line-height:1.7;">
+            <li>Ses çıkış cihazı (hoparlör/kulaklık) seçimi eklendi.</li>
+            <li>UNO'da ceza ve özel kural mantığındaki tutarsızlıklar birleştirildi.</li>
+            <li>Push-to-Talk artık kullanıcı ayarlarında, gürültü engelleyiciyle aynı anda kullanılabiliyor.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="mactions" style="justify-content: center;">
+        <button id="update-log-close" class="btn-sec" style="width: 100%; padding: 12px;">Kapat</button>
       </div>
     </div>
   </div>

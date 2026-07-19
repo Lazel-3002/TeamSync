@@ -527,16 +527,8 @@ ipcMain.on('notify', (event, { title, body }) => {
   } catch (e) {}
 });
 
-ipcMain.on('tray-action-show', () => {
-  if (mainWindow) {
-    mainWindow.show();
-    if (trayMenuWindow) trayMenuWindow.hide();
-  }
-});
-
-ipcMain.on('tray-action-quit', () => {
-  forceQuit();
-});
+// Not: tray-action-show / tray-action-quit dinleyicileri whenReady içinde
+// kayıtlı (tray kurulumuyla birlikte); burada ikinci kez kaydedilmemeli.
 
 ipcMain.on('set-remote-control', (event, active) => {
   remoteControlActive = !!active;
@@ -781,61 +773,12 @@ app.whenReady().then(() => {
   tray.on('click', showTrayMenu);
   tray.on('right-click', showTrayMenu);
 
-  // Generate High Quality Ottoman Flag Tray Icon using Canvas
-  const flagWin = new BrowserWindow({ 
-    width: 128, height: 128, show: false, 
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-flag.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  });
-  
-  const flagHtml = `
-    <html><body>
-      <canvas id="c" width="128" height="128"></canvas>
-      <script>
-        const canvas = document.getElementById('c');
-        const ctx = canvas.getContext('2d');
-        const svg = \`
-          <svg width="128" height="128" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <mask id="cmask">
-                <rect x="0" y="0" width="100" height="100" fill="white" />
-                <circle cx="56" cy="50" r="11" fill="black" />
-              </mask>
-              <g id="hilal">
-                <circle cx="50" cy="50" r="14" fill="#FFD700" mask="url(#cmask)" />
-              </g>
-            </defs>
-            <rect width="100" height="100" rx="20" fill="#c8102e" />
-            <circle cx="50" cy="50" r="42" fill="#006b3f" />
-            <g filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.4))">
-              <g transform="translate(-14, 0)"><use href="#hilal" /></g>
-              <g transform="translate(10, -18)"><use href="#hilal" /></g>
-              <g transform="translate(10, 18)"><use href="#hilal" /></g>
-            </g>
-          </svg>\`;
-        
-        const img = new Image();
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0);
-          window.flagAPI.sendIcon(canvas.toDataURL('image/png'));
-        };
-        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-      </script>
-    </body></html>
-  `;
-  flagWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(flagHtml));
-  
-  ipcMain.once('set-tray-icon', (event, dataUrl) => {
-    if (tray) {
-      tray.setImage(nativeImage.createFromDataURL(dataUrl).resize({width: 32, height: 32}));
-    }
-    flagWin.destroy();
-  });
-  
+  // Not: sistem tepsisinde eskiden burada üretilen kırmızı-yeşil "Osmanlı
+  // bayrağı" ikonu tray oluşturulduktan hemen sonra üzerine yazılıyordu —
+  // küçük boyutta bulanık/dağınık görünüyordu ve diğer uygulama ikonlarının
+  // yanında düzensiz duruyordu. Kaldırıldı; tray artık kalıcı olarak temiz
+  // uygulama logosunu (assets/icon.png) kullanıyor.
+
   ipcMain.on('tray-action-show', () => {
     if (mainWindow) {
       mainWindow.show();

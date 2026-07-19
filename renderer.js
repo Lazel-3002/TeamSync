@@ -135,6 +135,14 @@ async function checkAvatar(base64Str) {
 
 const CHUNK_SIZE = 64 * 1024;
 const fileBuffer = new Map();
+// Sohbette paylaşılan dosyaların blob URL'leri: revoke edilmezse dosyanın
+// tüm içeriği uygulama kapanana kadar bellekte kalır (sohbet DOM'u
+// temizlense bile). Odadan çıkarken topluca serbest bırakılır.
+const chatBlobUrls = [];
+function releaseChatBlobUrls() {
+  chatBlobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  chatBlobUrls.length = 0;
+}
 
 let mqttClient = null;
 let internetAnnounceInterval = null;
@@ -488,7 +496,9 @@ window.loginWithAccount = function(acc) {
     document.getElementById('my-avatar-default').style.display = 'none';
   } else {
     document.getElementById('my-avatar-img').style.display = 'none';
-    document.getElementById('my-avatar-default').style.display = 'block';
+    // 'block' varsayılan SVG'yi sol üste yapıştırıyordu — .profile-avatar'ın
+    // flex ortalaması ancak display:flex ile korunur
+    document.getElementById('my-avatar-default').style.display = 'flex';
   }
   
   document.getElementById('step-accounts').classList.add('hidden');
@@ -610,7 +620,36 @@ function loadDMs() {
 }
 
 function saveDMs() {
-  localStorage.setItem('teamsync_dms', JSON.stringify(state.dms));
+  // DM geçmişi (base64 dosya içerikleriyle birlikte) sınırsız büyüyordu:
+  // hem bellekte hem localStorage'da (~10MB kota). Arkadaş başına son 100
+  // mesaj tutulur; kota yine dolarsa en eski dosya/görsel içerikleri
+  // düşürülür (metin mesajlarına dokunulmaz).
+  const DM_LIMIT = 100;
+  Object.keys(state.dms).forEach(fId => {
+    if (Array.isArray(state.dms[fId]) && state.dms[fId].length > DM_LIMIT) {
+      state.dms[fId] = state.dms[fId].slice(-DM_LIMIT);
+    }
+  });
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      localStorage.setItem('teamsync_dms', JSON.stringify(state.dms));
+      return;
+    } catch (e) {
+      const fileMsgs = [];
+      Object.values(state.dms).forEach(list => (list || []).forEach(m => {
+        if ((m.type === 'image' || m.type === 'file') && m.content) fileMsgs.push(m);
+      }));
+      if (fileMsgs.length === 0) {
+        console.warn('DM geçmişi kaydedilemedi (kota):', e && e.message);
+        return;
+      }
+      fileMsgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      fileMsgs.slice(0, Math.max(1, Math.ceil(fileMsgs.length / 2))).forEach(m => {
+        m.content = '';
+        m.expired = true;
+      });
+    }
+  }
 }
 
 function renderFriends() {
@@ -911,11 +950,6 @@ function setupGlobalMQTT() {
         } else if (data.type === 'room_join_accepted') {
           showToast(`${data.name} isteğini kabul etti, bağlanılıyor...`, 'ok');
           document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
-          const ai = document.getElementById('join-useAI') ? document.getElementById('join-useAI').checked : true;
-          const ptt = document.getElementById('join-usePTT') ? document.getElementById('join-usePTT').checked : false;
-          // startApp'i direk cagiramayabiliriz eger degiskense ama event listener'in altinda veya global
-          // Wait, startApp is scoped inside DOMContentLoaded in this code. Let's trigger a UI update or just dispatch an event?
-          // I will fix startApp scope later. For now let's set values and click join.
           const joinIdInput = document.getElementById('join-id');
           const joinPwInput = document.getElementById('join-password');
           const btnJoin = document.getElementById('btn-join');
@@ -960,6 +994,16 @@ setInterval(() => {
       const dot = document.getElementById(`status-${fId}`);
       if (dot) dot.classList.remove('online');
       changed = true;
+    }
+  });
+
+  // Yarım kalan DM dosya transferleri: gönderen ortada çevrimdışı olursa
+  // biriken base64 chunk'lar süresiz bellekte kalıyordu — 2 dk sessiz kalan
+  // transfer düşürülür (aktif transferde her chunk lastChunkAt'i tazeler)
+  Object.keys(state.incomingDMFiles || {}).forEach(fileId => {
+    const f = state.incomingDMFiles[fileId];
+    if (f && now - (f.lastChunkAt || 0) > 120000) {
+      delete state.incomingDMFiles[fileId];
     }
   });
 }, 10000);
@@ -1283,7 +1327,20 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   const btnShowJoin = document.getElementById('btn-show-join');
   const btnShowCreate = document.getElementById('btn-show-create');
-  
+
+  const btnShowUpdates = document.getElementById('btn-show-updates');
+  if (btnShowUpdates) {
+    btnShowUpdates.addEventListener('click', () => {
+      document.getElementById('update-log-modal').classList.remove('hidden');
+    });
+  }
+  const updateLogClose = document.getElementById('update-log-close');
+  if (updateLogClose) {
+    updateLogClose.addEventListener('click', () => {
+      document.getElementById('update-log-modal').classList.add('hidden');
+    });
+  }
+
   document.querySelectorAll('.btn-back').forEach(btn => {
     btn.addEventListener('click', () => {
       stepJoin.classList.add('hidden');
@@ -1296,13 +1353,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   const joinId = document.getElementById('join-id');
   const joinPw = document.getElementById('join-password');
   const joinAi = document.getElementById('join-useAI');
-  const joinPtt = document.getElementById('join-usePTT');
 
   const btnCreate = document.getElementById('btn-create');
   const createName = document.getElementById('create-name');
   const createPw = document.getElementById('create-password');
   const createAi = document.getElementById('create-useAI');
-  const createPtt = document.getElementById('create-usePTT');
 
   try {
     const ips = await window.electronAPI.getLocalIPs();
@@ -1553,7 +1608,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('my-avatar-default').style.display = 'none';
     } else {
       document.getElementById('my-avatar-img').style.display = 'none';
-      document.getElementById('my-avatar-default').style.display = 'block';
+      document.getElementById('my-avatar-default').style.display = 'flex';
     }
 
     document.getElementById('step-auth').classList.add('hidden');
@@ -1940,25 +1995,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         state.ipcAttached = true;
       }
 
-      if (state.pttMode) {
-        window.electronAPI.registerPTT('Space');
-        if (!state.pttAttached) {
-          window.electronAPI.onPTT(() => {
-            if (!state.pttMode) return;
-            state.pttActive = true;
-            document.getElementById('ptt').classList.add('active');
-            setMicEnabled(true);
-          });
-          document.addEventListener('keyup', (e) => {
-            if (e.code === 'Space' && state.pttMode) {
-              state.pttActive = false;
-              document.getElementById('ptt').classList.remove('active');
-              setMicEnabled(false);
-            }
-          });
-          state.pttAttached = true;
-        }
-      }
+      if (pttMode) applyPttMode(true);
 
       setConnStatus(true);
     } catch (err) {
@@ -1978,7 +2015,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     state.isJoining = true;
     const useRelay = document.getElementById('join-useRelay') ? document.getElementById('join-useRelay').checked : false;
-    startApp(roomId, joinPw.value, joinAi.checked, joinPtt.checked, "Sunucu " + roomId, true, false, false, useRelay);
+    const pttEnabled = localStorage.getItem('teamsync_ptt_enabled') === '1';
+    startApp(roomId, joinPw.value, joinAi.checked, pttEnabled, "Sunucu " + roomId, true, false, false, useRelay);
 
     // Sunucu var mı kontrolü (15 saniye içinde kimse bulunamazsa iptal et)
     if (state.joinTimeout) clearTimeout(state.joinTimeout);
@@ -2009,7 +2047,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     const useSFW = document.getElementById('create-useSFW').checked;
     const useGameMode = document.getElementById('create-gameMode') ? document.getElementById('create-gameMode').checked : false;
     const useRelay = document.getElementById('create-useRelay') ? document.getElementById('create-useRelay').checked : false;
-    startApp(odaId, createPw.value, createAi.checked, createPtt.checked, sName, false, useSFW, useGameMode, useRelay);
+    const pttEnabled = localStorage.getItem('teamsync_ptt_enabled') === '1';
+    startApp(odaId, createPw.value, createAi.checked, pttEnabled, sName, false, useSFW, useGameMode, useRelay);
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -2437,6 +2476,7 @@ function removePeer(peerId) {
   if (peer.dc) peer.dc.close();
   if (peer.mediaStreamSource) { try { peer.mediaStreamSource.disconnect(); } catch(e) {} }
   if (peer.analyser) { try { peer.analyser.disconnect(); } catch(e) {} }
+  if (peer.silentGain) { try { peer.silentGain.disconnect(); } catch(e) {} }
   if (peer.audioCtx) { try { peer.audioCtx.close(); } catch(e) {} }
   if (peer.audioEl) { try { peer.audioEl.srcObject = null; peer.audioEl.remove(); } catch(e) {} }
   if (peer.videoEl) { try { peer.videoEl.srcObject = null; peer.videoEl.remove(); } catch(e) {} }
@@ -3431,6 +3471,7 @@ async function handleDataMessage(peerId, msg) {
     if (f) {
       const blob = new Blob(f.chunks, { type: f.meta.mime });
       const url = URL.createObjectURL(blob);
+      chatBlobUrls.push(url);
       const div = document.getElementById('file-' + msg.id);
       if (div) {
         if (f.meta.mime.startsWith('image/')) {
@@ -3538,6 +3579,7 @@ function setupSpeakingDetection(peerId, stream) {
     if (!state.peers.has(peerId)) {
       try { source.disconnect(); } catch(e) {}
       try { analyser.disconnect(); } catch(e) {}
+      try { silentGain.disconnect(); } catch(e) {}
       return;
     }
     if (audioCtx.state === 'suspended') {
@@ -4160,10 +4202,7 @@ function bindUI() {
     }
     
     if (state.pttMode) {
-      state.pttMode = false;
-      window.electronAPI.unregisterPTT();
-      document.getElementById('ptt').classList.add('hidden');
-      setMicEnabled(true);
+      applyPttMode(false);
     }
     
     if (state.deafened) {
@@ -4364,6 +4403,7 @@ function bindUI() {
     document.getElementById('turn-url').value = localStorage.getItem('teamsync_turn_url') || '';
     document.getElementById('turn-user').value = localStorage.getItem('teamsync_turn_user') || '';
     document.getElementById('turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
+    document.getElementById('settings-ptt').checked = localStorage.getItem('teamsync_ptt_enabled') === '1';
   });
 
   document.getElementById('founder-settings').addEventListener('click', () => {
@@ -4465,6 +4505,10 @@ function bindUI() {
     localStorage.setItem('teamsync_turn_url', document.getElementById('turn-url').value.trim());
     localStorage.setItem('teamsync_turn_user', document.getElementById('turn-user').value.trim());
     localStorage.setItem('teamsync_turn_pass', document.getElementById('turn-pass').value.trim());
+    const pttEnabled = document.getElementById('settings-ptt').checked;
+    localStorage.setItem('teamsync_ptt_enabled', pttEnabled ? '1' : '0');
+    // Odadaysak canlı uygula: bir sonraki sunucuya katılmayı beklemeye gerek yok
+    if (state.room) applyPttMode(pttEnabled);
     showToast('Ayarlar kaydedildi!', 'ok');
     document.getElementById('settings-modal').classList.add('hidden');
   });
@@ -4530,6 +4574,38 @@ function bindUI() {
   });
   
   initActivitiesUI();
+}
+
+// Push-to-Talk artık kişisel bir kullanıcı ayarı (ayarlar modalı) — oda
+// başlarken VEYA oda içindeyken ayar değiştirildiğinde bu fonksiyon çağrılır.
+function applyPttMode(enabled) {
+  state.pttMode = enabled;
+  const pttBtn = document.getElementById('ptt');
+  if (enabled) {
+    window.electronAPI.registerPTT('Space');
+    if (pttBtn) pttBtn.classList.remove('hidden');
+    if (!state.pttAttached) {
+      window.electronAPI.onPTT(() => {
+        if (!state.pttMode) return;
+        state.pttActive = true;
+        document.getElementById('ptt').classList.add('active');
+        setMicEnabled(true);
+      });
+      document.addEventListener('keyup', (e) => {
+        if (e.code === 'Space' && state.pttMode) {
+          state.pttActive = false;
+          document.getElementById('ptt').classList.remove('active');
+          setMicEnabled(false);
+        }
+      });
+      state.pttAttached = true;
+    }
+  } else {
+    window.electronAPI.unregisterPTT();
+    if (pttBtn) { pttBtn.classList.add('hidden'); pttBtn.classList.remove('active'); }
+    state.pttActive = false;
+    if (state.micEnabled === false && !state.deafened) setMicEnabled(true);
+  }
 }
 
 function setMicEnabled(enabled) {
@@ -4643,6 +4719,10 @@ function startRecording() {
       a.download = `record-${Date.now()}.webm`;
       a.click();
       URL.revokeObjectURL(url);
+      // Kayıt indirildi; chunk'lar tutulursa kaydın tamamı bellekte kalır
+      state.recordedChunks = [];
+      state.recorder = null;
+      state.recordingStream = null;
     };
     state.recorder.start(1000);
     state.isRecording = true;
@@ -4939,6 +5019,7 @@ function disconnectApp() {
   
   document.getElementById('users').innerHTML = '';
   document.getElementById('msgs').innerHTML = '';
+  releaseChatBlobUrls();
   
   const grid = document.getElementById('grid');
   document.querySelectorAll('.vcard').forEach(el => {
@@ -5091,6 +5172,7 @@ async function sendFile(file) {
   const div = document.getElementById('file-' + fileId);
   if (div) {
     const url = URL.createObjectURL(file);
+    chatBlobUrls.push(url);
     if (file.type.startsWith('image/')) {
       div.innerHTML = '';
       div.style.background = 'transparent';
@@ -5188,6 +5270,9 @@ window.renderDMs = () => {
     
     if (m.isCensored) {
        contentHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
+    } else if (m.expired) {
+      // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
+      contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
     } else if (m.type === 'image') {
       contentHtml = `<img src="${m.content}" />`;
     } else if (m.type === 'file') {
@@ -5387,12 +5472,14 @@ window.receiveDM = async (fromId, data) => {
       msgType: data.msgType,
       fileName: data.fileName,
       totalChunks: data.totalChunks,
-      chunks: []
+      chunks: [],
+      lastChunkAt: Date.now()
     };
   }
   else if (data.type === 'dm_file_chunk') {
     const fileData = state.incomingDMFiles[data.fileId];
     if (fileData) {
+      fileData.lastChunkAt = Date.now();
       fileData.chunks[data.chunkIndex] = data.data;
       if (fileData.chunks.filter(c => c).length === fileData.totalChunks) {
         const fullBase64 = fileData.chunks.join('');
