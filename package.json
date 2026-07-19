@@ -43,7 +43,7 @@
       "!node_modules",
       "!dist",
       "!.env",
-      "!yapaydenetleyici.js",
+      "!tools/dev/yapaydenetleyici.js",
       "!problemler.md",
       "!yapaydenetliyici.md"
     ],

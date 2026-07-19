@@ -239,7 +239,7 @@ function createWindow() {
 
   if (!app.isPackaged) {
     try {
-      require('./yapaydenetleyici.js')(mainWindow);
+      require('./tools/dev/yapaydenetleyici.js')(mainWindow);
     } catch (e) {
       console.warn("Yapay denetleyici başlatılamadı:", e);
     }
@@ -384,7 +384,7 @@ ipcMain.handle('get-device-credentials', (event, slot) => {
 
 ipcMain.handle('start-cloudflared', async (event, port) => {
   return new Promise((resolve, reject) => {
-    const exePath = path.join(app.getAppPath(), 'cloudflared.exe');
+    const exePath = path.join(app.getAppPath(), 'vendor', 'cloudflared', 'cloudflared.exe');
     cloudflaredProcess = spawn(exePath, ['tunnel', '--url', `localhost:${port}`]);
 
     cloudflaredProcess.stderr.on('data', (data) => {
@@ -742,13 +742,13 @@ app.whenReady().then(() => {
     skipTaskbar: true,
     resizable: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload-tray.js'),
+      preload: path.join(__dirname, 'electron', 'preload-tray.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
     }
   });
-  trayMenuWindow.loadFile('tray-menu.html');
+  trayMenuWindow.loadFile(path.join(__dirname, 'electron', 'tray-menu.html'));
   trayMenuWindow.on('blur', () => {
     trayMenuWindow.hide();
   });
@@ -803,7 +803,7 @@ app.whenReady().then(() => {
     skipTaskbar: true,
     focusable: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload-notification.js'),
+      preload: path.join(__dirname, 'electron', 'preload-notification.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -815,7 +815,7 @@ app.whenReady().then(() => {
   const { width, height } = primaryDisplay.workAreaSize;
   notificationWindow.setPosition(width - 360, height - 130);
   
-  notificationWindow.loadFile('notification.html');
+  notificationWindow.loadFile(path.join(__dirname, 'electron', 'notification.html'));
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -9,3 +9,15 @@
 3. `npm start` yazarak uygulamayı yerelde test edin.
 4. Kuruluma gerek kalmayan taşınabilir sürümünü almak için: `npm run build` komutunu çalıştırın. Dosya `dist/` klasöründe hazır olacaktır.
 
+## Proje Yapısı
+
+- `assets/` — uygulama görselleri
+- `electron/` — tepsi ve bildirim pencereleri
+- `js/` — ana arayüz modülleri
+- `src/` — React geliştirme arayüzü
+- `test/` — otomatik ve elle çalıştırılan testler
+- `tools/` — veri üretme, bakım ve eski dönüşüm araçları
+- `vendor/` — uygulamayla birlikte dağıtılan üçüncü taraf dosyalar
+
+`node_modules/`, `dist/` ve `src/dist-react/` yeniden üretilebildikleri için Git tarafından izlenmez.
+
