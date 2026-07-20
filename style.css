@@ -1387,8 +1387,10 @@ body { padding-top: 35px; } /* Prevent overlap */
 .msg-file .prog-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .msg-file .prog { height: 100%; width: 0%; background: var(--acc); transition: width 0.2s; }
 
-.img-wrap { position: relative; display: inline-block; margin-top: 8px; }
-.chat-img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; border: 1px solid rgba(255,255,255,0.1); }
+/* isolation: cam butonun backdrop-filter'ı yalnızca bu görseli örneklesin;
+   yoksa GPU katman ayrımında arkadaki mor uygulama zeminini alıp mor görünüyordu. */
+.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; }
+.chat-img { max-width: 220px; max-height: 220px; border-radius: 14px; display: block; border: 1px solid rgba(255,255,255,0.1); }
 
 /* İndirme butonu — SAF BUZLU CAM (renk katmaz):
    - Şeffaf zemin + backdrop-filter blur+saturate → arkadaki içeriği gösterir
@@ -1402,7 +1404,7 @@ body { padding-top: 35px; } /* Prevent overlap */
   color: #fff; text-decoration: none;
   background: rgba(17, 24, 39, 0.26);
   border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 15px;
+  border-radius: 16px;
   backdrop-filter: blur(10px) saturate(175%);
   -webkit-backdrop-filter: blur(10px) saturate(175%);
   box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
@@ -1625,8 +1627,10 @@ body { padding-top: 35px; } /* Prevent overlap */
 .msg-file .prog-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .msg-file .prog { height: 100%; width: 0%; background: var(--acc); transition: width 0.2s; }
 
-.img-wrap { position: relative; display: inline-block; margin-top: 8px; }
-.chat-img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; border: 1px solid rgba(255,255,255,0.1); }
+/* isolation: cam butonun backdrop-filter'ı yalnızca bu görseli örneklesin;
+   yoksa GPU katman ayrımında arkadaki mor uygulama zeminini alıp mor görünüyordu. */
+.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; }
+.chat-img { max-width: 220px; max-height: 220px; border-radius: 14px; display: block; border: 1px solid rgba(255,255,255,0.1); }
 
 /* İndirme butonu — SAF BUZLU CAM (renk katmaz):
    - Şeffaf zemin + backdrop-filter blur+saturate → arkadaki içeriği gösterir
@@ -1640,7 +1644,7 @@ body { padding-top: 35px; } /* Prevent overlap */
   color: #fff; text-decoration: none;
   background: rgba(17, 24, 39, 0.26);
   border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 15px;
+  border-radius: 16px;
   backdrop-filter: blur(10px) saturate(175%);
   -webkit-backdrop-filter: blur(10px) saturate(175%);
   box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
