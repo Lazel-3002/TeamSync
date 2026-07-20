@@ -1492,6 +1492,15 @@ async function diagnoseIceFailure(peerId) {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  // Başlangıç menüsünün sol altına uygulama sürümünü yaz (package.json'dan).
+  try {
+    const verEl = document.getElementById('app-version');
+    if (verEl && window.electronAPI && window.electronAPI.getAppVersion) {
+      const v = window.electronAPI.getAppVersion();
+      if (v) verEl.textContent = 'v' + v;
+    }
+  } catch (e) { /* sürüm alınamazsa statik metin kalır */ }
+
   const stepName = document.getElementById('step-name');
   const stepAction = document.getElementById('step-action');
   const stepJoin = document.getElementById('step-join');
@@ -2128,6 +2137,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.friendsOnlyMode = false;
     state.moderators = new Set();
     state.serverMutedIds = new Set();
+    // Susturma her odaya özeldir: yeni sunucuya geçince susturma sıfırlanır,
+    // aksi halde başka sunucuda da susturulmuş kalıyordunuz.
+    state.serverMuted = false;
     // Kurucu, bu odaya ait kalıcı yasak listesini diskten yükler; katılan biri
     // ise liste kurucunun hello mesajıyla senkronize edilir.
     state.bannedIds = state.isRoomFounder ? loadRoomBans(roomId) : new Set();
@@ -2779,17 +2791,37 @@ function removePeer(peerId) {
 }
 
 // Ses bit hızı (kbps) kurucu tarafından ayarlanabilir; SDP içindeki Opus
-// (payload 111) fmtp satırına maxaveragebitrate olarak yazılır. Varsayılan
-// 128 kbps. (item 7)
+// fmtp satırına maxaveragebitrate olarak yazılır. Varsayılan 128 kbps. (item 7)
 function getAudioBitrate() {
   const v = parseInt(state.audioBitrate, 10);
   return (Number.isFinite(v) && v >= 8 && v <= 512) ? v : 128;
 }
 
+// Opus için yüksek kalite fmtp parametreleri. Not: Opus payload numarası her
+// zaman 111 değildir — SDP'den dinamik bulunur, yoksa fmtp satırı eklenir.
+// cbr=1 (sabit bit hızı) kaldırıldı; VBR daha iyi ses/oran verir. useinbandfec
+// paket kaybında sesi netleştirir, maxplaybackrate 48kHz tam bant sağlar.
 function setMediaBitrates(sdp) {
   if (!sdp) return sdp;
   const bps = getAudioBitrate() * 1000;
-  return sdp.replace(/a=fmtp:111(.*)/g, `a=fmtp:111$1;maxaveragebitrate=${bps};stereo=1;sprop-stereo=1;cbr=1`);
+  const m = sdp.match(/a=rtpmap:(\d+)\s+opus/i);
+  if (!m) return sdp;
+  const pt = m[1];
+  const opusParams =
+    `maxaveragebitrate=${bps};maxplaybackrate=48000;sprop-maxcapturerate=48000;` +
+    `stereo=1;sprop-stereo=1;useinbandfec=1;usedtx=0`;
+  const fmtpRe = new RegExp(`a=fmtp:${pt} ([^\\r\\n]*)`);
+  if (fmtpRe.test(sdp)) {
+    // Mevcut satırdan çakışan Opus parametrelerini temizleyip yenilerini ekle.
+    return sdp.replace(fmtpRe, (full, existing) => {
+      const cleaned = existing.split(';')
+        .filter(p => p && !/^(maxaveragebitrate|maxplaybackrate|sprop-maxcapturerate|stereo|sprop-stereo|useinbandfec|usedtx|cbr)=/i.test(p.trim()))
+        .join(';');
+      return `a=fmtp:${pt} ${cleaned ? cleaned + ';' : ''}${opusParams}`;
+    });
+  }
+  // fmtp satırı yoksa Opus rtpmap satırının hemen ardına ekle.
+  return sdp.replace(new RegExp(`(a=rtpmap:${pt}\\s+opus[^\\r\\n]*)`), `$1\r\na=fmtp:${pt} ${opusParams}`);
 }
 
 // Mevcut (kurulu) bağlantılara ses bit hızını yeniden anlaşma olmadan uygular:
@@ -5687,6 +5719,8 @@ function disconnectApp() {
   state.moderators = new Set();
   state.serverMutedIds = new Set();
   state.bannedIds = new Set();
+  // Sunucudan çıkınca susturma da kalkar (odaya özel).
+  state.serverMuted = false;
   state.founderId = null;
   document.getElementById('founder-settings').classList.add('hidden');
 

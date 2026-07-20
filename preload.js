@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
   windowClose: () => ipcRenderer.send('window-close'),
   onWindowVisibility: (cb) => ipcRenderer.on('window-visibility', (e, visible) => cb(visible)),
-  appQuitForce: () => ipcRenderer.send('app-quit-force')
+  appQuitForce: () => ipcRenderer.send('app-quit-force'),
+  // Uygulama sürümü (package.json'dan). Başlangıç menüsünde gösterilir.
+  getAppVersion: () => { try { return require('./package.json').version; } catch (e) { return null; } }
 });
 
