@@ -184,7 +184,12 @@ function setupInternetSignaling(roomId, myId, myName) {
           // listesi kurucunun periyodik hello'suyla tüm katılımcılara (geç
           // katılanlar dahil) her 3 saniyede bir yayılır.
           roomName: state.isRoomFounder ? state.roomName : undefined,
-          moderators: state.isRoomFounder ? Array.from(state.moderators) : undefined
+          moderators: state.isRoomFounder ? Array.from(state.moderators) : undefined,
+          // Geç katılanların da öğrenmesi için kurucu otoritesiyle taşınan diğer
+          // sunucu durumu: yasak listesi, susturulanlar ve ses bit hızı.
+          bannedIds: state.isRoomFounder ? Array.from(state.bannedIds || []) : undefined,
+          serverMutedIds: state.isRoomFounder ? Array.from(state.serverMutedIds || []) : undefined,
+          audioBitrate: state.isRoomFounder ? getAudioBitrate() : undefined
         }));
       }
     }, 3000);
@@ -251,6 +256,27 @@ function setupInternetSignaling(roomId, myId, myName) {
               affected.forEach(id => refreshUserRoleBadge(id));
               if (state.myId && affected.has(state.myId)) updateFounderMenuVisibility();
             }
+          }
+          // Yasak listesi (item 3) ve susturulanlar (item 5): kurucu otoritesiyle
+          // eşitlenir. Yasaklıysam anında düşürülürüm.
+          if (Array.isArray(data.bannedIds)) {
+            state.bannedIds = new Set(data.bannedIds);
+            if (state.bannedIds.has(state.myId)) {
+              disconnectApp();
+              document.getElementById('error-text').textContent = "Bu sunucudan kalıcı olarak yasaklandınız.";
+              document.getElementById('error-modal').classList.remove('hidden');
+            }
+          }
+          if (Array.isArray(data.serverMutedIds)) {
+            state.serverMutedIds = new Set(data.serverMutedIds);
+            const iAmMuted = state.serverMutedIds.has(state.myId);
+            if (iAmMuted && !state.serverMuted) { state.serverMuted = true; setMicEnabled(false); }
+            else if (!iAmMuted && state.serverMuted) { state.serverMuted = false; }
+          }
+          // Ses bit hızı (item 7): kurucu değeriyle eşitlenir ve uygulanır.
+          if (typeof data.audioBitrate === 'number' && data.audioBitrate !== state.audioBitrate) {
+            state.audioBitrate = data.audioBitrate;
+            applyAudioBitrateToPeers();
           }
         }
         applySharedTurn(data.turn);
@@ -638,6 +664,28 @@ async function saveProfile() {
   }
 }
 
+// Profil fotoğrafını Supabase Storage'daki "avatars" bucket'ına yükler ve
+// herkesin erişebileceği kalıcı bir public URL döner. Yükleme başarısız olursa
+// null döner; çağıran taraf base64'e geri düşebilir.
+async function uploadAvatarToStorage(blob) {
+  if (!supabaseClient || !blob) return null;
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return null;
+    const path = `${session.user.id}.jpg`;
+    const { error } = await supabaseClient.storage
+      .from('avatars')
+      .upload(path, blob, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' });
+    if (error) throw error;
+    const { data } = supabaseClient.storage.from('avatars').getPublicUrl(path);
+    // Aynı yol üzerine yazıldığı için <img> önbelleğini kırmak üzere zaman damgası ekliyoruz.
+    return `${data.publicUrl}?t=${Date.now()}`;
+  } catch (e) {
+    console.error('Avatar Supabase Storage yükleme hatası:', e);
+    return null;
+  }
+}
+
 function loadDMs() {
   const savedDMs = localStorage.getItem('teamsync_dms');
   if (savedDMs) {
@@ -981,7 +1029,10 @@ function setupGlobalMQTT() {
           id: state.friendId,
           name: state.myName,
           room: state.room || null,
-          avatarHash: state.myAvatarHash || null
+          avatarHash: state.myAvatarHash || null,
+          // Avatar bir Supabase URL'iyse presence ile paylaş (kısa); base64 ise
+          // gönderme, eski avatarHash/req_avatar akışına bırak.
+          avatar: (typeof state.myAvatar === 'string' && state.myAvatar.startsWith('http')) ? state.myAvatar : undefined
         }));
       }
     }, 5000);
@@ -998,20 +1049,28 @@ function setupGlobalMQTT() {
           const wasOnline = state.friends[data.id].online;
           const oldRoom = state.friends[data.id].room;
           const oldAvatarHash = state.friends[data.id].avatarHash;
-          
+          const oldAvatar = state.friends[data.id].avatar;
+
           state.friends[data.id].online = true;
           state.friends[data.id].lastSeen = Date.now();
           state.friends[data.id].room = data.room;
           state.friends[data.id].avatarHash = data.avatarHash;
-          
-          if (data.avatarHash && oldAvatarHash !== data.avatarHash) {
+
+          // Presence bir Supabase avatar URL'i taşıyorsa doğrudan kullan;
+          // base64 P2P alışverişine (req_avatar) gerek kalmaz.
+          let avatarChanged = false;
+          if (typeof data.avatar === 'string' && data.avatar.startsWith('http') && data.avatar !== oldAvatar) {
+            state.friends[data.id].avatar = data.avatar;
+            avatarChanged = true;
+          } else if (data.avatarHash && oldAvatarHash !== data.avatarHash) {
+            // Eski istemciler / base64 avatarlar için geri uyumluluk.
             state.globalMqtt.publish(`teamsync/user/${data.id}/events`, JSON.stringify({
               type: 'req_avatar',
               fromId: state.friendId
             }));
           }
-          
-          if (!wasOnline || oldRoom !== data.room || oldAvatarHash !== data.avatarHash) {
+
+          if (!wasOnline || oldRoom !== data.room || oldAvatarHash !== data.avatarHash || avatarChanged) {
             renderFriends();
           } else {
             const dot = document.getElementById(`status-${data.id}`);
@@ -1090,6 +1149,9 @@ function setupGlobalMQTT() {
           if (state.friends[data.fromId]) {
             state.friends[data.fromId].avatar = data.avatar;
             saveProfile();
+            // Arkadaş listesini hemen yeniden çiz: yeni gelen profil fotoğrafı
+            // uygulamayı yeniden başlatmadan görünür olsun (item 8).
+            renderFriends();
           }
         } else if (data.type === 'dm_msg' || data.type === 'dm_file_start' || data.type === 'dm_file_chunk') {
           receiveDM(data.fromId, data);
@@ -2065,6 +2127,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.isRoomFounder = !isJoining;
     state.friendsOnlyMode = false;
     state.moderators = new Set();
+    state.serverMutedIds = new Set();
+    // Kurucu, bu odaya ait kalıcı yasak listesini diskten yükler; katılan biri
+    // ise liste kurucunun hello mesajıyla senkronize edilir.
+    state.bannedIds = state.isRoomFounder ? loadRoomBans(roomId) : new Set();
     state.founderId = state.isRoomFounder ? state.myId : null;
 
     updateFounderMenuVisibility();
@@ -2161,6 +2227,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     const useGameMode = document.getElementById('create-gameMode') ? document.getElementById('create-gameMode').checked : false;
     const useRelay = document.getElementById('create-useRelay') ? document.getElementById('create-useRelay').checked : false;
     const pttEnabled = localStorage.getItem('teamsync_ptt_enabled') === '1';
+    // Sunucu oluştururken seçilen ses bit hızı (item 7). setMediaBitrates bunu
+    // ilk bağlantıların SDP'sine uygular.
+    const bitrateSel = document.getElementById('create-bitrate');
+    state.audioBitrate = bitrateSel ? (parseInt(bitrateSel.value, 10) || 128) : 128;
     startApp(odaId, createPw.value, createAi.checked, pttEnabled, sName, false, useSFW, useGameMode, useRelay);
   });
 
@@ -2494,7 +2564,17 @@ async function setupDeviceList() {
 
 async function handlePeerDiscovered(peer) {
   if (!peer || !peer.id || peer.id === state.myId) return;
-  
+
+  // Kalıcı yasak kontrolü (item 3): yasaklı biri odaya giremez. Kurucu ayrıca
+  // yasaklıyı aktif olarak atar (kick), diğer istemciler sadece bağlantı kurmaz.
+  if (state.bannedIds && state.bannedIds.has(peer.id)) {
+    if (state.isRoomFounder) {
+      broadcast({ type: 'ban_peer', targetId: peer.id });
+    }
+    if (state.peers.has(peer.id)) removePeer(peer.id);
+    return;
+  }
+
   if (state.sfwMode) {
     const cleaned = cleanText(peer.name);
     if (cleaned !== peer.name) peer.name = "Anonim";
@@ -2689,11 +2769,47 @@ function removePeer(peerId) {
       if (state.uno.started) renderUnoGame();
     }
   }
+
+  // Ayrılan peer kurucuysa sahiplik boşta kalmasın diye halef (moderatör) seç.
+  // (item 4) Not: state.peers.delete(peerId) yukarıda çalıştığı için aday
+  // filtresi ayrılan kurucuyu doğru şekilde hariç tutar.
+  if (peerId === state.founderId) {
+    handleFounderLeft(peerId);
+  }
+}
+
+// Ses bit hızı (kbps) kurucu tarafından ayarlanabilir; SDP içindeki Opus
+// (payload 111) fmtp satırına maxaveragebitrate olarak yazılır. Varsayılan
+// 128 kbps. (item 7)
+function getAudioBitrate() {
+  const v = parseInt(state.audioBitrate, 10);
+  return (Number.isFinite(v) && v >= 8 && v <= 512) ? v : 128;
 }
 
 function setMediaBitrates(sdp) {
   if (!sdp) return sdp;
-  return sdp.replace(/a=fmtp:111(.*)/g, 'a=fmtp:111$1;maxaveragebitrate=128000;stereo=1;sprop-stereo=1;cbr=1');
+  const bps = getAudioBitrate() * 1000;
+  return sdp.replace(/a=fmtp:111(.*)/g, `a=fmtp:111$1;maxaveragebitrate=${bps};stereo=1;sprop-stereo=1;cbr=1`);
+}
+
+// Mevcut (kurulu) bağlantılara ses bit hızını yeniden anlaşma olmadan uygular:
+// her peer'ın ses göndericisinin encodings.maxBitrate değeri güncellenir. Yeni
+// bağlantılar için ise setMediaBitrates SDP üzerinden çalışır. (item 7)
+async function applyAudioBitrateToPeers() {
+  const maxBitrate = getAudioBitrate() * 1000;
+  for (const [, peer] of state.peers) {
+    if (!peer.pc) continue;
+    const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+    if (!sender) continue;
+    try {
+      const params = sender.getParameters();
+      if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+      params.encodings[0].maxBitrate = maxBitrate;
+      await sender.setParameters(params);
+    } catch (e) {
+      console.warn('Ses bit hızı uygulanamadı:', e);
+    }
+  }
 }
 
 function getVideoSender(pc) {
@@ -3225,6 +3341,9 @@ async function handleDataMessage(peerId, msg) {
     }
     return;
   } else if (msg.type === 'kick_peer') {
+    // Yetki doğrulaması: gönderen (peerId) hedefe at uygulayabiliyor olmalı.
+    // Moderatör kurucuyu/başka moderatörü atamaz; yetkisiz kimse atamaz.
+    if (!canModerateTarget(peerId, msg.targetId)) return;
     if (msg.targetId === state.myId) {
       disconnectApp();
       document.getElementById('error-text').textContent = "Sunucudan atıldınız: " + (msg.reason || "Bilinmeyen sebep.");
@@ -3234,13 +3353,54 @@ async function handleDataMessage(peerId, msg) {
     }
     return;
   } else if (msg.type === 'force_mute') {
+    // Yetki doğrulaması: moderatör kurucuyu/başka moderatörü susturamaz.
+    if (!canModerateTarget(peerId, msg.targetId)) return;
+    // Tüm istemciler susturulanlar listesini tutar; böylece kurucu panelindeki
+    // sustur/aç butonu doğru durumu (toggle) gösterebilir. (item 5)
+    if (!state.serverMutedIds) state.serverMutedIds = new Set();
+    state.serverMutedIds.add(msg.targetId);
     if (msg.targetId === state.myId) {
       state.serverMuted = true;
       setMicEnabled(false);
       showToast('Kurucu tarafından susturuldunuz!', 'danger');
     }
     return;
+  } else if (msg.type === 'force_unmute') {
+    // Susturmayı kaldırma yetkisi de aynı kurala tabidir. (item 5)
+    if (!canModerateTarget(peerId, msg.targetId)) return;
+    if (!state.serverMutedIds) state.serverMutedIds = new Set();
+    state.serverMutedIds.delete(msg.targetId);
+    if (msg.targetId === state.myId) {
+      state.serverMuted = false;
+      showToast('Susturmanız kaldırıldı, konuşabilirsiniz.', 'ok');
+    }
+    return;
+  } else if (msg.type === 'ban_peer') {
+    // Yalnızca kurucu kalıcı yasaklayabilir. Yasak listesi tüm istemcilerde
+    // tutulur; yasaklı kişi hiçbir peer ile bağlantı kuramaz. (item 3)
+    if (peerId !== state.founderId) return;
+    if (!state.bannedIds) state.bannedIds = new Set();
+    state.bannedIds.add(msg.targetId);
+    if (msg.targetId === state.myId) {
+      disconnectApp();
+      document.getElementById('error-text').textContent = "Bu sunucudan kalıcı olarak yasaklandınız.";
+      document.getElementById('error-modal').classList.remove('hidden');
+    } else {
+      removePeer(msg.targetId);
+    }
+    return;
+  } else if (msg.type === 'set_bitrate') {
+    // Sunucu geneli ses bit hızı; yalnızca kurucu değiştirebilir. (item 7)
+    if (peerId !== state.founderId) return;
+    const kbps = parseInt(msg.value, 10);
+    if (Number.isFinite(kbps)) {
+      state.audioBitrate = kbps;
+      applyAudioBitrateToPeers();
+    }
+    return;
   } else if (msg.type === 'set_moderator') {
+    // Yalnızca kurucu yetki verebilir/alabilir.
+    if (peerId !== state.founderId) return;
     if (msg.value) state.moderators.add(msg.targetId);
     else state.moderators.delete(msg.targetId);
     refreshUserRoleBadge(msg.targetId);
@@ -3250,6 +3410,8 @@ async function handleDataMessage(peerId, msg) {
     }
     return;
   } else if (msg.type === 'transfer_ownership') {
+    // Yalnızca mevcut kurucu sahipliği devredebilir.
+    if (peerId !== state.founderId) return;
     state.founderId = msg.targetId;
     state.moderators.delete(msg.targetId);
     if (msg.targetId === state.myId) {
@@ -3744,6 +3906,66 @@ function canManageRoom() {
 
 function isPeerModerator(id) {
   return !!(state.moderators && state.moderators.has(id));
+}
+
+// Bir aktörün (actorId) hedef oyuncuya (targetId) sustur/at uygulama yetkisi var mı?
+// Kurucu herkese uygulayabilir. Moderatör yalnızca sıradan oyunculara uygulayabilir;
+// kurucuya veya başka bir moderatöre uygulayamaz. Yetkisiz kişiler hiçbir şey yapamaz.
+// Hem UI (butonları gizlemek) hem de gelen mesajları doğrulamak için kullanılır.
+function canModerateTarget(actorId, targetId) {
+  const actorIsFounder = actorId === state.founderId;
+  const actorIsMod = isPeerModerator(actorId);
+  if (!actorIsFounder && !actorIsMod) return false; // yetkisiz kişi hiçbir şey yapamaz
+  if (actorIsFounder) return true;                   // kurucu her oyuncuya uygulayabilir
+  // Aktör moderatör: kurucuya veya başka bir moderatöre dokunamaz.
+  if (targetId === state.founderId) return false;
+  if (isPeerModerator(targetId)) return false;
+  return true;
+}
+
+// --- Kalıcı yasak (ban) sistemi -------------------------------------------
+// Yasak listesi kurucu tarafında oda kimliğine göre localStorage'da tutulur;
+// böylece kurucu uygulamayı kapatıp açsa bile yasaklar korunur.
+function roomBansKey(roomId) { return 'teamsync_bans_' + roomId; }
+
+function loadRoomBans(roomId) {
+  try {
+    const raw = localStorage.getItem(roomBansKey(roomId));
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch (e) { return new Set(); }
+}
+
+function saveRoomBans(roomId) {
+  try {
+    localStorage.setItem(roomBansKey(roomId), JSON.stringify(Array.from(state.bannedIds || [])));
+  } catch (e) { /* kota dolu olabilir; yoksay */ }
+}
+
+// Kurucu odadan ayrıldığında sahiplik boşta kalmasın: hâlâ odada olan en küçük
+// id'li moderatör deterministik olarak yeni kurucu olur (tüm istemciler aynı
+// seçimi yapar, split-brain olmaz). Moderatör yoksa oda sahipsiz kalır ve eski
+// kurucu geri dönebilir. (item 4)
+function handleFounderLeft(prevFounderId) {
+  const candidates = Array.from(state.moderators || [])
+    .filter(id => id === state.myId || state.peers.has(id))
+    .sort();
+  if (candidates.length === 0) {
+    state.founderId = null;
+    return;
+  }
+  const newFounderId = candidates[0];
+  state.founderId = newFounderId;
+  state.moderators.delete(newFounderId);
+  if (newFounderId === state.myId) {
+    state.isRoomFounder = true;
+    // Yeni kurucu artık yetkili hello'sunu göndermeye başlar (moderatör/ban/oda
+    // adı senkronizasyonu). Yasak listesini kendi diskine de yazar.
+    if (state.room) saveRoomBans(state.room);
+    updateFounderMenuVisibility();
+    showToast('Kurucu ayrıldı — sunucunun yeni sahibi sen oldun!', 'ok');
+  }
+  refreshUserRoleBadge(newFounderId);
+  if (prevFounderId) refreshUserRoleBadge(prevFounderId);
 }
 
 // Oda listesindeki bir kullanıcının kurucu (fez) / yetkili (kalkan) rozetini
@@ -4683,6 +4905,8 @@ function bindUI() {
     document.getElementById('founder-friends-only').checked = state.friendsOnlyMode || false;
     document.getElementById('founder-sfw-mode').checked = state.sfwMode || false;
     document.getElementById('founder-game-mode').checked = state.gameMode || false;
+    const bitrateEl = document.getElementById('founder-bitrate');
+    if (bitrateEl) bitrateEl.value = String(getAudioBitrate());
 
     // Sunucu çapındaki ayarlar (arkadaş-only/AI koruması/oyun modu) ve devir/yetki
     // butonları yalnızca kurucuya özel; moderatörler yalnızca sustur/at yapabilir.
@@ -4725,14 +4949,30 @@ function bindUI() {
         actionsDiv.style.gap = '8px';
         actionsDiv.style.flexWrap = 'wrap';
 
+        // Sustur/Sesini Aç toggle: kişi hâlihazırda susturulmuşsa buton "Sesini
+        // Aç" olur ve force_unmute gönderir; değilse "Sustur" olup force_mute
+        // gönderir. (item 5)
+        const isMuted = state.serverMutedIds && state.serverMutedIds.has(peerId);
         const muteBtn = document.createElement('button');
         muteBtn.className = 'btn-sec btn-sm';
-        muteBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12"></path><path d="M15 9.34V4a3 3 0 0 0-5.94-.6"></path><path d="M17 16.95A7 7 0 0 1 5 12v-2"></path><path d="M19 10v2a7 7 0 0 1-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Sustur';
+        const muteIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12"></path><path d="M15 9.34V4a3 3 0 0 0-5.94-.6"></path><path d="M17 16.95A7 7 0 0 1 5 12v-2"></path><path d="M19 10v2a7 7 0 0 1-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>';
+        const unmuteIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>';
+        muteBtn.innerHTML = isMuted ? unmuteIcon + ' Sesini Aç' : muteIcon + ' Sustur';
         muteBtn.style.padding = '4px 8px';
         muteBtn.style.fontSize = '12px';
         muteBtn.onclick = () => {
-          broadcast({ type: 'force_mute', targetId: peerId });
-          showToast(`${peer.name} susturuldu.`, 'info');
+          if (isMuted) {
+            broadcast({ type: 'force_unmute', targetId: peerId });
+            if (state.serverMutedIds) state.serverMutedIds.delete(peerId);
+            showToast(`${peer.name} susturması kaldırıldı.`, 'info');
+          } else {
+            broadcast({ type: 'force_mute', targetId: peerId });
+            if (!state.serverMutedIds) state.serverMutedIds = new Set();
+            state.serverMutedIds.add(peerId);
+            showToast(`${peer.name} susturuldu.`, 'info');
+          }
+          // Butonu güncellemek için paneli tazele.
+          document.getElementById('founder-settings').dispatchEvent(new Event('click'));
         };
 
         const kickBtn = document.createElement('button');
@@ -4748,8 +4988,19 @@ function bindUI() {
           showToast(`${peer.name} atıldı.`, 'info');
         };
 
-        actionsDiv.appendChild(muteBtn);
-        actionsDiv.appendChild(kickBtn);
+        // Moderatörler kurucuyu veya başka moderatörü susturup atamaz —
+        // bu durumda sustur/at butonları hiç gösterilmez. Kurucu için her
+        // zaman gösterilir. (Sunucu tarafı doğrulama için bkz: canModerateTarget
+        // kullanımı, kick_peer/force_mute mesaj işleyicileri.)
+        if (canModerateTarget(state.myId, peerId)) {
+          actionsDiv.appendChild(muteBtn);
+          actionsDiv.appendChild(kickBtn);
+        } else {
+          const protectedNote = document.createElement('span');
+          protectedNote.style.cssText = 'font-size:11px; color:var(--txt-mut);';
+          protectedNote.textContent = 'Korumalı';
+          actionsDiv.appendChild(protectedNote);
+        }
 
         // Yetki verme/alma ve sahiplik devri yalnızca kurucuya özel.
         if (state.isRoomFounder) {
@@ -4793,8 +5044,29 @@ function bindUI() {
             showToast(`Sunucu sahipliği ${peer.name} adlı kişiye devredildi.`, 'info');
           };
 
+          // Kalıcı yasak butonu (yalnızca kurucu). Yasaklanan kişi bu odaya bir
+          // daha giremez. (item 3)
+          const banBtn = document.createElement('button');
+          banBtn.className = 'btn-sec btn-sm';
+          banBtn.style.padding = '4px 8px';
+          banBtn.style.fontSize = '12px';
+          banBtn.style.color = 'var(--danger)';
+          banBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+          banBtn.innerHTML = '🚫 Yasakla';
+          banBtn.onclick = async () => {
+            if (!(await window.showConfirm('🚫 Kalıcı Yasakla', `"${peer.name}" bu sunucudan kalıcı olarak yasaklansın mı? Bu kişi bir daha bu odaya giremez.`))) return;
+            if (!state.bannedIds) state.bannedIds = new Set();
+            state.bannedIds.add(peerId);
+            if (state.room) saveRoomBans(state.room);
+            broadcast({ type: 'ban_peer', targetId: peerId });
+            removePeer(peerId);
+            showToast(`${peer.name} kalıcı olarak yasaklandı.`, 'info');
+            document.getElementById('founder-settings').dispatchEvent(new Event('click'));
+          };
+
           actionsDiv.appendChild(modBtn);
           actionsDiv.appendChild(transferBtn);
+          actionsDiv.appendChild(banBtn);
         }
 
         div.appendChild(nameSpan);
@@ -4826,6 +5098,19 @@ function bindUI() {
     broadcast({ type: 'founder_settings_update', gameMode: state.gameMode });
     showToast(state.gameMode ? 'Oyun Modu aktif (15FPS/Düşük İşlemci)!' : 'Oyun Modu kapatıldı.', 'info');
   });
+
+  // Ses bit hızı değişince: kendi göndericine anında uygula ve tüm katılımcılara
+  // yayınla; herkes kendi göndericisine uygular. (item 7)
+  const founderBitrateEl = document.getElementById('founder-bitrate');
+  if (founderBitrateEl) {
+    founderBitrateEl.addEventListener('change', (e) => {
+      const kbps = parseInt(e.target.value, 10) || 128;
+      state.audioBitrate = kbps;
+      applyAudioBitrateToPeers();
+      broadcast({ type: 'set_bitrate', value: kbps });
+      showToast(`Ses kalitesi ${kbps} kbps olarak ayarlandı.`, 'ok');
+    });
+  }
   
   document.getElementById('settings-save').addEventListener('click', () => {
     localStorage.setItem('teamsync_turn_url', document.getElementById('turn-url').value.trim());
@@ -5400,6 +5685,8 @@ function disconnectApp() {
   state.room = null;
   state.pendingJoinReq = null;
   state.moderators = new Set();
+  state.serverMutedIds = new Set();
+  state.bannedIds = new Set();
   state.founderId = null;
   document.getElementById('founder-settings').classList.add('hidden');
 
@@ -5976,9 +6263,15 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
         
-        state.myAvatar = dataUrl;
-        state.myAvatarHash = getAvatarHash(dataUrl);
-        document.getElementById('my-avatar-img').src = dataUrl;
+        // Profil fotoğrafını Supabase Storage'a yükle; başarılı olursa base64
+        // yerine kalıcı public URL kullan. Yükleme başarısızsa base64'e düş.
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+        const publicUrl = await uploadAvatarToStorage(blob);
+        const avatarSrc = publicUrl || dataUrl;
+
+        state.myAvatar = avatarSrc;
+        state.myAvatarHash = getAvatarHash(avatarSrc);
+        document.getElementById('my-avatar-img').src = avatarSrc;
         document.getElementById('my-avatar-img').style.display = 'block';
         document.getElementById('my-avatar-default').style.display = 'none';
         saveProfile();
@@ -5989,7 +6282,10 @@ document.addEventListener('DOMContentLoaded', () => {
             id: state.friendId,
             name: state.myName,
             room: state.room || null,
-            avatarHash: state.myAvatarHash
+            avatarHash: state.myAvatarHash,
+            // Supabase URL'i kısa olduğundan doğrudan presence ile paylaşılır;
+            // arkadaşlar fotoğrafı base64 alışverişi olmadan yükleyebilir.
+            avatar: (typeof avatarSrc === 'string' && avatarSrc.startsWith('http')) ? avatarSrc : undefined
           }));
         }
       };

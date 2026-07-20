@@ -80,7 +80,16 @@ window.state = {
   sfwMode: false,
   aiModel: null,
   gameMode: false,
+  // Sunucu geneli ses bit hızı (kbps). Kurucu, sunucu oluştururken ve kurucu
+  // ayarlarından değiştirebilir; tüm katılımcılara yayılır. (item 7)
+  audioBitrate: 128,
   moderators: new Set(),
+  // Kurucu/yetkili tarafından susturulan oyuncuların id'leri — sustur/aç
+  // butonunun durumunu (toggle) belirlemek için tüm istemcilerde tutulur.
+  serverMutedIds: new Set(),
+  // Kurucunun kalıcı olarak yasakladığı oyuncuların id'leri; bu odaya tekrar
+  // giremezler. Kurucu tarafında localStorage'a da yazılır (bkz: room bans).
+  bannedIds: new Set(),
   founderId: null,
   roomName: null
 };
