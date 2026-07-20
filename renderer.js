@@ -998,6 +998,22 @@ window.removeFriend = async (id) => {
 let presenceInterval = null;
 let pingInterval = null;
 
+// Kendi çevrimiçi durumumu (ad, oda, avatar URL) arkadaşlara yayınlar.
+function publishPresence() {
+  if (state.globalMqtt && state.globalMqtt.connected) {
+    state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
+      online: true,
+      id: state.friendId,
+      name: state.myName,
+      room: state.room || null,
+      avatarHash: state.myAvatarHash || null,
+      // Avatar bir Supabase URL'iyse presence ile paylaş (kısa); base64 ise
+      // gönderme, eski avatarHash/req_avatar akışına bırak.
+      avatar: (typeof state.myAvatar === 'string' && state.myAvatar.startsWith('http')) ? state.myAvatar : undefined
+    }));
+  }
+}
+
 function setupGlobalMQTT() {
   if (state.globalMqtt) return;
   const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
@@ -1021,25 +1037,20 @@ function setupGlobalMQTT() {
     console.log('🔗 Global MQTT (Arkadaşlık) bağlandı');
     client.subscribe(`teamsync/user/${state.friendId}/events`);
 
+    // Açılışta eski oturumdan kalan "online" bayrağını sıfırla (yanlış çevrimiçi
+    // göstermesin); gerçekten çevrimiçi olanlar en geç 5 sn içinde presence ile
+    // yeniden işaretlenir.
     Object.keys(state.friends).forEach(fId => {
+      state.friends[fId].online = false;
       client.subscribe(`teamsync/user/${fId}/presence`);
     });
-    
+    renderFriends();
+
+    // Kendi presence'ımı hemen yayınla ki arkadaşlar beklemeden görsün.
+    publishPresence();
+
     if (presenceInterval) clearInterval(presenceInterval);
-    presenceInterval = setInterval(() => {
-      if (state.globalMqtt && state.globalMqtt.connected) {
-        state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
-          online: true,
-          id: state.friendId,
-          name: state.myName,
-          room: state.room || null,
-          avatarHash: state.myAvatarHash || null,
-          // Avatar bir Supabase URL'iyse presence ile paylaş (kısa); base64 ise
-          // gönderme, eski avatarHash/req_avatar akışına bırak.
-          avatar: (typeof state.myAvatar === 'string' && state.myAvatar.startsWith('http')) ? state.myAvatar : undefined
-        }));
-      }
-    }, 5000);
+    presenceInterval = setInterval(publishPresence, 5000);
 
     // Removed global MQTT ping logic for serverless operation
   });
@@ -3457,6 +3468,10 @@ async function handleDataMessage(peerId, msg) {
     state.moderators.delete(msg.targetId);
     if (msg.targetId === state.myId) {
       state.isRoomFounder = true;
+      // Kurucu olan biri sunucu tarafından susturulmuş kalmasın: kendi
+      // susturmanı temizle (susturulup sonra kurucu yapılma durumu).
+      if (state.serverMutedIds) state.serverMutedIds.delete(state.myId);
+      if (state.serverMuted) { state.serverMuted = false; applyMicState(); }
       updateFounderMenuVisibility();
       showToast('Sunucunun yeni sahibi sen oldun!', 'ok');
     }
@@ -4002,6 +4017,9 @@ function handleFounderLeft(prevFounderId) {
     // Yeni kurucu artık yetkili hello'sunu göndermeye başlar (moderatör/ban/oda
     // adı senkronizasyonu). Yasak listesini kendi diskine de yazar.
     if (state.room) saveRoomBans(state.room);
+    // Kurucu olan biri susturulmuş kalmasın.
+    if (state.serverMutedIds) state.serverMutedIds.delete(state.myId);
+    if (state.serverMuted) { state.serverMuted = false; applyMicState(); }
     updateFounderMenuVisibility();
     showToast('Kurucu ayrıldı — sunucunun yeni sahibi sen oldun!', 'ok');
   }
@@ -4732,10 +4750,21 @@ function bindUI() {
 
   mic.addEventListener('click', () => {
     if (state.serverMuted) {
+      // Kurucu kendi susturmasını kaldırabilir (örn. susturulup sonra kurucu
+      // yapılan biri). Sıradan oyuncu kaldıramaz.
+      if (state.isRoomFounder) {
+        state.serverMuted = false;
+        if (state.serverMutedIds) state.serverMutedIds.delete(state.myId);
+        broadcast({ type: 'force_unmute', targetId: state.myId });
+        applyMicState();
+        playSound('on');
+        showToast('Kendi susturmanı kaldırdın.', 'ok');
+        return;
+      }
       showToast('Kurucu tarafından susturuldunuz. Sesinizi açamazsınız!', 'danger');
       return;
     }
-    
+
     if (state.pttMode) {
       applyPttMode(false);
     }
