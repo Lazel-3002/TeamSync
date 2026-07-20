@@ -1400,28 +1400,34 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  background: rgba(17, 24, 39, 0.32);
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 11px;
-  backdrop-filter: blur(10px) saturate(135%);
-  -webkit-backdrop-filter: blur(10px) saturate(135%);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+  background: rgba(17, 24, 39, 0.26);
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 15px;
+  backdrop-filter: blur(10px) saturate(175%);
+  -webkit-backdrop-filter: blur(10px) saturate(175%);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
               background 0.2s ease, box-shadow 0.2s ease,
               backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
 }
+/* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
+.dl-btn::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(150deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.05) 42%, rgba(255,255,255,0) 100%);
+  pointer-events: none;
+}
 /* Yalnızca görselin üstüne gelince belir */
 .img-wrap:hover .dl-btn { opacity: 1; transform: translateY(0) scale(1); }
-.dl-btn svg { display: block; width: 17px; height: 17px; overflow: visible; }
+.dl-btn svg { display: block; width: 17px; height: 17px; overflow: visible; position: relative; z-index: 1; }
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  background: rgba(17, 24, 39, 0.22);
-  backdrop-filter: blur(12px) saturate(210%);
-  -webkit-backdrop-filter: blur(12px) saturate(210%);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28);
+  background: rgba(17, 24, 39, 0.14);
+  backdrop-filter: blur(12px) saturate(260%);
+  -webkit-backdrop-filter: blur(12px) saturate(260%);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.32);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
 .dl-btn:active { transform: scale(0.92); }
@@ -1632,28 +1638,34 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  background: rgba(17, 24, 39, 0.32);
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 11px;
-  backdrop-filter: blur(10px) saturate(135%);
-  -webkit-backdrop-filter: blur(10px) saturate(135%);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+  background: rgba(17, 24, 39, 0.26);
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 15px;
+  backdrop-filter: blur(10px) saturate(175%);
+  -webkit-backdrop-filter: blur(10px) saturate(175%);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
               background 0.2s ease, box-shadow 0.2s ease,
               backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
 }
+/* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
+.dl-btn::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(150deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.05) 42%, rgba(255,255,255,0) 100%);
+  pointer-events: none;
+}
 /* Yalnızca görselin üstüne gelince belir */
 .img-wrap:hover .dl-btn { opacity: 1; transform: translateY(0) scale(1); }
-.dl-btn svg { display: block; width: 17px; height: 17px; overflow: visible; }
+.dl-btn svg { display: block; width: 17px; height: 17px; overflow: visible; position: relative; z-index: 1; }
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  background: rgba(17, 24, 39, 0.22);
-  backdrop-filter: blur(12px) saturate(210%);
-  -webkit-backdrop-filter: blur(12px) saturate(210%);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28);
+  background: rgba(17, 24, 39, 0.14);
+  backdrop-filter: blur(12px) saturate(260%);
+  -webkit-backdrop-filter: blur(12px) saturate(260%);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.32);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
 .dl-btn:active { transform: scale(0.92); }
