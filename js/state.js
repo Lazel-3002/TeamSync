@@ -9,7 +9,12 @@ window.state = {
   processedStream: null,
   audioCtx: null,
   remoteAudioCtx: null,
+  // micEnabled = EFEKTİF mikrofon durumu (diğer kodun okuduğu). selfMicOn =
+  // kullanıcının KENDİ tercihi. Efektif = selfMicOn && !serverMuted. Kurucu
+  // susturması kalkınca kullanıcının kendi tercihi geri uygulanır (iki değişken).
   micEnabled: true,
+  selfMicOn: true,
+  serverMuted: false,
   deafened: false,
   isSharing: false,
   isRecording: false,

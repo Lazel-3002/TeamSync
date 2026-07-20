@@ -270,8 +270,12 @@ function setupInternetSignaling(roomId, myId, myName) {
           if (Array.isArray(data.serverMutedIds)) {
             state.serverMutedIds = new Set(data.serverMutedIds);
             const iAmMuted = state.serverMutedIds.has(state.myId);
-            if (iAmMuted && !state.serverMuted) { state.serverMuted = true; setMicEnabled(false); }
-            else if (!iAmMuted && state.serverMuted) { state.serverMuted = false; }
+            // Kurucu susturması değiştiyse efektif durumu güncelle; kendi
+            // tercihim (selfMicOn) korunur, susturma kalkınca geri uygulanır.
+            if (iAmMuted !== !!state.serverMuted) {
+              state.serverMuted = iAmMuted;
+              applyMicState();
+            }
           }
           // Ses bit hızı (item 7): kurucu değeriyle eşitlenir ve uygulanır.
           if (typeof data.audioBitrate === 'number' && data.audioBitrate !== state.audioBitrate) {
@@ -3392,8 +3396,10 @@ async function handleDataMessage(peerId, msg) {
     if (!state.serverMutedIds) state.serverMutedIds = new Set();
     state.serverMutedIds.add(msg.targetId);
     if (msg.targetId === state.myId) {
+      // Kurucu susturması: kendi tercihini (selfMicOn) ezmeden efektif durumu
+      // güncelle. Susturma kalkınca kendi tercihin geri gelecek.
       state.serverMuted = true;
-      setMicEnabled(false);
+      applyMicState();
       showToast('Kurucu tarafından susturuldunuz!', 'danger');
     }
     return;
@@ -3403,8 +3409,11 @@ async function handleDataMessage(peerId, msg) {
     if (!state.serverMutedIds) state.serverMutedIds = new Set();
     state.serverMutedIds.delete(msg.targetId);
     if (msg.targetId === state.myId) {
+      // Kurucu susturması kalktı: kendi tercihin (selfMicOn) geri uygulanır.
+      // Susturulmadan önce mikrofonun açıksa açılır, kendin kapattıysan kapalı kalır.
       state.serverMuted = false;
-      showToast('Susturmanız kaldırıldı, konuşabilirsiniz.', 'ok');
+      applyMicState();
+      showToast('Susturmanız kaldırıldı.', 'ok');
     }
     return;
   } else if (msg.type === 'ban_peer') {
@@ -5251,20 +5260,29 @@ function applyPttMode(enabled) {
   }
 }
 
+// Kullanıcının KENDİ mikrofon tercihini ayarlar (self-mute). Kurucu susturması
+// bu tercihi ezmez; yalnızca efektif duruma etki eder. Böylece kurucu susturmayı
+// kaldırınca kullanıcı susturulmadan önce mikrofonu açıksa geri açılır, kendisi
+// kapatmışsa kapalı kalır.
 function setMicEnabled(enabled) {
-  if (enabled && state.serverMuted) {
-    enabled = false;
-  }
-  state.micEnabled = enabled;
+  state.selfMicOn = !!enabled;
+  applyMicState();
+}
+
+// İki bağımsız değişkeni birleştirip efektif mikrofon durumunu uygular:
+//   efektif = selfMicOn (kendi tercihi) && !serverMuted (kurucu susturması).
+function applyMicState() {
+  const active = !!state.selfMicOn && !state.serverMuted;
+  state.micEnabled = active; // efektif durum — diğer kod bunu okur
   if (state.localStream) {
-    state.localStream.getAudioTracks().forEach(t => t.enabled = enabled);
+    state.localStream.getAudioTracks().forEach(t => t.enabled = active);
   }
   if (state.rawMicStream) {
-    state.rawMicStream.getAudioTracks().forEach(t => t.enabled = enabled);
+    state.rawMicStream.getAudioTracks().forEach(t => t.enabled = active);
   }
   const micBtn = document.getElementById('mic');
-  micBtn.classList.toggle('off', !enabled);
-  broadcast({ type: 'state', mic: enabled });
+  if (micBtn) micBtn.classList.toggle('off', !active);
+  broadcast({ type: 'state', mic: active });
   updateUserUI('self');
 }
 
