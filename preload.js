@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onWindowVisibility: (cb) => ipcRenderer.on('window-visibility', (e, visible) => cb(visible)),
   appQuitForce: () => ipcRenderer.send('app-quit-force'),
   // Uygulama sürümü (package.json'dan). Başlangıç menüsünde gösterilir.
-  getAppVersion: () => { try { return require('./package.json').version; } catch (e) { return null; } }
+  getAppVersion: () => { try { return require('./package.json').version; } catch (e) { return null; } },
+  // Donanım hızlandırma tercihi (buzlu cam / performans). Yeniden başlatınca etkin.
+  getHardwareAcceleration: () => ipcRenderer.invoke('get-hardware-acceleration'),
+  setHardwareAcceleration: (enabled) => ipcRenderer.invoke('set-hardware-acceleration', enabled)
 });
 

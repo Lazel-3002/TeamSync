@@ -1516,6 +1516,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) { /* sürüm alınamazsa statik metin kalır */ }
 
+  // Donanım hızlandırma kapalıysa body'ye 'no-hw-accel' ekle: backdrop-filter
+  // çalışmayacağı için cam buton opak nötr zemine düşer (bkz: style.css).
+  if (window.electronAPI && window.electronAPI.getHardwareAcceleration) {
+    window.electronAPI.getHardwareAcceleration()
+      .then(on => { document.body.classList.toggle('no-hw-accel', !on); })
+      .catch(() => {});
+  }
+
   const stepName = document.getElementById('step-name');
   const stepAction = document.getElementById('step-action');
   const stepJoin = document.getElementById('step-join');
@@ -3834,7 +3842,7 @@ async function handleDataMessage(peerId, msg) {
           imgWrap.style.marginTop = '0';
           imgWrap.innerHTML = `
             <img src="${url}" class="chat-img" />
-            <a href="${url}" download="${f.meta.name}" class="dl-btn" title="İndir">⬇️</a>
+            <a href="${url}" download="${f.meta.name}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
           `;
           div.appendChild(imgWrap);
         } else {
@@ -4968,7 +4976,21 @@ function bindUI() {
     document.getElementById('turn-user').value = localStorage.getItem('teamsync_turn_user') || '';
     document.getElementById('turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
     document.getElementById('settings-ptt').checked = localStorage.getItem('teamsync_ptt_enabled') === '1';
+    // Donanım hızlandırma tercihini main sürecinden (settings.json) oku.
+    const hwEl = document.getElementById('settings-hwaccel');
+    if (hwEl && window.electronAPI && window.electronAPI.getHardwareAcceleration) {
+      window.electronAPI.getHardwareAcceleration().then(on => { hwEl.checked = !!on; }).catch(() => {});
+    }
   });
+
+  // Donanım hızlandırma anahtarı: tercihi kaydeder; yeniden başlatınca etkin olur.
+  const hwAccelEl = document.getElementById('settings-hwaccel');
+  if (hwAccelEl && window.electronAPI && window.electronAPI.setHardwareAcceleration) {
+    hwAccelEl.addEventListener('change', (e) => {
+      window.electronAPI.setHardwareAcceleration(e.target.checked);
+      showToast('Donanım hızlandırma tercihi kaydedildi. Uygulamayı yeniden başlatınca etkin olacak.', 'info');
+    });
+  }
 
   document.getElementById('founder-settings').addEventListener('click', () => {
     document.getElementById('founder-settings-modal').classList.remove('hidden');
@@ -5906,7 +5928,7 @@ async function sendFile(file) {
       imgWrap.style.marginTop = '0';
       imgWrap.innerHTML = `
         <img src="${url}" class="chat-img" />
-        <a href="${url}" download="${file.name}" class="dl-btn" title="İndir">⬇️</a>
+        <a href="${url}" download="${file.name}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
       `;
       div.appendChild(imgWrap);
     } else {

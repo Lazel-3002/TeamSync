@@ -1,6 +1,18 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage } = require('electron');
 app.name = 'TeamSync';
-app.disableHardwareAcceleration();
+// Donanım hızlandırma tercihi ayarlardan değiştirilebilir (settings.json).
+// Varsayılan: AÇIK — backdrop-filter (buzlu cam) yalnızca GPU açıkken çalışır.
+// Sadece ayar açıkça false ise kapatılır. Değişiklik yeniden başlatınca etkin olur.
+try {
+  const _fs = require('fs');
+  const _settingsPath = require('path').join(app.getPath('userData'), 'settings.json');
+  if (_fs.existsSync(_settingsPath)) {
+    const _s = JSON.parse(_fs.readFileSync(_settingsPath, 'utf8'));
+    if (_s && _s.hardwareAcceleration === false) {
+      app.disableHardwareAcceleration();
+    }
+  }
+} catch (e) { /* ayar okunamazsa varsayılan: donanım hızlandırma açık */ }
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 app.commandLine.appendSwitch('allow-loopback-in-peer-connection');
 app.commandLine.appendSwitch('disable-async-dns');
@@ -331,6 +343,29 @@ ipcMain.handle('save-accounts', (event, accounts) => {
   } catch (e) {
     return false;
   }
+});
+
+// --- Uygulama ayarları (settings.json) — donanım hızlandırma tercihi ----------
+function readSettings() {
+  try {
+    const fp = path.join(baseUserData, 'settings.json');
+    if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf8')) || {};
+  } catch (e) {}
+  return {};
+}
+function writeSettings(obj) {
+  try {
+    fs.writeFileSync(path.join(baseUserData, 'settings.json'), JSON.stringify(obj, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+ipcMain.handle('get-hardware-acceleration', () => readSettings().hardwareAcceleration !== false);
+ipcMain.handle('set-hardware-acceleration', (event, enabled) => {
+  const s = readSettings();
+  s.hardwareAcceleration = !!enabled;
+  return writeSettings(s);
 });
 
 ipcMain.handle('is-second-instance', () => {
