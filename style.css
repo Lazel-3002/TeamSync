@@ -1561,18 +1561,22 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  /* OPAK koyu zemin (backdrop-filter YOK). Yarı saydam olsaydı ARKASINDAKI
-     mor/renkli görselin rengi butondan sızıp onu mor gösteriyordu. Tam opak
-     olunca butonun rengi görselden bağımsızdır → donanım hızlandırma açık/kapalı
-     her durumda aynı koyu ton, asla mor. Camsı parıltıyı ::before verir. */
-  background: #1b2334;
+  /* BUZLU CAM: yarı saydam koyu zemin + backdrop-filter blur. Renk SIZMASINI
+     önlemek için doygunluğu DÜŞÜRÜP (saturate<1) karartıyoruz (brightness<1);
+     böylece arkadaki mor görsel bastırılır → buton koyu-buzlu okunur, mor değil.
+     (Eski bug saturate>1 ile tam tersini yapıp moru güçlendiriyordu.)
+     img-wrap isolation+#0d1220 sayesinde backdrop kökü değil görseli örnekler. */
+  background: rgba(17, 23, 37, 0.40);
+  backdrop-filter: blur(9px) saturate(45%) brightness(0.75);
+  -webkit-backdrop-filter: blur(9px) saturate(45%) brightness(0.75);
   border: 1px solid rgba(255,255,255,0.26);
   border-radius: 17px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.26);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
-              background 0.2s ease, box-shadow 0.2s ease;
+              background 0.2s ease, box-shadow 0.2s ease,
+              backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
 }
 /* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
 .dl-btn::before {
@@ -1586,8 +1590,10 @@ body { padding-top: 35px; } /* Prevent overlap */
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  /* Hover'da biraz açılır (yine opak → mor sızması yok). */
-  background: #28324a;
+  /* Hover'da biraz daha berrak/açık buzlu cam (yine desatüre → mor sızmaz). */
+  background: rgba(24, 31, 50, 0.34);
+  backdrop-filter: blur(11px) saturate(60%) brightness(0.9);
+  -webkit-backdrop-filter: blur(11px) saturate(60%) brightness(0.9);
   box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.36);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
@@ -1805,18 +1811,22 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  /* OPAK koyu zemin (backdrop-filter YOK). Yarı saydam olsaydı ARKASINDAKI
-     mor/renkli görselin rengi butondan sızıp onu mor gösteriyordu. Tam opak
-     olunca butonun rengi görselden bağımsızdır → donanım hızlandırma açık/kapalı
-     her durumda aynı koyu ton, asla mor. Camsı parıltıyı ::before verir. */
-  background: #1b2334;
+  /* BUZLU CAM: yarı saydam koyu zemin + backdrop-filter blur. Renk SIZMASINI
+     önlemek için doygunluğu DÜŞÜRÜP (saturate<1) karartıyoruz (brightness<1);
+     böylece arkadaki mor görsel bastırılır → buton koyu-buzlu okunur, mor değil.
+     (Eski bug saturate>1 ile tam tersini yapıp moru güçlendiriyordu.)
+     img-wrap isolation+#0d1220 sayesinde backdrop kökü değil görseli örnekler. */
+  background: rgba(17, 23, 37, 0.40);
+  backdrop-filter: blur(9px) saturate(45%) brightness(0.75);
+  -webkit-backdrop-filter: blur(9px) saturate(45%) brightness(0.75);
   border: 1px solid rgba(255,255,255,0.26);
   border-radius: 17px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.26);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
-              background 0.2s ease, box-shadow 0.2s ease;
+              background 0.2s ease, box-shadow 0.2s ease,
+              backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
 }
 /* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
 .dl-btn::before {
@@ -1830,8 +1840,10 @@ body { padding-top: 35px; } /* Prevent overlap */
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  /* Hover'da biraz açılır (yine opak → mor sızması yok). */
-  background: #28324a;
+  /* Hover'da biraz daha berrak/açık buzlu cam (yine desatüre → mor sızmaz). */
+  background: rgba(24, 31, 50, 0.34);
+  backdrop-filter: blur(11px) saturate(60%) brightness(0.9);
+  -webkit-backdrop-filter: blur(11px) saturate(60%) brightness(0.9);
   box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.36);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
