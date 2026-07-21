@@ -1528,8 +1528,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Donanım hızlandırma kapalıysa body'ye 'no-hw-accel' ekle: backdrop-filter
   // çalışmayacağı için cam buton opak nötr zemine düşer (bkz: style.css).
-  if (window.electronAPI && window.electronAPI.getHardwareAcceleration) {
-    window.electronAPI.getHardwareAcceleration()
+  if (window.electronAPI && window.electronAPI.getEffectiveHardwareAcceleration) {
+    window.electronAPI.getEffectiveHardwareAcceleration()
       .then(on => { document.body.classList.toggle('no-hw-accel', !on); })
       .catch(() => {});
   }

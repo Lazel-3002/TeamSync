@@ -432,6 +432,7 @@ function writeSettings(obj) {
   }
 }
 ipcMain.handle('get-hardware-acceleration', () => readSettings().hardwareAcceleration !== false);
+ipcMain.handle('get-effective-hardware-acceleration', () => _diagHwAccelEffective);
 ipcMain.handle('set-hardware-acceleration', (event, enabled) => {
   const s = readSettings();
   s.hardwareAcceleration = !!enabled;

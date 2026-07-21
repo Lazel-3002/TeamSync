@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => { try { return require('./package.json').version; } catch (e) { return null; } },
   // Donanım hızlandırma tercihi (buzlu cam / performans). Yeniden başlatınca etkin.
   getHardwareAcceleration: () => ipcRenderer.invoke('get-hardware-acceleration'),
+  getEffectiveHardwareAcceleration: () => ipcRenderer.invoke('get-effective-hardware-acceleration'),
   setHardwareAcceleration: (enabled) => ipcRenderer.invoke('set-hardware-acceleration', enabled),
   // TEŞHİS: DIAG açık mı? ve canlı DOM'daki indirme butonlarını günlüğe gönder.
   diagEnabled: () => ipcRenderer.invoke('diag-enabled'),

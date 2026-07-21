@@ -1543,42 +1543,33 @@ body { padding-top: 35px; } /* Prevent overlap */
 .msg-file .prog-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .msg-file .prog { height: 100%; width: 0%; background: var(--acc); transition: width 0.2s; }
 
-/* isolation: cam butonun backdrop-filter'ı yalnızca bu görseli örneklesin;
-   yoksa GPU katman ayrımında arkadaki mor uygulama zeminini alıp mor görünüyordu. */
-/* isolation + nötr koyu zemin: görselin YUVARLATILMIŞ köşelerinden butonun
-   backdrop-filter'ı arkadaki mor uygulama zeminini örnekliyordu (donanım
-   hızlandırma açıkken). Köşeleri nötr koyuyla doldur → cam asla mor olmaz. */
-.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; background: #0d1220; border-radius: 14px; }
-.chat-img { max-width: 220px; max-height: 220px; border-radius: 14px; display: block; border: 1px solid rgba(255,255,255,0.1); }
+/* Referanstaki gibi görsel sınırı cam butonu kırpar; ayrı bir isolation/background
+   katmanı kullanılmaz, böylece GPU açıkken backdrop-filter görseli örnekler. */
+.img-wrap { position: relative; display: inline-block; max-width: 100%; margin-top: 8px; border-radius: 10px; overflow: hidden; }
+.chat-img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; border: 1px solid rgba(255,255,255,0.1); }
 
 /* İndirme butonu — SAF BUZLU CAM / V7 (renk katmaz, doygunluk artar):
    Şeffaf zemin + backdrop-filter blur+saturate → arkadaki içeriği gösterir, RENK KATMAZ.
    Yalnızca görselin üstüne gelince belirir; üstüne gelince doygunluk artar
-   (saturate 135%→210%) ve ok hafifçe aşağı kayar. img-wrap isolation+#0d1220
-   sayesinde cam, arkadaki mor uygulama zeminini değil görseli örnekler → asla mor.
+   (saturate 135%→210%) ve ok hafifçe aşağı kayar.
    Donanım hızlandırma kapalıysa body.no-hw-accel opak nötr zemine düşer. */
 .dl-btn {
   position: absolute; top: 8px; right: 8px; z-index: 2;
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  background: rgba(17, 24, 39, 0.26);
-  border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 15px;
+  background: rgba(17, 24, 39, 0.32);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 11px;
   backdrop-filter: blur(10px) saturate(135%);
   -webkit-backdrop-filter: blur(10px) saturate(135%);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
               background 0.2s ease, box-shadow 0.2s ease,
               backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
-}
-/* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
-.dl-btn::before {
-  content: ''; position: absolute; inset: 0; border-radius: inherit;
-  background: linear-gradient(150deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.05) 42%, rgba(255,255,255,0) 100%);
-  pointer-events: none;
+  cursor: pointer;
 }
 /* Yalnızca görselin üstüne gelince belir */
 .img-wrap:hover .dl-btn { opacity: 1; transform: translateY(0) scale(1); }
@@ -1586,16 +1577,17 @@ body { padding-top: 35px; } /* Prevent overlap */
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  background: rgba(17, 24, 39, 0.14);
+  background: rgba(17, 24, 39, 0.22);
+  border-color: rgba(255,255,255,0.4);
   backdrop-filter: blur(12px) saturate(210%);
   -webkit-backdrop-filter: blur(12px) saturate(210%);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.32);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
 .dl-btn:active { transform: scale(0.92); }
 .dl-btn:focus-visible {
   outline: none; opacity: 1; transform: translateY(0) scale(1);
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.7), 0 4px 14px rgba(0,0,0,0.3);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.75), 0 4px 14px rgba(0,0,0,0.35);
 }
 /* Donanım hızlandırma KAPALIYKEN backdrop-filter render edilmez → cam görünmez.
    O durumda buton opak nötr zemine düşer (renk yok); hover'da biraz açılır. */
@@ -1799,42 +1791,33 @@ body.no-hw-accel .dl-btn:hover {
 .msg-file .prog-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .msg-file .prog { height: 100%; width: 0%; background: var(--acc); transition: width 0.2s; }
 
-/* isolation: cam butonun backdrop-filter'ı yalnızca bu görseli örneklesin;
-   yoksa GPU katman ayrımında arkadaki mor uygulama zeminini alıp mor görünüyordu. */
-/* isolation + nötr koyu zemin: görselin YUVARLATILMIŞ köşelerinden butonun
-   backdrop-filter'ı arkadaki mor uygulama zeminini örnekliyordu (donanım
-   hızlandırma açıkken). Köşeleri nötr koyuyla doldur → cam asla mor olmaz. */
-.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; background: #0d1220; border-radius: 14px; }
-.chat-img { max-width: 220px; max-height: 220px; border-radius: 14px; display: block; border: 1px solid rgba(255,255,255,0.1); }
+/* Referanstaki gibi görsel sınırı cam butonu kırpar; ayrı bir isolation/background
+   katmanı kullanılmaz, böylece GPU açıkken backdrop-filter görseli örnekler. */
+.img-wrap { position: relative; display: inline-block; max-width: 100%; margin-top: 8px; border-radius: 10px; overflow: hidden; }
+.chat-img { max-width: 220px; max-height: 220px; border-radius: 10px; display: block; border: 1px solid rgba(255,255,255,0.1); }
 
 /* İndirme butonu — SAF BUZLU CAM / V7 (renk katmaz, doygunluk artar):
    Şeffaf zemin + backdrop-filter blur+saturate → arkadaki içeriği gösterir, RENK KATMAZ.
    Yalnızca görselin üstüne gelince belirir; üstüne gelince doygunluk artar
-   (saturate 135%→210%) ve ok hafifçe aşağı kayar. img-wrap isolation+#0d1220
-   sayesinde cam, arkadaki mor uygulama zeminini değil görseli örnekler → asla mor.
+   (saturate 135%→210%) ve ok hafifçe aşağı kayar.
    Donanım hızlandırma kapalıysa body.no-hw-accel opak nötr zemine düşer. */
 .dl-btn {
   position: absolute; top: 8px; right: 8px; z-index: 2;
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  background: rgba(17, 24, 39, 0.26);
-  border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 15px;
+  background: rgba(17, 24, 39, 0.32);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 11px;
   backdrop-filter: blur(10px) saturate(135%);
   -webkit-backdrop-filter: blur(10px) saturate(135%);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
               background 0.2s ease, box-shadow 0.2s ease,
               backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
-}
-/* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
-.dl-btn::before {
-  content: ''; position: absolute; inset: 0; border-radius: inherit;
-  background: linear-gradient(150deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.05) 42%, rgba(255,255,255,0) 100%);
-  pointer-events: none;
+  cursor: pointer;
 }
 /* Yalnızca görselin üstüne gelince belir */
 .img-wrap:hover .dl-btn { opacity: 1; transform: translateY(0) scale(1); }
@@ -1842,16 +1825,17 @@ body.no-hw-accel .dl-btn:hover {
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  background: rgba(17, 24, 39, 0.14);
+  background: rgba(17, 24, 39, 0.22);
+  border-color: rgba(255,255,255,0.4);
   backdrop-filter: blur(12px) saturate(210%);
   -webkit-backdrop-filter: blur(12px) saturate(210%);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.32);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.28);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
 .dl-btn:active { transform: scale(0.92); }
 .dl-btn:focus-visible {
   outline: none; opacity: 1; transform: translateY(0) scale(1);
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.7), 0 4px 14px rgba(0,0,0,0.3);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.75), 0 4px 14px rgba(0,0,0,0.35);
 }
 /* Donanım hızlandırma KAPALIYKEN backdrop-filter render edilmez → cam görünmez.
    O durumda buton opak nötr zemine düşer (renk yok); hover'da biraz açılır. */
@@ -3201,6 +3185,5 @@ input:checked + .slider:before {
   color: #fff;
 }
 
-/* İndirme butonu artık backdrop-filter kullanmıyor (GPU'da kök moru örnekliyordu),
-   bu yüzden donanım hızlandırma durumu bu buton için önemsiz — no-hw-accel özel
-   durumu kaldırıldı; buton her iki modda da aynı yarı saydam koyu cam. */
+/* Fotoğraf indirme butonunun etkin stili yukarıda Claude Artifact referansıyla
+   eşleştirilmiştir: GPU açıkken gerçek backdrop camı, kapalıyken nötr fallback. */

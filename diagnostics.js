@@ -53,10 +53,10 @@ function _analyzeCssText(label, css) {
   const markers = {
     "backdrop-filter içeriyor mu?": /backdrop-filter/.test(css),
     "'.dl-btn' geçiyor mu?": /\.dl-btn/.test(css),
-    "'border-radius: 17px' (yeni yuvarlak)": /border-radius:\s*17px/.test(css),
+    "'border-radius: 11px' (referans kare)": /border-radius:\s*11px/.test(css),
     "'rgba(20, 26, 40' (yeni yarı saydam zemin)": /rgba\(20,\s*26,\s*40/.test(css),
     "'saturate(' (eski cam)": /saturate\(/.test(css),
-    "'#0d1220' (img-wrap nötr dolgu)": /#0d1220/.test(css),
+    "'overflow: hidden' (referans img-wrap)": /overflow:\s*hidden/.test(css),
   };
   for (const [k, v] of Object.entries(markers)) _append(`  [${label}] ${k}  ->  ${v ? 'EVET' : 'hayır'}`);
   const rules = _extractRule(css, '.dl-btn');
@@ -183,7 +183,7 @@ function appendRenderer(data) {
 
     _append(`\n  >>> YORUM İPUCU:`);
     _append(`      - computed.backgroundColor mor/indigo ise ve backdropFilter "none" değilse -> GPU backdrop bug.`);
-    _append(`      - computed.borderRadius 17px değilse -> yeni CSS yüklenmemiş (yanlış dosya/önbellek).`);
+    _append(`      - computed.borderRadius 11px değilse -> referans CSS yüklenmemiş (yanlış dosya/önbellek).`);
     _append(`      - matchedRules içinde ikinci bir .dl-btn (mor) kural varsa -> onu ez.`);
   } catch (e) { _append(`  renderer verisi işlenemedi: ${e.message}`); }
   _append(`\n[DIAG] Günlük tamam: ${_logPath}`);
