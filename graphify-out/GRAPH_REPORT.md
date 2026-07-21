@@ -1,13 +1,18 @@
-# Graph Report - .  (2026-07-21)
+# Graph Report - kanka-voice  (2026-07-21)
 
 ## Corpus Check
-- 88 files · ~185,364 words
+- 70 files · ~185,632 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 599 nodes · 1044 edges · 62 communities (41 shown, 21 thin omitted)
+- 600 nodes · 1045 edges · 63 communities (42 shown, 21 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 32 edges (avg confidence: 0.66)
 - Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `d72cacd0`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - E2E Test Harness
@@ -67,6 +72,7 @@
 - Tools README
 - Fez SVG Asset
 - React Entry Point
+- resolveTurnHostsViaDoH
 
 ## God Nodes (most connected - your core abstractions)
 1. `handleDataMessage()` - 29 edges
@@ -100,7 +106,7 @@
 - **Serverless P2P Communication Platform** — readme_p2p_serverless, docs_index_p2p_voice_video, index_relay_option, index_emqx_broker [INFERRED 0.75]
 - **TeamSync Marketed Feature Set** — docs_index_p2p_voice_video, docs_index_device_id_auth, docs_index_screen_share_remote, docs_index_activities [EXTRACTED 0.75]
 
-## Communities (62 total, 21 thin omitted)
+## Communities (63 total, 21 thin omitted)
 
 ### Community 0 - "E2E Test Harness"
 Cohesion: 0.08
@@ -112,11 +118,11 @@ Nodes (38): App(), Chat(), Dashboard(), accountItemStyle, cardStyle, containerSt
 
 ### Community 2 - "Package Dependencies"
 Cohesion: 0.04
-Nodes (48): acorn, concurrently, cross-env, cross-fetch, crypto-js, electron, electron-builder, electron-packager (+40 more)
+Nodes (45): concurrently, cross-env, electron, electron-builder, electron-packager, author, build, appId (+37 more)
 
 ### Community 3 - "Chat & TURN Resolution Utils"
 Cohesion: 0.07
-Nodes (23): appendChat(), badWordsList, badWordsRegex, chatBlobUrls, cleanText(), dohResolve(), expandTurnFamily(), expandTurnWithIpVariants() (+15 more)
+Nodes (17): appendChat(), badWordsList, badWordsRegex, chatBlobUrls, cleanText(), fileBuffer, getActiveActivity(), loadLocalChatHistory() (+9 more)
 
 ### Community 4 - "UNO Card Game"
 Cohesion: 0.24
@@ -127,20 +133,20 @@ Cohesion: 0.09
 Nodes (15): { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage }, baseUserData, deviceIdentityFile, dgram, _diagSettingsPath, envPath, fs, getBroadcastAddresses() (+7 more)
 
 ### Community 6 - "WebRTC Peer & ICE Management"
-Cohesion: 0.14
-Nodes (24): applyIceEscalationPolicy(), applyRoomNoiseSuppression(), applySharedTurn(), applySpeakerTo(), applySpeakerToAll(), attemptIceRestart(), checkAvatar(), createPeerConnection() (+16 more)
+Cohesion: 0.17
+Nodes (21): applyIceEscalationPolicy(), applyRoomNoiseSuppression(), applySharedTurn(), applySpeakerTo(), applySpeakerToAll(), attemptIceRestart(), createPeerConnection(), detectTunnelInterference() (+13 more)
 
 ### Community 7 - "Landing Page & Docs Concepts"
 Cohesion: 0.11
 Nodes (23): Together Activities (UNO, Wheel, Synced Video, Whiteboard), Device Identity Login, Family-Friendly AI Mode, GitHub Repository (Lazel-3002/TeamSync), TeamSync Landing Page, P2P Voice & Video, Screen Sharing & Remote Control, TeamSync App Shell (Main UI) (+15 more)
 
 ### Community 8 - "Screen Share & File Transfer"
-Cohesion: 0.16
-Nodes (22): addVideoCard(), appendFileMsg(), attachVideo(), broadcast(), checkTextWithAI(), decryptMsg(), getVideoConstraints(), getVideoSender() (+14 more)
+Cohesion: 0.21
+Nodes (17): addVideoCard(), checkTextWithAI(), closeAllCards(), decryptMsg(), disconnectApp(), handleDataMessage(), makeCardFocusable(), releaseChatBlobUrls() (+9 more)
 
 ### Community 9 - "Room Moderation & Audio Controls"
-Cohesion: 0.15
-Nodes (22): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), bindUI(), canManageRoom(), canModerateTarget(), getAudioBitrate(), getShareableTurn() (+14 more)
+Cohesion: 0.13
+Nodes (25): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), bindUI(), canManageRoom(), canModerateTarget(), checkAvatar(), getAudioBitrate() (+17 more)
 
 ### Community 10 - "Sidebar UI Styles"
 Cohesion: 0.10
@@ -151,12 +157,12 @@ Cohesion: 0.32
 Nodes (15): handleSBMessage(), initSharedBrowser(), sbApplyRemoteNav(), sbBroadcastAuth(), sbCanInteract(), sbCurrentUrl(), sbHandleHostLeft(), sbIsHost() (+7 more)
 
 ### Community 12 - "Build Config & Reference Files"
-Cohesion: 0.12
-Nodes (16): build, appId, directories, files, productName, win, output, icon (+8 more)
+Cohesion: 0.11
+Nodes (19): acorn, cross-fetch, crypto-js, @ghostery/adblocker-electron, @jitsi/robotjs, dependencies, acorn, cross-fetch (+11 more)
 
 ### Community 13 - "Device Auth & Presence"
-Cohesion: 0.20
-Nodes (16): checkSession(), deviceLogin(), escapeHtml(), getActiveSlot(), getDeviceAccounts(), loadSupabaseProfile(), loginWithProfileData(), publishPresence() (+8 more)
+Cohesion: 0.23
+Nodes (14): checkSession(), deviceLogin(), getActiveSlot(), getDeviceAccounts(), loadSupabaseProfile(), loginWithProfileData(), publishPresence(), renderDeviceAccounts() (+6 more)
 
 ### Community 14 - "CSS Diagnostics"
 Cohesion: 0.35
@@ -195,8 +201,8 @@ Cohesion: 0.70
 Nodes (4): handleWTMessage(), initWatchTogether(), loadWTVideo(), onWTStateChange()
 
 ### Community 23 - "App Disconnect & Cleanup"
-Cohesion: 0.40
-Nodes (5): closeAllCards(), disconnectApp(), releaseChatBlobUrls(), resetSharedBrowserState(), updateFocusLockBtn()
+Cohesion: 0.21
+Nodes (12): appendFileMsg(), attachVideo(), broadcast(), escapeHtml(), getVideoConstraints(), getVideoSender(), initFileTransfer(), isImageFile() (+4 more)
 
 ### Community 24 - "Pokemon Data Fetch"
 Cohesion: 0.50
@@ -246,25 +252,29 @@ Nodes (3): fs, html, pokeJs
 Cohesion: 0.50
 Nodes (3): fs, pokeJs, styleCss
 
+### Community 62 - "resolveTurnHostsViaDoH"
+Cohesion: 0.43
+Nodes (7): dohResolve(), expandTurnFamily(), expandTurnWithIpVariants(), getTurnIpCache(), isIpLiteral(), parseTurnHost(), resolveTurnHostsViaDoH()
+
 ## Knowledge Gaps
-- **220 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+215 more)
+- **221 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+216 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `handleSignal()` connect `WebRTC Peer & ICE Management` to `Room Moderation & Audio Controls`, `Chat & TURN Resolution Utils`, `React App / Signaling / Crypto Core`?**
+- **Why does `handleSignal()` connect `Room Moderation & Audio Controls` to `React App / Signaling / Crypto Core`, `Chat & TURN Resolution Utils`, `WebRTC Peer & ICE Management`?**
   _High betweenness centrality (0.045) - this node is a cross-community bridge._
-- **Why does `WebRTC()` connect `React App / Signaling / Crypto Core` to `WebRTC Peer & ICE Management`?**
+- **Why does `WebRTC()` connect `React App / Signaling / Crypto Core` to `Room Moderation & Audio Controls`?**
   _High betweenness centrality (0.045) - this node is a cross-community bridge._
+- **Why does `dependencies` connect `Build Config & Reference Files` to `Package Dependencies`?**
+  _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
-  _220 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _221 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `E2E Test Harness` be split into smaller, more focused modules?**
   _Cohesion score 0.07656341320864991 - nodes in this community are weakly interconnected._
 - **Should `React App / Signaling / Crypto Core` be split into smaller, more focused modules?**
   _Cohesion score 0.08 - nodes in this community are weakly interconnected._
 - **Should `Package Dependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
-- **Should `Chat & TURN Resolution Utils` be split into smaller, more focused modules?**
-  _Cohesion score 0.07254623044096728 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.043478260869565216 - nodes in this community are weakly interconnected._

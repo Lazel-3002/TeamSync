@@ -65,9 +65,9 @@
     "semantic_hash": "070b69aaac0ec2fc681b550791ccf900"
   },
   "renderer.js": {
-    "mtime": 1784658383.4997773,
-    "ast_hash": "e753b49e8d9e280742bab1c36f670640",
-    "semantic_hash": "e753b49e8d9e280742bab1c36f670640"
+    "mtime": 1784659644.7046235,
+    "ast_hash": "03c505f29ef6f59b4e148a0eb7e2e1b8",
+    "semantic_hash": ""
   },
   "src/App.jsx": {
     "mtime": 1784131960.424719,
@@ -333,16 +333,6 @@
     "mtime": 1784448418.780313,
     "ast_hash": "c3e6007e735990114041c975ee291776",
     "semantic_hash": "c3e6007e735990114041c975ee291776"
-  },
-  "vendor/crypto-js.min.js": {
-    "mtime": 1784448418.780313,
-    "ast_hash": "2ca03ad87885ab983541092b87adb299",
-    "semantic_hash": "2ca03ad87885ab983541092b87adb299"
-  },
-  "vendor/mqtt.min.js": {
-    "mtime": 1784448418.7823129,
-    "ast_hash": "9e44cd3ef2a17fa036653ae0164792bc",
-    "semantic_hash": "9e44cd3ef2a17fa036653ae0164792bc"
   },
   "docs/index.html": {
     "mtime": 1784658383.4924676,

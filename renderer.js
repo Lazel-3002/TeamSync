@@ -157,30 +157,72 @@ function isImageFile(name, mime) {
 let mqttClient = null;
 let internetAnnounceInterval = null;
 
+// Sinyalleşme yalnızca tek bir genel broker'a bağlıydı; o broker down,
+// hız-sınırlı veya (kurumsal/ülke) engelli olduğunda hiçbir odaya girilemiyor
+// ve reconnectPeriod sonsuza dek aynı ölü broker'ı zorluyordu. Artık sıralı bir
+// yedek listesi var: aktif broker üst üste birkaç denemede yanıt vermezse
+// otomatik olarak sıradakine geçilir. Tüm eşler AYNI deterministik sırayı
+// denediği için tam bir kesintide hepsi aynı yedek broker'da yeniden buluşur.
+const SIGNALING_BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://test.mosquitto.org:8081/mqtt'
+];
+// Her yeni oturum (oda katılımı) bayat istemci geri çağrılarını ve bekleyen
+// broker rotasyonlarını geçersiz kılmak için bu kimliği artırır.
+let mqttSessionId = 0;
+
 function setupInternetSignaling(roomId, myId, myName) {
-  if (mqttClient) mqttClient.end();
-  
-  // Sinyalleşmeyi HiveMQ üzerinden Cloudflare Oda ID'si ile yapıyoruz.
-  let brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
+  if (mqttClient) { try { mqttClient.end(true); } catch (e) {} }
+  const session = ++mqttSessionId;
+  let brokerIndex = 0;
+  let reconnectAttempts = 0;
 
-  mqttClient = mqtt.connect(brokerUrl, {
-    clientId: 'sig-' + myId,
-    keepalive: 60,
-    reconnectPeriod: 1000
-  });
+  const connectBroker = (idx) => {
+    if (session !== mqttSessionId) return; // oturum kapandı ya da yenilendi
+    brokerIndex = idx % SIGNALING_BROKERS.length;
+    const brokerUrl = SIGNALING_BROKERS[brokerIndex];
+    console.log(`🌐 Sinyalleşme broker'ı deneniyor (${brokerIndex + 1}/${SIGNALING_BROKERS.length}): ${brokerUrl}`);
 
-  mqttClient.on('error', (err) => {
-    console.error('MQTT signaling connection error:', err);
-  });
-  
-  mqttClient.on('connect', () => {
-    if (!mqttClient) return; // Prevent crash if disconnected during connection phase
+    const client = mqtt.connect(brokerUrl, {
+      clientId: 'sig-' + myId + '-' + Math.random().toString(16).slice(2, 8),
+      keepalive: 60,
+      reconnectPeriod: 1000,
+      connectTimeout: 6000
+    });
+    mqttClient = client;
+    reconnectAttempts = 0;
+
+    // Aktif broker birkaç kez üst üste bağlanamazsa sıradakine geç. mqtt.js her
+    // yeniden deneme öncesi 'reconnect' yayar; art arda 3 deneme (~ilk timeout +
+    // 3sn) başarısız olursa bu broker'ı ölü sayıp döndürüyoruz.
+    const rotate = () => {
+      if (session !== mqttSessionId || mqttClient !== client) return;
+      console.warn(`⚠️ Broker yanıt vermiyor (${brokerUrl}), sıradaki broker'a geçiliyor...`);
+      try { client.end(true); } catch (e) {}
+      connectBroker(brokerIndex + 1);
+    };
+
+    client.on('reconnect', () => {
+      if (mqttClient !== client) return;
+      reconnectAttempts++;
+      if (reconnectAttempts >= 3) rotate();
+    });
+
+    client.on('error', (err) => {
+      if (mqttClient !== client) return;
+      console.error('MQTT signaling connection error:', err && err.message ? err.message : err);
+    });
+
+    client.on('connect', () => {
+      if (mqttClient !== client) return; // bayat istemci geri çağrısı yok sayılır
+      reconnectAttempts = 0;
     console.log('🌐 İnternet sunucusuna bağlanıldı (MQTT)');
     mqttClient.subscribe(`teamsync/room/${roomId}/#`);
     
     if (internetAnnounceInterval) clearInterval(internetAnnounceInterval);
     internetAnnounceInterval = setInterval(() => {
-      if (mqttClient) {
+      if (mqttClient && mqttClient.connected) {
         mqttClient.publish(`teamsync/room/${roomId}/${myId}`, JSON.stringify({
           type: 'hello',
           id: myId,
@@ -211,7 +253,8 @@ function setupInternetSignaling(roomId, myId, myName) {
     }, 1000);
   });
 
-  mqttClient.on('message', async (topic, message) => {
+    client.on('message', async (topic, message) => {
+    if (mqttClient !== client) return; // bayat broker'dan gelen mesajları yut
     try {
       if (topic.endsWith('/file')) {
         const buf = new Uint8Array(message);
@@ -328,6 +371,9 @@ function setupInternetSignaling(roomId, myId, myName) {
       }
     } catch(e) {}
   });
+  };
+
+  connectBroker(0);
 }
 
 function sendInternetSignal(targetId, signal) {
