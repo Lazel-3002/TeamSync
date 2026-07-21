@@ -2063,7 +2063,38 @@ window.POKEMON_FAMILIES = [
     "evolutions": [
       {
         "name": "Smeargle",
-        "url": "https://play.pokemonshowdown.com/sprites/ani/smeargle.gif"
+        "label": "Smeargle — Yeşil",
+        "url": "assets/pokemon/smeargle/smeargle-green.gif"
+      },
+      {
+        "name": "Smeargle",
+        "label": "Smeargle — Kırmızı",
+        "url": "assets/pokemon/smeargle/smeargle-red.gif"
+      },
+      {
+        "name": "Smeargle",
+        "label": "Smeargle — Mavi",
+        "url": "assets/pokemon/smeargle/smeargle-blue.gif"
+      },
+      {
+        "name": "Smeargle",
+        "label": "Smeargle — Sarı",
+        "url": "assets/pokemon/smeargle/smeargle-yellow.gif"
+      },
+      {
+        "name": "Smeargle",
+        "label": "Smeargle — Turuncu",
+        "url": "assets/pokemon/smeargle/smeargle-orange.gif"
+      },
+      {
+        "name": "Smeargle",
+        "label": "Smeargle — Çivit",
+        "url": "assets/pokemon/smeargle/smeargle-indigo.gif"
+      },
+      {
+        "name": "Smeargle",
+        "label": "Smeargle — Turkuaz",
+        "url": "assets/pokemon/smeargle/smeargle-teal.gif"
       }
     ]
   },

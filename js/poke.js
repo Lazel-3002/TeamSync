@@ -956,6 +956,33 @@ POKEMONS.fairy.push(
     return parts[parts.length - 1].replace('.gif', '').replace('.png', '').split('-')[0];
   };
 
+  // Smeargle oyunlarda Sketch ile neredeyse her saldırıyı kalıcı olarak
+  // öğrenebilir. PokeAPI yalnızca seviye atlama saldırısı olan Sketch'i
+  // döndürdüğü için seçim ekranına, savaş motorunun gerçekten uygulayabildiği
+  // gerçek Pokémon saldırılarından dengeli bir Sketch repertuvarı ekliyoruz.
+  const SMEARGLE_SKETCH_MOVE_NAMES = [
+    'extreme-speed', 'rapid-spin', 'nuzzle', 'stone-axe', 'ceaseless-edge',
+    'mortal-spin', 'flamethrower', 'thunderbolt', 'ice-beam', 'psychic',
+    'aura-sphere', 'shadow-ball', 'earthquake', 'energy-ball', 'moonblast',
+    'dragon-pulse', 'surf', 'play-rough', 'iron-head', 'dark-pulse',
+    'recover', 'swords-dance'
+  ];
+
+  const createBattleMove = (moveName) => {
+    const dictMove = window.POKEMON_MOVES ? window.POKEMON_MOVES[moveName] : null;
+    if (!dictMove || !(dictMove.power > 0 || dictMove.damage_class === 'status')) return null;
+    return {
+      name: moveName.replace(/-/g, ' ').toUpperCase(),
+      type: dictMove.type,
+      power: dictMove.power || 0,
+      damage_class: dictMove.damage_class,
+      healing: dictMove.healing || 0,
+      category: dictMove.category,
+      stat_changes: dictMove.stat_changes || [],
+      target: dictMove.target
+    };
+  };
+
   const fetchPokemonStatsAndMoves = async (pokeName, targetType, fullList = false) => {
     try {
       let pokeApiName = pokeName.toLowerCase().replace(/ /g, '-').replace(/\./g, '').replace(/'/g, '');
@@ -987,21 +1014,18 @@ POKEMONS.fairy.push(
       if (data.moves) {
           data.moves.forEach(m => {
               const moveName = m.move.name;
-              const dictMove = window.POKEMON_MOVES ? window.POKEMON_MOVES[moveName] : null;
-              if (dictMove && (dictMove.power > 0 || dictMove.damage_class === 'status')) {
-                 const mObj = {
-                     name: moveName.replace(/-/g, ' ').toUpperCase(),
-                     type: dictMove.type,
-                     power: dictMove.power || 0,
-                     damage_class: dictMove.damage_class,
-                     healing: dictMove.healing || 0,
-                     category: dictMove.category,
-                     stat_changes: dictMove.stat_changes || [],
-                     target: dictMove.target
-                 };
-                 if (!allMoves.find(x => x.name === mObj.name)) {
-                     allMoves.push(mObj);
-                 }
+              const mObj = createBattleMove(moveName);
+              if (mObj && !allMoves.find(x => x.name === mObj.name)) {
+                 allMoves.push(mObj);
+              }
+          });
+      }
+
+      if (pokeApiName === 'smeargle') {
+          SMEARGLE_SKETCH_MOVE_NAMES.forEach(moveName => {
+              const move = createBattleMove(moveName);
+              if (move && !allMoves.find(existing => existing.name === move.name)) {
+                  allMoves.push(move);
               }
           });
       }
@@ -1423,10 +1447,10 @@ POKEMONS.fairy.push(
           flex.innerHTML = '';
           fam.evolutions.forEach(evo => {
              const card = document.createElement('div');
-             card.className = 'poke-evo-card';
+             card.className = fam.baseName === 'smeargle' ? 'poke-evo-card poke-variant-card' : 'poke-evo-card';
              card.innerHTML = `
                 <img src="${evo.url}" data-realname="${evo.name}" loading="lazy" onerror="window.handlePokeImgError(this)" />
-                <div class="poke-evo-name">${evo.name}</div>
+                <div class="poke-evo-name">${evo.label || evo.name}</div>
              `;
              card.onclick = () => {
                 document.getElementById('poke-evolution-selection-flex').innerHTML = '';

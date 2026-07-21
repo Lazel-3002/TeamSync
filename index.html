@@ -32,6 +32,9 @@
     }
     .poke-evo-card img { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); margin-bottom: 20px; }
     .poke-evo-name { color: #fbbf24; font-weight: 900; font-size: 22px; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,1); }
+    .poke-evo-card.poke-variant-card { width: 150px; padding: 16px 10px; }
+    .poke-evo-card.poke-variant-card img { width: 110px; height: 110px; margin-bottom: 10px; }
+    .poke-evo-card.poke-variant-card .poke-evo-name { font-size: 14px; line-height: 1.25; text-align: center; }
     
     /* Activity Card Premium Styles */
     .card-act-btn {
@@ -1066,7 +1069,7 @@
             <button id="poke-evo-back-btn" class="btn-pri" style="position: absolute; top: 20px; left: 20px; background: #334155; padding: 10px 20px; font-size: 16px; border-radius: 10px; border: none; cursor: pointer; color: white;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Geri Dön</button>
             <h2 style="color: white; font-size: 28px; margin-bottom: 5px;">Hangi Formla Savaşacaksın?</h2>
             <p style="color: #94a3b8; margin-bottom: 30px;">(Evrim formu sadece görseli değiştirir, özellikleri etkilemez)</p>
-            <div id="poke-evolution-selection-flex" style="display: flex; gap: 30px; justify-content: center; align-items: flex-end; flex-wrap: wrap;">
+            <div id="poke-evolution-selection-flex" style="display: flex; gap: 18px; justify-content: center; align-items: flex-end; flex-wrap: wrap;">
                <!-- Evolutions injected here -->
             </div>
             <div id="poke-waiting-evo-msg" style="color: #fbbf24; margin-top: 30px; font-weight: bold; display: none; font-size: 20px;">Rakip Evrimini Seçiyor...</div>
