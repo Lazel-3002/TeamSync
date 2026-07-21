@@ -30,9 +30,9 @@
     "semantic_hash": "ab487a8d65e91b79dfe985d0a9ae8620"
   },
   "js/state.js": {
-    "mtime": 1784573144.2115197,
-    "ast_hash": "13cba720f0021c29c67a9c9ef9bcffdf",
-    "semantic_hash": "13cba720f0021c29c67a9c9ef9bcffdf"
+    "mtime": 1784658383.4950705,
+    "ast_hash": "18eed13137f318ac6338bc935acc527e",
+    "semantic_hash": "18eed13137f318ac6338bc935acc527e"
   },
   "js/uno.js": {
     "mtime": 1784295605.4370763,
@@ -50,24 +50,24 @@
     "semantic_hash": "6d9380ee1c358c741b27c17acdd7da01"
   },
   "main.js": {
-    "mtime": 1784591775.1091666,
-    "ast_hash": "d734f9bf30389944cda2b22fc11d50d4",
-    "semantic_hash": "d734f9bf30389944cda2b22fc11d50d4"
+    "mtime": 1784658383.4955814,
+    "ast_hash": "242206fb75c618dbd56c9106bc483ac6",
+    "semantic_hash": "242206fb75c618dbd56c9106bc483ac6"
   },
   "package.json": {
-    "mtime": 1784590429.6438563,
-    "ast_hash": "71f9aaced73f8e124c675ce84355bcb2",
-    "semantic_hash": "71f9aaced73f8e124c675ce84355bcb2"
+    "mtime": 1784658383.4976876,
+    "ast_hash": "1950e17bafc6d15b052447d6416ec89a",
+    "semantic_hash": "1950e17bafc6d15b052447d6416ec89a"
   },
   "preload.js": {
-    "mtime": 1784591769.2575285,
-    "ast_hash": "697f4f54334065cb4a0236105044dc4a",
-    "semantic_hash": "697f4f54334065cb4a0236105044dc4a"
+    "mtime": 1784658383.4982061,
+    "ast_hash": "070b69aaac0ec2fc681b550791ccf900",
+    "semantic_hash": "070b69aaac0ec2fc681b550791ccf900"
   },
   "renderer.js": {
-    "mtime": 1784634926.1714034,
-    "ast_hash": "a73c666cf0a814af696b083bb0bd356a",
-    "semantic_hash": "a73c666cf0a814af696b083bb0bd356a"
+    "mtime": 1784658383.4997773,
+    "ast_hash": "e753b49e8d9e280742bab1c36f670640",
+    "semantic_hash": "e753b49e8d9e280742bab1c36f670640"
   },
   "src/App.jsx": {
     "mtime": 1784131960.424719,
@@ -150,14 +150,14 @@
     "semantic_hash": "2cf558ceac0d681c77c7a152cc0d5fef"
   },
   "README.md": {
-    "mtime": 1784448418.76625,
-    "ast_hash": "012718259e1f430d416ab5e4f667220c",
-    "semantic_hash": "012718259e1f430d416ab5e4f667220c"
+    "mtime": 1784658383.490877,
+    "ast_hash": "f6861dcb15831a9b008ca167929419a2",
+    "semantic_hash": "f6861dcb15831a9b008ca167929419a2"
   },
   "index.html": {
-    "mtime": 1784634939.2121966,
-    "ast_hash": "a091458f72569f521f1ac5ccb8abf453",
-    "semantic_hash": "a091458f72569f521f1ac5ccb8abf453"
+    "mtime": 1784658383.4935038,
+    "ast_hash": "203653276b363a50131ae6de176f7ff0",
+    "semantic_hash": "203653276b363a50131ae6de176f7ff0"
   },
   "src/index.html": {
     "mtime": 1783076691.7558117,
@@ -345,9 +345,9 @@
     "semantic_hash": "9e44cd3ef2a17fa036653ae0164792bc"
   },
   "docs/index.html": {
-    "mtime": 1784419844.2343132,
-    "ast_hash": "dbb4b81acba4119a14cbd043833cf4da",
-    "semantic_hash": "dbb4b81acba4119a14cbd043833cf4da"
+    "mtime": 1784658383.4924676,
+    "ast_hash": "757964edbefdca70ebe8db51d7287b08",
+    "semantic_hash": "757964edbefdca70ebe8db51d7287b08"
   },
   "electron/notification.html": {
     "mtime": 1784490445.1255355,
@@ -385,9 +385,9 @@
     "semantic_hash": "16abeddb9b18e1193ac68179d9269e0b"
   },
   "diagnostics.js": {
-    "mtime": 1784591787.8248816,
-    "ast_hash": "799e69c61a4ebed423ad95067f1708ae",
-    "semantic_hash": "799e69c61a4ebed423ad95067f1708ae"
+    "mtime": 1784658383.4913952,
+    "ast_hash": "c86bf1e52c265cebbb4f8c3eb834a4f7",
+    "semantic_hash": "c86bf1e52c265cebbb4f8c3eb834a4f7"
   },
   "tools/data/generate_smeargle_variants.js": {
     "mtime": 1784630277.8680317,
@@ -428,5 +428,25 @@
     "mtime": 1784630277.8634424,
     "ast_hash": "b7eebf93d7366349b8104a3f847c6438",
     "semantic_hash": "b7eebf93d7366349b8104a3f847c6438"
+  },
+  "js/rnnoise-noise-suppression.js": {
+    "mtime": 1784658383.4940212,
+    "ast_hash": "9354a096ff0824d7a6ad25aeab2ed64d",
+    "semantic_hash": "9354a096ff0824d7a6ad25aeab2ed64d"
+  },
+  "test/e2e/download-glass.test.js": {
+    "mtime": 1784658383.5008175,
+    "ast_hash": "6dd42982c336d6a96fe174826604e846",
+    "semantic_hash": "6dd42982c336d6a96fe174826604e846"
+  },
+  "test/e2e/founder-rnnoise-toggle.test.js": {
+    "mtime": 1784658383.5008175,
+    "ast_hash": "e2c4c58668c2fd0fed5ad9cd0cfb94b9",
+    "semantic_hash": "e2c4c58668c2fd0fed5ad9cd0cfb94b9"
+  },
+  "test/e2e/rnnoise-audio.test.js": {
+    "mtime": 1784658383.5018215,
+    "ast_hash": "d0eaa6563c434ba7cd7b69377b193d18",
+    "semantic_hash": "d0eaa6563c434ba7cd7b69377b193d18"
   }
 }
