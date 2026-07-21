@@ -3,19 +3,70 @@ app.name = 'TeamSync';
 // Donanım hızlandırma tercihi ayarlardan değiştirilebilir (settings.json).
 // Varsayılan: AÇIK — backdrop-filter (buzlu cam) yalnızca GPU açıkken çalışır.
 // Sadece ayar açıkça false ise kapatılır. Değişiklik yeniden başlatınca etkin olur.
+const _diagSettingsPath = require('path').join(app.getPath('userData'), 'settings.json');
+let _diagHwAccelEffective = true; // varsayılan açık
 try {
   const _fs = require('fs');
-  const _settingsPath = require('path').join(app.getPath('userData'), 'settings.json');
-  if (_fs.existsSync(_settingsPath)) {
-    const _s = JSON.parse(_fs.readFileSync(_settingsPath, 'utf8'));
+  if (_fs.existsSync(_diagSettingsPath)) {
+    const _s = JSON.parse(_fs.readFileSync(_diagSettingsPath, 'utf8'));
     if (_s && _s.hardwareAcceleration === false) {
       app.disableHardwareAcceleration();
+      _diagHwAccelEffective = false;
     }
   }
 } catch (e) { /* ayar okunamazsa varsayılan: donanım hızlandırma açık */ }
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 app.commandLine.appendSwitch('allow-loopback-in-peer-connection');
 app.commandLine.appendSwitch('disable-async-dns');
+
+// TEŞHİS: renderer içinde çalışır (executeJavaScript ile enjekte edilir).
+// GERÇEKTE yüklenen stylesheet'leri, .dl-btn'in tüm eşleşen kurallarını ve
+// canlı bir .dl-btn probe'unun HESAPLANMIŞ stilini toplar. Kapanış (closure)
+// yok — tamamen kendine yeten, tarayıcı global'lerini kullanan bir fonksiyon.
+async function _diagRendererProbe() {
+  const out = {
+    href: location.href, userAgent: navigator.userAgent, dpr: window.devicePixelRatio,
+    bodyClass: document.body ? document.body.className : '',
+    sheets: [], styleLinkHref: '', matchedRules: [], computed: null,
+    fetchedCss: null, fetchError: null,
+  };
+  try { out.sheets = Array.from(document.styleSheets).map(s => s.href || '(inline)'); } catch (e) {}
+  try {
+    const link = document.querySelector('link[rel="stylesheet"][href*="style.css"]');
+    out.styleLinkHref = link ? link.href : '(bulunamadı)';
+  } catch (e) {}
+  try {
+    for (const sheet of Array.from(document.styleSheets)) {
+      let rules; try { rules = sheet.cssRules; } catch (e) { continue; }
+      if (!rules) continue;
+      for (const rule of Array.from(rules)) {
+        if (rule.selectorText && rule.selectorText.includes('dl-btn')) {
+          out.matchedRules.push({ source: (sheet.href || 'inline').split('/').pop(), text: rule.cssText.slice(0, 300) });
+        }
+      }
+    }
+  } catch (e) {}
+  try {
+    const wrap = document.createElement('div');
+    wrap.className = 'img-wrap';
+    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    wrap.innerHTML = '<img class="chat-img"><a class="dl-btn"></a>';
+    document.body.appendChild(wrap);
+    const cs = getComputedStyle(wrap.querySelector('.dl-btn'));
+    out.computed = {
+      borderRadius: cs.borderRadius, backgroundColor: cs.backgroundColor,
+      backgroundImage: cs.backgroundImage,
+      backdropFilter: cs.backdropFilter || cs.webkitBackdropFilter || 'none',
+      boxShadow: cs.boxShadow, width: cs.width, height: cs.height, border: cs.border,
+    };
+    document.body.removeChild(wrap);
+  } catch (e) { out.computed = { hata: String(e) }; }
+  try {
+    const link = document.querySelector('link[rel="stylesheet"][href*="style.css"]');
+    if (link) out.fetchedCss = await (await fetch(link.href)).text();
+  } catch (e) { out.fetchError = String(e); }
+  return out;
+}
 const path = require('path');
 const dgram = require('dgram');
 const os = require('os');
@@ -241,6 +292,7 @@ function createWindow() {
     console.log(`[Renderer ${level}] ${message} (${line})`);
   });
 
+  const _loadTarget = process.env.REACT_DEV === 'true' ? 'http://localhost:5173' : 'index.html';
   if (process.env.REACT_DEV === 'true') {
     mainWindow.loadURL('http://localhost:5173');
     // mainWindow.webContents.openDevTools();
@@ -248,6 +300,24 @@ function createWindow() {
     mainWindow.loadFile('index.html');
   }
   Menu.setApplicationMenu(null);
+
+  // --- TEŞHİS GÜNLÜĞÜ (opt-in: DIAG=1 veya settings.diagnosticLog) ---
+  try {
+    const diagnostics = require('./diagnostics');
+    const diagInfo = diagnostics.init(app, {
+      settingsPath: _diagSettingsPath,
+      effectiveHardwareAccel: _diagHwAccelEffective,
+      loadedTarget: _loadTarget + ' (çözümlenen: ' + require('path').join(app.getAppPath(), 'index.html') + ')',
+    });
+    if (diagInfo && diagInfo.enabled) {
+      // Renderer yüklendiğinde tarayıcı tarafını da toplayıp aynı dosyaya ekle.
+      mainWindow.webContents.on('did-finish-load', () => {
+        mainWindow.webContents.executeJavaScript(`(${_diagRendererProbe.toString()})()`, true)
+          .then(data => diagnostics.appendRenderer(data))
+          .catch(err => diagnostics.appendRenderer({ error: String(err) }));
+      });
+    }
+  } catch (e) { console.warn('[DIAG] başlatılamadı:', e.message); }
 
   if (!app.isPackaged) {
     try {
@@ -370,6 +440,14 @@ ipcMain.handle('set-hardware-acceleration', (event, enabled) => {
 
 ipcMain.handle('is-second-instance', () => {
   return isSecondInstance;
+});
+
+// --- TEŞHİS: renderer'ın canlı DOM'dan yakaladığı indirme butonlarını günlükle ---
+ipcMain.handle('diag-enabled', () => {
+  try { return require('./diagnostics').isEnabled(); } catch (e) { return false; }
+});
+ipcMain.on('diag-capture', (e, info) => {
+  try { require('./diagnostics').appendCapture(info); } catch (err) {}
 });
 
 // ─── Cihaz Kimliği ───────────────────────────────────────────────────────────

@@ -10,3 +10,6 @@ src/dist-react/
 problemler.md
 yapaydenetliyici.md
 graphify-out/
+
+# Teşhis günlükleri (opt-in DIAG=1)
+diagnostics/

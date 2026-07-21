@@ -1389,7 +1389,10 @@ body { padding-top: 35px; } /* Prevent overlap */
 
 /* isolation: cam butonun backdrop-filter'ı yalnızca bu görseli örneklesin;
    yoksa GPU katman ayrımında arkadaki mor uygulama zeminini alıp mor görünüyordu. */
-.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; }
+/* isolation + nötr koyu zemin: görselin YUVARLATILMIŞ köşelerinden butonun
+   backdrop-filter'ı arkadaki mor uygulama zeminini örnekliyordu (donanım
+   hızlandırma açıkken). Köşeleri nötr koyuyla doldur → cam asla mor olmaz. */
+.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; background: #0d1220; border-radius: 14px; }
 .chat-img { max-width: 220px; max-height: 220px; border-radius: 14px; display: block; border: 1px solid rgba(255,255,255,0.1); }
 
 /* İndirme butonu — SAF BUZLU CAM (renk katmaz):
@@ -1402,17 +1405,18 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  background: rgba(17, 24, 39, 0.26);
-  border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 16px;
-  backdrop-filter: blur(10px) saturate(175%);
-  -webkit-backdrop-filter: blur(10px) saturate(175%);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+  /* OPAK koyu zemin (backdrop-filter YOK). Yarı saydam olsaydı ARKASINDAKI
+     mor/renkli görselin rengi butondan sızıp onu mor gösteriyordu. Tam opak
+     olunca butonun rengi görselden bağımsızdır → donanım hızlandırma açık/kapalı
+     her durumda aynı koyu ton, asla mor. Camsı parıltıyı ::before verir. */
+  background: #1b2334;
+  border: 1px solid rgba(255,255,255,0.26);
+  border-radius: 17px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.26);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
-              background 0.2s ease, box-shadow 0.2s ease,
-              backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
+              background 0.2s ease, box-shadow 0.2s ease;
 }
 /* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
 .dl-btn::before {
@@ -1426,10 +1430,9 @@ body { padding-top: 35px; } /* Prevent overlap */
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  background: rgba(17, 24, 39, 0.14);
-  backdrop-filter: blur(12px) saturate(260%);
-  -webkit-backdrop-filter: blur(12px) saturate(260%);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.32);
+  /* Hover'da biraz açılır (yine opak → mor sızması yok). */
+  background: #28324a;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.36);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
 .dl-btn:active { transform: scale(0.92); }
@@ -1439,12 +1442,13 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 .text-dl {
   position: static; display: inline-block; margin-top: 8px;
-  background: var(--acc); padding: 4px 12px; border-radius: 4px;
-  color: white; text-decoration: none; font-size: 12px; opacity: 1; border: none;
+  /* Nötr koyu (eski mor var(--acc) değil): indirme butonu artık hiçbir yerde mor değil. */
+  background: #2a3350; padding: 4px 12px; border-radius: 6px;
+  color: white; text-decoration: none; font-size: 12px; opacity: 1; border: 1px solid rgba(255,255,255,0.12);
 }
-.text-dl:hover { background: var(--acc-light); }
-.msg-file a { background: var(--acc); color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.2s; }
-.msg-file a:hover { background: var(--acc-hover); }
+.text-dl:hover { background: #37436a; }
+.msg-file a { background: #2a3350; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.12); }
+.msg-file a:hover { background: #37436a; }
 
 /* ===== ACTIVITIES ===== */
 #act-btn .icon { font-size: 22px; }
@@ -1629,7 +1633,10 @@ body { padding-top: 35px; } /* Prevent overlap */
 
 /* isolation: cam butonun backdrop-filter'ı yalnızca bu görseli örneklesin;
    yoksa GPU katman ayrımında arkadaki mor uygulama zeminini alıp mor görünüyordu. */
-.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; }
+/* isolation + nötr koyu zemin: görselin YUVARLATILMIŞ köşelerinden butonun
+   backdrop-filter'ı arkadaki mor uygulama zeminini örnekliyordu (donanım
+   hızlandırma açıkken). Köşeleri nötr koyuyla doldur → cam asla mor olmaz. */
+.img-wrap { position: relative; display: inline-block; margin-top: 8px; isolation: isolate; background: #0d1220; border-radius: 14px; }
 .chat-img { max-width: 220px; max-height: 220px; border-radius: 14px; display: block; border: 1px solid rgba(255,255,255,0.1); }
 
 /* İndirme butonu — SAF BUZLU CAM (renk katmaz):
@@ -1642,17 +1649,18 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: flex; align-items: center; justify-content: center;
   width: 34px; height: 34px;
   color: #fff; text-decoration: none;
-  background: rgba(17, 24, 39, 0.26);
-  border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 16px;
-  backdrop-filter: blur(10px) saturate(175%);
-  -webkit-backdrop-filter: blur(10px) saturate(175%);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+  /* OPAK koyu zemin (backdrop-filter YOK). Yarı saydam olsaydı ARKASINDAKI
+     mor/renkli görselin rengi butondan sızıp onu mor gösteriyordu. Tam opak
+     olunca butonun rengi görselden bağımsızdır → donanım hızlandırma açık/kapalı
+     her durumda aynı koyu ton, asla mor. Camsı parıltıyı ::before verir. */
+  background: #1b2334;
+  border: 1px solid rgba(255,255,255,0.26);
+  border-radius: 17px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.26);
   opacity: 0; transform: translateY(-4px) scale(0.92);
   transition: opacity 0.2s ease,
               transform 0.26s cubic-bezier(0.2, 0.9, 0.25, 1),
-              background 0.2s ease, box-shadow 0.2s ease,
-              backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
+              background 0.2s ease, box-shadow 0.2s ease;
 }
 /* Camsı parlaklık (sheen): düz renk zeminlerde bile "cam" gibi okunsun. */
 .dl-btn::before {
@@ -1666,10 +1674,9 @@ body { padding-top: 35px; } /* Prevent overlap */
 .dl-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
 /* Butonun üstüne gelince: daha şeffaf + daha doygun (renk yok) + ok aşağı kayar */
 .dl-btn:hover {
-  background: rgba(17, 24, 39, 0.14);
-  backdrop-filter: blur(12px) saturate(260%);
-  -webkit-backdrop-filter: blur(12px) saturate(260%);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.32);
+  /* Hover'da biraz açılır (yine opak → mor sızması yok). */
+  background: #28324a;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.36);
 }
 .dl-btn:hover .dl-arrow { transform: translateY(2px); }
 .dl-btn:active { transform: scale(0.92); }
@@ -1679,12 +1686,13 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 .text-dl {
   position: static; display: inline-block; margin-top: 8px;
-  background: var(--acc); padding: 4px 12px; border-radius: 4px;
-  color: white; text-decoration: none; font-size: 12px; opacity: 1; border: none;
+  /* Nötr koyu (eski mor var(--acc) değil): indirme butonu artık hiçbir yerde mor değil. */
+  background: #2a3350; padding: 4px 12px; border-radius: 6px;
+  color: white; text-decoration: none; font-size: 12px; opacity: 1; border: 1px solid rgba(255,255,255,0.12);
 }
-.text-dl:hover { background: var(--acc-light); }
-.msg-file a { background: var(--acc); color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.2s; }
-.msg-file a:hover { background: var(--acc-hover); }
+.text-dl:hover { background: #37436a; }
+.msg-file a { background: #2a3350; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.12); }
+.msg-file a:hover { background: #37436a; }
 
 /* ===== ACTIVITIES ===== */
 #act-btn .icon { font-size: 22px; }
@@ -3013,14 +3021,6 @@ input:checked + .slider:before {
   color: #fff;
 }
 
-/* Donanım hızlandırma KAPALIYKEN backdrop-filter render edilmez → cam görünmez.
-   O durumda buton opak nötr zemine düşer (renk yok); hover'da biraz açılır.
-   Sınıf renderer.js'te settings.json tercihine göre <body>'ye eklenir. */
-body.no-hw-accel .dl-btn {
-  background: rgba(20, 26, 40, 0.82);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-body.no-hw-accel .dl-btn:hover {
-  background: rgba(38, 46, 66, 0.9);
-}
+/* İndirme butonu artık backdrop-filter kullanmıyor (GPU'da kök moru örnekliyordu),
+   bu yüzden donanım hızlandırma durumu bu buton için önemsiz — no-hw-accel özel
+   durumu kaldırıldı; buton her iki modda da aynı yarı saydam koyu cam. */

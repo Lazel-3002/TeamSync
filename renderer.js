@@ -144,6 +144,16 @@ function releaseChatBlobUrls() {
   chatBlobUrls.length = 0;
 }
 
+// Bir dosyanın görsel olup olmadığını sağlam biçimde belirler.
+// Bazı görseller boş/yanlış MIME ile gelir (panodan yapıştırma, uzantısız
+// gönderim, application/octet-stream). Sadece MIME'a bakınca bunlar "dosya"
+// sayılıp MOR .text-dl (yuvarlak kare) butonuyla gösteriliyordu; yuvarlak cam
+// .dl-btn yerine. Bu yüzden MIME yetersizse dosya adı uzantısına da bakarız.
+function isImageFile(name, mime) {
+  if (mime && mime.toLowerCase().startsWith('image/')) return true;
+  return /\.(png|jpe?g|jfif|gif|webp|bmp|avif|svg|ico|heic|heif|tiff?)$/i.test(name || '');
+}
+
 let mqttClient = null;
 let internetAnnounceInterval = null;
 
@@ -1522,6 +1532,36 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.electronAPI.getHardwareAcceleration()
       .then(on => { document.body.classList.toggle('no-hw-accel', !on); })
       .catch(() => {});
+  }
+
+  // TEŞHİS: DIAG açıkken, DOM'a eklenen GERÇEK indirme butonlarını yakalayıp
+  // ana sürece yolla (computed renk + hangi eleman). Kullanıcının gördüğü mor
+  // butonun kesin kimliğini öğrenmek için — sentetik probe yerine canlı DOM.
+  if (window.electronAPI && window.electronAPI.diagEnabled) {
+    window.electronAPI.diagEnabled().then(on => {
+      if (!on) return;
+      const cap = (el) => {
+        try {
+          const cs = getComputedStyle(el);
+          window.electronAPI.diagCapture({
+            tag: el.tagName, className: el.className,
+            download: el.getAttribute && el.getAttribute('download'),
+            parentClass: el.parentElement ? el.parentElement.className : '',
+            backgroundColor: cs.backgroundColor, backgroundImage: cs.backgroundImage,
+            borderRadius: cs.borderRadius, width: cs.width, height: cs.height,
+            outerHTML: (el.outerHTML || '').replace(/\s+/g, ' ').slice(0, 260),
+          });
+        } catch (e) {}
+      };
+      const scan = (node) => {
+        if (!node || node.nodeType !== 1) return;
+        if (node.matches && node.matches('a[download], .dl-btn, .text-dl, .msg-file a')) cap(node);
+        if (node.querySelectorAll) node.querySelectorAll('a[download], .dl-btn, .text-dl, .msg-file a').forEach(cap);
+      };
+      new MutationObserver(muts => muts.forEach(m => m.addedNodes && m.addedNodes.forEach(scan)))
+        .observe(document.body, { childList: true, subtree: true });
+      scan(document.body);
+    }).catch(() => {});
   }
 
   const stepName = document.getElementById('step-name');
@@ -3831,7 +3871,7 @@ async function handleDataMessage(peerId, msg) {
       chatBlobUrls.push(url);
       const div = document.getElementById('file-' + msg.id);
       if (div) {
-        if (f.meta.mime.startsWith('image/')) {
+        if (isImageFile(f.meta.name, f.meta.mime)) {
           div.innerHTML = '';
           div.style.background = 'transparent';
           div.style.border = 'none';
@@ -5917,7 +5957,7 @@ async function sendFile(file) {
   if (div) {
     const url = URL.createObjectURL(file);
     chatBlobUrls.push(url);
-    if (file.type.startsWith('image/')) {
+    if (isImageFile(file.name, file.type)) {
       div.innerHTML = '';
       div.style.background = 'transparent';
       div.style.border = 'none';
@@ -6139,7 +6179,7 @@ window.sendDMFile = (file) => {
   const reader = new FileReader();
   reader.onload = async (e) => {
     const base64Data = e.target.result;
-    const isImage = file.type.startsWith('image/');
+    const isImage = isImageFile(file.name, file.type);
     const msgType = isImage ? 'image' : 'file';
 
     // Local store
