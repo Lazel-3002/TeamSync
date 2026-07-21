@@ -17,6 +17,7 @@
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.18.1",
     "@jitsi/robotjs": "^0.6.22",
+    "@sapphi-red/web-noise-suppressor": "0.3.5",
     "@supabase/supabase-js": "^2.110.0",
     "acorn": "^8.17.0",
     "cross-fetch": "^4.1.0",

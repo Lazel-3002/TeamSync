@@ -2373,7 +2373,19 @@ function playSound(type) {
   }
 }
 
-async function setupLocalAudio() {
+async function setupLocalAudio(options = {}) {
+  const generation = ++state.audioSetupGeneration;
+  const forceSystemSuppression = options.forceSystemSuppression === true;
+
+  if (state.rnnoiseFilterNode && window.RNNoiseSuppression) {
+    window.RNNoiseSuppression.releaseFilter(state.rnnoiseFilterNode);
+  }
+  state.rnnoiseFilterNode = null;
+  state.rnnoiseActive = false;
+  state.rnnoiseStatus = state.useAI
+    ? (forceSystemSuppression ? 'fallback' : 'loading')
+    : 'off';
+
   if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') {
     try { state.gateAudioCtx.close(); } catch(e) {}
   }
@@ -2387,12 +2399,28 @@ async function setupLocalAudio() {
   const sel = document.getElementById('mic-select');
   const deviceId = sel && sel.value ? { exact: sel.value } : undefined;
 
+  let useRnnoise = !!state.useAI
+    && !forceSystemSuppression
+    && !!window.RNNoiseSuppression
+    && window.RNNoiseSuppression.isSupported();
+  if (state.useAI && !useRnnoise && !forceSystemSuppression) {
+    state.rnnoiseStatus = 'fallback';
+    if (!state.rnnoiseFallbackNotified) {
+      state.rnnoiseFallbackNotified = true;
+      showToast('RNNoise desteklenmiyor; sistem gürültü engelleme etkinleştirildi', 'warn');
+    }
+  }
+
+  if (generation !== state.audioSetupGeneration) return;
+
   const raw = await navigator.mediaDevices.getUserMedia({
     audio: {
       deviceId: deviceId,
       echoCancellation: true,
-      noiseSuppression: { ideal: true },
-      autoGainControl: { ideal: true },
+      // RNNoise kendi AI modelini çalıştırırken Chromium'un gürültü/AGC
+      // işlemesini kapat; iki işlemciyi üst üste bindirmek konuşmayı boğar.
+      noiseSuppression: { ideal: !!state.useAI && !useRnnoise },
+      autoGainControl: { ideal: !!state.useAI && !useRnnoise },
       sampleRate: { ideal: 48000 },
       // Yankı iptali (AEC) Chromium'da yalnızca mono yakalamada güvenilir
       // çalışır; stereo istek AEC'yi sessizce devre dışı bırakabiliyor
@@ -2401,9 +2429,20 @@ async function setupLocalAudio() {
     }
   });
 
+  if (generation !== state.audioSetupGeneration) {
+    raw.getTracks().forEach(track => track.stop());
+    return;
+  }
+
   state.rawMicStream = raw;
 
-  const vuCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  let vuCtx;
+  try {
+    vuCtx = new AudioContextClass({ sampleRate: 48000, latencyHint: 'interactive' });
+  } catch (error) {
+    vuCtx = new AudioContextClass();
+  }
   if (vuCtx.state === 'suspended') {
     vuCtx.resume().catch(console.error);
   }
@@ -2419,8 +2458,50 @@ async function setupLocalAudio() {
   
   const dest = vuCtx.createMediaStreamDestination();
   let highpassNode = null, lowpassNode = null, compressorNode = null, gainNodeInst = null;
+  let rnnoiseFilterNode = null;
 
-  if (state.useAI) {
+  if (useRnnoise) {
+    try {
+      rnnoiseFilterNode = await window.RNNoiseSuppression.createNoiseFilter({
+        audioContext: vuCtx,
+        onError: error => {
+          console.error('RNNoise çalışma zamanı hatası:', error);
+          if (generation !== state.audioSetupGeneration || state.rnnoiseStatus !== 'active') return;
+          state.rnnoiseStatus = 'fallback';
+          showToast('RNNoise durdu; ses kesilmeden sistem filtresine geçiliyor', 'warn');
+          setTimeout(() => {
+            if (generation === state.audioSetupGeneration) {
+              setupLocalAudio({ forceSystemSuppression: true }).catch(console.error);
+            }
+          }, 0);
+        }
+      });
+      if (generation !== state.audioSetupGeneration) {
+        window.RNNoiseSuppression.releaseFilter(rnnoiseFilterNode);
+        raw.getTracks().forEach(track => track.stop());
+        try { vuCtx.close(); } catch (error) {}
+        return;
+      }
+      state.gateGainNode.connect(rnnoiseFilterNode);
+      rnnoiseFilterNode.connect(dest);
+      state.rnnoiseFilterNode = rnnoiseFilterNode;
+      state.rnnoiseActive = true;
+      state.rnnoiseStatus = 'active';
+    } catch (error) {
+      console.warn('RNNoise filtresi başlatılamadı; sistem gürültü engellemeye dönülüyor:', error);
+      raw.getTracks().forEach(track => track.stop());
+      try { vuCtx.close(); } catch (closeError) {}
+      state.rnnoiseStatus = 'fallback';
+      if (!state.rnnoiseFallbackNotified) {
+        state.rnnoiseFallbackNotified = true;
+        showToast('RNNoise başlatılamadı; sistem gürültü engelleme etkinleştirildi', 'warn');
+      }
+      if (generation === state.audioSetupGeneration) {
+        return setupLocalAudio({ forceSystemSuppression: true });
+      }
+      return;
+    }
+  } else if (state.useAI) {
     highpassNode = vuCtx.createBiquadFilter();
     highpassNode.type = 'highpass';
     highpassNode.frequency.value = 80;
@@ -2445,11 +2526,10 @@ async function setupLocalAudio() {
     compressorNode.connect(gainNodeInst);
     gainNodeInst.connect(dest);
 
-    state.processedStream = dest.stream;
   } else {
     state.gateGainNode.connect(dest);
-    state.processedStream = dest.stream;
   }
+  state.processedStream = dest.stream;
 
   // Prevent Garbage Collection of WebAudio processing nodes by V8
   state.audioNodes = {
@@ -2460,7 +2540,8 @@ async function setupLocalAudio() {
     highpassNode,
     lowpassNode,
     compressorNode,
-    gainNodeInst
+    gainNodeInst,
+    rnnoiseFilterNode
   };
 
   const canvas = document.createElement('canvas');
@@ -5777,6 +5858,12 @@ function disconnectApp() {
   if (state.screenStream) state.screenStream.getTracks().forEach(t => t.stop());
   if (state.processedStream) state.processedStream.getTracks().forEach(t => t.stop());
   if (state.rawMicStream) { state.rawMicStream.getTracks().forEach(t => t.stop()); state.rawMicStream = null; }
+  if (state.rnnoiseFilterNode && window.RNNoiseSuppression) {
+    window.RNNoiseSuppression.releaseFilter(state.rnnoiseFilterNode);
+  }
+  state.rnnoiseFilterNode = null;
+  state.rnnoiseActive = false;
+  state.rnnoiseStatus = 'off';
   if (state.audioCtx && state.audioCtx.state !== 'closed') state.audioCtx.close();
   if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') state.gateAudioCtx.close();
   if (state.remoteAudioCtx && state.remoteAudioCtx.state !== 'closed') {

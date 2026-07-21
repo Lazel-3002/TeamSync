@@ -9,6 +9,14 @@
 3. `npm start` yazarak uygulamayı yerelde test edin.
 4. Kuruluma gerek kalmayan taşınabilir sürümünü almak için: `npm run build` komutunu çalıştırın. Dosya `dist/` klasöründe hazır olacaktır.
 
+### RNNoise gürültü engelleme
+
+Uygulamadaki RNNoise seçeneği, ücretsiz ve açık kaynak RNNoise modelini 48 kHz
+mono mikrofon zincirinde bir AudioWorklet içinde çalıştırır. WASM dosyaları
+uygulamayla birlikte yerel olarak gelir; hesap, API anahtarı veya internet
+bağlantısı gerekmez. AudioWorklet başlatılamazsa çağrı kesilmeden Chromium'un
+sistem gürültü engellemesine otomatik dönülür.
+
 ## Proje Yapısı
 
 - `assets/` — uygulama görselleri
