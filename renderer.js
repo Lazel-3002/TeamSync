@@ -199,7 +199,8 @@ function setupInternetSignaling(roomId, myId, myName) {
           // sunucu durumu: yasak listesi, susturulanlar ve ses bit hızı.
           bannedIds: state.isRoomFounder ? Array.from(state.bannedIds || []) : undefined,
           serverMutedIds: state.isRoomFounder ? Array.from(state.serverMutedIds || []) : undefined,
-          audioBitrate: state.isRoomFounder ? getAudioBitrate() : undefined
+          audioBitrate: state.isRoomFounder ? getAudioBitrate() : undefined,
+          noiseSuppressionEnabled: state.isRoomFounder ? !!state.useAI : undefined
         }));
       }
     }, 3000);
@@ -291,6 +292,14 @@ function setupInternetSignaling(roomId, myId, myName) {
           if (typeof data.audioBitrate === 'number' && data.audioBitrate !== state.audioBitrate) {
             state.audioBitrate = data.audioBitrate;
             applyAudioBitrateToPeers();
+          }
+          // Kurucunun RNNoise tercihi oda durumunun parçasıdır. Periyodik hello
+          // sayesinde sonradan katılanlar da kendi giriş ekranı tercihlerinden
+          // bağımsız olarak sunucunun güncel ayarını alır.
+          if (!state.isRoomFounder
+              && typeof data.noiseSuppressionEnabled === 'boolean'
+              && data.noiseSuppressionEnabled !== state.useAI) {
+            await applyRoomNoiseSuppression(data.noiseSuppressionEnabled);
           }
         }
         applySharedTurn(data.turn);
@@ -2376,6 +2385,7 @@ function playSound(type) {
 async function setupLocalAudio(options = {}) {
   const generation = ++state.audioSetupGeneration;
   const forceSystemSuppression = options.forceSystemSuppression === true;
+  const previousLocalStream = state.localStream;
 
   if (state.rnnoiseFilterNode && window.RNNoiseSuppression) {
     window.RNNoiseSuppression.releaseFilter(state.rnnoiseFilterNode);
@@ -2557,7 +2567,9 @@ async function setupLocalAudio(options = {}) {
 
   state.uiAnalyser = vuCtx.createAnalyser();
   state.uiAnalyser.fftSize = 512;
-  if (gainNodeInst) {
+  if (rnnoiseFilterNode) {
+    rnnoiseFilterNode.connect(state.uiAnalyser);
+  } else if (gainNodeInst) {
     gainNodeInst.connect(state.uiAnalyser);
   } else {
     state.gateGainNode.connect(state.uiAnalyser);
@@ -2565,15 +2577,50 @@ async function setupLocalAudio(options = {}) {
 
   if (state.peers && state.peers.size > 0) {
     const newAudioTrack = state.localStream.getAudioTracks()[0];
+    const replacements = [];
     state.peers.forEach(peer => {
       const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio');
-      if (sender && newAudioTrack) sender.replaceTrack(newAudioTrack);
+      if (sender && newAudioTrack) replacements.push(sender.replaceTrack(newAudioTrack));
     });
+    await Promise.allSettled(replacements);
+  }
+
+  if (previousLocalStream && previousLocalStream !== state.localStream) {
+    previousLocalStream.getTracks().forEach(track => track.stop());
   }
 
   if (state.micEnabled === false) {
     state.localStream.getAudioTracks().forEach(t => t.enabled = false);
     if (state.rawMicStream) state.rawMicStream.getAudioTracks().forEach(t => t.enabled = false);
+  }
+}
+
+// Kurucu anahtarı değiştiğinde mikrofon işleme zincirini yeniden kurup mevcut
+// RTCPeerConnection'ların ses göndericisini replaceTrack ile değiştirir. Böylece
+// bağlantı kopmaz. Hızlı art arda değişikliklerde son istek mutlaka uygulanır.
+async function applyRoomNoiseSuppression(enabled) {
+  state.useAI = !!enabled;
+  const founderToggle = document.getElementById('founder-noise-suppression');
+  if (founderToggle) founderToggle.checked = state.useAI;
+
+  if (!state.room || !state.localStream) return;
+  if (state.noiseSuppressionApplyPromise) return state.noiseSuppressionApplyPromise;
+
+  const applyPromise = (async () => {
+    while (state.room && state.localStream) {
+      const requestedValue = state.useAI;
+      await setupLocalAudio();
+      if (requestedValue === state.useAI) break;
+    }
+  })();
+
+  state.noiseSuppressionApplyPromise = applyPromise;
+  try {
+    await applyPromise;
+  } finally {
+    if (state.noiseSuppressionApplyPromise === applyPromise) {
+      state.noiseSuppressionApplyPromise = null;
+    }
   }
 }
 
@@ -3371,6 +3418,14 @@ function setupDataChannel(peerId, dc) {
         }, 2000);
 
         dc.send(JSON.stringify({ type: 'state', mic: state.micEnabled, deaf: state.deafened }));
+        // İnternet sinyallemesi olmasa bile geç katılan kişi kurucunun oda
+        // genelindeki RNNoise tercihini açık veri kanalından hemen alır.
+        if (state.isRoomFounder) {
+          dc.send(JSON.stringify({
+            type: 'founder_settings_update',
+            noiseSuppressionEnabled: !!state.useAI
+          }));
+        }
         if (state.isSharing) dc.send(JSON.stringify({ type: 'sharing', sharing: true }));
         if (state.lobbies && state.lobbies.length > 0) {
           dc.send(JSON.stringify({ type: 'lobby-list-sync', lobbies: state.lobbies }));
@@ -3493,11 +3548,20 @@ async function handleDataMessage(peerId, msg) {
   }
   
   if (msg.type === 'founder_settings_update') {
+    // Sunucu çapındaki ayarlar yalnızca gerçek kurucudan kabul edilir.
+    if (peerId !== state.founderId) return;
     if (msg.friendsOnlyMode !== undefined) state.friendsOnlyMode = msg.friendsOnlyMode;
     if (msg.gameMode !== undefined) state.gameMode = msg.gameMode;
     if (msg.sfwMode !== undefined) {
       state.sfwMode = msg.sfwMode;
       if (state.sfwMode) loadAIFilter();
+    }
+    if (typeof msg.noiseSuppressionEnabled === 'boolean'
+        && msg.noiseSuppressionEnabled !== state.useAI) {
+      await applyRoomNoiseSuppression(msg.noiseSuppressionEnabled);
+      showToast(msg.noiseSuppressionEnabled
+        ? 'Kurucu RNNoise gürültü engellemeyi açtı.'
+        : 'Kurucu RNNoise gürültü engellemeyi kapattı.', 'info');
     }
     console.log('👑 Founder settings updated:', msg);
     return;
@@ -5118,6 +5182,7 @@ function bindUI() {
     document.getElementById('founder-friends-only').checked = state.friendsOnlyMode || false;
     document.getElementById('founder-sfw-mode').checked = state.sfwMode || false;
     document.getElementById('founder-game-mode').checked = state.gameMode || false;
+    document.getElementById('founder-noise-suppression').checked = !!state.useAI;
     const bitrateEl = document.getElementById('founder-bitrate');
     if (bitrateEl) bitrateEl.value = String(getAudioBitrate());
 
@@ -5310,6 +5375,30 @@ function bindUI() {
     state.gameMode = e.target.checked;
     broadcast({ type: 'founder_settings_update', gameMode: state.gameMode });
     showToast(state.gameMode ? 'Oyun Modu aktif (15FPS/Düşük İşlemci)!' : 'Oyun Modu kapatıldı.', 'info');
+  });
+
+  document.getElementById('founder-noise-suppression').addEventListener('change', async (e) => {
+    if (!state.isRoomFounder) {
+      e.target.checked = !!state.useAI;
+      return;
+    }
+
+    const enabled = e.target.checked;
+    e.target.disabled = true;
+    try {
+      await applyRoomNoiseSuppression(enabled);
+      broadcast({ type: 'founder_settings_update', noiseSuppressionEnabled: enabled });
+      showToast(enabled
+        ? 'RNNoise gürültü engelleme tüm katılımcılar için açıldı.'
+        : 'RNNoise gürültü engelleme tüm katılımcılar için kapatıldı.', 'ok');
+    } catch (error) {
+      console.error('RNNoise sunucu ayarı uygulanamadı:', error);
+      e.target.checked = !enabled;
+      await applyRoomNoiseSuppression(!enabled).catch(console.error);
+      showToast('RNNoise ayarı değiştirilemedi.', 'error');
+    } finally {
+      e.target.disabled = false;
+    }
   });
 
   // Ses bit hızı değişince: kendi göndericine anında uygula ve tüm katılımcılara
