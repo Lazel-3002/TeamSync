@@ -410,12 +410,18 @@
       <!-- Adım 3B: Oluştur -->
       <div id="step-create" class="hidden">
         <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Geri</button>
-        <label>Sunucu Adı</label>
-        <input id="create-name" type="text" placeholder="Benim Sunucum" value="Oyun Odası" />
-        
-        <label>Şifre <span class="muted">(opsiyonel)</span></label>
-        <input id="create-password" type="password" placeholder="•••••" />
-        
+        <div class="create-fields">
+          <div class="create-field">
+            <label for="create-name">Sunucu Adı</label>
+            <input id="create-name" type="text" placeholder="Benim Sunucum" value="Oyun Odası" />
+          </div>
+          <div class="create-field">
+            <label for="create-password">Şifre <span class="muted">(opsiyonel)</span></label>
+            <input id="create-password" type="password" placeholder="•••••" />
+          </div>
+        </div>
+
+        <div class="create-options">
         <div class="premium-option" onclick="document.getElementById('create-useAI').click()">
           <div class="premium-option-info">
             <div class="premium-option-title">
@@ -471,7 +477,7 @@
           </label>
         </div>
 
-        <div class="premium-option">
+        <div class="premium-option create-quality-option">
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
@@ -487,6 +493,7 @@
             <option value="192">192 kbps</option>
             <option value="256">256 kbps (Yüksek)</option>
           </select>
+        </div>
         </div>
 
         <button id="btn-create">Oluştur</button>

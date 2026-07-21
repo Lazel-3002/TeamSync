@@ -210,6 +210,162 @@ body { padding-top: 35px; } /* Prevent overlap */
   position: relative;
   z-index: 10;
 }
+
+/* Sunucu oluşturma kartı ekranla birlikte büyür/küçülür. */
+.login-card:has(#step-create:not(.hidden)) {
+  width: min(520px, calc(100vw - 32px));
+  max-height: none;
+  padding: clamp(14px, 2.4vh, 26px);
+  overflow: visible;
+}
+
+.login-card:has(#step-create:not(.hidden)) > h1 {
+  font-size: clamp(22px, 3vw, 28px);
+}
+
+#step-create .btn-back {
+  width: max-content;
+  min-width: 92px;
+  margin-top: 0;
+}
+
+.create-fields,
+.create-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(5px, 1vh, 10px);
+}
+
+.create-field label {
+  margin-top: clamp(5px, 1vh, 10px);
+}
+
+.create-options {
+  margin-top: clamp(6px, 1.2vh, 12px);
+}
+
+.create-options .premium-option {
+  min-width: 0;
+  height: 100%;
+  margin-top: 0;
+}
+
+.create-options .create-quality-option {
+  grid-column: auto;
+}
+
+#step-create #btn-create {
+  margin-top: clamp(8px, 1.5vh, 16px);
+}
+
+@media (max-width: 480px) {
+  .login-card:has(#step-create:not(.hidden)) {
+    width: calc(100vw - 16px);
+    padding-inline: 14px;
+    border-radius: 12px;
+  }
+
+  #step-create .premium-option-info {
+    padding-right: 8px;
+  }
+}
+
+/* Kısa ekranlarda dikey düzen korunur ve kart kaydırma olmadan sıkışır. */
+@media (max-height: 800px) {
+  .login-card:has(#step-create:not(.hidden)) {
+    width: min(500px, calc(100vw - 24px));
+    padding: 10px 18px;
+  }
+
+  .login-card:has(#step-create:not(.hidden)) > h1 {
+    margin-bottom: 0;
+    font-size: 23px;
+    line-height: 1.15;
+  }
+
+  .login-card:has(#step-create:not(.hidden)) > p.muted {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  #step-create .btn-back {
+    min-width: 80px;
+    margin-bottom: 2px !important;
+    padding: 2px 7px !important;
+    font-size: 12px;
+  }
+
+  .create-options,
+  .create-fields {
+    gap: 4px;
+  }
+
+  #step-create .create-field label {
+    margin: 3px 0 2px;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  #step-create .create-field input {
+    padding: 7px 11px;
+    font-size: 13px;
+  }
+
+  .create-options {
+    margin-top: 5px;
+  }
+
+  .create-options .premium-option {
+    padding: 5px 10px;
+    min-height: 0;
+  }
+
+  #step-create .premium-option-info {
+    gap: 1px;
+    padding-right: 10px;
+  }
+
+  #step-create .premium-option-title {
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  #step-create .premium-option-title svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  #step-create .premium-option-desc {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  #step-create .switch {
+    flex: 0 0 50px;
+    margin: 0;
+    transform: scale(0.82);
+    transform-origin: right center;
+  }
+
+  #step-create .quality-select {
+    min-width: 120px !important;
+    padding: 6px 28px 6px 9px;
+    font-size: 11px;
+  }
+
+  #step-create #btn-create {
+    margin-top: 7px;
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .login-card:has(#step-create:not(.hidden)) > .hint {
+    margin-top: 4px;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+}
 .login-card h1 { 
   margin-bottom: 8px; 
   font-size: 28px;
