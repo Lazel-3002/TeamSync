@@ -51,36 +51,30 @@ window.state = {
   act: { wt: false, uno: false },
   wt: { player: null, isReady: false, lastAction: 0, ignoreNextEvent: false, joinedActivity: false },
   sb: { host: null, startedAt: 0, appliedRemoteUrl: '', remoteNavTs: 0, joinedActivity: false, lastUrl: '', lastVideoState: null, lastNavTs: 0, lastVideoSyncTs: 0, remoteVideoSyncTs: 0, authorized: [], authTs: 0, lastActionTs: 0, lastRoutineSyncTs: 0 },
+  // UNO — host-yetkili kart oyunu (bkz. js/uno.js). Herkese açık alanlar tüm
+  // istemcilerde; deck/hands yalnızca host'ta doludur.
   uno: {
     host: null,
-    players: new Map(),
-    scores: {},
-    maxPlayers: 4,
     started: false,
-    myHand: [],
-    deck: [],
-    discard: [],
-    turnIndex: 0,
-    direction: 1,
-    currentColor: '',
-    turnOrder: [],
-    botHands: {},
-    botTimeout: null,
     joinedActivity: false,
-    pendingDrawCount: 0,
-    rules: {
-      startCards: 7,
-      kombo: false,
-      stacking: false,
-      jumpIn: false,
-      drawUntilPlay: false,
-      noBluff: false,
-      noPass: false,
-      noBlackLast: false,
-      mirror: false,
-      zeroPass: false,
-      sevenSwap: false
-    }
+    maxPlayers: 4,   // kurucu "kaç kişilik" ayarı (2-8)
+    botTimer: null,  // host: bot hamlesi zamanlayıcısı
+    players: [],     // [{id, name, count, isBot?}]
+    hand: [],        // benim elim [{color, value}]
+    turnId: null,
+    turnIndex: 0,    // host tarafında sıra indeksi
+    dir: 1,
+    color: null,
+    top: null,
+    pile: [],        // ıskartanın en üstteki son ~5 kartı (yığın görünümü)
+    playSeq: 0,      // oynanan kart sayacı (ıskarta "slam" animasyonu için)
+    actionSeq: 0,    // her eylem (atma/çekme) sayacı — uçan kart animasyonu için
+    lastActorId: null,   // son eylemi yapan oyuncu
+    lastActionKind: null, // 'play' | 'draw'
+    deck: [],        // host-only
+    discard: [],     // host-only
+    hands: {},       // host-only: id -> [cards]
+    winnerId: null
   },
   lobbies: [],
   activeLobbyId: null,

@@ -2953,14 +2953,6 @@ function removePeer(peerId) {
           
           if (nextPlayer.id === state.myId) {
             state.isLobbyHost = true;
-            if (lob.activity === 'uno') {
-              const hostSettings = document.getElementById('uno-host-settings');
-              if (hostSettings) hostSettings.style.display = 'block';
-              const startBtn = document.getElementById('uno-start-btn');
-              if (startBtn) startBtn.classList.remove('hidden');
-              const readyBtn = document.getElementById('uno-ready-btn');
-              if (readyBtn) readyBtn.classList.add('hidden');
-            }
           }
         } else {
           state.lobbies.splice(index, 1);
@@ -2986,38 +2978,7 @@ function removePeer(peerId) {
     if (state.sb.host === state.myId && typeof sbBroadcastAuth === 'function') sbBroadcastAuth();
   }
 
-  // Activity-specific cleanup on peer disconnect
-  if (state.uno.players.has(peerId)) {
-    state.uno.players.delete(peerId);
-    
-    if (state.uno.host === state.myId) {
-      const idx = state.uno.turnOrder.indexOf(peerId);
-      if (idx !== -1) {
-        state.uno.turnOrder.splice(idx, 1);
-        if (state.uno.turnIndex >= state.uno.turnOrder.length) {
-          state.uno.turnIndex = 0;
-        }
-      }
-      
-      const handsCount = Array.from(state.uno.players.entries()).map(([k, v]) => ({ id: k, count: v.cardCount }));
-      broadcast({
-        type: 'uno-sync',
-        host: state.uno.host,
-        players: Array.from(state.uno.players.entries()),
-        turnOrder: state.uno.turnOrder,
-        turnIndex: state.uno.turnIndex,
-        direction: state.uno.direction,
-        discard: state.uno.discard,
-        currentColor: state.uno.currentColor,
-        handsCount
-      });
-      
-      renderUnoGame();
-    } else {
-      renderUnoLobby();
-      if (state.uno.started) renderUnoGame();
-    }
-  }
+  if (typeof unoHandlePeerLeft === 'function') unoHandlePeerLeft(peerId);
 
   // Ayrılan peer kurucuysa sahiplik boşta kalmasın diye halef (moderatör) seç.
   // (item 4) Not: state.peers.delete(peerId) yukarıda çalıştığı için aday
@@ -3490,23 +3451,8 @@ function setupDataChannel(peerId, dc) {
             const currentUrl = document.getElementById('sb-url')?.value || '';
             dc.send(JSON.stringify({ type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl, auth: (state.sb.authorized || []).slice() }));
             if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl, ts: Date.now() }));
-          } else if (activeAct === 'uno' && state.uno.host === state.myId) {
-            if (!state.uno.started) {
-              dc.send(JSON.stringify({ type: 'uno-lobby', host: state.myId }));
-              dc.send(JSON.stringify({ type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) }));
-            } else {
-              dc.send(JSON.stringify({ 
-                type: 'uno-sync', 
-                host: state.myId,
-                players: Array.from(state.uno.players.entries()),
-                turnOrder: state.uno.turnOrder,
-                turnIndex: state.uno.turnIndex,
-                direction: state.uno.direction,
-                discard: state.uno.discard,
-                currentColor: state.uno.currentColor,
-                handsCount: Array.from(state.uno.players.entries()).map(([id, p]) => ({ id, count: p.cardCount }))
-              }));
-            }
+          } else if (activeAct === 'uno') {
+            if (typeof unoSyncNewPeer === 'function') unoSyncNewPeer(peerId);
           } else if (activeAct === 'poke' && window.pokeState) {
             dc.send(JSON.stringify({ type: 'poke_sync', state: window.pokeState }));
           } else if (activeAct === 'poll') {
@@ -3763,22 +3709,7 @@ async function handleDataMessage(peerId, msg) {
 
         // Send direct synchronization state to the joining peer
         if (lob.activity === 'uno') {
-          if (state.uno.started) {
-            broadcastTo(msg.peerId, { 
-              type: 'uno-sync', 
-              host: state.myId,
-              players: Array.from(state.uno.players.entries()),
-              turnOrder: state.uno.turnOrder,
-              turnIndex: state.uno.turnIndex,
-              direction: state.uno.direction,
-              discard: state.uno.discard,
-              currentColor: state.uno.currentColor,
-              handsCount: Array.from(state.uno.players.entries()).map(([id, p]) => ({ id, count: p.cardCount }))
-            });
-          } else {
-            broadcastTo(msg.peerId, { type: 'uno-lobby', host: state.myId });
-            broadcastTo(msg.peerId, { type: 'uno-lobby-sync', players: Array.from(state.uno.players.entries()) });
-          }
+          if (typeof unoSyncNewPeer === 'function') unoSyncNewPeer(msg.peerId);
         } else if (lob.activity === 'wt') {
           const url = document.getElementById('wt-url')?.value || '';
           const match = url.match(/(?:v=|youtu\.be\/)([^&]+)/);
@@ -3847,13 +3778,7 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'lobby-promote-host') {
     if (msg.lobbyId === state.activeLobbyId) {
       state.isLobbyHost = true;
-      state.uno.host = state.myId; // Enforce host change in UNO game too!
-      const hostSettings = document.getElementById('uno-host-settings');
-      if (hostSettings) hostSettings.style.display = 'block';
-      const startBtn = document.getElementById('uno-start-btn');
-      if (startBtn) startBtn.classList.remove('hidden');
-      const readyBtn = document.getElementById('uno-ready-btn');
-      if (readyBtn) readyBtn.classList.add('hidden');
+      if (state.uno) state.uno.host = state.myId;
     }
     return;
   } else if (msg.type === 'lobby-sync-request') {
@@ -3870,9 +3795,9 @@ async function handleDataMessage(peerId, msg) {
   // Bu yüzden MQTT sunucusu geçici olarak yavaşlasa/kopsa bile WebRTC bağlantımız kopmayacak!
   peer.lastSeen = Date.now();
 
-  const isActivityMsg = msg.type.startsWith('wt-') || 
-                        msg.type.startsWith('uno-') || 
-                        msg.type.startsWith('sb-') || 
+  const isActivityMsg = msg.type.startsWith('wt-') ||
+                        msg.type.startsWith('uno-') ||
+                        msg.type.startsWith('sb-') ||
                         msg.type.startsWith('poke_') || 
                         ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
 
@@ -4602,7 +4527,7 @@ function makeCardFocusable(card) {
   if (card.dataset.focusable) return;
   card.dataset.focusable = 'true';
   card.addEventListener('click', (e) => {
-    if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .uno-card-ui, .ucc, .uno-player-list, .act-src, #uno-table, .uno-remote-player, #wt-player-container, .wt-tools, #focus-lock-btn, .inactive-overlay, #uno-uno-btn, #uno-catch-btn, #uno-color-picker, #uno-end-turn-btn, #uno-turn-indicator, #uno-dir-indicator, .mactions')) return;
+    if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .act-src, .u-card, .u-swatch, .u-picker, .u-hand, .u-opponents, .u-lobby-players, #wt-player-container, .wt-tools, #focus-lock-btn, .inactive-overlay, .mactions')) return;
     if (e.target.tagName === 'CANVAS' && focusedCard === card) return;
     toggleFocus(card);
   });
@@ -4911,7 +4836,7 @@ function broadcast(msg) {
     // olacak şekilde tasarlandı (host beacon, 7/24 katılım), "maç başladı"
     // kavramı yok — dahil edilirse lobi oluşturulur oluşturulmaz Katıl butonu
     // kayboluyordu (status hemen 'playing' oluyordu).
-    if (state.isLobbyHost && (msg.type === 'uno-sync' || msg.type === 'wt-load' || msg.type === 'poll_start' || msg.type === 'wheel_ready')) {
+    if (state.isLobbyHost && (msg.type === 'wt-load' || msg.type === 'uno-state' || msg.type === 'poll_start' || msg.type === 'wheel_ready')) {
       const lob = state.lobbies.find(l => l.id === state.activeLobbyId);
       if (lob && lob.status === 'waiting') {
         lob.status = 'playing';
@@ -5895,7 +5820,7 @@ function closeAllCards(leaveLobby = false, except = null) {
 
   // Kapanan kart tam ekran odaktaysa tam ekranı da bırak; yoksa gizlenmiş
   // odak alanı görünmez bir tam ekran katmanı olarak tüm tıklamaları yutar
-  // (UNO'yu tam ekran + kilitliyken kapatınca UI'ın donması bunun sonucuydu).
+  // (bir aktiviteyi tam ekran + kilitliyken kapatınca UI'ın donması bunun sonucuydu).
   if (document.fullscreenElement && !(except && focusedCard && focusedCard.id === except)) {
     document.exitFullscreen().catch(() => {});
   }
@@ -5928,14 +5853,16 @@ function closeAllCards(leaveLobby = false, except = null) {
     resetSharedBrowserState();
   }
   if (state.uno && except !== 'uno-card') {
-    state.uno.joinedActivity = false;
     state.uno.host = null;
-    state.uno.players.clear();
     state.uno.started = false;
-    const lobby = document.getElementById('uno-lobby');
-    if (lobby) lobby.classList.remove('hidden');
-    const ugame = document.getElementById('uno-game');
-    if (ugame) ugame.classList.add('hidden');
+    state.uno.joinedActivity = false;
+    state.uno.players = [];
+    state.uno.hand = [];
+    state.uno.hands = {};
+    state.uno.winnerId = null;
+    const g = document.getElementById('uno-game'); if (g) g.classList.add('hidden');
+    const ov = document.getElementById('uno-over'); if (ov) ov.classList.add('hidden');
+    const lb = document.getElementById('uno-lobby'); if (lb) lb.classList.remove('hidden');
   }
 
   if (window.pokeState && except !== 'poke-card') {
@@ -6848,7 +6775,7 @@ window.renderLobbiesList = function(activity) {
     row.className = 'lobby-row';
     row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.08);';
     
-    const maxPlayers = lob.activity === 'uno' ? 4 : 10;
+    const maxPlayers = 10;
     const playerCount = lob.players.length;
     const specCount = lob.spectators.length;
     
@@ -6972,25 +6899,6 @@ window.leaveActiveLobby = function() {
 
 window.checkSpectatorUI = function() {
   const isSpec = state.spectating;
-  
-  // UNO
-  const unoReady = document.getElementById('uno-ready-btn');
-  const unoStart = document.getElementById('uno-start-btn');
-  const unoMax = document.getElementById('uno-max-players');
-  const unoBots = document.getElementById('uno-fill-bots');
-  const unoUno = document.getElementById('uno-uno-btn');
-  const unoCatch = document.getElementById('uno-catch-btn');
-  const unoReplay = document.getElementById('uno-replay-btn');
-  const unoDeck = document.getElementById('uno-deck');
-  
-  if (unoReady) unoReady.classList.toggle('hidden', isSpec);
-  if (unoStart) unoStart.classList.toggle('hidden', isSpec);
-  if (unoMax) unoMax.disabled = isSpec;
-  if (unoBots) unoBots.disabled = isSpec;
-  if (unoUno) unoUno.classList.toggle('hidden', isSpec);
-  if (unoCatch) unoCatch.classList.toggle('hidden', isSpec);
-  if (unoReplay) unoReplay.classList.toggle('hidden', isSpec);
-  if (unoDeck) unoDeck.style.pointerEvents = isSpec ? 'none' : 'auto';
   
   // WatchTogether
   const wtUrl = document.getElementById('wt-url');

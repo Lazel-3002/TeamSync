@@ -628,156 +628,77 @@
           </div>
         </div>
 
-        <div id="uno-card" class="vcard uno hidden" style="background: radial-gradient(circle, #2d6a4f, #081c15); display: flex; flex-direction: column;">
-          <div class="uno-tools card-actions">
+        <!-- UNO -->
+        <div id="uno-card" class="vcard hidden" style="background: radial-gradient(circle at 50% 25%, #1b2a4a, #0a1120); color: #fff; display: flex; flex-direction: column; overflow: hidden;">
+          <div class="card-actions" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:rgba(0,0,0,0.35);">
+            <span class="u-title">UNO</span>
             <button id="uno-close" class="btn-sec btn-sm" style="background: rgba(0,0,0,0.5);">Odadan Çık</button>
           </div>
-          <div id="uno-lobby" class="uno-view" style="padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; overflow-y: auto; overflow-x: hidden;">
-            <h3 style="font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); flex-shrink: 0; margin-top: 20px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:-2px;"><circle cx="12" cy="12" r="8" fill="#ef4444"></circle><circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="1.5" opacity="0.4"></circle></svg> UNO Bekleme Salonu</h3>
-            <div class="uno-premium-settings" id="uno-host-settings">
-              <h4 class="uno-settings-section-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Temel Ayarlar</h4>
-              
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Maksimum Oyuncu:</label>
-                <select id="uno-max-players" class="uno-settings-select"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select>
-              </div>
-              
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Boşlukları Botla Doldur</label>
-                <input type="checkbox" id="uno-fill-bots" class="uno-toggle-switch" />
-              </div>
-              
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Başlangıç Kart Sayısı: <span class="custom-tooltip" data-tooltip="Oyuna başlarken herkese dağıtılacak kart miktarı (5-20 arası)."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="number" id="uno-start-cards" min="5" max="20" value="7" class="uno-settings-input" />
-              </div>
-              
-              <h4 class="uno-settings-section-title" style="margin-top: 24px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> Özel Oyun Kuralları</h4>
-              
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Kombo <span class="custom-tooltip" data-tooltip="Aynı sayıya sahip başka kartlarınız varsa peş peşe atabilirsiniz."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-kombo" class="uno-rule-cb uno-toggle-switch" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Yığılma <span class="custom-tooltip" data-tooltip="+2 veya +4 yediğinizde elinizde varsa atıp cezayı katlayarak sonrakine atarsınız."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-stacking" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Araya Girme <span class="custom-tooltip" data-tooltip="Sıranız olmasa bile yerdeki kartın birebir aynısı elinizdeyse atıp sırayı alırsınız."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-jumpin" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Zorunlu Çekme <span class="custom-tooltip" data-tooltip="Oynanabilir bir kart bulana kadar desteden çekmeye devam edersiniz."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-drawuntilplay" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Serbest Atış <span class="custom-tooltip" data-tooltip="+4 kartı her zaman blöf cezası olmadan atılabilir."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-nobluff" class="uno-rule-cb uno-toggle-switch" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Pas Yok <span class="custom-tooltip" data-tooltip="Kart çekildiğinde oynanabiliyorsa bekletilemez, zorunlu olarak oynanır."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-nopass" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Zorlu Son Kart <span class="custom-tooltip" data-tooltip="Son kartınız eylem kartı veya siyah renkli olamaz, atarsanız bitmeyip 2 kart çekersiniz."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-noblacklast" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">Ayna Kuralı <span class="custom-tooltip" data-tooltip="Size +2 atıldığında Yön Değiştir kartı atarak cezayı atana geri yansıtabilirsiniz."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-mirror" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">0 Karmaşası <span class="custom-tooltip" data-tooltip="0 atıldığında herkes elini sıradakine devreder."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-zeropass" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-              <div class="uno-settings-row">
-                <label class="uno-settings-label">7 Takası <span class="custom-tooltip" data-tooltip="7 atan kişi rastgele bir oyuncuyla elindeki kartları değişir."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;opacity:0.75;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label>
-                <input type="checkbox" id="rule-sevenswap" class="uno-rule-cb uno-toggle-switch warn" />
-              </div>
-            </div>
-            <div id="uno-players" class="uno-player-list" style="margin: 20px 0; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;"></div>
-            <div class="mactions" style="justify-content: center; margin-top: 20px;">
-              <button id="uno-ready-btn" class="btn-pri" style="background: var(--warn); padding: 12px 24px; font-size: 16px;">Hazır Değilim</button>
-              <button id="uno-start-btn" class="btn-ok hidden" style="background: var(--ok); color: white; padding: 12px 24px; border-radius: 8px; border:none; font-weight:bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.3);">Başlat (Kurucu)</button>
-            </div>
-          </div>
-          <div id="uno-game" class="uno-view hidden" style="flex:1; position: relative; overflow: hidden;">
-            <div id="uno-modifiers-panel" style="position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); z-index: 50; max-width: 150px; display: flex; flex-direction: column; gap: 5px; max-height: 80%; overflow-y: auto;">
-               <div style="font-weight: bold; color: var(--acc-light); border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px; margin-bottom: 5px; font-size: 14px;">Etkenler</div>
-               <div id="uno-active-rules" style="font-size: 12px; color: #ddd; display: flex; flex-direction: column; gap: 4px;">
-                 <div style="font-style: italic; color: #aaa;">Kural Yok</div>
-               </div>
-            </div>
-            <div id="uno-table" class="uno-table">
-              <div id="uno-center">
-                <div id="uno-deck" class="uno-card-ui back" title="Kart Çek">UNO</div>
-                <div id="uno-discard" class="uno-card-ui empty"></div>
-                <div id="uno-turn-indicator" style="position: absolute; top: -40px; background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 20px; white-space: nowrap; font-weight: bold;">Sıra: <span id="uno-turn-name">...</span></div>
-                <div id="uno-dir-indicator" style="position: absolute; bottom: -30px; font-size: 20px;">🔃</div>
-                <div id="uno-pending-badge" class="hidden" style="position: absolute; top: -78px; left: 50%; transform: translateX(-50%); background: var(--warn, #f59e0b); color: white; font-weight: 900; font-size: 14px; padding: 4px 14px; border-radius: 20px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 2px solid white;"></div>
-              </div>
-            </div>
-            <div style="position: absolute; bottom: 160px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 60;">
-              <button id="uno-sort-color" style="background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">🎨 Renklere Göre</button>
-              <button id="uno-sort-num" style="background: rgba(0,0,0,0.6); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">🔢 Sayıya Göre</button>
-            </div>
-            <div id="uno-emojis" style="position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 70;">
-              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">😂</button>
-              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">😡</button>
-              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">🎉</button>
-              <button class="uno-emoji-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; transition: transform 0.2s;">😱</button>
-            </div>
-            <div id="uno-my-hand" class="uno-hand"></div>
-            <div id="uno-color-picker" class="hidden">
-              <h4>Renk Seç</h4>
-              <div class="uc-colors">
-                <div class="ucc red" data-color="red"></div>
-                <div class="ucc blue" data-color="blue"></div>
-                <div class="ucc green" data-color="green"></div>
-                <div class="ucc yellow" data-color="yellow"></div>
-              </div>
-            </div>
-            <div id="uno-end-turn-btn" class="hidden" style="position: absolute; right: 80px; bottom: 180px; background: var(--warn); color: white; font-weight: bold; font-size: 16px; padding: 12px 24px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.8); border: 2px solid white; z-index: 100;">Sırayı Sal</div>
-            <div id="uno-uno-btn" class="hidden" style="position: absolute; right: 80px; bottom: 120px; background: red; color: white; font-weight: 900; font-size: 20px; padding: 15px 30px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.8); border: 3px solid white; transform: rotate(-5deg); z-index: 100; transition: transform 0.1s;">UNO DE!</div>
-            <div id="uno-catch-btn" class="hidden" style="position: absolute; right: 80px; top: 120px; background: #f97316; color: white; font-weight: 900; font-size: 20px; padding: 15px 30px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.8); border: 3px solid white; transform: rotate(5deg); z-index: 100; transition: transform 0.1s; display: flex; flex-direction: column; align-items: center;"><span style="font-size:12px;">Biri UNO demeyi unuttu!</span>YAKALA!</div>
-            
-            <div id="uno-draw-modal" class="hidden" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:200; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(5px);">
-               <div style="color:white; font-size:24px; margin-bottom:20px; font-weight:bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">Kart Çekildi!</div>
-               <div id="uno-drawn-card-container" style="margin-bottom: 30px; display:flex; justify-content:center; align-items:center;"></div>
-               <div style="display:flex; gap: 20px;">
-                  <button id="uno-keep-btn" class="btn-sec" style="font-size: 16px; padding: 12px 24px; background: rgba(255,255,255,0.1); border: 2px solid white; color: white; border-radius: 8px; cursor: pointer;">Beklet</button>
-                  <button id="uno-play-drawn-btn" class="btn-ok" style="background: var(--ok); color: white; border: none; font-size: 16px; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.4);">Oyna</button>
-               </div>
-            </div>
 
-            <div id="uno-challenge-modal" class="hidden" style="position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:250; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter: blur(8px);">
-               <div style="color:gold; font-size:32px; margin-bottom:10px; font-weight:900; text-shadow: 0 2px 10px rgba(255,215,0,0.8);">MEYDAN OKU!</div>
-               <div style="color:white; font-size:18px; max-width:350px; text-align:center; margin-bottom:30px; line-height:1.5;">
-                  Sana <b>+4</b> atıldı! Acaba blöf mü yapıyor?<br><br>
-                  Eğer meydan okursan eline bakılacak. Yasadışı +4 attıysa <b>cezayı o çeker (+4)</b>! Ama yasal attıysa <b>sen 6 kart çekersin</b>!
-               </div>
-               <div style="display:flex; gap: 20px;">
-                  <button id="uno-challenge-yes" class="btn-warn" style="font-size: 18px; padding: 15px 30px; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(239,68,68,0.5);">Meydan Oku</button>
-                  <button id="uno-challenge-no" class="btn-sec" style="font-size: 18px; padding: 15px 30px; background: rgba(255,255,255,0.1); border: 2px solid white; color: white; border-radius: 8px; cursor: pointer;">Kartları Çek</button>
-               </div>
+          <!-- Bekleme salonu -->
+          <div id="uno-lobby" class="u-view">
+            <div class="u-lobby-box">
+              <h3 class="u-h">UNO — Bekleme Salonu</h3>
+              <div id="uno-players" class="u-lobby-players"></div>
+
+              <div id="uno-host-settings" class="u-host-settings hidden">
+                <div class="u-setting-row">
+                  <label for="uno-max">Kaç kişilik?</label>
+                  <select id="uno-max" class="u-select">
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4" selected>4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                  </select>
+                </div>
+                <div class="u-setting-row">
+                  <button id="uno-add-bot" class="btn-sec btn-sm">+ Bot Ekle</button>
+                  <label class="u-check"><input type="checkbox" id="uno-fill-bots" /> Başlatınca boşlukları botla doldur</label>
+                </div>
+                <div id="uno-seat-info" class="u-hint"></div>
+              </div>
+
+              <p id="uno-lobby-hint" class="u-hint"></p>
+              <button id="uno-start" class="btn-pri hidden u-start">Başlat</button>
             </div>
           </div>
-          <div id="uno-game-over" class="uno-view hidden" style="flex:1; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative;">
-            <h2 style="font-size: 32px; color: gold; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 20px;">🏆 OYUN BİTTİ 🏆</h2>
-            <div id="uno-rankings" style="display: flex; flex-direction: column; gap: 10px; width: 80%; max-width: 400px; margin-bottom: 30px;">
-               <!-- Rankings will be injected here -->
+
+          <!-- Oyun masası -->
+          <div id="uno-game" class="u-view hidden">
+            <div id="uno-opponents" class="u-opponents"></div>
+            <div class="u-center">
+              <div id="uno-deck" class="u-card back" title="Kart çek"><span class="u-val">UNO</span></div>
+              <div id="uno-discard" class="u-pile"></div>
             </div>
-            <button id="uno-replay-btn" class="btn-ok hidden" style="background: var(--ok); color: white; padding: 15px 30px; border-radius: 50px; font-weight: 900; font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,0.5); border: 2px solid white;">Tekrar Oyna</button>
-            <div id="uno-replay-wait" style="font-size: 16px; color: #aaa; font-style: italic;">Kurucunun oyunu yeniden başlatması bekleniyor...</div>
+            <div class="u-status">
+              <span id="uno-turn" class="u-turn"></span>
+              <span id="uno-color" class="u-color-badge"></span>
+              <span id="uno-dir" class="u-dir">↻</span>
+            </div>
+            <div id="uno-hand" class="u-hand"></div>
+
+            <div id="uno-color-picker" class="u-picker hidden">
+              <div class="u-picker-title">Renk seç</div>
+              <div class="u-swatches">
+                <div class="u-swatch red" data-color="red"></div>
+                <div class="u-swatch yellow" data-color="yellow"></div>
+                <div class="u-swatch green" data-color="green"></div>
+                <div class="u-swatch blue" data-color="blue"></div>
+              </div>
+            </div>
           </div>
-          <div id="uno-round-over" class="uno-view hidden" style="flex:1; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative;">
-            <h2 style="font-size: 32px; color: #3b82f6; text-shadow: 0 2px 4px rgba(0,0,0,0.8); margin-bottom: 5px;">🔥 Tur Bitti! 🔥</h2>
-            <div id="uno-round-winner-info" style="font-size: 18px; margin-bottom: 20px; color: #e2e8f0;"></div>
-            <div id="uno-round-rankings" style="display: flex; flex-direction: column; gap: 10px; width: 80%; max-width: 400px; margin-bottom: 30px;">
-               <!-- Rankings will be injected here -->
+
+          <!-- Oyun sonu -->
+          <div id="uno-over" class="u-view hidden">
+            <div class="u-over-box">
+              <div class="u-over-trophy">🏆</div>
+              <div id="uno-over-winner" class="u-over-winner"></div>
+              <button id="uno-replay" class="btn-pri hidden">Tekrar Oyna</button>
+              <p id="uno-over-wait" class="u-hint hidden">Kurucunun yeni oyun başlatması bekleniyor…</p>
             </div>
-            <button id="uno-next-round-btn" class="btn-ok hidden" style="background: #3b82f6; color: white; padding: 15px 30px; border-radius: 50px; font-weight: 900; font-size: 20px; cursor: pointer; border: 2px solid white;">Sonraki Tur</button>
-            <div id="uno-next-round-wait" style="font-size: 16px; color: #aaa; font-style: italic;">Kurucunun yeni turu başlatması bekleniyor...</div>
           </div>
         </div>
 
@@ -1381,10 +1302,10 @@
           <!-- UNO -->
           <div class="src act-src card-act-btn" id="card-act-uno" style="display: flex; align-items: center; justify-content: space-between; text-align: left; padding: 16px; cursor: pointer;">
             <div style="display: flex; align-items: center; flex: 1;">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:20px; color:var(--ok);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"></circle><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"></circle></svg>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:20px; color:#ef4444;"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 8l8 8M16 8l-8 8"></path></svg>
               <div>
-                <div style="font-size: 18px; font-weight: bold; color: var(--ok);">UNO</div>
-                <p class="muted" style="margin:4px 0 0 0;">Arkadaşlarınızla P2P üzerinden UNO oynayın.</p>
+                <div style="font-size: 18px; font-weight: bold; color: #ef4444;">UNO</div>
+                <p class="muted" style="margin:4px 0 0 0;">Arkadaşlarınızla P2P üzerinden klasik UNO oynayın.</p>
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
@@ -1553,7 +1474,6 @@
           <div style="font-weight:bold; color:#fff; margin-bottom:6px;">Diğer</div>
           <ul class="muted" style="margin:0; padding-left:18px; font-size:13px; line-height:1.7;">
             <li>Ses çıkış cihazı (hoparlör/kulaklık) seçimi eklendi.</li>
-            <li>UNO'da ceza ve özel kural mantığındaki tutarsızlıklar birleştirildi.</li>
             <li>Push-to-Talk artık kullanıcı ayarlarında, gürültü engelleyiciyle aynı anda kullanılabiliyor.</li>
           </ul>
         </div>

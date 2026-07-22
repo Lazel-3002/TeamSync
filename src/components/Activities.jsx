@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import UnoGame from './UnoGame';
 
 export default function Activities({ onClose, myId, targetId, isHost, connectedPeers, currentAccount }) {
   const [activeActivity, setActiveActivity] = useState(null);
 
   const activitiesList = [
     { id: 'browser', name: 'Ortak Tarayıcı', icon: '🌐', color: '#3b82f6' },
-    { id: 'uno', name: 'UNO', icon: '🃏', color: '#ef4444' },
     { id: 'wheel', name: 'Şans Çarkı', icon: '🎡', color: '#f59e0b' },
     { id: 'coin', name: 'Yazı Tura', icon: '🪙', color: '#10b981' },
     { id: 'pokemon', name: 'Pokemon', icon: '🐉', color: '#ec4899' }
@@ -20,8 +18,6 @@ export default function Activities({ onClose, myId, targetId, isHost, connectedP
             <iframe src="https://duckduckgo.com" style={{ width: '100%', height: '100%', border: 'none' }} title="Ortak Tarayıcı" />
           </div>
         );
-      case 'uno':
-        return <UnoGame myId={myId} targetId={targetId} isHost={isHost} connectedPeers={connectedPeers} currentAccount={currentAccount} />;
       case 'pokemon':
         return (
           <div style={{ width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden', background: '#000' }}>

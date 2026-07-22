@@ -1189,8 +1189,7 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 .vcard.screen video { object-fit: contain; } /* screen share should be contained */
 
-/* Make UNO and Whiteboard look like thumbnails when minimized in the grid */
-.main.focus-mode .grid .vcard .uno-view,
+/* Make the Whiteboard look like a thumbnail when minimized in the grid */
 .main.focus-mode .grid .vcard .wb-container {
   transform: scale(0.3);
   transform-origin: top left;
@@ -1619,157 +1618,6 @@ body.no-hw-accel .dl-btn:hover {
 #wt-player { width: 100%; height: 100%; border: none; }
 #wt-player iframe { width: 100%; height: 100%; border: none; }
 
-/* UNO Game Base */
-#uno-card { color: white; }
-.uno-view { width: 100%; height: 100%; }
-
-/* Lobby */
-.uno-player-list { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
-.uno-p-item {
-  background: rgba(0,0,0,0.5);
-  padding: 10px 20px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
-}
-.uno-p-item.ready { border-color: var(--ok); box-shadow: 0 0 10px rgba(16,185,129,0.3); }
-.uno-p-item .st { position: static; margin-right: 5px; }
-
-/* Table Setup */
-.uno-table {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%; height: 100%;
-}
-
-#uno-center {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  gap: 20px;
-  z-index: 10;
-}
-
-/* Remote Players */
-.uno-remote-player {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  transition: all 0.5s ease;
-}
-.uno-remote-player .uname { background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 12px; font-weight: bold; }
-.uno-remote-player .card-count { font-size: 24px; font-weight: bold; background: white; color: black; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 3px solid red; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
-
-/* Your Hand */
-.uno-hand {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0;
-  padding: 20px;
-  overflow-x: auto;
-  max-width: 90vw;
-  z-index: 50;
-}
-
-/* UNO Cards UI */
-.uno-card-ui {
-  width: 80px;
-  height: 120px;
-  border-radius: 8px;
-  background: white;
-  border: 4px solid white;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: 900;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-  cursor: pointer;
-  transition: transform 0.2s, z-index 0.2s;
-  user-select: none;
-  position: relative;
-  flex-shrink: 0;
-  margin-left: -15px;
-}
-.uno-hand .uno-card-ui:first-child { margin-left: 0; }
-.uno-hand .uno-card-ui:hover { transform: translateY(-30px) scale(1.1); z-index: 100 !important; }
-
-/* Card Colors */
-.uno-card-ui.red { background: #ef4444; color: white; }
-.uno-card-ui.blue { background: #3b82f6; color: white; }
-.uno-card-ui.green { background: #10b981; color: white; }
-.uno-card-ui.yellow { background: #facc15; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
-.uno-card-ui.black { background: #1f2937; color: white; }
-.uno-card-ui.back { background: #1f2937; border-color: white; color: red; margin-left: 0; }
-.uno-card-ui.empty { background: rgba(0,0,0,0.2); border: 2px dashed rgba(255,255,255,0.3); box-shadow: none; cursor: default; margin-left: 0; }
-.uno-card-ui .mini { position: absolute; font-size: 14px; font-weight: bold; }
-.uno-card-ui .mini.tl { top: 4px; left: 6px; }
-.uno-card-ui .mini.br { bottom: 4px; right: 6px; transform: rotate(180deg); }
-
-/* Color Picker */
-#uno-color-picker {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--bg-card);
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  z-index: 200;
-  text-align: center;
-}
-.uc-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-.ucc { width: 60px; height: 60px; border-radius: 8px; cursor: pointer; border: 2px solid white; transition: transform 0.2s; }
-.ucc:hover { transform: scale(1.1); }
-.ucc.red { background: #ef4444; }
-.ucc.blue { background: #3b82f6; }
-.ucc.green { background: #10b981; }
-.ucc.yellow { background: #facc15; }
-
-/* UNO Animations */
-@keyframes drawAnim {
-  0% { transform: translateY(-50px) scale(0.8); opacity: 0; }
-  100% { transform: translateY(0) scale(1); opacity: 1; }
-}
-.draw-anim {
-  animation: drawAnim 0.3s ease-out forwards;
-}
-
-@keyframes playAnim {
-  0% { transform: translateY(-20px) scale(1.1); z-index: 100; }
-  100% { transform: translateY(-150px) scale(0.5); opacity: 0; }
-}
-.play-anim {
-  animation: playAnim 0.3s ease-in forwards !important;
-  pointer-events: none;
-}
-@keyframes dropAnim {
-  0% { transform: scale(1.4); }
-  100% { transform: scale(1); }
-}
-
-@keyframes emojiRise {
-  0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
-  20% { transform: translate(-50%, -20px) scale(1.5); opacity: 1; }
-  100% { transform: translate(-50%, -100px) scale(1); opacity: 0; }
-}
-.floating-emoji {
-  position: absolute;
-  pointer-events: none;
-  animation: emojiRise 2s ease-out forwards;
-  z-index: 200;
-  font-size: 48px;
-}
 .wb-container { width: 100%; height: 100%; display: flex; flex-direction: column; background: #fff; }
 .wb-tools { padding: 8px; display: flex; gap: 8px; align-items: center; background: rgba(15, 23, 42, 0.9); flex-wrap: wrap; }
 .wb-tool-sel { background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 4px; border-radius: 4px; }
@@ -1866,125 +1714,6 @@ body.no-hw-accel .dl-btn:hover {
 .wt-tools { display: flex; gap: 8px; align-items: center; background: rgba(15, 23, 42, 0.9); padding: 8px; flex-wrap: wrap; }
 #wt-player { width: 100%; height: 100%; border: none; }
 #wt-player iframe { width: 100%; height: 100%; border: none; }
-
-/* UNO Game Base */
-#uno-card { color: white; }
-.uno-view { width: 100%; height: 100%; }
-
-/* Lobby */
-.uno-player-list { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
-.uno-p-item {
-  background: rgba(0,0,0,0.5);
-  padding: 10px 20px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
-}
-.uno-p-item.ready { border-color: var(--ok); box-shadow: 0 0 10px rgba(16,185,129,0.3); }
-.uno-p-item .st { position: static; margin-right: 5px; }
-
-/* Table Setup */
-.uno-table {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%; height: 100%;
-}
-
-#uno-center {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  gap: 20px;
-  z-index: 10;
-}
-
-/* Remote Players */
-.uno-remote-player {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  transition: all 0.5s ease;
-}
-.uno-remote-player .uname { background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 12px; font-weight: bold; }
-.uno-remote-player .card-count { font-size: 24px; font-weight: bold; background: white; color: black; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 3px solid red; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
-
-/* Your Hand */
-.uno-hand {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0;
-  padding: 20px;
-  overflow-x: auto;
-  max-width: 90vw;
-  z-index: 50;
-}
-
-/* UNO Cards UI */
-.uno-card-ui {
-  width: 80px;
-  height: 120px;
-  border-radius: 8px;
-  background: white;
-  border: 4px solid white;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: 900;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-  cursor: pointer;
-  transition: transform 0.2s, z-index 0.2s;
-  user-select: none;
-  position: relative;
-  flex-shrink: 0;
-  margin-left: -15px;
-}
-.uno-hand .uno-card-ui:first-child { margin-left: 0; }
-.uno-hand .uno-card-ui:hover { transform: translateY(-30px) scale(1.1); z-index: 100 !important; }
-
-/* Card Colors */
-.uno-card-ui.red { background: #ef4444; color: white; }
-.uno-card-ui.blue { background: #3b82f6; color: white; }
-.uno-card-ui.green { background: #10b981; color: white; }
-.uno-card-ui.yellow { background: #facc15; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
-.uno-card-ui.black { background: #1f2937; color: white; }
-.uno-card-ui.back { background: #1f2937; border-color: white; color: red; margin-left: 0; }
-.uno-card-ui.empty { background: rgba(0,0,0,0.2); border: 2px dashed rgba(255,255,255,0.3); box-shadow: none; cursor: default; margin-left: 0; }
-.uno-card-ui .mini { position: absolute; font-size: 14px; font-weight: bold; }
-.uno-card-ui .mini.tl { top: 4px; left: 6px; }
-.uno-card-ui .mini.br { bottom: 4px; right: 6px; transform: rotate(180deg); }
-
-/* Color Picker */
-#uno-color-picker {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--bg-card);
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  z-index: 200;
-  text-align: center;
-}
-.uc-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-.ucc { width: 60px; height: 60px; border-radius: 8px; cursor: pointer; border: 2px solid white; transition: transform 0.2s; }
-.ucc:hover { transform: scale(1.1); }
-.ucc.red { background: #ef4444; }
-.ucc.blue { background: #3b82f6; }
-.ucc.green { background: #10b981; }
-.ucc.yellow { background: #facc15; }
-
-/* UNO Animations */
 
 
 /* ===== RESPONSIVE DESIGN ===== */
@@ -2120,82 +1849,6 @@ body.no-hw-accel .dl-btn:hover {
   50% { transform: translateY(-20px); }
 }
 
-/* UNO responsive layout for smaller laptops/screens */
-@media (max-width: 1280px), (max-height: 800px) {
-  .uno-card-ui {
-    width: 60px !important;
-    height: 90px !important;
-    font-size: 22px !important;
-    border-width: 3px !important;
-    margin-left: -12px !important;
-  }
-  .uno-card-ui .mini {
-    font-size: 9px !important;
-  }
-  .uno-hand {
-    bottom: 10px !important;
-    padding: 10px !important;
-  }
-  #uno-my-hand {
-    bottom: 10px !important;
-  }
-  #uno-deck, #uno-discard {
-    width: 60px !important;
-    height: 90px !important;
-    font-size: 16px !important;
-  }
-  #uno-center {
-    gap: 12px !important;
-  }
-  .uno-remote-player .card-count {
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 18px !important;
-    border-width: 2px !important;
-  }
-  .uno-remote-player .uname {
-    font-size: 11px !important;
-    padding: 2px 6px !important;
-  }
-}
-
-@media (max-width: 1024px), (max-height: 700px) {
-  .uno-card-ui {
-    width: 48px !important;
-    height: 72px !important;
-    font-size: 18px !important;
-    border-width: 2px !important;
-    margin-left: -16px !important;
-  }
-  .uno-card-ui .mini {
-    font-size: 8px !important;
-  }
-  #uno-deck, #uno-discard {
-    width: 48px !important;
-    height: 72px !important;
-    font-size: 12px !important;
-  }
-  .uno-remote-player .card-count {
-    width: 26px !important;
-    height: 26px !important;
-    font-size: 13px !important;
-    border-width: 2px !important;
-  }
-  .uno-remote-player .uname {
-    font-size: 10px !important;
-    padding: 1px 4px !important;
-  }
-  .uno-hand {
-    bottom: 5px !important;
-    padding: 5px !important;
-  }
-  #uno-my-hand {
-    bottom: 5px !important;
-  }
-  #uno-center {
-    gap: 8px !important;
-  }
-}
 
 /* ===== HESAP YÖNETİCİSİ (ACCOUNT SWITCHER) ===== */
 .account-row {
@@ -2593,23 +2246,6 @@ body.no-hw-accel .dl-btn:hover {
   transform: translateY(0);
 }
 
-/* UNO Premium Settings Menu */
-.uno-premium-settings {
-  display: none; 
-  margin: 20px 0; 
-  background: rgba(15, 23, 42, 0.75); 
-  backdrop-filter: blur(16px);
-  padding: 24px; 
-  border-radius: 16px; 
-  width: 100%; 
-  max-width: 480px; 
-  border: 1px solid rgba(255, 255, 255, 0.1); 
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  flex: 1 1 auto;
-  min-height: 250px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
 
 /* Universal Scrollbar */
 ::-webkit-scrollbar {
@@ -2628,128 +2264,6 @@ body.no-hw-accel .dl-btn:hover {
   background: rgba(255, 255, 255, 0.35); 
 }
 
-.uno-settings-section-title {
-  margin: 0 0 16px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.uno-settings-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  transition: all 0.2s ease;
-}
-
-.uno-settings-row:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.uno-settings-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #e2e8f0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  flex: 1;
-}
-
-/* Premium Checkbox Toggle Style */
-.uno-toggle-switch {
-  appearance: none;
-  width: 40px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  position: relative;
-  cursor: pointer;
-  outline: none;
-  border: 2px solid transparent;
-  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  flex-shrink: 0;
-}
-
-.uno-toggle-switch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.uno-toggle-switch:checked {
-  background: var(--ok);
-}
-
-.uno-toggle-switch.warn:checked {
-  background: var(--warn);
-}
-
-.uno-toggle-switch:checked::after {
-  transform: translateX(18px);
-}
-
-.uno-settings-input {
-  background: rgba(0, 0, 0, 0.3);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 14px;
-  font-weight: 600;
-  outline: none;
-  transition: all 0.2s;
-  width: 70px;
-  text-align: center;
-}
-
-.uno-settings-input:focus {
-  border-color: var(--acc-light);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
-}
-
-.uno-settings-select {
-  background: rgba(0, 0, 0, 0.3);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 14px;
-  font-weight: 600;
-  outline: none;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-
-.uno-settings-select:focus {
-  border-color: var(--acc-light);
-}
-
-.uno-settings-select option {
-  background: #1e293b;
-  color: #fff;
-}
 
 @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 .poke-type-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
@@ -3187,3 +2701,155 @@ input:checked + .slider:before {
 
 /* Fotoğraf indirme butonunun etkin stili yukarıda Claude Artifact referansıyla
    eşleştirilmiştir: GPU açıkken gerçek backdrop camı, kapalıyken nötr fallback. */
+
+/* ========================================================================
+ * UNO — zengin görsel + animasyonlar (js/uno.js ile eşleşir)
+ * ===================================================================== */
+#uno-card { color: #fff; }
+#uno-card .card-actions { position: relative; z-index: 5; }
+.u-title { font-weight: 900; letter-spacing: 4px; font-size: 22px; color: #fff; text-shadow: 0 0 14px rgba(239,68,68,0.85), 0 2px 4px rgba(0,0,0,0.6); }
+.u-view { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.u-view.hidden { display: none; }
+.u-hint { font-size: 13px; color: rgba(255,255,255,0.6); font-style: italic; margin: 4px 0 0; text-align: center; }
+
+/* --- Lobi --- */
+#uno-lobby { align-items: center; justify-content: center; padding: 24px; overflow-y: auto; animation: uFade 0.4s ease; }
+.u-lobby-box { width: 100%; max-width: 480px; background: linear-gradient(160deg, rgba(30,42,74,0.65), rgba(10,17,32,0.78)); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 30px; display: flex; flex-direction: column; align-items: center; gap: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.55); backdrop-filter: blur(8px); animation: uPopIn 0.5s cubic-bezier(0.2,0.9,0.3,1.25); }
+.u-h { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1px; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+.u-lobby-players { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; }
+.u-lobby-player { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); padding: 6px 15px 6px 6px; border-radius: 999px; font-weight: 600; font-size: 14px; animation: uChip 0.35s ease backwards; }
+.u-lobby-player.host { border-color: rgba(245,197,24,0.55); box-shadow: 0 0 14px rgba(245,197,24,0.18); }
+.u-lobby-player .u-av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #0a1120; background: linear-gradient(135deg, #93c5fd, #3b82f6); }
+.u-lobby-player.host .u-av { background: linear-gradient(135deg, #fde68a, #f59e0b); }
+.u-lobby-player.bot .u-av { background: linear-gradient(135deg, #cbd5e1, #64748b); }
+.u-lobby-player .u-you { opacity: 0.55; font-weight: 400; }
+.u-start { padding: 13px 42px; font-size: 16px; font-weight: 800; border-radius: 12px; letter-spacing: 1px; animation: uGlowPulse 2.2s ease-in-out infinite; }
+
+/* --- Kurucu ayarları (kaç kişilik + bot) --- */
+.u-host-settings { width: 100%; display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px; }
+.u-host-settings.hidden { display: none; }
+.u-setting-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+.u-setting-row > label { font-size: 14px; font-weight: 600; }
+.u-select { background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 9px; padding: 7px 14px; font-size: 15px; font-weight: 800; cursor: pointer; transition: border-color 0.2s; }
+.u-select:focus, .u-select:hover { outline: none; border-color: rgba(245,197,24,0.7); }
+.u-select option { background: #16213a; color: #fff; }
+.u-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(255,255,255,0.82); cursor: pointer; font-weight: 500; }
+.u-check input { accent-color: var(--ok, #10b981); cursor: pointer; width: 16px; height: 16px; }
+#uno-add-bot { transition: transform 0.15s ease; }
+#uno-add-bot:not(:disabled):hover { transform: translateY(-2px); }
+#uno-add-bot:not(:disabled):active { transform: scale(0.94); }
+#uno-add-bot:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- Masa --- */
+#uno-game { padding: 12px; }
+.u-opponents { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; padding: 8px; min-height: 80px; }
+.u-opp { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 14px; transition: background 0.25s ease, box-shadow 0.25s ease; animation: uChip 0.3s ease backwards; }
+.u-opp.turn { background: rgba(245,197,24,0.14); animation: uTurnPulse 1.5s ease-in-out infinite; }
+.u-opp-fan { display: flex; height: 24px; align-items: flex-start; }
+.u-mini-back { width: 15px; height: 22px; margin-left: -8px; border-radius: 3px; background: linear-gradient(135deg, #26365a, #0f1830); border: 1px solid rgba(255,255,255,0.45); box-shadow: 0 2px 3px rgba(0,0,0,0.4); }
+.u-opp-fan .u-mini-back:first-child { margin-left: 0; }
+.u-opp-badge { display: flex; align-items: center; gap: 7px; }
+.u-opp-av { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #0a1120; background: linear-gradient(135deg, #93c5fd, #3b82f6); }
+.u-opp.bot .u-opp-av { background: linear-gradient(135deg, #cbd5e1, #64748b); }
+.u-opp-name { font-size: 13px; font-weight: 600; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-opp-count { background: #fff; color: #111; border-radius: 999px; min-width: 22px; height: 22px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; border: 2px solid #e4322b; }
+
+.u-center { flex: 1; display: flex; align-items: center; justify-content: center; gap: 42px; position: relative; }
+.u-status { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 6px 8px; font-weight: 700; }
+.u-turn { font-size: 15px; padding: 5px 16px; border-radius: 999px; background: rgba(0,0,0,0.32); transition: background 0.25s, color 0.25s; }
+.u-turn.me { color: #0a1120; background: linear-gradient(135deg, #fde047, #f59e0b); font-weight: 900; animation: uMePulse 1.2s ease-in-out infinite; }
+.u-dir { font-size: 26px; opacity: 0.9; display: inline-block; }
+.u-dir.u-spin { animation: uSpin 0.6s ease; }
+.u-color-badge { padding: 4px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #111; transition: background 0.35s ease; }
+.u-color-badge.red { background: #d9282f; color: #fff; }
+.u-color-badge.yellow { background: #f4b41a; }
+.u-color-badge.green { background: #2f9e44; color: #fff; }
+.u-color-badge.blue { background: #1a71c9; color: #fff; }
+
+/* --- Kartlar (gerçek UNO stili: çapraz beyaz oval) --- */
+.u-card { --cc: #d9282f; position: relative; width: 78px; height: 114px; border-radius: 12px; background: #fff; box-shadow: 0 6px 14px rgba(0,0,0,0.5), inset 0 0 0 4px #fff, inset 0 0 0 5px rgba(0,0,0,0.07); display: flex; align-items: center; justify-content: center; user-select: none; flex-shrink: 0; overflow: hidden; transition: transform 0.18s cubic-bezier(0.2,0.8,0.3,1), box-shadow 0.18s ease, filter 0.18s ease; }
+.u-card.red { --cc: #d9282f; background: #d9282f; }
+.u-card.yellow { --cc: #e0a800; background: #f4b41a; }
+.u-card.green { --cc: #2f9e44; background: #2f9e44; }
+.u-card.blue { --cc: #1a71c9; background: #1a71c9; }
+.u-oval { position: absolute; width: 130%; height: 60%; background: #fff; border-radius: 50%; transform: rotate(-45deg); }
+.u-val { position: relative; z-index: 2; font-size: 34px; font-weight: 900; color: var(--cc); line-height: 1; }
+.u-corner { position: absolute; z-index: 2; font-size: 13px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+.u-corner.tl { top: 5px; left: 8px; }
+.u-corner.br { bottom: 5px; right: 8px; transform: rotate(180deg); }
+.u-card.wild { background: conic-gradient(from 45deg, #d9282f 0deg 90deg, #f4b41a 90deg 180deg, #2f9e44 180deg 270deg, #1a71c9 270deg 360deg); }
+.u-card.wild .u-val { color: #fff; font-size: 30px; text-shadow: 0 2px 5px rgba(0,0,0,0.7); }
+.u-card.back { background: radial-gradient(circle at 50% 40%, #1c2740, #0a1018); box-shadow: 0 6px 14px rgba(0,0,0,0.55), inset 0 0 0 4px #0a1018, inset 0 0 0 5px rgba(255,255,255,0.14); }
+.u-card.back .u-val { color: #e4322b; font-size: 20px; font-style: italic; letter-spacing: 1px; transform: rotate(-18deg); text-shadow: 0 2px 6px rgba(0,0,0,0.8); }
+.u-card.empty { background: rgba(255,255,255,0.04); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.16); }
+.u-card.empty::after { content: ''; position: absolute; inset: 14px; border: 2px dashed rgba(255,255,255,0.16); border-radius: 8px; }
+.u-card.back.u-actionable { cursor: pointer; animation: uDeckPulse 1.6s ease-in-out infinite; }
+.u-card.back.u-actionable:hover { transform: translateY(-4px) scale(1.05); }
+
+/* Iskarta yığını: sabit boyutlu kap; kartlar mutlak konumlu, üst üste kaykılı. */
+.u-pile { position: relative; width: 78px; height: 114px; flex-shrink: 0; overflow: visible; }
+.u-pile-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.u-pile-card > .u-card { box-shadow: 0 5px 12px rgba(0,0,0,0.6), inset 0 0 0 4px #fff, inset 0 0 0 5px rgba(0,0,0,0.07); }
+.u-pile-card > .u-card.wild, .u-pile-card > .u-card.back { box-shadow: 0 5px 12px rgba(0,0,0,0.6); }
+.u-pile-hidden { visibility: hidden; }
+
+.u-hand { display: flex; justify-content: center; align-items: flex-end; padding: 20px 10px 8px; overflow-x: auto; overflow-y: visible; min-height: 150px; }
+.u-hand .u-card { margin-left: -20px; cursor: pointer; }
+.u-hand .u-card:first-child { margin-left: 0; }
+.u-hand .u-card.playable { box-shadow: 0 6px 14px rgba(0,0,0,0.5), inset 0 0 0 4px #fff, 0 0 0 3px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.3); }
+.u-hand .u-card.playable:hover { transform: translateY(-28px) scale(1.09); z-index: 200 !important; box-shadow: 0 18px 30px rgba(0,0,0,0.6), inset 0 0 0 4px #fff, 0 0 0 3px #fff; }
+.u-hand .u-card.dimmed { filter: brightness(0.58) saturate(0.7); cursor: not-allowed; }
+.u-deal-in { animation: uDeal 0.42s cubic-bezier(0.2,0.9,0.3,1.2) backwards; animation-delay: var(--d, 0s); }
+.u-slam { animation: uSlam 0.38s cubic-bezier(0.3,1.4,0.5,1); }
+/* Uçan kart: masadaki gerçek konumlar arasında hareket eden geçici katman. */
+.u-fly { position: fixed; z-index: 500; margin: 0 !important; pointer-events: none; transform: translate(-50%,-50%); transition: transform 0.48s cubic-bezier(0.3,0.85,0.35,1); will-change: transform; box-shadow: 0 18px 34px rgba(0,0,0,0.7); }
+.u-pending { opacity: 0 !important; }
+
+/* --- Renk seçici --- */
+.u-picker { position: absolute; inset: 0; background: rgba(5,10,20,0.8); backdrop-filter: blur(6px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 300; animation: uFade 0.2s ease; }
+.u-picker.hidden { display: none; }
+.u-picker-title { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+.u-swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.u-swatch { width: 78px; height: 78px; border-radius: 16px; cursor: pointer; border: 3px solid rgba(255,255,255,0.85); transition: transform 0.15s ease, box-shadow 0.15s ease; animation: uPopIn 0.3s backwards; }
+.u-swatch:hover { transform: scale(1.14) rotate(-3deg); box-shadow: 0 12px 26px rgba(0,0,0,0.5); }
+.u-swatch.red { background: #d9282f; }
+.u-swatch.yellow { background: #f4b41a; }
+.u-swatch.green { background: #2f9e44; }
+.u-swatch.blue { background: #1a71c9; }
+
+/* --- Oyun sonu --- */
+#uno-over { align-items: center; justify-content: center; padding: 24px; overflow: hidden; }
+.u-over-box { display: flex; flex-direction: column; align-items: center; gap: 18px; z-index: 2; animation: uPopIn 0.55s cubic-bezier(0.2,0.9,0.3,1.3); }
+.u-over-trophy { font-size: 64px; animation: uTrophy 1.7s ease-in-out infinite; }
+.u-over-winner { font-size: 32px; font-weight: 900; color: #fde047; text-shadow: 0 2px 16px rgba(253,224,71,0.6); text-align: center; }
+.u-confetti { position: absolute; top: -24px; width: 10px; height: 14px; border-radius: 2px; opacity: 0; z-index: 1; will-change: transform, opacity; animation: uConfetti linear forwards; }
+
+/* --- Animasyonlar --- */
+@keyframes uFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes uPopIn { 0% { opacity: 0; transform: scale(0.82); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes uChip { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes uDeal { 0% { opacity: 0; transform: translateY(-96px) rotate(-20deg) scale(0.55); } 100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); } }
+@keyframes uFly { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-150px) scale(0.68) rotate(8deg); opacity: 0; } }
+@keyframes uSlam { 0% { transform: scale(1.55); filter: brightness(1.75); } 60% { transform: scale(0.9); } 100% { transform: scale(1); filter: brightness(1); } }
+@keyframes uSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes uTurnPulse { 0%, 100% { box-shadow: 0 0 0 2px rgba(245,197,24,0.55) inset, 0 0 14px rgba(245,197,24,0.2); } 50% { box-shadow: 0 0 0 2px rgba(245,197,24,0.95) inset, 0 0 28px rgba(245,197,24,0.5); } }
+@keyframes uMePulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(245,158,11,0); } 50% { transform: scale(1.06); box-shadow: 0 0 22px rgba(245,158,11,0.65); } }
+@keyframes uGlowPulse { 0%, 100% { box-shadow: 0 8px 22px rgba(16,185,129,0.35); } 50% { box-shadow: 0 8px 34px rgba(16,185,129,0.75); } }
+@keyframes uDeckPulse { 0%, 100% { box-shadow: 0 6px 14px rgba(0,0,0,0.55), inset 0 0 0 4px #0a1018, 0 0 0 3px rgba(245,197,24,0.5); } 50% { box-shadow: 0 6px 14px rgba(0,0,0,0.55), inset 0 0 0 4px #0a1018, 0 0 0 5px rgba(245,197,24,0.95), 0 0 20px rgba(245,197,24,0.55); } }
+@keyframes uTrophy { 0%, 100% { transform: translateY(0) rotate(-7deg); } 50% { transform: translateY(-12px) rotate(7deg); } }
+@keyframes uConfetti { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0.85; transform: translateY(380px) rotate(600deg); } }
+
+@media (max-width: 1024px), (max-height: 720px) {
+  .u-card { width: 56px; height: 84px; }
+  .u-pile { width: 56px; height: 84px; }
+  .u-val { font-size: 24px; }
+  .u-card.wild .u-val { font-size: 22px; }
+  .u-hand .u-card { margin-left: -22px; }
+  .u-center { gap: 22px; }
+  .u-hand { min-height: 120px; padding-top: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .u-deal-in, .u-slam, .u-start, .u-opp.turn, .u-turn.me, .u-card.back.u-actionable, .u-over-trophy, .u-confetti { animation: none !important; }
+  .u-fly { transition: none !important; }
+}
+

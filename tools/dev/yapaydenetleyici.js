@@ -115,10 +115,6 @@ class YapayDenetleyici {
               report.healthy = false;
               report.issues.push("DOM elemanı sayısı çok yüksek (>10000). Muhtemel bellek sızıntısı.");
             }
-            if (window.state && window.state.uno && window.state.uno.joinedActivity && document.getElementById('uno-card').classList.contains('hidden')) {
-               report.healthy = false;
-               report.issues.push("UNO durumu aktif ama UI gizli, oyun takılmış olabilir.");
-            }
             return report;
           })();
         `);
