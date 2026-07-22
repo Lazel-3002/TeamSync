@@ -1049,6 +1049,181 @@ window.showProfileModal = ({ name, avatar, idLabel, badges = [], actions = [] })
   modal.classList.remove('hidden');
 };
 
+// ===== Lakap (yerel takma ad) ve kişi bazlı ses seviyesi ====================
+// İkisi de SADECE bu cihazda localStorage'da tutulur, ağa asla gönderilmez.
+// Anahtar kalıcı kullanıcı kimliğidir (cihaz id'si) — kişi odadan çıkıp girse,
+// adını değiştirse bile lakap ve ses ayarı korunur. Lakabı yalnızca koyan görür.
+const NICKNAMES_KEY = 'teamsync_nicknames';
+const USER_VOLUMES_KEY = 'teamsync_user_volumes';
+
+function loadLocalJsonMap(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+state.nicknames = loadLocalJsonMap(NICKNAMES_KEY);
+state.userVolumes = loadLocalJsonMap(USER_VOLUMES_KEY);
+
+function getNickname(id) {
+  const n = state.nicknames[id];
+  return (typeof n === 'string' && n.trim()) ? n.trim() : null;
+}
+
+// Ekranda gösterilecek isim: lakap varsa lakap, yoksa gerçek isim.
+function displayName(id, realName) {
+  return getNickname(id) || realName;
+}
+
+function setNickname(id, nick) {
+  const clean = (nick || '').trim().slice(0, 32);
+  if (clean) state.nicknames[id] = clean;
+  else delete state.nicknames[id];
+  try { localStorage.setItem(NICKNAMES_KEY, JSON.stringify(state.nicknames)); } catch (e) {}
+  refreshUserRowName(id);
+}
+
+// Oda listesindeki satırın isim metnini (lakap dahil) canlı günceller.
+// Gerçek isim satırın dataset'inde tutulur (bkz: addUser / handlePeerDiscovered).
+function refreshUserRowName(id) {
+  const li = document.querySelector(`[data-uid="${id}"]`);
+  if (!li) return;
+  const t = li.querySelector('.uname-text');
+  if (t) t.textContent = displayName(id, li.dataset.realName || '?');
+}
+
+// Kişi bazlı ses seviyesi: 0.0 – 2.0 (Discord'daki %0–%200 gibi).
+function getUserVolume(id) {
+  const v = parseFloat(state.userVolumes[id]);
+  if (!Number.isFinite(v)) return 1.0;
+  return Math.min(Math.max(v, 0), 2);
+}
+
+function setUserVolume(id, vol) {
+  const v = Math.min(Math.max(vol, 0), 2);
+  if (v === 1.0) delete state.userVolumes[id]; // varsayılan değeri saklamaya gerek yok
+  else state.userVolumes[id] = v;
+  try { localStorage.setItem(USER_VOLUMES_KEY, JSON.stringify(state.userVolumes)); } catch (e) {}
+  applyPeerVolume(id);
+}
+
+// %100 üzeri güçlendirme <audio>.volume ile mümkün değil; WebAudio gain zinciri
+// kurulur: rawStream → source → gain → destination → audioEl. audioEl oynatıcı
+// olarak kalır, böylece hoparlör seçimi (setSinkId), sağırlaştırma (muted) ve
+// ses yolu bekçisi (logVoicePathReport) aynen çalışmaya devam eder.
+// Chromium bilinen davranışı: uzak WebRTC akışı bir medya elemanına bağlı
+// değilse WebAudio'ya veri akmaz — bu yüzden sessiz bir "pompa" Audio tutulur.
+function ensurePeerBoostChain(peer) {
+  if (peer.gainNode || !peer.rawAudioStream) return;
+  try {
+    if (!state.remoteAudioCtx) state.remoteAudioCtx = new AudioContext();
+    const ctx = state.remoteAudioCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const src = ctx.createMediaStreamSource(peer.rawAudioStream);
+    const gain = ctx.createGain();
+    const dest = ctx.createMediaStreamDestination();
+    src.connect(gain);
+    gain.connect(dest);
+    const pump = new Audio();
+    pump.srcObject = peer.rawAudioStream;
+    pump.muted = true;
+    pump.play().catch(() => {});
+    peer.volPump = pump;
+    peer.gainSrc = src;
+    peer.gainNode = gain;
+    peer.gainDest = dest;
+    peer.audioEl.srcObject = dest.stream;
+    peer.audioEl.play().catch(() => {});
+  } catch (e) {
+    console.warn('Ses güçlendirme zinciri kurulamadı, %100 ile sınırlanacak:', e);
+    peer.gainNode = null;
+  }
+}
+
+// Tek yetkili ses uygulayıcısı: kişi ayarı × ana ses × sağırlaştırma durumunu
+// peer'in oynatıcısına uygular. Sağırlaştırma, ana ses ve kişi slider'ı hep
+// bunu çağırır; böylece birbirlerinin ayarını ezmezler.
+function applyPeerVolume(peerId) {
+  const peer = state.peers.get(peerId);
+  if (!peer || !peer.audioEl) return;
+  const userVol = getUserVolume(peerId);
+  if (state.deafened) {
+    peer.audioEl.muted = true;
+    peer.audioEl.volume = 0.0;
+    if (peer.gainNode) peer.gainNode.gain.value = 0.0;
+    return;
+  }
+  peer.audioEl.muted = false;
+  if (userVol > 1.0) ensurePeerBoostChain(peer);
+  const master = Math.min(Math.max(state.volume ?? 1.0, 0), 1);
+  if (peer.gainNode) {
+    peer.gainNode.gain.value = userVol;
+    peer.audioEl.volume = master;
+  } else {
+    peer.audioEl.volume = Math.min(master * Math.min(userVol, 1.0), 1.0);
+  }
+}
+
+// Bekçinin (logVoicePathReport) "oynatıcı sustu" tespitinde kullanılır:
+// kullanıcı bu kişiyi bilerek %0'a çektiyse ses yolu sağlıklıdır.
+function intendedPeerVolumeIsZero(peerId) {
+  if (state.deafened) return true;
+  const master = Math.min(Math.max(state.volume ?? 1.0, 0), 1);
+  return master === 0 || getUserVolume(peerId) === 0;
+}
+
+// showConfirm ile aynı görsel dili taşıyan tek satırlık metin giriş modalı.
+// Çözülen değer: girilen metin (boş olabilir) ya da iptalse null.
+window.showPrompt = (title, message, defaultValue = '', placeholder = '') => {
+  return new Promise((resolve) => {
+    let modal = document.getElementById('generic-prompt-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'generic-prompt-modal';
+      modal.className = 'hidden';
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+      modal.innerHTML = `
+        <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 400px; padding: 24px; text-align: center;">
+          <h3 id="generic-prompt-title" style="margin-top: 0; margin-bottom: 10px; font-size: 20px; color: #f8fafc;"></h3>
+          <p id="generic-prompt-message" style="margin-bottom: 16px; color: #94a3b8; font-size: 14px; line-height: 1.5;"></p>
+          <input id="generic-prompt-input" type="text" maxlength="32" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(15,23,42,0.8); color: #f8fafc; font-size: 15px; outline: none;" />
+          <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="generic-prompt-ok" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 8px; background: var(--acc, #6366f1); border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">Kaydet</button>
+            <button id="generic-prompt-cancel" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">İptal</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    document.getElementById('generic-prompt-title').innerText = title;
+    document.getElementById('generic-prompt-message').innerText = message;
+    const input = document.getElementById('generic-prompt-input');
+    input.value = defaultValue || '';
+    input.placeholder = placeholder || '';
+    modal.classList.remove('hidden');
+
+    const okBtn = document.getElementById('generic-prompt-ok');
+    const cancelBtn = document.getElementById('generic-prompt-cancel');
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKey);
+    };
+    const onOk = () => { cleanup(); resolve(input.value); };
+    const onCancel = () => { cleanup(); resolve(null); };
+    const onKey = (e) => {
+      if (e.key === 'Enter') onOk();
+      else if (e.key === 'Escape') onCancel();
+    };
+
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKey);
+    setTimeout(() => input.focus(), 50);
+  });
+};
+
 window.removeFriend = async (id) => {
   const confirmed = await window.showConfirm('⚠️ Arkadaşlıktan Çıkar', 'Bu kişiyi arkadaşlıktan çıkarmak istediğine emin misin?');
   if (confirmed) {
@@ -2839,14 +3014,17 @@ async function handlePeerDiscovered(peer) {
     existing.lastSeen = Date.now();
     if (existing.name !== peer.name) {
       existing.name = peer.name;
-      const userEl = document.querySelector(`[data-uid="${peer.id}"] .uname`);
-      if (userEl) userEl.textContent = escapeHtml(peer.name);
-      
+      // Satırdaki gerçek ismi güncelle; ekranda lakap varsa lakap kalır.
+      const li = document.querySelector(`[data-uid="${peer.id}"]`);
+      if (li) li.dataset.realName = peer.name;
+      refreshUserRowName(peer.id);
+
+      const shown = displayName(peer.id, peer.name);
       const vlbl = document.querySelector(`#vc-${peer.id}-c .vlbl`);
-      if (vlbl) vlbl.innerHTML = `<span class="live"></span> ${escapeHtml(peer.name)} • Kamera`;
-      
+      if (vlbl) vlbl.innerHTML = `<span class="live"></span> ${escapeHtml(shown)} • Kamera`;
+
       const slbl = document.querySelector(`#vc-${peer.id}-s .vlbl`);
-      if (slbl) slbl.innerHTML = `<span class="live"></span> ${escapeHtml(peer.name)} • Ekran`;
+      if (slbl) slbl.innerHTML = `<span class="live"></span> ${escapeHtml(shown)} • Ekran`;
     }
     return;
   }
@@ -2897,7 +3075,7 @@ async function handlePeerDiscovered(peer) {
 
   const isInitiator = state.myId > peer.id;
   await createPeerConnection(peer.id, peer.name, isInitiator, peer.ip);
-  showToast(peer.name + ' bulundu', 'info');
+  showToast(displayName(peer.id, peer.name) + ' bulundu', 'info');
 }
 
 setInterval(() => {
@@ -2924,6 +3102,10 @@ function removePeer(peerId) {
   if (peer.analyser) { try { peer.analyser.disconnect(); } catch(e) {} }
   if (peer.silentGain) { try { peer.silentGain.disconnect(); } catch(e) {} }
   if (peer.audioCtx) { try { peer.audioCtx.close(); } catch(e) {} }
+  // Kişi bazlı ses güçlendirme zinciri temizliği (bkz: ensurePeerBoostChain)
+  if (peer.gainSrc) { try { peer.gainSrc.disconnect(); } catch(e) {} }
+  if (peer.gainNode) { try { peer.gainNode.disconnect(); } catch(e) {} }
+  if (peer.volPump) { try { peer.volPump.srcObject = null; peer.volPump.remove(); } catch(e) {} }
   if (peer.audioEl) { try { peer.audioEl.srcObject = null; peer.audioEl.remove(); } catch(e) {} }
   if (peer.videoEl) { try { peer.videoEl.srcObject = null; peer.videoEl.remove(); } catch(e) {} }
   state.peers.delete(peerId);
@@ -2937,7 +3119,7 @@ function removePeer(peerId) {
   }
   // Beni kontrol eden kişi koptuysa girişleri kapat, pill'i kaldır.
   if (state.controlledBy === peerId) stopBeingControlled(false);
-  showToast(peer.name + ' ayrıldı', 'warn');
+  showToast(displayName(peerId, peer.name) + ' ayrıldı', 'warn');
   updateEmptyGrid();
 
   // Lobby cleanup on peer disconnect
@@ -3137,15 +3319,16 @@ async function logVoicePathReport(peerId, tag) {
       ` | track=${track ? `${track.readyState}${track.muted ? '/RTP-YOK(muted)' : ''}` : 'YOK'}` +
       ` | oynatıcı=${el ? `paused=${el.paused} vol=${el.volume} muted=${el.muted} sink=${el.sinkId || 'default'} src=${el.srcObject ? 'var' : 'YOK'}` : 'YOK'}` +
       ` | deafen=${state.deafened}`);
-    // Kendini onar: ses verisi GELİYOR ama oynatıcı çalmıyor
+    // Kendini onar: ses verisi GELİYOR ama oynatıcı çalmıyor. Kullanıcı bu
+    // kişiyi bilerek %0'a çektiyse (kişi bazlı ses) bu bir arıza değildir.
     if (inAudio && inAudio.bytesReceived > 0 && el && !state.deafened &&
+        !intendedPeerVolumeIsZero(peerId) &&
         (el.paused || el.muted || el.volume === 0 || !el.srcObject)) {
       console.warn(`🔈 [${peer.name}] ses verisi geliyor ama oynatıcı çalmıyordu — oynatma yeniden başlatılıyor`);
-      showToast(`${peer.name} sesi oynatılamıyordu, oynatıcı yeniden başlatıldı`, 'warn');
+      showToast(`${displayName(peerId, peer.name)} sesi oynatılamıyordu, oynatıcı yeniden başlatıldı`, 'warn');
       try {
         if (!el.srcObject && track) el.srcObject = new MediaStream([track]);
-        el.muted = false;
-        el.volume = 1.0;
+        applyPeerVolume(peerId); // 1.0'a sabitleme yerine kayıtlı ayarı uygula
         await el.play();
       } catch (e) {}
     }
@@ -3270,9 +3453,18 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
 
     if (e.track.kind === 'audio') {
       const audioStream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
-      peer.audioEl.srcObject = audioStream;
-      peer.audioEl.volume = state.deafened ? 0.0 : 1.0;
-      peer.audioEl.muted = state.deafened;
+      peer.rawAudioStream = audioStream;
+      if (peer.gainNode && peer.gainSrc && state.remoteAudioCtx) {
+        // Yeniden müzakerede (renegotiation) güçlendirme zinciri korunur:
+        // yeni ham akış eski gain düğümüne bağlanır, oynatıcı dest'te kalır.
+        try { peer.gainSrc.disconnect(); } catch (err) {}
+        peer.gainSrc = state.remoteAudioCtx.createMediaStreamSource(audioStream);
+        peer.gainSrc.connect(peer.gainNode);
+        if (peer.volPump) peer.volPump.srcObject = audioStream;
+      } else {
+        peer.audioEl.srcObject = audioStream;
+      }
+      applyPeerVolume(peerId); // kayıtlı kişi sesi + ana ses + sağırlaştırma
 
       peer.audioEl.play().catch((err) => console.warn('Audio play failed:', err));
       setupSpeakingDetection(peerId, audioStream);
@@ -3862,7 +4054,7 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'sharing') {
     peer.sharing = msg.sharing;
     if (msg.sharing) {
-      addVideoCard(peerId, peer.name, peer.videoEl, true);
+      addVideoCard(peerId, displayName(peerId, peer.name), peer.videoEl, true);
     } else {
       removeVideoCard(peerId, true);
     }
@@ -4035,11 +4227,11 @@ async function handleDataMessage(peerId, msg) {
       fileBuffer.delete(msg.id);
     }
   } else if (msg.type === 'ctrl-req') {
-    showControlModal(peerId, peer.name, msg.reqId);
+    showControlModal(peerId, displayName(peerId, peer.name), msg.reqId);
   } else if (msg.type === 'ctrl-res') {
     if (msg.accepted) {
       state.activeControl = { hostId: peerId };
-      document.getElementById('remote-name').textContent = peer.name + ' Masaüstü';
+      document.getElementById('remote-name').textContent = displayName(peerId, peer.name) + ' Masaüstü';
       document.getElementById('remote-modal').classList.remove('hidden');
       if (peer.videoEl.srcObject) {
         document.getElementById('remote-vid').srcObject = peer.videoEl.srcObject;
@@ -4259,7 +4451,9 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
   const li = document.createElement('li');
   li.className = 'user';
   li.dataset.uid = id;
-  const avatarHtml = avatar 
+  li.dataset.realName = name; // lakap sisteminde gerçek isim burada saklanır
+  const shownName = self ? name : displayName(id, name);
+  const avatarHtml = avatar
     ? `<img src="${escapeHtml(avatar)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
     : name.charAt(0).toUpperCase();
   const fezHtml = isFounder ? `<img src="assets/fez.svg" class="founder-fez" />` : '';
@@ -4271,13 +4465,7 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
       <div class="st"></div>
     </div>
     <div class="uname ${nameClass}" style="flex:1;">
-      <div style="font-weight:bold;">${escapeHtml(name)}</div>
-      ${!self ? `
-        <div style="display:flex; align-items:center; margin-top:2px;" title="Ses Seviyesi">
-          <span style="font-size:10px; margin-right:4px;">🔉</span>
-          <input type="range" class="vol-slider" min="0" max="2" step="0.1" value="1" data-vol="${id}" style="width:60px; height:4px; accent-color:var(--ok); cursor:pointer;">
-        </div>
-      ` : ''}
+      <div class="uname-text" style="font-weight:bold;">${escapeHtml(shownName)}</div>
     </div>
     <div class="uact" style="display:flex; align-items:center; gap:8px;">
       <div id="ping-${id}" class="uping" title="Gecikme" style="font-size:11px; font-weight:bold;">--ms</div>
@@ -4287,26 +4475,17 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
   document.getElementById('users').appendChild(li);
   if (!self) {
     li.querySelector(`[data-ctrl="${id}"]`).addEventListener('click', () => requestControl(id));
-    const volSlider = li.querySelector(`[data-vol="${id}"]`);
-    if (volSlider) {
-      volSlider.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        const peer = state.peers.get(id);
-        if (peer) {
-          if (peer.gainNode) peer.gainNode.gain.value = val;
-          else if (peer.audioEl) peer.audioEl.volume = Math.min(val, 1.0);
-        }
-      });
-    }
-    
-    // Sleek context menu on clicking user in room
-    li.addEventListener('click', (e) => {
-      if (e.target.closest('.vol-slider') || e.target.closest(`[data-ctrl="${id}"]`)) {
+
+    // Menü hem normal (sol) tıkla hem de sağ tıkla açılır (Discord gibi)
+    const openMenu = (e) => {
+      if (e.target.closest(`[data-ctrl="${id}"]`)) {
         return;
       }
       e.preventDefault();
       showUserContextMenu(e, id, name);
-    });
+    };
+    li.addEventListener('click', openMenu);
+    li.addEventListener('contextmenu', openMenu);
   }
   updateEmptyGrid();
 }
@@ -4359,10 +4538,12 @@ function showRoomUserProfile(targetId, targetName) {
     });
   }
 
+  const nick = getNickname(targetId);
   window.showProfileModal({
-    name: targetName,
+    name: nick || targetName,
     avatar: peer ? peer.avatar : null,
-    idLabel: `ID: ${targetId}`,
+    // Lakap varsa gerçek isim ID satırında görünür kalsın
+    idLabel: nick ? `${targetName} • ID: ${targetId}` : `ID: ${targetId}`,
     badges,
     actions
   });
@@ -4380,11 +4561,54 @@ function showUserContextMenu(e, targetId, targetName) {
   menu.style.top = `${e.clientY}px`;
 
   const isFriend = !!state.friends[targetId];
+  const nick = getNickname(targetId);
 
+  // Başlık: lakap varsa lakap büyük, gerçek isim altında küçük gösterilir.
   const title = document.createElement('div');
-  title.style.cssText = 'padding: 6px 12px; font-size: 11px; font-weight: bold; color: var(--txt-mut); border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 4px;';
-  title.textContent = targetName;
+  title.style.cssText = 'padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 4px;';
+  const titleName = document.createElement('div');
+  titleName.style.cssText = 'font-size: 12px; font-weight: bold; color: var(--txt-main);';
+  titleName.textContent = nick || targetName;
+  title.appendChild(titleName);
+  if (nick) {
+    const realNameEl = document.createElement('div');
+    realNameEl.style.cssText = 'font-size: 10px; color: var(--txt-mut); margin-top: 1px;';
+    realNameEl.textContent = targetName;
+    title.appendChild(realNameEl);
+  }
   menu.appendChild(title);
+
+  // Kişi Bazlı Ses Seviyesi (Discord tarzı): %0–%200, sadece bu cihazda geçerli.
+  const volWrap = document.createElement('div');
+  volWrap.className = 'ucm-vol';
+  const volHeader = document.createElement('div');
+  volHeader.className = 'ucm-vol-header';
+  const volLabel = document.createElement('span');
+  volLabel.textContent = '🔊 Kullanıcı Ses Seviyesi';
+  const volVal = document.createElement('span');
+  volVal.className = 'ucm-vol-val';
+  const curVol = Math.round(getUserVolume(targetId) * 100);
+  volVal.textContent = `%${curVol}`;
+  volHeader.appendChild(volLabel);
+  volHeader.appendChild(volVal);
+  const volRange = document.createElement('input');
+  volRange.type = 'range';
+  volRange.className = 'ucm-vol-slider';
+  volRange.min = '0';
+  volRange.max = '200';
+  volRange.step = '5';
+  volRange.value = String(curVol);
+  volRange.addEventListener('input', (ev) => {
+    const pct = parseInt(ev.target.value, 10) || 0;
+    volVal.textContent = `%${pct}`;
+    volVal.style.color = pct > 100 ? 'var(--warn, #f59e0b)' : '';
+    setUserVolume(targetId, pct / 100);
+  });
+  // Slider'a tıklamak menüyü kapatmasın
+  volWrap.addEventListener('click', (ev) => ev.stopPropagation());
+  volWrap.appendChild(volHeader);
+  volWrap.appendChild(volRange);
+  menu.appendChild(volWrap);
 
   // Profile Button
   const profileBtn = document.createElement('button');
@@ -4395,6 +4619,25 @@ function showUserContextMenu(e, targetId, targetName) {
     menu.remove();
   });
   menu.appendChild(profileBtn);
+
+  // Lakap Koy / Değiştir — lakap SADECE bu cihazda saklanır, kimseye gönderilmez.
+  const nickBtn = document.createElement('button');
+  nickBtn.className = 'user-context-menu-item';
+  nickBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg> ' + (nick ? 'Lakabı Değiştir' : 'Lakap Koy');
+  nickBtn.addEventListener('click', async () => {
+    menu.remove();
+    const result = await window.showPrompt(
+      '✏️ Lakap Koy',
+      `"${targetName}" için bir lakap belirle. Lakabı sadece sen görürsün; boş bırakıp kaydedersen lakap silinir.`,
+      nick || '',
+      'Lakap yaz...'
+    );
+    if (result === null) return; // iptal edildi
+    setNickname(targetId, result);
+    const newNick = getNickname(targetId);
+    showToast(newNick ? `Lakap kaydedildi: ${newNick}` : 'Lakap kaldırıldı', 'ok');
+  });
+  menu.appendChild(nickBtn);
 
   // Friend Option Button
   const friendBtn = document.createElement('button');
@@ -4797,7 +5040,10 @@ function textToHtmlEscape(str) {
 let lastChatEntry = null; // { uid, text, isCensored, el, count, badgeEl }
 
 function appendChat(uid, name, text, isCensored = false) {
-  saveChatToLocal(uid, name, text, isCensored);
+  saveChatToLocal(uid, name, text, isCensored); // geçmişe gerçek isim yazılır
+
+  // Ekranda lakap görünür (varsa) — sadece bu cihazda geçerli.
+  if (uid && uid !== 'self') name = displayName(uid, name);
 
   if (state.sfwMode) {
     if (typeof name === 'string') {
@@ -4976,27 +5222,8 @@ function bindUI() {
       }
     }
     
-    // Mute/unmute Web Audio gain nodes and audio elements of all peers
-    state.peers.forEach((peer, peerId) => {
-      peer.audioEl.muted = state.deafened;
-      if (peer.gainNode) {
-        if (state.deafened) {
-          peer.gainNode.gain.value = 0.0;
-        } else {
-          const slider = document.querySelector(`[data-vol="${peerId}"]`);
-          const val = slider ? parseFloat(slider.value) : 1.0;
-          peer.gainNode.gain.value = val;
-        }
-      } else {
-        if (state.deafened) {
-          peer.audioEl.volume = 0.0;
-        } else {
-          const slider = document.querySelector(`[data-vol="${peerId}"]`);
-          const val = slider ? parseFloat(slider.value) : 1.0;
-          peer.audioEl.volume = Math.min(val, 1.0);
-        }
-      }
-    });
+    // Sağırlaştır/aç: kayıtlı kişi bazlı ses + ana ses tek yerden uygulanır.
+    state.peers.forEach((peer, peerId) => applyPeerVolume(peerId));
 
     deaf.classList.toggle('off', state.deafened);
     broadcast({ type: 'state', deaf: state.deafened });
@@ -5028,7 +5255,8 @@ function bindUI() {
   volslider.addEventListener('input', (e) => {
     state.volume = parseInt(e.target.value) / 100;
     volval.textContent = e.target.value + '%';
-    state.peers.forEach(p => { p.audioEl.volume = state.volume; });
+    // Ana ses, kişi bazlı ses ayarlarını ezmeden uygulanır (çarpılır).
+    state.peers.forEach((p, id) => applyPeerVolume(id));
   });
 
   const shareCancel = document.getElementById('share-cancel');
@@ -5208,7 +5436,7 @@ function bindUI() {
 
         const nameSpan = document.createElement('span');
         const roleTag = isPeerModerator(peerId) ? ' <span style="color:#60a5fa; font-size:11px; font-weight:normal;">(Yetkili)</span>' : '';
-        nameSpan.innerHTML = escapeHtml(peer.name || 'Bilinmeyen') + roleTag;
+        nameSpan.innerHTML = escapeHtml(displayName(peerId, peer.name || 'Bilinmeyen')) + roleTag;
         nameSpan.style.fontWeight = '500';
 
         const actionsDiv = document.createElement('div');

@@ -3113,3 +3113,52 @@ input:checked + .slider:before {
   font-size: 13px;
 }
 .u-rule-select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ===== Kullanıcı sağ tık menüsü: kişi bazlı ses seviyesi (Discord tarzı) ===== */
+.ucm-vol {
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 4px;
+  cursor: default;
+}
+
+.ucm-vol-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--txt-mut);
+  margin-bottom: 6px;
+}
+
+.ucm-vol-val {
+  font-variant-numeric: tabular-nums;
+  color: var(--txt-main);
+}
+
+.ucm-vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+  cursor: pointer;
+}
+
+.ucm-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+
+.ucm-vol-slider::-webkit-slider-thumb:active { cursor: grabbing; }
