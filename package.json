@@ -23,7 +23,8 @@
     "cross-fetch": "^4.1.0",
     "crypto-js": "^4.2.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "uiohook-napi": "^1.5.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.3",
@@ -42,7 +43,6 @@
     },
     "files": [
       "**/*",
-      "!node_modules",
       "!dist",
       "!.env",
       "!tools/dev/yapaydenetleyici.js",

@@ -133,7 +133,17 @@ let myPeerId = null;
 let currentRoom = '';
 let currentName = '';
 let remoteControlActive = false;
+let remoteControlOwner = 'host';
+let remoteParticipantPoint = null;
+let hostPassivePoint = null;
+let remoteInjectionUntil = 0;
+let remoteMoveGuard = null;
+let currentScreenShareSourceId = null;
+let sharedDisplayBounds = null;
 let robot = null;
+let uIOhook = null;
+let inputHookStarted = false;
+let cursorOverlayWindow = null;
 
 let tray = null;
 let trayMenuWindow = null;
@@ -148,6 +158,164 @@ try {
 } catch (e) {
   console.warn('⚠️ robotjs yüklenemedi. Uzaktan kontrol çalışmaz:', e.message);
   console.warn('   Kurulum: Windows için Visual Studio Build Tools gerekebilir.');
+}
+
+try {
+  ({ uIOhook } = require('uiohook-napi'));
+  console.log('✅ Global fare dinleyicisi yüklendi - tıklayarak kontrol devri aktif');
+} catch (e) {
+  console.warn('⚠️ Global fare dinleyicisi yüklenemedi; paylaşan kişi tıklayarak kontrolü geri alamaz:', e.message);
+}
+
+function getControlBounds() {
+  return sharedDisplayBounds || screen.getPrimaryDisplay().bounds;
+}
+
+function normalizePrimaryPoint(point = screen.getCursorScreenPoint()) {
+  const bounds = getControlBounds();
+  return {
+    x: Math.max(0, Math.min(1, (point.x - bounds.x) / bounds.width)),
+    y: Math.max(0, Math.min(1, (point.y - bounds.y) / bounds.height))
+  };
+}
+
+function validNormalizedPoint(point) {
+  return point && Number.isFinite(point.x) && Number.isFinite(point.y)
+    ? { x: Math.max(0, Math.min(1, point.x)), y: Math.max(0, Math.min(1, point.y)) }
+    : null;
+}
+
+function createCursorOverlay() {
+  if (cursorOverlayWindow && !cursorOverlayWindow.isDestroyed()) return cursorOverlayWindow;
+  const bounds = getControlBounds();
+  cursorOverlayWindow = new BrowserWindow({
+    ...bounds,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    movable: false,
+    resizable: false,
+    hasShadow: false,
+    enableLargerThanScreen: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'electron', 'preload-cursor-overlay.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      backgroundThrottling: false
+    }
+  });
+  cursorOverlayWindow.setIgnoreMouseEvents(true);
+  cursorOverlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  cursorOverlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Windows'ta katmanı ekran kaydından çıkarır. Kontrol eden kendi düşük gecikmeli
+  // imleçlerini yerel olarak çizer; paylaşan ise bu masaüstü katmanını görür.
+  cursorOverlayWindow.setContentProtection(true);
+  cursorOverlayWindow.loadFile(path.join(__dirname, 'electron', 'cursor-overlay.html'));
+  cursorOverlayWindow.on('closed', () => { cursorOverlayWindow = null; });
+  return cursorOverlayWindow;
+}
+
+function renderVirtualCursor(point, label) {
+  const normalized = validNormalizedPoint(point);
+  const overlay = createCursorOverlay();
+  if (!normalized) {
+    if (!overlay.isDestroyed()) overlay.webContents.send('cursor-overlay-update', { visible: false });
+    return;
+  }
+  const bounds = getControlBounds();
+  if (overlay.getBounds().x !== bounds.x || overlay.getBounds().y !== bounds.y ||
+      overlay.getBounds().width !== bounds.width || overlay.getBounds().height !== bounds.height) {
+    overlay.setBounds(bounds);
+  }
+  const update = {
+    visible: true,
+    x: Math.round(normalized.x * bounds.width),
+    y: Math.round(normalized.y * bounds.height),
+    label: label || ''
+  };
+  const show = () => {
+    if (!overlay || overlay.isDestroyed()) return;
+    overlay.webContents.send('cursor-overlay-update', update);
+    overlay.showInactive();
+  };
+  if (overlay.webContents.isLoadingMainFrame()) overlay.webContents.once('did-finish-load', show);
+  else show();
+}
+
+function hideVirtualCursor() {
+  if (!cursorOverlayWindow || cursorOverlayWindow.isDestroyed()) return;
+  cursorOverlayWindow.webContents.send('cursor-overlay-update', { visible: false });
+  cursorOverlayWindow.hide();
+}
+
+function renderCursorForOwner() {
+  if (!remoteControlActive) return hideVirtualCursor();
+  if (remoteControlOwner === 'remote') renderVirtualCursor(hostPassivePoint, 'Paylaşan');
+  else renderVirtualCursor(remoteParticipantPoint && remoteParticipantPoint.point, remoteParticipantPoint && remoteParticipantPoint.label);
+}
+
+function handleLocalMouseDown() {
+  if (!remoteControlActive || remoteControlOwner !== 'remote') return;
+  if (Date.now() <= remoteInjectionUntil) return;
+  remoteControlOwner = 'host';
+  hostPassivePoint = normalizePrimaryPoint();
+  renderCursorForOwner();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('local-control-takeover', { owner: 'host', hostPoint: hostPassivePoint });
+  }
+}
+
+function handleLocalMouseMove() {
+  if (!remoteControlActive || remoteControlOwner !== 'remote') return;
+  const point = normalizePrimaryPoint();
+  if (remoteMoveGuard && Date.now() <= remoteMoveGuard.until &&
+      Math.abs(point.x - remoteMoveGuard.x) < 0.004 && Math.abs(point.y - remoteMoveGuard.y) < 0.004) {
+    return;
+  }
+  hostPassivePoint = point;
+  renderCursorForOwner();
+}
+
+function startLocalInputHook() {
+  if (!uIOhook || inputHookStarted) return;
+  try {
+    uIOhook.on('mousedown', handleLocalMouseDown);
+    uIOhook.on('mousemove', handleLocalMouseMove);
+    uIOhook.start();
+    inputHookStarted = true;
+  } catch (e) {
+    console.error('Global fare dinleyicisi başlatılamadı:', e);
+  }
+}
+
+function stopLocalInputHook() {
+  if (!uIOhook || !inputHookStarted) return;
+  try {
+    uIOhook.stop();
+    uIOhook.removeListener('mousedown', handleLocalMouseDown);
+    uIOhook.removeListener('mousemove', handleLocalMouseMove);
+  } catch (e) {
+    console.warn('Global fare dinleyicisi durdurulamadı:', e.message);
+  }
+  inputHookStarted = false;
+}
+
+function setRemoteControlEnabled(active) {
+  remoteControlActive = Boolean(active);
+  remoteControlOwner = 'host';
+  remoteParticipantPoint = null;
+  hostPassivePoint = normalizePrimaryPoint();
+  if (remoteControlActive) startLocalInputHook();
+  else {
+    stopLocalInputHook();
+    hideVirtualCursor();
+  }
+  syncControlKillSwitch();
 }
 
 function getLocalIPs() {
@@ -666,8 +834,7 @@ function syncControlKillSwitch() {
       globalShortcut.register(CTRL_KILL_ACCEL, () => {
         const now = Date.now();
         if (now - ctrlKillLastPress <= CTRL_KILL_WINDOW_MS) {
-          remoteControlActive = false;
-          syncControlKillSwitch();
+          setRemoteControlEnabled(false);
           console.log('Uzaktan kontrol: Ctrl+X x2 kill-switch ile KAPATILDI');
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('remote-control-killed');
@@ -685,13 +852,32 @@ function syncControlKillSwitch() {
 }
 
 ipcMain.on('set-remote-control', (event, active) => {
-  remoteControlActive = !!active;
+  setRemoteControlEnabled(active);
   console.log('Uzaktan kontrol:', remoteControlActive ? 'AKTİF' : 'KAPALI');
-  syncControlKillSwitch();
+});
+
+ipcMain.on('update-control-pointer', (event, data) => {
+  if (!remoteControlActive) return;
+  const point = validNormalizedPoint(data);
+  if (!point) return;
+  remoteParticipantPoint = { point, label: String(data.label || 'Kontrol eden').slice(0, 40) };
+  if (remoteControlOwner === 'host') renderCursorForOwner();
+});
+
+ipcMain.handle('set-control-owner', (event, requestedOwner) => {
+  if (!remoteControlActive) return { owner: 'host', hostPoint: normalizePrimaryPoint() };
+  if (requestedOwner === 'remote') {
+    hostPassivePoint = normalizePrimaryPoint();
+    remoteControlOwner = 'remote';
+  } else {
+    remoteControlOwner = 'host';
+  }
+  renderCursorForOwner();
+  return { owner: remoteControlOwner, hostPoint: hostPassivePoint };
 });
 
 ipcMain.on('remote-input', (event, data) => {
-  if (!remoteControlActive) return;
+  if (!remoteControlActive || remoteControlOwner !== 'remote') return;
 
   if (!robot) {
     // Fallback to Electron's native webContents.sendInputEvent if robotjs is missing
@@ -743,18 +929,23 @@ ipcMain.on('remote-input', (event, data) => {
     return;
   }
 
-  const display = screen.getPrimaryDisplay().size;
-  const { width: sw, height: sh } = display;
+  const displayBounds = getControlBounds();
+  const { width: sw, height: sh, x: displayX, y: displayY } = displayBounds;
 
   try {
     if (data.type === 'mousemove' || data.type === 'mousedown' || data.type === 'mouseup' || data.type === 'click') {
-      const x = Math.max(0, Math.min(sw - 1, Math.round(data.x * sw)));
-      const y = Math.max(0, Math.min(sh - 1, Math.round(data.y * sh)));
+      const x = displayX + Math.max(0, Math.min(sw - 1, Math.round(data.x * sw)));
+      const y = displayY + Math.max(0, Math.min(sh - 1, Math.round(data.y * sh)));
+      remoteMoveGuard = { x: data.x, y: data.y, until: Date.now() + 90 };
       robot.moveMouse(x, y);
 
-      if (data.type === 'mousedown') robot.mouseToggle('down', mapButton(data.button));
+      if (data.type === 'mousedown') {
+        remoteInjectionUntil = Date.now() + 180;
+        robot.mouseToggle('down', mapButton(data.button));
+      }
       else if (data.type === 'mouseup') robot.mouseToggle('up', mapButton(data.button));
       else if (data.type === 'click') {
+        remoteInjectionUntil = Date.now() + 180;
         robot.mouseClick(mapButton(data.button));
       }
     } else if (data.type === 'keydown' || data.type === 'keyup') {
@@ -861,7 +1052,6 @@ app.whenReady().then(() => {
     callback(true); // Mikrofon ve Kamera izinlerini otomatik onayla
   });
 
-  let currentScreenShareSourceId = null;
   ipcMain.on('set-screen-share-source', (event, id) => {
     currentScreenShareSourceId = id;
   });
@@ -870,6 +1060,12 @@ app.whenReady().then(() => {
     desktopCapturer.getSources({ types: ['window', 'screen'] }).then((sources) => {
       const selectedSource = sources.find(s => s.id === currentScreenShareSourceId) || sources[0];
       if (selectedSource) {
+        if (selectedSource.id.startsWith('screen:')) {
+          const selectedDisplay = screen.getAllDisplays().find(display => String(display.id) === String(selectedSource.display_id));
+          sharedDisplayBounds = selectedDisplay ? selectedDisplay.bounds : screen.getPrimaryDisplay().bounds;
+        } else {
+          sharedDisplayBounds = screen.getPrimaryDisplay().bounds;
+        }
         callback({ video: selectedSource, audio: 'loopback' });
       } else {
         callback();
@@ -979,6 +1175,8 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
   if (cloudflaredProcess) cloudflaredProcess.kill();
+  stopLocalInputHook();
+  if (cursorOverlayWindow && !cursorOverlayWindow.isDestroyed()) cursorOverlayWindow.destroy();
   globalShortcut.unregisterAll();
   if (discoveryInterval) clearInterval(discoveryInterval);
   if (discoverySocket) {

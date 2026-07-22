@@ -42,6 +42,8 @@ window.state = {
   useAI: true,
   activeControl: null,      // kontrol EDEN taraf: { hostId } (kimin masaüstünü yönetiyorum)
   controlledBy: null,       // kontrol EDİLEN taraf: beni yöneten peer'in id'si
+  controlOwner: 'host',     // paylaşılan masaüstünde şu an gerçek beyaz imleci kim yönetiyor
+  remoteControlPointer: null,
   pendingControlReq: null,
   speakingPeers: new Map(),
   analyser: null,

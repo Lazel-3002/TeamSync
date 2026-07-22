@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPTT: (cb) => ipcRenderer.on('ptt-trigger', cb),
   notify: (title, body) => ipcRenderer.send('notify', { title, body }),
   setRemoteControl: (active) => ipcRenderer.send('set-remote-control', active),
+  updateControlPointer: (data) => ipcRenderer.send('update-control-pointer', data),
+  setControlOwner: (owner) => ipcRenderer.invoke('set-control-owner', owner),
+  onLocalControlTakeover: (cb) => ipcRenderer.on('local-control-takeover', (_event, data) => cb(data)),
   // Main süreç Ctrl+X x2 kill-switch ile denetimi kapattığında tetiklenir.
   onRemoteControlKilled: (cb) => ipcRenderer.on('remote-control-killed', cb),
   sendRemoteInput: (data) => ipcRenderer.send('remote-input', data),

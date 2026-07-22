@@ -1511,6 +1511,21 @@ body { padding-top: 35px; } /* Prevent overlap */
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.35));
 }
 .remote-pointer.active path { stroke: #050505; }
+.remote-pointer.host-passive-pointer { z-index: 2; }
+.remote-pointer-name {
+  position: absolute;
+  top: 22px;
+  left: 22px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 5px;
+  background: rgba(5, 8, 14, 0.88);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
 
 .remote-control-state {
   position: absolute;

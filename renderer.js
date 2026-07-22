@@ -4336,8 +4336,11 @@ async function handleDataMessage(peerId, msg) {
     showControlModal(peerId, displayName(peerId, peer.name), msg.reqId);
   } else if (msg.type === 'ctrl-res') {
     if (msg.accepted) {
-      state.activeControl = { hostId: peerId };
+      state.activeControl = { hostId: peerId, hostName: displayName(peerId, peer.name) };
+      state.controlOwner = 'host';
+      remoteOwnerConfirmed = false;
       setRemotePointerActive(false);
+      setHostPassivePointer(null, false);
       document.getElementById('remote-name').textContent = displayName(peerId, peer.name) + ' Masaüstü';
       document.getElementById('remote-modal').classList.remove('hidden');
       if (peer.videoEl.srcObject) {
@@ -4354,17 +4357,47 @@ async function handleDataMessage(peerId, msg) {
       showToast('Uzaktan kontrol sonlandırıldı.', 'info');
     }
     if (state.activeControl && state.activeControl.hostId === peerId) {
+      remoteOwnerConfirmed = false;
       setRemotePointerActive(false);
+      setHostPassivePointer(null, false);
       document.getElementById('remote-modal').classList.add('hidden');
       state.activeControl = null;
       showToast('Uzaktan kontrol izni kaldırıldı.', 'info');
+    }
+  } else if (msg.type === 'ctrl-pointer') {
+    if (state.controlledBy === peerId && msg.point) {
+      state.remoteControlPointer = msg.point;
+      window.electronAPI.updateControlPointer({
+        x: msg.point.x,
+        y: msg.point.y,
+        label: displayName(peerId, peer.name)
+      });
+    }
+  } else if (msg.type === 'ctrl-takeover') {
+    if (state.controlledBy === peerId) {
+      await setHostControlOwner('remote', peerId, true);
+    }
+  } else if (msg.type === 'ctrl-release') {
+    if (state.controlledBy === peerId) {
+      await setHostControlOwner('host', peerId, true);
+    }
+  } else if (msg.type === 'ctrl-owner') {
+    if (state.activeControl && state.activeControl.hostId === peerId) {
+      state.controlOwner = msg.owner === 'remote' ? 'remote' : 'host';
+      remoteOwnerConfirmed = state.controlOwner === 'remote';
+      setRemotePointerActive(remoteOwnerConfirmed);
+      setHostPassivePointer(msg.hostPoint, remoteOwnerConfirmed);
+      if (remoteOwnerConfirmed && pendingTakeoverPoint) {
+        sendCtrlEvent({ type: 'mousemove', x: pendingTakeoverPoint.x, y: pendingTakeoverPoint.y });
+      }
+      pendingTakeoverPoint = null;
     }
   } else if (msg.type === 'ctrl-event') {
     // DİKKAT: activeControl kontrol EDEN tarafta tutulur; kontrol EDİLEN taraf
     // gelen girdileri controlledBy üzerinden doğrular. (Önceden activeControl'e
     // bakılıyordu ve kontrol edilen tarafta hep null olduğundan hiçbir girdi
     // işlenmiyordu — "uzaktan kontrol çalışmıyor" hatası buydu.)
-    if (state.controlledBy === peerId) {
+    if (state.controlledBy === peerId && state.controlOwner === 'remote') {
       window.electronAPI.sendRemoteInput(msg.event);
     }
   } else if (msg.type.startsWith('wt-')) {
@@ -6041,12 +6074,12 @@ document.getElementById('ctrl-accept').addEventListener('click', () => {
   if (state.pendingControlReq) {
     // Kabul: gelen ctrl-event'lerin işleneceği kaynak burada kaydedilir.
     state.controlledBy = state.pendingControlReq.peerId;
+    state.controlOwner = 'host';
     broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: true });
     window.electronAPI.setRemoteControl(true);
+    window.electronAPI.setControlOwner('host');
     const pill = document.getElementById('ctrl-active-pill');
-    const peer = state.peers.get(state.controlledBy);
-    document.getElementById('ctrl-pill-text').textContent =
-      `${peer ? peer.name : 'Bir kullanıcı'} bilgisayarınızı kontrol ediyor`;
+    updateHostControlPill();
     if (pill) pill.classList.remove('hidden');
   }
   closeCtrlModal();
@@ -6064,12 +6097,41 @@ function closeCtrlModal() {
   state.pendingControlReq = null;
 }
 
+function updateHostControlPill() {
+  if (!state.controlledBy) return;
+  const peer = state.peers.get(state.controlledBy);
+  const name = peer ? displayName(state.controlledBy, peer.name) : 'Diğer kullanıcı';
+  const text = document.getElementById('ctrl-pill-text');
+  if (text) {
+    text.textContent = state.controlOwner === 'remote'
+      ? `${name} kontrol ediyor — tıklayarak geri alın`
+      : `Kontrol sizde — ${name} siyah imleçle izliyor`;
+  }
+}
+
+async function setHostControlOwner(owner, peerId, notifyPeer) {
+  if (!state.controlledBy || state.controlledBy !== peerId) return;
+  const requestedOwner = owner === 'remote' ? 'remote' : 'host';
+  const result = await window.electronAPI.setControlOwner(requestedOwner);
+  state.controlOwner = result && result.owner === 'remote' ? 'remote' : 'host';
+  updateHostControlPill();
+  if (notifyPeer) {
+    broadcastTo(peerId, {
+      type: 'ctrl-owner',
+      owner: state.controlOwner,
+      hostPoint: result && result.hostPoint ? result.hostPoint : null
+    });
+  }
+}
+
 // Kontrol edilen tarafın izni kapatması (pill'deki Durdur veya karşı tarafın revoke'u).
 function stopBeingControlled(notifyPeer) {
   if (notifyPeer && state.controlledBy) {
     broadcastTo(state.controlledBy, { type: 'ctrl-revoke' });
   }
   state.controlledBy = null;
+  state.controlOwner = 'host';
+  state.remoteControlPointer = null;
   window.electronAPI.setRemoteControl(false);
   const pill = document.getElementById('ctrl-active-pill');
   if (pill) pill.classList.add('hidden');
@@ -6089,11 +6151,26 @@ if (window.electronAPI.onRemoteControlKilled) {
   });
 }
 
+if (window.electronAPI.onLocalControlTakeover) {
+  window.electronAPI.onLocalControlTakeover((data) => {
+    if (!state.controlledBy) return;
+    state.controlOwner = 'host';
+    updateHostControlPill();
+    broadcastTo(state.controlledBy, {
+      type: 'ctrl-owner',
+      owner: 'host',
+      hostPoint: data && data.hostPoint ? data.hostPoint : null
+    });
+  });
+}
+
 document.getElementById('remote-stop').addEventListener('click', () => {
   if (state.activeControl) {
     broadcastTo(state.activeControl.hostId, { type: 'ctrl-revoke' });
   }
+  remoteOwnerConfirmed = false;
   setRemotePointerActive(false);
+  setHostPassivePointer(null, false);
   document.getElementById('remote-modal').classList.add('hidden');
   state.activeControl = null;
   window.electronAPI.setRemoteControl(false);
@@ -6105,7 +6182,10 @@ const remotePointer = document.getElementById('remote-pointer');
 const remoteControlState = document.getElementById('remote-control-state');
 const remoteControlStateText = document.getElementById('remote-control-state-text');
 const remoteControlHelp = document.getElementById('remote-control-help');
+const hostPassivePointer = document.getElementById('host-passive-pointer');
 let remotePointerActive = false;
+let remoteOwnerConfirmed = false;
+let pendingTakeoverPoint = null;
 let lastRemotePoint = null;
 const remotePressedButtons = new Set();
 const remotePressedKeys = new Set();
@@ -6135,6 +6215,32 @@ function setRemotePointerActive(active) {
       ? 'Beyaz imleç uzaktaki bilgisayarı kontrol ediyor. İzleme moduna dönmek için ESC.'
       : 'Siyah imleci hareket ettirin. Kontrolü almak için ekrana tıklayın; bırakmak için ESC.';
   }
+}
+
+function normalizedPointToOverlay(point) {
+  if (!point || !remoteVid.videoWidth || !remoteVid.videoHeight) return null;
+  const rect = remoteVid.getBoundingClientRect();
+  const scale = Math.min(rect.width / remoteVid.videoWidth, rect.height / remoteVid.videoHeight);
+  const pictureWidth = remoteVid.videoWidth * scale;
+  const pictureHeight = remoteVid.videoHeight * scale;
+  const pictureLeft = rect.left + (rect.width - pictureWidth) / 2;
+  const pictureTop = rect.top + (rect.height - pictureHeight) / 2;
+  const wrapRect = remoteWrap.getBoundingClientRect();
+  return {
+    overlayX: pictureLeft - wrapRect.left + Math.max(0, Math.min(1, point.x)) * pictureWidth,
+    overlayY: pictureTop - wrapRect.top + Math.max(0, Math.min(1, point.y)) * pictureHeight
+  };
+}
+
+function setHostPassivePointer(point, visible) {
+  if (!hostPassivePointer) return;
+  const overlayPoint = normalizedPointToOverlay(point);
+  if (!visible || !overlayPoint) {
+    hostPassivePointer.classList.remove('visible');
+    return;
+  }
+  hostPassivePointer.style.transform = `translate3d(${overlayPoint.overlayX - 3}px, ${overlayPoint.overlayY - 3}px, 0)`;
+  hostPassivePointer.classList.add('visible');
 }
 
 // Return coordinates inside the actual video picture. object-fit: contain can add
@@ -6168,7 +6274,13 @@ function positionRemotePointer(point) {
 }
 
 const sendRemoteMove = throttle(point => {
-  if (remotePointerActive && point) sendCtrlEvent({ type: 'mousemove', x: point.x, y: point.y });
+  if (!state.activeControl || !point) return;
+  broadcastTo(state.activeControl.hostId, { type: 'ctrl-pointer', point: { x: point.x, y: point.y } });
+  if (remotePointerActive && remoteOwnerConfirmed) {
+    sendCtrlEvent({ type: 'mousemove', x: point.x, y: point.y });
+  } else if (remotePointerActive) {
+    pendingTakeoverPoint = { x: point.x, y: point.y };
+  }
 }, 16);
 
 remoteVid.addEventListener('mouseenter', e => {
@@ -6189,14 +6301,14 @@ remoteVid.addEventListener('mousemove', e => {
 });
 remoteVid.addEventListener('mousedown', e => {
   const point = remoteVideoPoint(e);
-  if (!remotePointerActive || !point) return;
+  if (!remotePointerActive || !remoteOwnerConfirmed || !point) return;
   e.preventDefault();
   remotePressedButtons.add(e.button);
   sendCtrlEvent({ type: 'mousedown', x: point.x, y: point.y, button: e.button });
 });
 remoteVid.addEventListener('mouseup', e => {
   const point = remoteVideoPoint(e);
-  if (!remotePointerActive || !point || !remotePressedButtons.has(e.button)) return;
+  if (!remotePointerActive || !remoteOwnerConfirmed || !point || !remotePressedButtons.has(e.button)) return;
   e.preventDefault();
   remotePressedButtons.delete(e.button);
   sendCtrlEvent({ type: 'mouseup', x: point.x, y: point.y, button: e.button });
@@ -6213,12 +6325,14 @@ remoteVid.addEventListener('click', e => {
   e.preventDefault();
   // Activation only takes control; it must not click an app remotely. Moving
   // aligns the real white system cursor with the black preview cursor.
+  pendingTakeoverPoint = { x: point.x, y: point.y };
+  remoteOwnerConfirmed = false;
   setRemotePointerActive(true);
-  sendCtrlEvent({ type: 'mousemove', x: point.x, y: point.y });
+  broadcastTo(state.activeControl.hostId, { type: 'ctrl-takeover', point: pendingTakeoverPoint });
 });
 remoteVid.addEventListener('wheel', e => {
   e.preventDefault();
-  if (remotePointerActive) sendCtrlEvent({ type: 'scroll', deltaX: e.deltaX, deltaY: e.deltaY });
+  if (remotePointerActive && remoteOwnerConfirmed) sendCtrlEvent({ type: 'scroll', deltaX: e.deltaX, deltaY: e.deltaY });
 }, { passive: false });
 remoteVid.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -6226,10 +6340,13 @@ document.addEventListener('keydown', e => {
   if (document.activeElement && document.activeElement.tagName === 'WEBVIEW') return;
   if (e.key === 'Escape' && state.activeControl && remotePointerActive) {
     e.preventDefault();
+    broadcastTo(state.activeControl.hostId, { type: 'ctrl-release' });
+    remoteOwnerConfirmed = false;
     setRemotePointerActive(false);
+    setHostPassivePointer(null, false);
     return;
   }
-  if (state.activeControl && remotePointerActive && !e.repeat) {
+  if (state.activeControl && remotePointerActive && remoteOwnerConfirmed && !e.repeat) {
     e.preventDefault();
     remotePressedKeys.add(e.key);
     sendCtrlEvent({ type: 'keydown', key: e.key });
@@ -6237,7 +6354,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => {
   if (document.activeElement && document.activeElement.tagName === 'WEBVIEW') return;
-  if (state.activeControl && remotePointerActive) {
+  if (state.activeControl && remotePointerActive && remoteOwnerConfirmed) {
     e.preventDefault();
     remotePressedKeys.delete(e.key);
     sendCtrlEvent({ type: 'keyup', key: e.key });
