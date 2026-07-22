@@ -30,6 +30,11 @@ window.state = {
   pttMode: false,
   friendId: '',
   friends: {},
+  // Yerel lakaplar ve kişi bazlı ses seviyeleri (id → değer). SADECE bu
+  // cihazda localStorage'da tutulur, ağa gönderilmez; renderer.js açılışta
+  // teamsync_nicknames / teamsync_user_volumes anahtarlarından doldurur.
+  nicknames: {},
+  userVolumes: {},
   friendRequests: [],
   globalMqtt: null,
   pttActive: false,

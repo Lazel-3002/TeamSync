@@ -60,8 +60,8 @@
     "semantic_hash": "070b69aaac0ec2fc681b550791ccf900"
   },
   "renderer.js": {
-    "mtime": 1784661345.706161,
-    "ast_hash": "0e2977da22d9fb8e3e83508dd3ec52ef",
+    "mtime": 1784733805.3043158,
+    "ast_hash": "a1c06afb4c61d13da2c768114b234939",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -145,8 +145,8 @@
     "semantic_hash": "f6861dcb15831a9b008ca167929419a2"
   },
   "index.html": {
-    "mtime": 1784670678.8369572,
-    "ast_hash": "a0f899fda0b4a9c798945673620e6e4f",
+    "mtime": 1784733783.2008069,
+    "ast_hash": "2dbb1b699b61513ca0c750c91876fd2d",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -410,9 +410,9 @@
     "semantic_hash": "b7eebf93d7366349b8104a3f847c6438"
   },
   "js/rnnoise-noise-suppression.js": {
-    "mtime": 1784658383.4940212,
-    "ast_hash": "9354a096ff0824d7a6ad25aeab2ed64d",
-    "semantic_hash": "9354a096ff0824d7a6ad25aeab2ed64d"
+    "mtime": 1784733795.0688734,
+    "ast_hash": "9e4fd994441544e7112d8cf34a1b67d2",
+    "semantic_hash": ""
   },
   "test/e2e/download-glass.test.js": {
     "mtime": 1784658383.5008175,
@@ -425,9 +425,9 @@
     "semantic_hash": "e2c4c58668c2fd0fed5ad9cd0cfb94b9"
   },
   "test/e2e/rnnoise-audio.test.js": {
-    "mtime": 1784658383.5018215,
-    "ast_hash": "d0eaa6563c434ba7cd7b69377b193d18",
-    "semantic_hash": "d0eaa6563c434ba7cd7b69377b193d18"
+    "mtime": 1784733828.7116323,
+    "ast_hash": "3e7e794508fa95bf58da03afb07c72d3",
+    "semantic_hash": ""
   },
   "js/uno.js": {
     "mtime": 1784688312.7799783,

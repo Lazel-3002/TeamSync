@@ -1,16 +1,16 @@
 # Graph Report - kanka-voice  (2026-07-22)
 
 ## Corpus Check
-- 69 files · ~179,200 words
+- 69 files · ~179,469 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 613 nodes · 1079 edges · 66 communities (44 shown, 22 thin omitted)
+- 614 nodes · 1081 edges · 61 communities (40 shown, 21 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 36 edges (avg confidence: 0.65)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d956ec2e`
+- Built from commit: `a065facd`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -38,7 +38,6 @@
 - Mega Pokemon Injector
 - Sprite / Image Assets
 - Watch Together
-- build
 - Pokemon Data Fetch
 - HTML Fix Patch
 - HTML Fix Patch 2
@@ -72,10 +71,6 @@
 - Tools README
 - Fez SVG Asset
 - React Entry Point
-- files
-- scripts
-- package.json
-- crypto-js
 
 ## God Nodes (most connected - your core abstractions)
 1. `handleDataMessage()` - 29 edges
@@ -109,7 +104,7 @@
 - **Serverless P2P Communication Platform** — readme_p2p_serverless, docs_index_p2p_voice_video, index_relay_option, index_emqx_broker [INFERRED 0.75]
 - **TeamSync Marketed Feature Set** — docs_index_p2p_voice_video, docs_index_device_id_auth, docs_index_screen_share_remote, docs_index_activities [EXTRACTED 0.75]
 
-## Communities (66 total, 22 thin omitted)
+## Communities (61 total, 21 thin omitted)
 
 ### Community 0 - "E2E Test Harness"
 Cohesion: 0.08
@@ -120,8 +115,8 @@ Cohesion: 0.07
 Nodes (39): App(), Activities(), Chat(), Dashboard(), accountItemStyle, cardStyle, containerStyle, deleteBtnStyle (+31 more)
 
 ### Community 2 - "Package Dependencies"
-Cohesion: 0.13
-Nodes (15): concurrently, cross-env, electron, electron-builder, electron-packager, devDependencies, concurrently, cross-env (+7 more)
+Cohesion: 0.04
+Nodes (45): concurrently, cross-env, electron, electron-builder, electron-packager, author, build, appId (+37 more)
 
 ### Community 3 - "Chat & TURN Resolution Utils"
 Cohesion: 0.07
@@ -160,8 +155,8 @@ Cohesion: 0.32
 Nodes (15): handleSBMessage(), initSharedBrowser(), sbApplyRemoteNav(), sbBroadcastAuth(), sbCanInteract(), sbCurrentUrl(), sbHandleHostLeft(), sbIsHost() (+7 more)
 
 ### Community 12 - "Build Config & Reference Files"
-Cohesion: 0.12
-Nodes (17): acorn, cross-fetch, @ghostery/adblocker-electron, @jitsi/robotjs, dependencies, acorn, cross-fetch, @ghostery/adblocker-electron (+9 more)
+Cohesion: 0.11
+Nodes (19): acorn, cross-fetch, crypto-js, @ghostery/adblocker-electron, @jitsi/robotjs, dependencies, acorn, cross-fetch (+11 more)
 
 ### Community 13 - "Device Auth & Presence"
 Cohesion: 0.23
@@ -184,8 +179,8 @@ Cohesion: 0.29
 Nodes (7): assertSourceGif(), fs, generate(), outputDir, path, sourcePath, variants
 
 ### Community 18 - "RNNoise Noise Suppression"
-Cohesion: 0.48
-Nodes (5): createNoiseFilter(), isSupported(), loadArrayBuffer(), loadWasmBinary(), supportsWasmSimd()
+Cohesion: 0.43
+Nodes (6): canCompileWasm(), createNoiseFilter(), isSupported(), loadArrayBuffer(), loadWasmBinary(), supportsWasmSimd()
 
 ### Community 19 - "Remote Control & User Menu"
 Cohesion: 0.24
@@ -202,10 +197,6 @@ Nodes (5): Smeargle Red Variant (animated sprite), Smeargle Teal Variant (animat
 ### Community 22 - "Watch Together"
 Cohesion: 0.70
 Nodes (4): handleWTMessage(), initWatchTogether(), loadWTVideo(), onWTStateChange()
-
-### Community 23 - "build"
-Cohesion: 0.25
-Nodes (8): build, appId, directories, productName, win, output, icon, target
 
 ### Community 24 - "Pokemon Data Fetch"
 Cohesion: 0.50
@@ -255,22 +246,10 @@ Nodes (3): fs, html, pokeJs
 Cohesion: 0.50
 Nodes (3): fs, pokeJs, styleCss
 
-### Community 62 - "files"
-Cohesion: 0.25
-Nodes (8): files, **/*, !dist, !.env, !node_modules, !problemler.md, !tools/dev/yapaydenetleyici.js, !yapaydenetliyici.md
-
-### Community 63 - "scripts"
-Cohesion: 0.25
-Nodes (8): scripts, build, build-full, build:react, dev:react, diag, start, test:e2e
-
-### Community 64 - "package.json"
-Cohesion: 0.29
-Nodes (6): author, description, license, main, name, version
-
 ## Knowledge Gaps
 - **220 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+215 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -279,7 +258,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.039) - this node is a cross-community bridge._
 - **Why does `WebRTC()` connect `React App / Signaling / Crypto Core` to `WebRTC Peer & ICE Management`?**
   _High betweenness centrality (0.039) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `Build Config & Reference Files` to `package.json`, `crypto-js`?**
+- **Why does `dependencies` connect `Build Config & Reference Files` to `Package Dependencies`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
   _220 weakly-connected nodes found - possible documentation gaps or missing edges._
@@ -288,4 +267,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `React App / Signaling / Crypto Core` be split into smaller, more focused modules?**
   _Cohesion score 0.07205387205387205 - nodes in this community are weakly interconnected._
 - **Should `Package Dependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.13333333333333333 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.043478260869565216 - nodes in this community are weakly interconnected._
