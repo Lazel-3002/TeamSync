@@ -1542,10 +1542,21 @@
       "norm_label": "forcequit()"
     },
     {
+      "label": "syncControlKillSwitch()",
+      "file_type": "code",
+      "source_file": "main.js",
+      "source_location": "L661",
+      "_origin": "ast",
+      "id": "main_synccontrolkillswitch",
+      "community": 5,
+      "community_name": "Electron Main Process",
+      "norm_label": "synccontrolkillswitch()"
+    },
+    {
       "label": "mapButton()",
       "file_type": "code",
       "source_file": "main.js",
-      "source_location": "L732",
+      "source_location": "L773",
       "_origin": "ast",
       "id": "main_mapbutton",
       "community": 5,
@@ -1556,7 +1567,7 @@
       "label": "normalizeKey()",
       "file_type": "code",
       "source_file": "main.js",
-      "source_location": "L738",
+      "source_location": "L779",
       "_origin": "ast",
       "id": "main_normalizekey",
       "community": 5,
@@ -1569,9 +1580,9 @@
       "source_file": "package.json",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "package",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "package.json"
     },
     {
@@ -1580,9 +1591,9 @@
       "source_file": "package.json",
       "source_location": "L2",
       "_origin": "ast",
-      "id": "package_name",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_name",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "name"
     },
     {
@@ -1591,9 +1602,9 @@
       "source_file": "package.json",
       "source_location": "L3",
       "_origin": "ast",
-      "id": "package_version",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_version",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "version"
     },
     {
@@ -1602,9 +1613,9 @@
       "source_file": "package.json",
       "source_location": "L4",
       "_origin": "ast",
-      "id": "package_description",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_description",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "description"
     },
     {
@@ -1613,9 +1624,9 @@
       "source_file": "package.json",
       "source_location": "L5",
       "_origin": "ast",
-      "id": "package_main",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_main",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "main"
     },
     {
@@ -1624,9 +1635,9 @@
       "source_file": "package.json",
       "source_location": "L6",
       "_origin": "ast",
-      "id": "package_scripts",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "scripts"
     },
     {
@@ -1635,9 +1646,9 @@
       "source_file": "package.json",
       "source_location": "L7",
       "_origin": "ast",
-      "id": "package_scripts_start",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts_start",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "start"
     },
     {
@@ -1646,9 +1657,9 @@
       "source_file": "package.json",
       "source_location": "L8",
       "_origin": "ast",
-      "id": "package_scripts_diag",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts_diag",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "diag"
     },
     {
@@ -1657,9 +1668,9 @@
       "source_file": "package.json",
       "source_location": "L9",
       "_origin": "ast",
-      "id": "package_scripts_dev_react",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts_dev_react",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "dev:react"
     },
     {
@@ -1668,9 +1679,9 @@
       "source_file": "package.json",
       "source_location": "L10",
       "_origin": "ast",
-      "id": "package_scripts_build_react",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts_build_react",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "build:react"
     },
     {
@@ -1679,9 +1690,9 @@
       "source_file": "package.json",
       "source_location": "L11",
       "_origin": "ast",
-      "id": "package_scripts_build",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts_build",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "build"
     },
     {
@@ -1690,9 +1701,9 @@
       "source_file": "package.json",
       "source_location": "L12",
       "_origin": "ast",
-      "id": "package_scripts_build_full",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts_build_full",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "build-full"
     },
     {
@@ -1701,9 +1712,9 @@
       "source_file": "package.json",
       "source_location": "L13",
       "_origin": "ast",
-      "id": "package_scripts_test_e2e",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_scripts_test_e2e",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "test:e2e"
     },
     {
@@ -1712,9 +1723,9 @@
       "source_file": "package.json",
       "source_location": "L15",
       "_origin": "ast",
-      "id": "package_author",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_author",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "author"
     },
     {
@@ -1723,9 +1734,9 @@
       "source_file": "package.json",
       "source_location": "L16",
       "_origin": "ast",
-      "id": "package_license",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_license",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "license"
     },
     {
@@ -1734,7 +1745,7 @@
       "source_file": "package.json",
       "source_location": "L17",
       "_origin": "ast",
-      "id": "package_dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "dependencies"
@@ -1745,7 +1756,7 @@
       "source_file": "package.json",
       "source_location": "L18",
       "_origin": "ast",
-      "id": "package_dependencies_ghostery_adblocker_electron",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_ghostery_adblocker_electron",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "@ghostery/adblocker-electron"
@@ -1767,7 +1778,7 @@
       "source_file": "package.json",
       "source_location": "L19",
       "_origin": "ast",
-      "id": "package_dependencies_jitsi_robotjs",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_jitsi_robotjs",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "@jitsi/robotjs"
@@ -1789,7 +1800,7 @@
       "source_file": "package.json",
       "source_location": "L20",
       "_origin": "ast",
-      "id": "package_dependencies_sapphi_red_web_noise_suppressor",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_sapphi_red_web_noise_suppressor",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "@sapphi-red/web-noise-suppressor"
@@ -1811,7 +1822,7 @@
       "source_file": "package.json",
       "source_location": "L21",
       "_origin": "ast",
-      "id": "package_dependencies_supabase_supabase_js",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_supabase_supabase_js",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "@supabase/supabase-js"
@@ -1833,7 +1844,7 @@
       "source_file": "package.json",
       "source_location": "L22",
       "_origin": "ast",
-      "id": "package_dependencies_acorn",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_acorn",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "acorn"
@@ -1855,7 +1866,7 @@
       "source_file": "package.json",
       "source_location": "L23",
       "_origin": "ast",
-      "id": "package_dependencies_cross_fetch",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_cross_fetch",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "cross-fetch"
@@ -1877,7 +1888,7 @@
       "source_file": "package.json",
       "source_location": "L24",
       "_origin": "ast",
-      "id": "package_dependencies_crypto_js",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_crypto_js",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "crypto-js"
@@ -1899,7 +1910,7 @@
       "source_file": "package.json",
       "source_location": "L25",
       "_origin": "ast",
-      "id": "package_dependencies_react",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_react",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "react"
@@ -1921,7 +1932,7 @@
       "source_file": "package.json",
       "source_location": "L26",
       "_origin": "ast",
-      "id": "package_dependencies_react_dom",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_dependencies_react_dom",
       "community": 12,
       "community_name": "Build Config & Reference Files",
       "norm_label": "react-dom"
@@ -1943,9 +1954,9 @@
       "source_file": "package.json",
       "source_location": "L28",
       "_origin": "ast",
-      "id": "package_devdependencies",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "devdependencies"
     },
     {
@@ -1954,9 +1965,9 @@
       "source_file": "package.json",
       "source_location": "L29",
       "_origin": "ast",
-      "id": "package_devdependencies_vitejs_plugin_react",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_vitejs_plugin_react",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "@vitejs/plugin-react"
     },
     {
@@ -1966,8 +1977,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "vitejs_plugin_react",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "@vitejs/plugin-react"
     },
     {
@@ -1976,9 +1987,9 @@
       "source_file": "package.json",
       "source_location": "L30",
       "_origin": "ast",
-      "id": "package_devdependencies_concurrently",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_concurrently",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "concurrently"
     },
     {
@@ -1988,8 +1999,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "concurrently",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "concurrently"
     },
     {
@@ -1998,9 +2009,9 @@
       "source_file": "package.json",
       "source_location": "L31",
       "_origin": "ast",
-      "id": "package_devdependencies_cross_env",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_cross_env",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "cross-env"
     },
     {
@@ -2010,8 +2021,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "cross_env",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "cross-env"
     },
     {
@@ -2020,9 +2031,9 @@
       "source_file": "package.json",
       "source_location": "L32",
       "_origin": "ast",
-      "id": "package_devdependencies_electron",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "electron"
     },
     {
@@ -2032,8 +2043,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "electron",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "electron"
     },
     {
@@ -2042,9 +2053,9 @@
       "source_file": "package.json",
       "source_location": "L33",
       "_origin": "ast",
-      "id": "package_devdependencies_electron_builder",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron_builder",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "electron-builder"
     },
     {
@@ -2054,8 +2065,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "electron_builder",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "electron-builder"
     },
     {
@@ -2064,9 +2075,9 @@
       "source_file": "package.json",
       "source_location": "L34",
       "_origin": "ast",
-      "id": "package_devdependencies_electron_packager",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron_packager",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "electron-packager"
     },
     {
@@ -2076,8 +2087,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "electron_packager",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "electron-packager"
     },
     {
@@ -2086,9 +2097,9 @@
       "source_file": "package.json",
       "source_location": "L35",
       "_origin": "ast",
-      "id": "package_devdependencies_vite",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_vite",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "vite"
     },
     {
@@ -2098,8 +2109,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "vite",
-      "community": 2,
-      "community_name": "Package Dependencies",
+      "community": 12,
+      "community_name": "Build Config & Reference Files",
       "norm_label": "vite"
     },
     {
@@ -2108,7 +2119,7 @@
       "source_file": "package.json",
       "source_location": "L37",
       "_origin": "ast",
-      "id": "package_build",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_build",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "build"
@@ -2119,7 +2130,7 @@
       "source_file": "package.json",
       "source_location": "L38",
       "_origin": "ast",
-      "id": "package_build_appid",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_build_appid",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "appid"
@@ -2130,7 +2141,7 @@
       "source_file": "package.json",
       "source_location": "L39",
       "_origin": "ast",
-      "id": "package_build_productname",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_build_productname",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "productname"
@@ -2141,7 +2152,7 @@
       "source_file": "package.json",
       "source_location": "L40",
       "_origin": "ast",
-      "id": "package_build_directories",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_build_directories",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "directories"
@@ -2152,7 +2163,7 @@
       "source_file": "package.json",
       "source_location": "L41",
       "_origin": "ast",
-      "id": "package_directories_output",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_directories_output",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "output"
@@ -2163,7 +2174,7 @@
       "source_file": "package.json",
       "source_location": "L43",
       "_origin": "ast",
-      "id": "package_build_files",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "files"
@@ -2251,7 +2262,7 @@
       "source_file": "package.json",
       "source_location": "L52",
       "_origin": "ast",
-      "id": "package_build_win",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_build_win",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "win"
@@ -2262,7 +2273,7 @@
       "source_file": "package.json",
       "source_location": "L53",
       "_origin": "ast",
-      "id": "package_win_icon",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_win_icon",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "icon"
@@ -2273,7 +2284,7 @@
       "source_file": "package.json",
       "source_location": "L54",
       "_origin": "ast",
-      "id": "package_win_target",
+      "id": "c_users_w11_desktop_new_kanka_voice_package_win_target",
       "community": 2,
       "community_name": "Package Dependencies",
       "norm_label": "target"
@@ -3602,7 +3613,7 @@
       "label": "remoteVid",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5735",
+      "source_location": "L5747",
       "_origin": "ast",
       "id": "renderer_remotevid",
       "community": 3,
@@ -3613,7 +3624,7 @@
       "label": "relX()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5752",
+      "source_location": "L5764",
       "_origin": "ast",
       "id": "renderer_relx",
       "community": 3,
@@ -3624,7 +3635,7 @@
       "label": "relY()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5753",
+      "source_location": "L5765",
       "_origin": "ast",
       "id": "renderer_rely",
       "community": 3,
@@ -3635,7 +3646,7 @@
       "label": "sendCtrlEvent()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5755",
+      "source_location": "L5767",
       "_origin": "ast",
       "id": "renderer_sendctrlevent",
       "community": 8,
@@ -3646,7 +3657,7 @@
       "label": "broadcastTo()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5760",
+      "source_location": "L5772",
       "_origin": "ast",
       "id": "renderer_broadcastto",
       "community": 8,
@@ -3657,7 +3668,7 @@
       "label": "showToast()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5796",
+      "source_location": "L5808",
       "_origin": "ast",
       "id": "renderer_showtoast",
       "community": 6,
@@ -3668,7 +3679,7 @@
       "label": "resetSharedBrowserState()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5832",
+      "source_location": "L5844",
       "_origin": "ast",
       "id": "renderer_resetsharedbrowserstate",
       "community": 3,
@@ -3679,7 +3690,7 @@
       "label": "closeAllCards()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5869",
+      "source_location": "L5881",
       "_origin": "ast",
       "id": "renderer_closeallcards",
       "community": 3,
@@ -3690,7 +3701,7 @@
       "label": "throttle()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5941",
+      "source_location": "L5953",
       "_origin": "ast",
       "id": "renderer_throttle",
       "community": 3,
@@ -3701,7 +3712,7 @@
       "label": "getVideoConstraints()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5949",
+      "source_location": "L5961",
       "_origin": "ast",
       "id": "renderer_getvideoconstraints",
       "community": 16,
@@ -3712,7 +3723,7 @@
       "label": "limitVideoBitrate()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5956",
+      "source_location": "L5968",
       "_origin": "ast",
       "id": "renderer_limitvideobitrate",
       "community": 3,
@@ -3723,7 +3734,7 @@
       "label": "disconnectApp()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L5973",
+      "source_location": "L5985",
       "_origin": "ast",
       "id": "renderer_disconnectapp",
       "community": 8,
@@ -3734,7 +3745,7 @@
       "label": "initFileTransfer()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L6062",
+      "source_location": "L6074",
       "_origin": "ast",
       "id": "renderer_initfiletransfer",
       "community": 16,
@@ -3745,7 +3756,7 @@
       "label": "appendFileMsg()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L6078",
+      "source_location": "L6090",
       "_origin": "ast",
       "id": "renderer_appendfilemsg",
       "community": 16,
@@ -3756,7 +3767,7 @@
       "label": "sendFile()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L6095",
+      "source_location": "L6107",
       "_origin": "ast",
       "id": "renderer_sendfile",
       "community": 16,
@@ -3767,7 +3778,7 @@
       "label": "initActivitiesUI()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L6212",
+      "source_location": "L6224",
       "_origin": "ast",
       "id": "renderer_initactivitiesui",
       "community": 9,
@@ -3778,7 +3789,7 @@
       "label": "pushDmMessage()",
       "file_type": "code",
       "source_file": "renderer.js",
-      "source_location": "L6322",
+      "source_location": "L6334",
       "_origin": "ast",
       "id": "renderer_pushdmmessage",
       "community": 3,
@@ -10482,7 +10493,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "main.js",
-      "source_location": "L732",
+      "source_location": "L773",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main",
@@ -10504,7 +10515,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "main.js",
-      "source_location": "L738",
+      "source_location": "L779",
       "weight": 1.0,
       "_origin": "ast",
       "source": "main",
@@ -10570,6 +10581,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "main.js",
+      "source_location": "L661",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "main",
+      "target": "main_synccontrolkillswitch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "main.js",
       "source_location": "L426",
       "weight": 1.0,
       "_origin": "ast",
@@ -10608,8 +10630,8 @@
       "source_location": "L15",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_author",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_author",
       "confidence_score": 1.0
     },
     {
@@ -10619,8 +10641,8 @@
       "source_location": "L37",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_build",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_build",
       "confidence_score": 1.0
     },
     {
@@ -10630,8 +10652,8 @@
       "source_location": "L17",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_dependencies",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
       "confidence_score": 1.0
     },
     {
@@ -10641,8 +10663,8 @@
       "source_location": "L4",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_description",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_description",
       "confidence_score": 1.0
     },
     {
@@ -10652,8 +10674,8 @@
       "source_location": "L28",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_devdependencies",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
       "confidence_score": 1.0
     },
     {
@@ -10663,8 +10685,8 @@
       "source_location": "L16",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_license",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_license",
       "confidence_score": 1.0
     },
     {
@@ -10674,8 +10696,8 @@
       "source_location": "L5",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_main",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_main",
       "confidence_score": 1.0
     },
     {
@@ -10685,8 +10707,8 @@
       "source_location": "L2",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_name",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_name",
       "confidence_score": 1.0
     },
     {
@@ -10696,8 +10718,8 @@
       "source_location": "L6",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_scripts",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts",
       "confidence_score": 1.0
     },
     {
@@ -10707,8 +10729,8 @@
       "source_location": "L3",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package",
-      "target": "package_version",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_json",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_version",
       "confidence_score": 1.0
     },
     {
@@ -10718,8 +10740,8 @@
       "source_location": "L11",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_scripts",
-      "target": "package_scripts_build",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts_build",
       "confidence_score": 1.0
     },
     {
@@ -10729,8 +10751,8 @@
       "source_location": "L12",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_scripts",
-      "target": "package_scripts_build_full",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts_build_full",
       "confidence_score": 1.0
     },
     {
@@ -10740,8 +10762,8 @@
       "source_location": "L10",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_scripts",
-      "target": "package_scripts_build_react",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts_build_react",
       "confidence_score": 1.0
     },
     {
@@ -10751,8 +10773,8 @@
       "source_location": "L9",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_scripts",
-      "target": "package_scripts_dev_react",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts_dev_react",
       "confidence_score": 1.0
     },
     {
@@ -10762,8 +10784,8 @@
       "source_location": "L8",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_scripts",
-      "target": "package_scripts_diag",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts_diag",
       "confidence_score": 1.0
     },
     {
@@ -10773,8 +10795,8 @@
       "source_location": "L7",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_scripts",
-      "target": "package_scripts_start",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts_start",
       "confidence_score": 1.0
     },
     {
@@ -10784,8 +10806,8 @@
       "source_location": "L13",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_scripts",
-      "target": "package_scripts_test_e2e",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_scripts",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_scripts_test_e2e",
       "confidence_score": 1.0
     },
     {
@@ -10795,8 +10817,8 @@
       "source_location": "L22",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_acorn",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_acorn",
       "confidence_score": 1.0
     },
     {
@@ -10806,8 +10828,8 @@
       "source_location": "L23",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_cross_fetch",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_cross_fetch",
       "confidence_score": 1.0
     },
     {
@@ -10817,8 +10839,8 @@
       "source_location": "L24",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_crypto_js",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_crypto_js",
       "confidence_score": 1.0
     },
     {
@@ -10828,8 +10850,8 @@
       "source_location": "L18",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_ghostery_adblocker_electron",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_ghostery_adblocker_electron",
       "confidence_score": 1.0
     },
     {
@@ -10839,8 +10861,8 @@
       "source_location": "L19",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_jitsi_robotjs",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_jitsi_robotjs",
       "confidence_score": 1.0
     },
     {
@@ -10850,8 +10872,8 @@
       "source_location": "L25",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_react",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_react",
       "confidence_score": 1.0
     },
     {
@@ -10861,8 +10883,8 @@
       "source_location": "L26",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_react_dom",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_react_dom",
       "confidence_score": 1.0
     },
     {
@@ -10872,8 +10894,8 @@
       "source_location": "L20",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_sapphi_red_web_noise_suppressor",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_sapphi_red_web_noise_suppressor",
       "confidence_score": 1.0
     },
     {
@@ -10883,8 +10905,8 @@
       "source_location": "L21",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_dependencies",
-      "target": "package_dependencies_supabase_supabase_js",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_dependencies_supabase_supabase_js",
       "confidence_score": 1.0
     },
     {
@@ -10895,7 +10917,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_ghostery_adblocker_electron",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_ghostery_adblocker_electron",
       "target": "ghostery_adblocker_electron",
       "confidence_score": 1.0
     },
@@ -10907,7 +10929,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_jitsi_robotjs",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_jitsi_robotjs",
       "target": "jitsi_robotjs",
       "confidence_score": 1.0
     },
@@ -10919,7 +10941,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_sapphi_red_web_noise_suppressor",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_sapphi_red_web_noise_suppressor",
       "target": "sapphi_red_web_noise_suppressor",
       "confidence_score": 1.0
     },
@@ -10931,7 +10953,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_supabase_supabase_js",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_supabase_supabase_js",
       "target": "supabase_supabase_js",
       "confidence_score": 1.0
     },
@@ -10943,7 +10965,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_acorn",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_acorn",
       "target": "acorn",
       "confidence_score": 1.0
     },
@@ -10955,7 +10977,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_cross_fetch",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_cross_fetch",
       "target": "cross_fetch",
       "confidence_score": 1.0
     },
@@ -10967,7 +10989,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_crypto_js",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_crypto_js",
       "target": "crypto_js",
       "confidence_score": 1.0
     },
@@ -10979,7 +11001,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_react",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_react",
       "target": "react",
       "confidence_score": 1.0
     },
@@ -10991,7 +11013,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_dependencies_react_dom",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_dependencies_react_dom",
       "target": "react_dom",
       "confidence_score": 1.0
     },
@@ -11002,8 +11024,8 @@
       "source_location": "L30",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_concurrently",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_concurrently",
       "confidence_score": 1.0
     },
     {
@@ -11013,8 +11035,8 @@
       "source_location": "L31",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_cross_env",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_cross_env",
       "confidence_score": 1.0
     },
     {
@@ -11024,8 +11046,8 @@
       "source_location": "L32",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_electron",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron",
       "confidence_score": 1.0
     },
     {
@@ -11035,8 +11057,8 @@
       "source_location": "L33",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_electron_builder",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron_builder",
       "confidence_score": 1.0
     },
     {
@@ -11046,8 +11068,8 @@
       "source_location": "L34",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_electron_packager",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron_packager",
       "confidence_score": 1.0
     },
     {
@@ -11057,8 +11079,8 @@
       "source_location": "L35",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_vite",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_vite",
       "confidence_score": 1.0
     },
     {
@@ -11068,8 +11090,8 @@
       "source_location": "L29",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_devdependencies",
-      "target": "package_devdependencies_vitejs_plugin_react",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_vitejs_plugin_react",
       "confidence_score": 1.0
     },
     {
@@ -11080,7 +11102,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_devdependencies_vitejs_plugin_react",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_vitejs_plugin_react",
       "target": "vitejs_plugin_react",
       "confidence_score": 1.0
     },
@@ -11092,7 +11114,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_devdependencies_concurrently",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_concurrently",
       "target": "concurrently",
       "confidence_score": 1.0
     },
@@ -11104,7 +11126,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_devdependencies_cross_env",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_cross_env",
       "target": "cross_env",
       "confidence_score": 1.0
     },
@@ -11116,7 +11138,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_devdependencies_electron",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron",
       "target": "electron",
       "confidence_score": 1.0
     },
@@ -11128,7 +11150,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_devdependencies_electron_builder",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron_builder",
       "target": "electron_builder",
       "confidence_score": 1.0
     },
@@ -11140,7 +11162,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_devdependencies_electron_packager",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_electron_packager",
       "target": "electron_packager",
       "confidence_score": 1.0
     },
@@ -11152,7 +11174,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_devdependencies_vite",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_devdependencies_vite",
       "target": "vite",
       "confidence_score": 1.0
     },
@@ -11163,8 +11185,8 @@
       "source_location": "L38",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build",
-      "target": "package_build_appid",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_build_appid",
       "confidence_score": 1.0
     },
     {
@@ -11174,8 +11196,8 @@
       "source_location": "L40",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build",
-      "target": "package_build_directories",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_build_directories",
       "confidence_score": 1.0
     },
     {
@@ -11185,8 +11207,8 @@
       "source_location": "L43",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build",
-      "target": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "confidence_score": 1.0
     },
     {
@@ -11196,8 +11218,8 @@
       "source_location": "L39",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build",
-      "target": "package_build_productname",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_build_productname",
       "confidence_score": 1.0
     },
     {
@@ -11207,8 +11229,8 @@
       "source_location": "L52",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build",
-      "target": "package_build_win",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_build_win",
       "confidence_score": 1.0
     },
     {
@@ -11218,8 +11240,8 @@
       "source_location": "L41",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build_directories",
-      "target": "package_directories_output",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_directories",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_directories_output",
       "confidence_score": 1.0
     },
     {
@@ -11230,7 +11252,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "target": "ref",
       "confidence_score": 1.0
     },
@@ -11242,7 +11264,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "target": "ref_dist",
       "confidence_score": 1.0
     },
@@ -11254,7 +11276,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "target": "ref_env",
       "confidence_score": 1.0
     },
@@ -11266,7 +11288,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "target": "ref_node_modules",
       "confidence_score": 1.0
     },
@@ -11278,7 +11300,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "target": "ref_problemler_md",
       "confidence_score": 1.0
     },
@@ -11290,7 +11312,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "target": "ref_tools_dev_yapaydenetleyici_js",
       "confidence_score": 1.0
     },
@@ -11302,7 +11324,7 @@
       "weight": 1.0,
       "context": "import",
       "_origin": "ast",
-      "source": "package_build_files",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_files",
       "target": "ref_yapaydenetliyici_md",
       "confidence_score": 1.0
     },
@@ -11313,8 +11335,8 @@
       "source_location": "L53",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build_win",
-      "target": "package_win_icon",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_win",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_win_icon",
       "confidence_score": 1.0
     },
     {
@@ -11324,8 +11346,8 @@
       "source_location": "L54",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "package_build_win",
-      "target": "package_win_target",
+      "source": "c_users_w11_desktop_new_kanka_voice_package_build_win",
+      "target": "c_users_w11_desktop_new_kanka_voice_package_win_target",
       "confidence_score": 1.0
     },
     {
@@ -11376,7 +11398,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6078",
+      "source_location": "L6090",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -11541,7 +11563,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5760",
+      "source_location": "L5772",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -11629,7 +11651,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5869",
+      "source_location": "L5881",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -11706,7 +11728,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5973",
+      "source_location": "L5985",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -11871,7 +11893,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5949",
+      "source_location": "L5961",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -11937,7 +11959,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6212",
+      "source_location": "L6224",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -11948,7 +11970,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6062",
+      "source_location": "L6074",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12003,7 +12025,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5956",
+      "source_location": "L5968",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12179,7 +12201,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6322",
+      "source_location": "L6334",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12223,7 +12245,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5752",
+      "source_location": "L5764",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12234,7 +12256,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5753",
+      "source_location": "L5765",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12245,7 +12267,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5735",
+      "source_location": "L5747",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12322,7 +12344,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5832",
+      "source_location": "L5844",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12410,7 +12432,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5755",
+      "source_location": "L5767",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12421,7 +12443,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6095",
+      "source_location": "L6107",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12630,7 +12652,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5796",
+      "source_location": "L5808",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12729,7 +12751,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5941",
+      "source_location": "L5953",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer",
@@ -12890,7 +12912,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6009",
+      "source_location": "L6021",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_disconnectapp",
@@ -12914,7 +12936,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6170",
+      "source_location": "L6182",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_sendfile",
@@ -13226,7 +13248,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6057",
+      "source_location": "L6069",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_disconnectapp",
@@ -14054,7 +14076,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6001",
+      "source_location": "L6013",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_disconnectapp",
@@ -15026,7 +15048,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5880",
+      "source_location": "L5892",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_closeallcards",
@@ -15050,7 +15072,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5894",
+      "source_location": "L5906",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_closeallcards",
@@ -15218,7 +15240,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6140",
+      "source_location": "L6152",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_sendfile",
@@ -15254,7 +15276,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6086",
+      "source_location": "L6098",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_appendfilemsg",
@@ -15542,7 +15564,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5757",
+      "source_location": "L5769",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_sendctrlevent",
@@ -15554,7 +15576,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6138",
+      "source_location": "L6150",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_sendfile",
@@ -15566,7 +15588,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5914",
+      "source_location": "L5926",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_closeallcards",
@@ -15578,7 +15600,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L5977",
+      "source_location": "L5989",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_disconnectapp",
@@ -15590,7 +15612,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6069",
+      "source_location": "L6081",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_initfiletransfer",
@@ -15602,7 +15624,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "renderer.js",
-      "source_location": "L6097",
+      "source_location": "L6109",
       "weight": 1.0,
       "_origin": "ast",
       "source": "renderer_sendfile",
@@ -20048,5 +20070,5 @@
       "source_file": "docs/index.html"
     }
   ],
-  "built_at_commit": "79ea0c41a53e3acc443f2d205a5a2b98538e4d10"
+  "built_at_commit": "e4c4bf0017462cfeb1692a1c22382dace88a5b38"
 }
