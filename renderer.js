@@ -3012,6 +3012,11 @@ async function handlePeerDiscovered(peer) {
   if (state.peers.has(peer.id)) {
     const existing = state.peers.get(peer.id);
     existing.lastSeen = Date.now();
+    // Avatar sonradan gelebilir/değişebilir (ör. peer profil fotoğrafını
+    // güncellediğinde yeni announce ile yayılır) — profil kartı bunu okur.
+    if (peer.avatar && existing.avatar !== peer.avatar) {
+      existing.avatar = peer.avatar;
+    }
     if (existing.name !== peer.name) {
       existing.name = peer.name;
       // Satırdaki gerçek ismi güncelle; ekranda lakap varsa lakap kalır.
@@ -3074,7 +3079,7 @@ async function handlePeerDiscovered(peer) {
   }
 
   const isInitiator = state.myId > peer.id;
-  await createPeerConnection(peer.id, peer.name, isInitiator, peer.ip);
+  await createPeerConnection(peer.id, peer.name, isInitiator, peer.ip, peer.avatar);
   showToast(displayName(peer.id, peer.name) + ' bulundu', 'info');
 }
 
@@ -3379,7 +3384,7 @@ async function attemptIceRestart(peerId) {
   }
 }
 
-async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
+async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerAvatar) {
   if (state.peers.has(peerId)) return;
   const pc = new RTCPeerConnection({ 
     iceServers: getIceServers(),
@@ -3505,6 +3510,9 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp) {
     videoEl: (function(){ const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; applySpeakerTo(v); return v; })(),
     dc,
     name: peerName,
+    // Profil kartı (showRoomUserProfile) avatarı buradan okur; eskiden bu
+    // alan hiç set edilmediği için kartta fotoğraf asla görünmüyordu.
+    avatar: peerAvatar || null,
     mic: true,
     deaf: false,
     sharing: false,
@@ -4541,7 +4549,9 @@ function showRoomUserProfile(targetId, targetName) {
   const nick = getNickname(targetId);
   window.showProfileModal({
     name: nick || targetName,
-    avatar: peer ? peer.avatar : null,
+    // Peer kaydında avatar yoksa (ör. announce'ta gelmemişse) arkadaş
+    // listesindeki avatara geri düş — ikisi de aynı kalıcı kimliği kullanır.
+    avatar: (peer && peer.avatar) || (state.friends[targetId] && state.friends[targetId].avatar) || null,
     // Lakap varsa gerçek isim ID satırında görünür kalsın
     idLabel: nick ? `${targetName} • ID: ${targetId}` : `ID: ${targetId}`,
     badges,
