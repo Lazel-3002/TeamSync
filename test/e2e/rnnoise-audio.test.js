@@ -34,6 +34,33 @@ module.exports = async function run() {
       hasFilter: true,
       hasOutboundAudio: true
     });
+
+    // Durum bayrakları yeterli değil: worklet'in WASM kurulumu asenkron
+    // çöktüğünde (ör. CSP 'wasm-unsafe-eval' eksikken) statü 'active' kalır ama
+    // çıkış sonsuza dek dijital sessizliktir (tam 0.0 örnekler) ve odadaki
+    // kimse kimseyi duyamaz. Ham mikrofonda sinyal varken RNNoise çıkışının
+    // tamamen sıfır olmadığını doğrula.
+    const energy = await evalJS(peer.client, `
+      (async function() {
+        function peak(analyser) {
+          if (!analyser) return null;
+          const d = new Float32Array(analyser.fftSize);
+          analyser.getFloatTimeDomainData(d);
+          let m = 0;
+          for (let i = 0; i < d.length; i++) m = Math.max(m, Math.abs(d[i]));
+          return m;
+        }
+        let rawPeak = 0, outPeak = 0;
+        for (let i = 0; i < 30; i++) { // ~3 sn örnekle
+          rawPeak = Math.max(rawPeak, peak(window.state.vuAnalyser) || 0);
+          outPeak = Math.max(outPeak, peak(window.state.uiAnalyser) || 0);
+          await new Promise(r => setTimeout(r, 100));
+        }
+        return { rawPeak, outPeak };
+      })()
+    `, true);
+    assert.ok(energy.rawPeak > 0, 'Sahte mikrofon sinyal üretmedi, test anlamsız: ' + JSON.stringify(energy));
+    assert.ok(energy.outPeak > 0, 'RNNoise çıkışı dijital sessizlik (worklet WASM kurulumu çökmüş olabilir): ' + JSON.stringify(energy));
   } finally {
     cleanupPeer(peer);
   }

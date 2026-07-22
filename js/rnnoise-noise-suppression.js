@@ -8,10 +8,25 @@
   const moduleContexts = new WeakSet();
   let wasmBinaryPromise = null;
 
+  // CSP script-src 'wasm-unsafe-eval' içermiyorsa WebAssembly derlemesi worklet
+  // içinde asenkron patlar ve işlemci kurulamadan sonsuza dek sessizlik üretir
+  // ("birbirimizi duyamıyoruz" hatası). WebAssembly.validate derleme yapmadığı
+  // için bunu yakalayamaz; minik bir modülü gerçekten derleyerek baştan test et.
+  function canCompileWasm() {
+    try {
+      new WebAssembly.Module(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+      return true;
+    } catch (error) {
+      console.warn('WebAssembly derlemesi engellendi (CSP wasm-unsafe-eval eksik olabilir):', error);
+      return false;
+    }
+  }
+
   function isSupported() {
     return typeof AudioWorkletNode === 'function'
       && typeof WebAssembly === 'object'
-      && !!(window.AudioContext || window.webkitAudioContext);
+      && !!(window.AudioContext || window.webkitAudioContext)
+      && canCompileWasm();
   }
 
   function supportsWasmSimd() {

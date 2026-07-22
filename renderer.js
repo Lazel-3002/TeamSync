@@ -2522,7 +2522,11 @@ async function setupLocalAudio(options = {}) {
         audioContext: vuCtx,
         onError: error => {
           console.error('RNNoise çalışma zamanı hatası:', error);
-          if (generation !== state.audioSetupGeneration || state.rnnoiseStatus !== 'active') return;
+          // 'loading' da kabul edilir: worklet'in asenkron WASM kurulumu, statü
+          // 'active' yazılmadan önce patlayabilir; o hatayı yutarsak filtre
+          // sonsuza dek sessizlik üretir ve kimse kimseyi duyamaz.
+          if (generation !== state.audioSetupGeneration) return;
+          if (state.rnnoiseStatus !== 'active' && state.rnnoiseStatus !== 'loading') return;
           state.rnnoiseStatus = 'fallback';
           showToast('RNNoise durdu; ses kesilmeden sistem filtresine geçiliyor', 'warn');
           setTimeout(() => {
