@@ -1393,9 +1393,13 @@ function setupGlobalMQTT() {
         } else if (data.type === 'room_join_declined') {
           showToast(`${data.name} katılma isteğini reddetti veya bir sunucuda değil.`, 'warn');
         } else if (data.type === 'server_invite_received') {
-          state.pendingServerInvite = { id: data.id, name: data.name, roomId: data.roomId, password: data.password };
-          document.getElementById('server-invite-name').textContent = data.name;
-          document.getElementById('server-invite-received-modal').classList.remove('hidden');
+          // Davet spamı koruması: aynı kişiden 5 sn içinde gelen tekrar davetleri yok say
+          const inviteNow = Date.now();
+          if (!state.lastInviteReceivedAt) state.lastInviteReceivedAt = {};
+          if (inviteNow - (state.lastInviteReceivedAt[data.id] || 0) >= 5000) {
+            state.lastInviteReceivedAt[data.id] = inviteNow;
+            showServerInviteNotification({ id: data.id, name: data.name, roomId: data.roomId, password: data.password });
+          }
         } else if (data.type === 'req_avatar') {
           if (state.myAvatar) {
             state.globalMqtt.publish(`teamsync/user/${data.fromId}/events`, JSON.stringify({
@@ -2313,8 +2317,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  let lastServerInviteSentAt = 0;
   window.sendServerInvite = (fId) => {
+    // Davet spamı koruması: 5 saniyede bir davet gönderilebilir
+    const now = Date.now();
+    const remaining = 5000 - (now - lastServerInviteSentAt);
+    if (remaining > 0) {
+      showToast(`Çok hızlısın! ${Math.ceil(remaining / 1000)} sn sonra tekrar davet atabilirsin.`, "warn");
+      return;
+    }
     if (state.globalMqtt && state.globalMqtt.connected) {
+      lastServerInviteSentAt = now;
       state.globalMqtt.publish(`teamsync/user/${fId}/events`, JSON.stringify({
         type: 'server_invite_received',
         id: state.friendId,
@@ -2375,36 +2388,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (serverInvitesClose) {
     serverInvitesClose.addEventListener('click', () => {
       document.getElementById('server-invites-modal').classList.add('hidden');
-    });
-  }
-
-  const serverInviteAcceptBtn = document.getElementById('server-invite-accept');
-  if (serverInviteAcceptBtn) {
-    serverInviteAcceptBtn.addEventListener('click', () => {
-      document.getElementById('server-invite-received-modal').classList.add('hidden');
-      if (state.pendingServerInvite) {
-        if (state.room) disconnectApp();
-        
-        document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
-        
-        const joinIdInput = document.getElementById('join-id');
-        const joinPwInput = document.getElementById('join-password');
-        const btnJoin = document.getElementById('btn-join');
-        if(joinIdInput && btnJoin) {
-           joinIdInput.value = state.pendingServerInvite.roomId;
-           if(joinPwInput) joinPwInput.value = state.pendingServerInvite.password || '';
-           btnJoin.click();
-        }
-        state.pendingServerInvite = null;
-      }
-    });
-  }
-
-  const serverInviteDenyBtn = document.getElementById('server-invite-deny');
-  if (serverInviteDenyBtn) {
-    serverInviteDenyBtn.addEventListener('click', () => {
-      document.getElementById('server-invite-received-modal').classList.add('hidden');
-      state.pendingServerInvite = null;
     });
   }
 
@@ -6101,6 +6084,66 @@ function showToast(msg, type = 'info') {
     entry.removeTimeout = setTimeout(() => toast.remove(), 300);
   }, 3000);
   lastToast = entry;
+}
+
+// Gelen sunucu davetini tam ekran modal yerine sağ altta bildirim kartı olarak gösterir.
+// Aynı anda tek davet bildirimi durur; 15 sn içinde yanıtlanmazsa kendiliğinden kapanır.
+let activeInviteToast = null;
+function showServerInviteNotification(invite) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  // Önceki davet bildirimi hâlâ açıksa kaldır, yenisi onun yerine geçsin
+  if (activeInviteToast) {
+    clearTimeout(activeInviteToast.timeout);
+    activeInviteToast.el.remove();
+    activeInviteToast = null;
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-info invite-toast';
+  toast.innerHTML = `
+    <div class="invite-toast-text"><b>${escapeHtml(invite.name || 'Arkadaşın')}</b> seni sunucusuna davet ediyor.</div>
+    <div class="invite-toast-actions">
+      <button class="btn-sec btn-sm invite-toast-deny">Reddet</button>
+      <button class="btn-pri btn-sm invite-toast-accept">Katıl</button>
+    </div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 10);
+
+  const dismiss = () => {
+    clearTimeout(entry.timeout);
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+    if (activeInviteToast && activeInviteToast.el === toast) activeInviteToast = null;
+  };
+
+  toast.querySelector('.invite-toast-accept').addEventListener('click', () => {
+    dismiss();
+    acceptServerInvite(invite);
+  });
+  toast.querySelector('.invite-toast-deny').addEventListener('click', dismiss);
+
+  const entry = { el: toast, timeout: setTimeout(dismiss, 15000) };
+  activeInviteToast = entry;
+}
+
+// Daveti kabul et: odadaysa çık, giriş formunu doldurup katıl butonunu tetikle
+function acceptServerInvite(invite) {
+  if (state.room) disconnectApp();
+
+  document.getElementById('step-action').classList.add('hidden');
+  document.querySelector('.login-card').classList.remove('expanded');
+
+  const joinIdInput = document.getElementById('join-id');
+  const joinPwInput = document.getElementById('join-password');
+  const btnJoin = document.getElementById('btn-join');
+  if (joinIdInput && btnJoin) {
+    joinIdInput.value = invite.roomId;
+    if (joinPwInput) joinPwInput.value = invite.password || '';
+    btnJoin.click();
+  }
 }
 
 // Ortak Tarayıcı durumunu ve webview'i tamamen sıfırlar. Hem kart kapanışında
