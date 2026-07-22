@@ -904,6 +904,11 @@ window.toggleMuteFriend = (fId) => {
   saveProfile();
 };
 
+// Gönderilen katılma isteği yanıtsız kalırsa kullanıcıya haber ver: karşı taraf
+// çevrimdışıysa QoS-0 broker'da istek sessizce kaybolur, "bekleniyor" toast'ı
+// sonsuza dek askıda kalmasın. Yanıt (kabul/ret) gelince zamanlayıcı iptal edilir.
+let joinReqAnswerTimer = null;
+
 window.requestJoinRoom = (fId) => {
   if (state.globalMqtt && state.globalMqtt.connected) {
     state.globalMqtt.publish(`teamsync/user/${fId}/events`, JSON.stringify({
@@ -912,10 +917,56 @@ window.requestJoinRoom = (fId) => {
       name: state.myName
     }));
     showToast("Katılma isteği gönderildi, bekleniyor...", "info");
+    clearTimeout(joinReqAnswerTimer);
+    joinReqAnswerTimer = setTimeout(() => {
+      showToast("Katılma isteğine yanıt gelmedi; arkadaşın çevrimdışı olabilir.", "warn");
+    }, 40000);
   } else {
     showToast("Bağlantı bekleniyor...", "warn");
   }
 };
+
+// Gelen katılma isteği: ekranı kaplayan modal yerine sağ üstte bildirim kartı
+// (uzaktan kontrol isteğiyle aynı desen); kullanıcının o an yaptığı işi
+// engellemez. 30 sn yanıtsız kalırsa otomatik ret — gönderen haber alır.
+const JOIN_REQ_TIMEOUT_MS = 30000;
+let joinReqTimer = null;
+
+function showJoinRequestNote(id, name) {
+  state.pendingJoinReq = { id, name };
+  const nameEl = document.getElementById('join-req-name');
+  if (nameEl) nameEl.textContent = name;
+  const note = document.getElementById('join-request-note');
+  if (!note) return;
+  note.classList.remove('hidden');
+  const bar = document.getElementById('join-req-timer-bar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    void bar.offsetWidth;
+    bar.style.transition = `width ${JOIN_REQ_TIMEOUT_MS}ms linear`;
+    bar.style.width = '0%';
+  }
+  clearTimeout(joinReqTimer);
+  joinReqTimer = setTimeout(() => {
+    if (state.pendingJoinReq && state.globalMqtt) {
+      state.globalMqtt.publish(`teamsync/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
+        type: 'room_join_declined',
+        id: state.friendId,
+        name: state.myName
+      }));
+    }
+    closeJoinRequestNote();
+  }, JOIN_REQ_TIMEOUT_MS);
+}
+
+function closeJoinRequestNote() {
+  clearTimeout(joinReqTimer);
+  joinReqTimer = null;
+  const note = document.getElementById('join-request-note');
+  if (note) note.classList.add('hidden');
+  state.pendingJoinReq = null;
+}
 
 window.acceptInvite = (idx) => {
   const req = state.friendRequests[idx];
@@ -1079,16 +1130,51 @@ function publishPresence() {
   }
 }
 
+// Arkadaşlık/presence kanalı da oda sinyalleşmesiyle aynı zaafı taşıyordu:
+// TEK sabit broker (broker.emqx.io) down/hız-sınırlı/engelli olduğunda
+// arkadaşlık isteği, sunucuya katılma isteği ve DM'ler sessizce HİÇ
+// iletilmiyordu ("istek atılmıyor" şikayetinin kök nedeni). Aynı deterministik
+// SIGNALING_BROKERS listesi ve rotasyon deseni burada da kullanılır — tam
+// kesintide tüm istemciler sıradaki aynı yedek broker'da yeniden buluşur.
+let globalMqttSessionId = 0;
+
 function setupGlobalMQTT() {
   if (state.globalMqtt) return;
-  const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+  connectGlobalBroker(0, ++globalMqttSessionId);
+}
+
+function connectGlobalBroker(idx, session) {
+  if (session !== globalMqttSessionId) return; // çıkış/hesap değişimi: bayat rotasyon
+  const brokerIndex = idx % SIGNALING_BROKERS.length;
+  const brokerUrl = SIGNALING_BROKERS[brokerIndex];
+  console.log(`🔗 Arkadaşlık broker'ı deneniyor (${brokerIndex + 1}/${SIGNALING_BROKERS.length}): ${brokerUrl}`);
+
+  const client = mqtt.connect(brokerUrl, {
     clientId: 'glob-' + state.friendId + '-' + state.myId,
     keepalive: 60,
-    reconnectPeriod: 1000
+    reconnectPeriod: 1000,
+    connectTimeout: 6000
   });
   state.globalMqtt = client;
+  let reconnectAttempts = 0;
+
+  // Aktif broker art arda 3 denemede bağlanamazsa ölü sayıp sıradakine geç
+  // (setupInternetSignaling'deki rotate deseninin birebir karşılığı).
+  const rotate = () => {
+    if (session !== globalMqttSessionId || state.globalMqtt !== client) return;
+    console.warn(`⚠️ Arkadaşlık broker'ı yanıt vermiyor (${brokerUrl}), sıradakine geçiliyor...`);
+    try { client.end(true); } catch (e) {}
+    connectGlobalBroker(brokerIndex + 1, session);
+  };
+
+  client.on('reconnect', () => {
+    if (state.globalMqtt !== client) return;
+    reconnectAttempts++;
+    if (reconnectAttempts >= 3) rotate();
+  });
 
   client.on('error', (err) => {
+    if (state.globalMqtt !== client) return;
     console.error('MQTT global connection error:', err);
   });
 
@@ -1099,7 +1185,8 @@ function setupGlobalMQTT() {
       try { client.end(true); } catch (e) {}
       return;
     }
-    console.log('🔗 Global MQTT (Arkadaşlık) bağlandı');
+    reconnectAttempts = 0;
+    console.log(`🔗 Global MQTT (Arkadaşlık) bağlandı: ${brokerUrl}`);
     client.subscribe(`teamsync/user/${state.friendId}/events`);
 
     // Açılışta eski oturumdan kalan "online" bayrağını sıfırla (yanlış çevrimiçi
@@ -1187,10 +1274,7 @@ function setupGlobalMQTT() {
           }
         } else if (data.type === 'room_join_request') {
           if (state.room) {
-            state.pendingJoinReq = { id: data.id, name: data.name };
-            const nameEl = document.getElementById('join-req-name');
-            if (nameEl) nameEl.textContent = data.name;
-            document.getElementById('join-request-modal').classList.remove('hidden');
+            showJoinRequestNote(data.id, data.name);
             playSound('on');
             if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify('Katılma İsteği', `${data.name} odanıza katılmak istiyor.`);
           } else {
@@ -1201,6 +1285,7 @@ function setupGlobalMQTT() {
             }));
           }
         } else if (data.type === 'room_join_accepted') {
+          clearTimeout(joinReqAnswerTimer);
           showToast(`${data.name} isteğini kabul etti, bağlanılıyor...`, 'ok');
           document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
           const joinIdInput = document.getElementById('join-id');
@@ -1212,6 +1297,7 @@ function setupGlobalMQTT() {
              btnJoin.click();
           }
         } else if (data.type === 'room_join_declined') {
+          clearTimeout(joinReqAnswerTimer);
           showToast(`${data.name} katılma isteğini reddetti veya bir sunucuda değil.`, 'warn');
         } else if (data.type === 'server_invite_received') {
           state.pendingServerInvite = { id: data.id, name: data.name, roomId: data.roomId, password: data.password };
@@ -1988,6 +2074,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       } catch (e) {}
       state.globalMqtt.end();
       state.globalMqtt = null;
+      globalMqttSessionId++; // bekleyen broker rotasyonlarını geçersiz kıl
     }
     
     // Supabase Sign Out
@@ -2115,8 +2202,7 @@ window.addEventListener('DOMContentLoaded', async () => {
           password: state.password || ''
         }));
       }
-      document.getElementById('join-request-modal').classList.add('hidden');
-      state.pendingJoinReq = null;
+      closeJoinRequestNote();
     });
   }
 
@@ -2129,8 +2215,7 @@ window.addEventListener('DOMContentLoaded', async () => {
           name: state.myName
         }));
       }
-      document.getElementById('join-request-modal').classList.add('hidden');
-      state.pendingJoinReq = null;
+      closeJoinRequestNote();
     });
   }
 

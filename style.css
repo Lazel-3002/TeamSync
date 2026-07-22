@@ -2906,6 +2906,16 @@ input:checked + .slider:before {
   background: #ffd166;
 }
 
+/* Sunucu katılma isteği bildirimi: ctrl-note iskeletini paylaşır, yeşil vurgu.
+   İki kart aynı anda açılırsa üst üste binmesin diye biraz aşağıda durur. */
+#join-request-note { top: 150px; }
+.join-req-head { color: #6ee7b7; }
+#join-req-timer-bar {
+  height: 100%;
+  width: 100%;
+  background: #34d399;
+}
+
 /* Kontrol edilen tarafta görünen kalıcı uyarı */
 .ctrl-pill {
   position: fixed;

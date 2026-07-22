@@ -1595,16 +1595,19 @@
     </div>
   </div>
 
-  <!-- Sunucu Katılma İsteği Modali -->
-  <div id="join-request-modal" class="modal hidden">
-    <div class="mcard" style="width: 380px; text-align: center;">
-      <h3 style="margin-bottom: 8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg> Sunucu Katılma İsteği</h3>
-      <p class="muted" style="margin-bottom: 16px;"><span id="join-req-name" style="font-weight:bold; color:#fff;">Arkadaşın</span> sunucuna katılmak istiyor.</p>
-      <div class="mactions" style="display: flex; gap: 12px;">
-        <button id="join-req-deny" class="btn-sec" style="flex: 1; padding: 12px;">Reddet</button>
-        <button id="join-req-accept" class="btn-pri" style="flex: 1; padding: 12px; background: var(--ok);">Kabul Et</button>
-      </div>
+  <!-- Sunucu katılma isteği: ekranı kaplayan modal yerine köşe bildirimi
+       (uzaktan kontrol isteğiyle aynı desen). 30 sn yanıtsız kalırsa reddedilir. -->
+  <div id="join-request-note" class="ctrl-note hidden">
+    <div class="ctrl-note-head join-req-head">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+      <span>Sunucu Katılma İsteği</span>
     </div>
+    <p><span id="join-req-name" style="font-weight:bold; color:#fff;">Arkadaşın</span> sunucuna katılmak istiyor.</p>
+    <div class="ctrl-note-actions">
+      <button id="join-req-deny" class="btn-sec btn-sm">Reddet</button>
+      <button id="join-req-accept" class="btn-pri btn-sm" style="background: var(--ok);">Kabul Et</button>
+    </div>
+    <div class="ctrl-note-timer"><div id="join-req-timer-bar"></div></div>
   </div>
 
   <!-- Sunucu İçi Arkadaş Davet Modali -->
