@@ -4476,14 +4476,16 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
   if (!self) {
     li.querySelector(`[data-ctrl="${id}"]`).addEventListener('click', () => requestControl(id));
 
-    // Sleek context menu on clicking user in room
-    li.addEventListener('click', (e) => {
+    // Menü hem normal (sol) tıkla hem de sağ tıkla açılır (Discord gibi)
+    const openMenu = (e) => {
       if (e.target.closest(`[data-ctrl="${id}"]`)) {
         return;
       }
       e.preventDefault();
       showUserContextMenu(e, id, name);
-    });
+    };
+    li.addEventListener('click', openMenu);
+    li.addEventListener('contextmenu', openMenu);
   }
   updateEmptyGrid();
 }
