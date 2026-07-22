@@ -913,7 +913,25 @@ window.toggleMuteFriend = (fId) => {
 // sonsuza dek askıda kalmasın. Yanıt (kabul/ret) gelince zamanlayıcı iptal edilir.
 let joinReqAnswerTimer = null;
 
+// Eski sürümlerde odada eklenen arkadaşlıklar kalıcı kimlik (KNK-...) yerine
+// oturumluk oda UUID'siyle kaydedilebiliyordu. O konuya yapılan yayın karşıya
+// ASLA ulaşmaz (kimse dinlemiyor) — istek/davet sessizce kaybolur. Sessiz
+// kayıp yerine kullanıcıya kaydı yenilemesini açıkça söyle.
+function isPersistentFriendId(id) {
+  if (typeof id !== 'string' || !id) return false;
+  // Bilinen-bozuk desen: çıplak UUID = oturumluk oda kimliği (state.myId).
+  // KNK-'sız ama UUID olmayan kimlikler engellenmez (çok eski hesap formatı
+  // hâlâ geçerli bir abonelik olabilir) — sadece kesin bozuk olanı yakala.
+  const bareUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return !bareUuid.test(id);
+}
+function warnStaleFriendEntry(fId) {
+  const f = state.friends[fId];
+  showToast(`"${(f && f.name) || fId}" kaydı eski sürümden kalma, istek karşıya ulaşamıyor. Arkadaşlıktan çıkarıp yeniden ekleyin.`, 'warn');
+}
+
 window.requestJoinRoom = (fId) => {
+  if (!isPersistentFriendId(fId)) { warnStaleFriendEntry(fId); return; }
   if (state.globalMqtt && state.globalMqtt.connected) {
     state.globalMqtt.publish(`teamsync/user/${fId}/events`, JSON.stringify({
       type: 'room_join_request',
@@ -2404,6 +2422,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   let lastServerInviteSentAt = 0;
   window.sendServerInvite = (fId) => {
+    if (!isPersistentFriendId(fId)) { warnStaleFriendEntry(fId); return; }
     // Davet spamı koruması: 5 saniyede bir davet gönderilebilir
     const now = Date.now();
     const remaining = 5000 - (now - lastServerInviteSentAt);

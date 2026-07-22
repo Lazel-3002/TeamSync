@@ -1522,8 +1522,8 @@ body { padding-top: 35px; } /* Prevent overlap */
   padding: 14px 16px;
 }
 .invite-toast-text { margin-bottom: 10px; line-height: 1.4; }
-.invite-toast-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.invite-toast-actions button { padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+.invite-toast-actions { display: flex; gap: 8px; }
+.invite-toast-actions button { flex: 1; min-height: 38px; padding: 9px 0; border-radius: 8px; cursor: pointer; }
 
 /* ===== SETTINGS ===== */
 .lbl-block { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; color: var(--txt-mut); }
@@ -2900,8 +2900,17 @@ input:checked + .slider:before {
 }
 .ctrl-note-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 8px;
+}
+/* Butonlar kartın tüm genişliğine yayılır: küçük hedefe nişan almak yerine
+   yarım karta tıklamak yeter (hitbox şikayetinin düzeltmesi). */
+.ctrl-note-actions button {
+  flex: 1;
+  min-height: 38px;
+  padding: 9px 0;
+  font-size: 13px;
+  border-radius: 8px;
+  cursor: pointer;
 }
 .ctrl-note-timer {
   height: 3px;
