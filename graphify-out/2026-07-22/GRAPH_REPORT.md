@@ -1,7 +1,7 @@
 # Graph Report - kanka-voice  (2026-07-22)
 
 ## Corpus Check
-- 69 files · ~178,987 words
+- 69 files · ~179,041 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

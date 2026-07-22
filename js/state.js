@@ -68,9 +68,8 @@ window.state = {
     top: null,
     pile: [],        // ıskartanın en üstteki son ~5 kartı (yığın görünümü)
     playSeq: 0,      // oynanan kart sayacı (ıskarta "slam" animasyonu için)
-    actionSeq: 0,    // her eylem (atma/çekme) sayacı — uçan kart animasyonu için
-    lastActorId: null,   // son eylemi yapan oyuncu
-    lastActionKind: null, // 'play' | 'draw'
+    actionSeq: 0,    // her eylem grubu sayacı — uçan kart animasyonları için
+    events: [],      // son eylem grubu: [{kind:'play'|'draw', actorId, count}]
     deck: [],        // host-only
     discard: [],     // host-only
     hands: {},       // host-only: id -> [cards]

@@ -48,21 +48,25 @@ function unoActorEl(id) {
 }
 
 // İki eleman arasında geçici "uçan kart" animasyonu (viewport koordinatları).
-function unoFlyBetween(fromEl, toEl, faceHTML, faceClass) {
+function unoFlyBetween(fromEl, toEl, faceHTML, faceClass, endRot, endDx, endDy) {
   if (!fromEl || !toEl || typeof fromEl.getBoundingClientRect !== 'function') return;
   const a = fromEl.getBoundingClientRect();
   const b = toEl.getBoundingClientRect();
   if ((!a.width && !a.height) || (!b.width && !b.height)) return;
   const sx = a.left + a.width / 2, sy = a.top + a.height / 2;
-  const ex = b.left + b.width / 2, ey = b.top + b.height / 2;
+  const ex = b.left + b.width / 2 + (endDx || 0), ey = b.top + b.height / 2 + (endDy || 0);
+  const rot = (typeof endRot === 'number') ? endRot : 6;
   const fly = document.createElement('div');
   fly.className = 'u-card u-fly ' + (faceClass || '');
   fly.innerHTML = faceHTML;
   fly.style.left = sx + 'px';
   fly.style.top = sy + 'px';
+  // Başlangıçta hedef açının tersine hafif eğik dur; uçarken hedefe döner
+  // (elden fırlatılıp masaya konuyormuş gibi doğal bir dönüş).
+  fly.style.transform = 'translate(-50%,-50%) rotate(' + (-rot * 0.4) + 'deg)';
   document.body.appendChild(fly);
   requestAnimationFrame(() => {
-    fly.style.transform = 'translate(-50%,-50%) translate(' + (ex - sx) + 'px,' + (ey - sy) + 'px) rotate(6deg)';
+    fly.style.transform = 'translate(-50%,-50%) translate(' + (ex - sx) + 'px,' + (ey - sy) + 'px) rotate(' + rot + 'deg)';
   });
   setTimeout(() => { try { fly.remove(); } catch (e) {} }, 520);
 }
@@ -202,12 +206,13 @@ function unoRenderGame() {
   const meIdx = state.uno.players.findIndex(p => p.id === state.myId);
   const n = state.uno.players.length;
 
-  // Yeni eylem algıla (kart atma / çekme) → uçan kart animasyonu tetikle.
+  // Yeni eylem grubu algıla → uçan kart animasyonları (atış + zorunlu çekişler).
   const seq = state.uno.actionSeq || 0;
-  const isNewAction = seq > 0 && seq !== state.uno._lastActionSeq && !!state.uno.lastActorId;
-  const actKind = state.uno.lastActionKind;
-  const actor = state.uno.lastActorId;
+  const isNewBatch = seq > 0 && seq !== state.uno._lastActionSeq;
+  const events = (isNewBatch && Array.isArray(state.uno.events)) ? state.uno.events : [];
   state.uno._lastActionSeq = seq;
+  const playEvent = events.find(e => e.kind === 'play');
+  const myDraw = events.find(e => e.kind === 'draw' && e.actorId === state.myId);
 
   // Rakipler (data-pid ile — uçuş hedefi/kaynağı olarak kullanılır)
   const opp = document.getElementById('uno-opponents');
@@ -256,40 +261,47 @@ function unoRenderGame() {
   const deckEl = document.getElementById('uno-deck');
   if (deckEl) deckEl.classList.toggle('u-actionable', myTurn);
 
-  // Iskarta YIĞINI — yeni kart atıldıysa atan kişiden yığının üstüne uçar,
-  // inişte "slam". Yığındaki eski kartlar yerinde kalır (deste büyüyormuş gibi).
+  // Iskarta YIĞINI — kart atıldıysa atan kişiden yığının üstüne, KONACAĞI
+  // açı ve konuma dönerek uçar; inişte "slam". Eski kartlar yerinde kalır.
   const discard = document.getElementById('uno-discard');
-  const playFly = isNewAction && actKind === 'play' && !!state.uno.top;
+  const playFly = !!playEvent && !!state.uno.top;
   if (discard) {
     const topOuter = unoRenderPile(playFly);
     const topInner = topOuter ? topOuter.firstChild : null;
     if (playFly && topOuter) {
-      unoFlyBetween(unoActorEl(actor), discard, unoCardFaceHTML(state.uno.top), state.uno.top.color || 'wild');
+      const t = state.uno.top;
+      unoFlyBetween(
+        unoActorEl(playEvent.actorId), discard, unoCardFaceHTML(t), t.color || 'wild',
+        (typeof t._r === 'number' ? t._r : 0),
+        (typeof t._dx === 'number' ? t._dx : 0),
+        (typeof t._dy === 'number' ? t._dy : 0)
+      );
       setTimeout(() => {
         topOuter.classList.remove('u-pile-hidden');
         if (topInner) { topInner.classList.remove('u-slam'); void topInner.offsetWidth; topInner.classList.add('u-slam'); }
-      }, 380);
+      }, 440);
     } else if (topInner && state.uno.playSeq !== state.uno._lastSeq) {
       topInner.classList.remove('u-slam'); void topInner.offsetWidth; topInner.classList.add('u-slam');
     }
     state.uno._lastSeq = state.uno.playSeq;
   }
 
-  // Elim — yeni kart(lar) çektiysem desteden elime uçur, sonra deal-in ile yerleşsin.
+  // Elim — kart çektiysem (manuel veya +2/+4 zorunlu) desteden elime kartlar
+  // ard arda ("tak tak tak") uçar; her biri inince yerine oturur.
   const handEl = document.getElementById('uno-hand');
-  const drawFlyMine = isNewAction && actKind === 'draw' && actor === state.myId;
   if (handEl) {
     const cards = state.uno.hand || [];
     const prevLen = state.uno._prevHandLen || 0;
-    const willFlyDraw = drawFlyMine && cards.length > prevLen;
+    const animMine = !!myDraw && cards.length > prevLen;
     handEl.classList.toggle('my-turn', myTurn);
     handEl.innerHTML = '';
+    const pendingEls = [];
     cards.forEach((card, i) => {
       const el = document.createElement('div');
       const playable = myTurn && unoCanPlay(card, state.uno.top, state.uno.color);
       el.className = 'u-card ' + (card.color || 'wild') + (playable ? ' playable' : '') + (myTurn && !playable ? ' dimmed' : '');
       if (i >= prevLen) {
-        if (willFlyDraw) el.classList.add('u-pending');            // uçuş bitene kadar gizli
+        if (animMine) { el.classList.add('u-pending'); pendingEls.push(el); }
         else { el.classList.add('u-deal-in'); el.style.setProperty('--d', ((i - prevLen) * 0.05) + 's'); }
       }
       el.style.zIndex = String(i);
@@ -297,22 +309,31 @@ function unoRenderGame() {
       el.addEventListener('click', () => unoPlayFromHand(i));
       handEl.appendChild(el);
     });
-    if (willFlyDraw && deckEl) {
-      unoFlyBetween(deckEl, handEl, '<span class="u-val">UNO</span>', 'back');
-      setTimeout(() => {
-        handEl.querySelectorAll('.u-pending').forEach((el, j) => {
+    if (animMine && deckEl) {
+      pendingEls.forEach((el, j) => {
+        setTimeout(() => unoFlyBetween(deckEl, handEl, '<span class="u-val">UNO</span>', 'back', Math.round(Math.random() * 16 - 8)), j * 150);
+        setTimeout(() => {
           el.classList.remove('u-pending');
           el.classList.add('u-deal-in');
-          el.style.setProperty('--d', (j * 0.05) + 's');
-        });
-      }, 360);
+          el.style.setProperty('--d', '0s');
+        }, j * 150 + 300);
+      });
     }
     state.uno._prevHandLen = cards.length;
   }
 
-  // Rakip kart çektiyse desteden ona doğru (kapalı) kart uçur.
-  if (isNewAction && actKind === 'draw' && actor !== state.myId && deckEl) {
-    unoFlyBetween(deckEl, unoActorEl(actor), '<span class="u-val">UNO</span>', 'back');
+  // Rakip(ler) kart çektiyse (manuel veya zorunlu) desteden onlara doğru
+  // kapalı kartlar ard arda uçar.
+  if (deckEl) {
+    events.forEach(e => {
+      if (e.kind === 'draw' && e.actorId !== state.myId) {
+        const tgt = unoActorEl(e.actorId);
+        const cnt = Math.max(1, e.count || 1);
+        for (let j = 0; j < cnt; j++) {
+          setTimeout(() => unoFlyBetween(deckEl, tgt, '<span class="u-val">UNO</span>', 'back', Math.round(Math.random() * 20 - 10)), j * 130);
+        }
+      }
+    });
   }
 }
 
@@ -469,8 +490,7 @@ function unoHostStart() {
   state.uno.winnerId = null;
   state.uno.playSeq = 0;
   state.uno.actionSeq = 0;
-  state.uno.lastActorId = null;
-  state.uno.lastActionKind = null;
+  state.uno.events = [];
 
   unoHostSync();
 }
@@ -522,8 +542,7 @@ function unoHostApplyPlay(pid, card, chosenColor) {
   state.uno.top = played;
   state.uno.playSeq = (state.uno.playSeq || 0) + 1;
   state.uno.actionSeq = (state.uno.actionSeq || 0) + 1;
-  state.uno.lastActorId = pid;
-  state.uno.lastActionKind = 'play';
+  state.uno.events = [{ kind: 'play', actorId: pid }];
   state.uno.color = unoIsWild(played)
     ? (UNO_COLORS.includes(chosenColor) ? chosenColor : UNO_COLORS[Math.floor(Math.random() * 4)])
     : played.color;
@@ -552,12 +571,14 @@ function unoHostApplyPlay(pid, card, chosenColor) {
     case 'draw2': {
       const victim = state.uno.players[unoPlayerIndexAt(1)];
       unoHostDraw(victim.id, 2);
+      state.uno.events.push({ kind: 'draw', actorId: victim.id, count: 2 });
       unoHostAdvance(2);
       break;
     }
     case 'wild4': {
       const victim = state.uno.players[unoPlayerIndexAt(1)];
       unoHostDraw(victim.id, 4);
+      state.uno.events.push({ kind: 'draw', actorId: victim.id, count: 4 });
       unoHostAdvance(2);
       break;
     }
@@ -573,8 +594,7 @@ function unoHostApplyDraw(pid) {
   if (state.uno.turnId !== pid) return;
   unoHostDraw(pid, 1);
   state.uno.actionSeq = (state.uno.actionSeq || 0) + 1;
-  state.uno.lastActorId = pid;
-  state.uno.lastActionKind = 'draw';
+  state.uno.events = [{ kind: 'draw', actorId: pid, count: 1 }];
   unoHostAdvance(1); // çekmek sırayı bitirir
   unoHostSync();
 }
@@ -599,8 +619,7 @@ function unoHostSync() {
     pile: state.uno.discard.slice(-5),
     playSeq: state.uno.playSeq || 0,
     actionSeq: state.uno.actionSeq || 0,
-    lastActorId: state.uno.lastActorId || null,
-    lastActionKind: state.uno.lastActionKind || null,
+    events: state.uno.events || [],
     winnerId: state.uno.winnerId
   });
 
@@ -716,8 +735,7 @@ function handleUnoMessage(peerId, msg) {
       state.uno.pile = msg.pile || (msg.top ? [msg.top] : []);
       state.uno.playSeq = msg.playSeq || 0;
       state.uno.actionSeq = msg.actionSeq || 0;
-      state.uno.lastActorId = msg.lastActorId || null;
-      state.uno.lastActionKind = msg.lastActionKind || null;
+      state.uno.events = msg.events || [];
       state.uno.winnerId = msg.winnerId || null;
       unoOpenCard();
       if (!msg.started && msg.winnerId) unoRenderOver();
@@ -790,7 +808,7 @@ function unoSyncNewPeer(peerId) {
       started: true,
       players: state.uno.players.map(p => ({ id: p.id, name: p.name, count: p.count })),
       turnId: state.uno.turnId, dir: state.uno.dir, color: state.uno.color, top: state.uno.top, pile: state.uno.discard.slice(-5), playSeq: state.uno.playSeq || 0,
-      actionSeq: state.uno.actionSeq || 0, lastActorId: null, lastActionKind: null, winnerId: null
+      actionSeq: state.uno.actionSeq || 0, events: [], winnerId: null
     });
   } else {
     broadcastTo(peerId, {
