@@ -60,8 +60,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1784742501.4480207,
-    "ast_hash": "610ef990900a4b1c24340aa4135bff9e",
+    "mtime": 1784744516.868853,
+    "ast_hash": "52029ecb387b923c0ca4ee1b09a3c8cb",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -432,6 +432,11 @@
   "js/uno.js": {
     "mtime": 1784742400.569987,
     "ast_hash": "be014b2a8fb896f455656be7499d4427",
+    "semantic_hash": ""
+  },
+  "test/e2e/join-request.test.js": {
+    "mtime": 1784743490.8534963,
+    "ast_hash": "9dbafc09fe4f3ecd65cee0f51e277b3c",
     "semantic_hash": ""
   }
 }
