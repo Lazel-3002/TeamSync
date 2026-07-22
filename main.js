@@ -220,7 +220,21 @@ function createCursorOverlay() {
   return cursorOverlayWindow;
 }
 
-function renderVirtualCursor(point, label) {
+function safeCursorAvatar(value) {
+  if (typeof value !== 'string' || value.length > 2_000_000) return '';
+  return /^(https?:\/\/|data:image\/)/i.test(value) ? value : '';
+}
+
+function cursorProfile(label, avatar) {
+  const normalizedLabel = String(label || '').trim();
+  if (!normalizedLabel) return null;
+  return {
+    avatar: safeCursorAvatar(avatar),
+    initial: normalizedLabel.charAt(0).toLocaleUpperCase('tr-TR')
+  };
+}
+
+function renderVirtualCursor(point, options = {}) {
   const normalized = validNormalizedPoint(point);
   const overlay = createCursorOverlay();
   if (!normalized) {
@@ -236,8 +250,18 @@ function renderVirtualCursor(point, label) {
     visible: true,
     x: Math.round(normalized.x * bounds.width),
     y: Math.round(normalized.y * bounds.height),
-    label: label || ''
+    label: options.label || '',
+    profile: cursorProfile(options.profileLabel, options.avatar),
+    activeProfile: null
   };
+  const activePoint = options.activeProfile && validNormalizedPoint(options.activeProfile.point);
+  if (activePoint) {
+    update.activeProfile = {
+      x: Math.round(activePoint.x * bounds.width),
+      y: Math.round(activePoint.y * bounds.height),
+      ...cursorProfile(options.activeProfile.label, options.activeProfile.avatar)
+    };
+  }
   const show = () => {
     if (!overlay || overlay.isDestroyed()) return;
     overlay.webContents.send('cursor-overlay-update', update);
@@ -255,8 +279,15 @@ function hideVirtualCursor() {
 
 function renderCursorForOwner() {
   if (!remoteControlActive) return hideVirtualCursor();
-  if (remoteControlOwner === 'remote') renderVirtualCursor(hostPassivePoint, 'Paylaşan');
-  else renderVirtualCursor(remoteParticipantPoint && remoteParticipantPoint.point, remoteParticipantPoint && remoteParticipantPoint.label);
+  if (remoteControlOwner === 'remote') {
+    renderVirtualCursor(hostPassivePoint, { label: 'Paylaşan', activeProfile: remoteParticipantPoint });
+  } else {
+    renderVirtualCursor(remoteParticipantPoint && remoteParticipantPoint.point, {
+      label: remoteParticipantPoint && remoteParticipantPoint.label,
+      profileLabel: remoteParticipantPoint && remoteParticipantPoint.label,
+      avatar: remoteParticipantPoint && remoteParticipantPoint.avatar
+    });
+  }
 }
 
 function handleLocalMouseDown() {
@@ -860,7 +891,11 @@ ipcMain.on('update-control-pointer', (event, data) => {
   if (!remoteControlActive) return;
   const point = validNormalizedPoint(data);
   if (!point) return;
-  remoteParticipantPoint = { point, label: String(data.label || 'Kontrol eden').slice(0, 40) };
+  remoteParticipantPoint = {
+    point,
+    label: String(data.label || 'Kontrol eden').slice(0, 40),
+    avatar: safeCursorAvatar(data.avatar)
+  };
   if (remoteControlOwner === 'host') renderCursorForOwner();
 });
 

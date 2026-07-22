@@ -4163,6 +4163,10 @@ async function handleDataMessage(peerId, msg) {
       addVideoCard(peerId, displayName(peerId, peer.name), peer.videoEl, true);
     } else {
       removeVideoCard(peerId, true);
+      if (state.activeControl && state.activeControl.hostId === peerId) {
+        closeActiveControlSession(false);
+        showToast('Ekran paylaşımı bittiği için denetim izni kapatıldı.', 'info');
+      }
     }
     updateUserUI(peerId);
   } else if (msg.type === 'chat') {
@@ -4333,21 +4337,37 @@ async function handleDataMessage(peerId, msg) {
       fileBuffer.delete(msg.id);
     }
   } else if (msg.type === 'ctrl-req') {
-    showControlModal(peerId, displayName(peerId, peer.name), msg.reqId);
+    if (!state.isSharing) {
+      rejectControlRequest(peerId, msg.reqId, 'not-sharing');
+    } else if (state.controlledBy || state.pendingControlReq) {
+      rejectControlRequest(peerId, msg.reqId, 'busy');
+    } else {
+      showControlModal(peerId, displayName(peerId, peer.name), msg.reqId);
+    }
   } else if (msg.type === 'ctrl-res') {
     if (msg.accepted) {
+      if (!peer.sharing) {
+        showToast('Ekran paylaşılmadığı için denetim izni başlatılamadı.', 'warn');
+        return;
+      }
       state.activeControl = { hostId: peerId, hostName: displayName(peerId, peer.name) };
       state.controlOwner = 'host';
       remoteOwnerConfirmed = false;
       setRemotePointerActive(false);
       setHostPassivePointer(null, false);
+      setAuthorizedCursorProfile(state.myName, state.myAvatar);
       document.getElementById('remote-name').textContent = displayName(peerId, peer.name) + ' Masaüstü';
       document.getElementById('remote-modal').classList.remove('hidden');
       if (peer.videoEl.srcObject) {
         document.getElementById('remote-vid').srcObject = peer.videoEl.srcObject;
       }
     } else {
-      showToast('Kontrol isteği reddedildi.', 'warn');
+      const reasonText = msg.reason === 'not-sharing'
+        ? 'Ekran paylaşılmadığı için denetim isteği gönderilemedi.'
+        : msg.reason === 'busy'
+          ? 'Denetim izni şu anda başka bir kullanıcıda.'
+          : 'Kontrol isteği reddedildi.';
+      showToast(reasonText, 'warn');
     }
   } else if (msg.type === 'ctrl-revoke') {
     // İki yönlü: kontrol EDEN vazgeçti → kontrol edilen taraf izni kapatır;
@@ -4357,11 +4377,7 @@ async function handleDataMessage(peerId, msg) {
       showToast('Uzaktan kontrol sonlandırıldı.', 'info');
     }
     if (state.activeControl && state.activeControl.hostId === peerId) {
-      remoteOwnerConfirmed = false;
-      setRemotePointerActive(false);
-      setHostPassivePointer(null, false);
-      document.getElementById('remote-modal').classList.add('hidden');
-      state.activeControl = null;
+      closeActiveControlSession(false);
       showToast('Uzaktan kontrol izni kaldırıldı.', 'info');
     }
   } else if (msg.type === 'ctrl-pointer') {
@@ -4370,7 +4386,8 @@ async function handleDataMessage(peerId, msg) {
       window.electronAPI.updateControlPointer({
         x: msg.point.x,
         y: msg.point.y,
-        label: displayName(peerId, peer.name)
+        label: displayName(peerId, peer.name),
+        avatar: peer.avatar || null
       });
     }
   } else if (msg.type === 'ctrl-takeover') {
@@ -4846,7 +4863,11 @@ function showUserContextMenu(e, targetId, targetName) {
   // Remote Control Button
   const ctrlBtn = document.createElement('button');
   ctrlBtn.className = 'user-context-menu-item';
-  ctrlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> Uzaktan Kontrol İste';
+  const targetPeer = state.peers.get(targetId);
+  const canRequestControl = Boolean(targetPeer && targetPeer.sharing);
+  ctrlBtn.disabled = !canRequestControl;
+  ctrlBtn.title = canRequestControl ? '' : 'Denetim izni yalnızca ekran paylaşılırken istenebilir.';
+  ctrlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> ' + (canRequestControl ? 'Uzaktan Kontrol İste' : 'Ekran paylaşılmıyor');
   ctrlBtn.addEventListener('click', () => {
     requestControl(targetId);
     menu.remove();
@@ -5988,6 +6009,11 @@ function stopScreenShare() {
   });
   state.screenStream = null;
   state.isSharing = false;
+  if (state.pendingControlReq) {
+    rejectControlRequest(state.pendingControlReq.peerId, state.pendingControlReq.reqId, 'not-sharing');
+    closeCtrlModal();
+  }
+  if (state.controlledBy) stopBeingControlled(true);
   document.getElementById('share').classList.remove('off');
   broadcast({ type: 'sharing', sharing: false });
   removeVideoCard('self', true);
@@ -6039,8 +6065,18 @@ function stopRecording() {
 }
 
 function requestControl(peerId) {
+  const peer = state.peers.get(peerId);
+  if (!peer || !peer.sharing) {
+    showToast('Denetim izni yalnızca ekran paylaşılırken istenebilir.', 'warn');
+    return false;
+  }
   broadcastTo(peerId, { type: 'ctrl-req', reqId: 'req-' + Date.now() });
   showToast('Kontrol isteği gönderildi.', 'info');
+  return true;
+}
+
+function rejectControlRequest(peerId, reqId, reason) {
+  broadcastTo(peerId, { type: 'ctrl-res', accepted: false, reqId, reason });
 }
 
 // İstek, ekranı kaplayan modal yerine sağ üstte bildirim kartı olarak gösterilir;
@@ -6049,6 +6085,14 @@ const CTRL_REQ_TIMEOUT_MS = 30000;
 let ctrlReqTimer = null;
 
 function showControlModal(peerId, peerName, reqId) {
+  if (!state.isSharing) {
+    rejectControlRequest(peerId, reqId, 'not-sharing');
+    return false;
+  }
+  if (state.controlledBy || state.pendingControlReq) {
+    rejectControlRequest(peerId, reqId, 'busy');
+    return false;
+  }
   state.pendingControlReq = { peerId, reqId };
   document.getElementById('ctrl-text').textContent = `${peerName} bilgisayarınızı kontrol etmek istiyor.`;
   const note = document.getElementById('ctrl-modal');
@@ -6064,18 +6108,30 @@ function showControlModal(peerId, peerName, reqId) {
   clearTimeout(ctrlReqTimer);
   ctrlReqTimer = setTimeout(() => {
     if (state.pendingControlReq) {
-      broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: false });
+      rejectControlRequest(state.pendingControlReq.peerId, state.pendingControlReq.reqId, 'timeout');
     }
     closeCtrlModal();
   }, CTRL_REQ_TIMEOUT_MS);
+  return true;
 }
 
 document.getElementById('ctrl-accept').addEventListener('click', () => {
   if (state.pendingControlReq) {
+    const request = state.pendingControlReq;
+    if (!state.isSharing) {
+      rejectControlRequest(request.peerId, request.reqId, 'not-sharing');
+      closeCtrlModal();
+      return;
+    }
+    if (state.controlledBy) {
+      rejectControlRequest(request.peerId, request.reqId, 'busy');
+      closeCtrlModal();
+      return;
+    }
     // Kabul: gelen ctrl-event'lerin işleneceği kaynak burada kaydedilir.
-    state.controlledBy = state.pendingControlReq.peerId;
+    state.controlledBy = request.peerId;
     state.controlOwner = 'host';
-    broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: true });
+    broadcastTo(request.peerId, { type: 'ctrl-res', accepted: true, reqId: request.reqId });
     window.electronAPI.setRemoteControl(true);
     window.electronAPI.setControlOwner('host');
     const pill = document.getElementById('ctrl-active-pill');
@@ -6086,7 +6142,7 @@ document.getElementById('ctrl-accept').addEventListener('click', () => {
 });
 document.getElementById('ctrl-deny').addEventListener('click', () => {
   if (state.pendingControlReq) {
-    broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: false });
+    rejectControlRequest(state.pendingControlReq.peerId, state.pendingControlReq.reqId, 'denied');
   }
   closeCtrlModal();
 });
@@ -6164,8 +6220,8 @@ if (window.electronAPI.onLocalControlTakeover) {
   });
 }
 
-document.getElementById('remote-stop').addEventListener('click', () => {
-  if (state.activeControl) {
+function closeActiveControlSession(notifyHost) {
+  if (notifyHost && state.activeControl) {
     broadcastTo(state.activeControl.hostId, { type: 'ctrl-revoke' });
   }
   remoteOwnerConfirmed = false;
@@ -6174,11 +6230,17 @@ document.getElementById('remote-stop').addEventListener('click', () => {
   document.getElementById('remote-modal').classList.add('hidden');
   state.activeControl = null;
   window.electronAPI.setRemoteControl(false);
+}
+
+document.getElementById('remote-stop').addEventListener('click', () => {
+  closeActiveControlSession(true);
 });
 
 const remoteVid = document.getElementById('remote-vid');
 const remoteWrap = remoteVid.closest('.rwrap');
 const remotePointer = document.getElementById('remote-pointer');
+const remotePointerAvatar = document.getElementById('remote-pointer-avatar');
+const remotePointerAvatarFallback = document.getElementById('remote-pointer-avatar-fallback');
 const remoteControlState = document.getElementById('remote-control-state');
 const remoteControlStateText = document.getElementById('remote-control-state-text');
 const remoteControlHelp = document.getElementById('remote-control-help');
@@ -6189,6 +6251,25 @@ let pendingTakeoverPoint = null;
 let lastRemotePoint = null;
 const remotePressedButtons = new Set();
 const remotePressedKeys = new Set();
+
+function safeCursorAvatar(value) {
+  if (typeof value !== 'string' || value.length > 2_000_000) return '';
+  return /^(https?:\/\/|data:image\/)/i.test(value) ? value : '';
+}
+
+function setAuthorizedCursorProfile(name, avatar) {
+  if (remotePointerAvatarFallback) {
+    remotePointerAvatarFallback.textContent = String(name || 'K').trim().charAt(0).toLocaleUpperCase('tr-TR') || 'K';
+  }
+  if (!remotePointerAvatar) return;
+  const safeAvatar = safeCursorAvatar(avatar);
+  if (safeAvatar) remotePointerAvatar.src = safeAvatar;
+  else remotePointerAvatar.removeAttribute('src');
+}
+
+if (remotePointerAvatar) {
+  remotePointerAvatar.addEventListener('error', () => remotePointerAvatar.removeAttribute('src'));
+}
 
 function setRemotePointerActive(active) {
   const nextActive = Boolean(active && state.activeControl);

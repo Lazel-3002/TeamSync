@@ -38,25 +38,83 @@
       white-space: nowrap;
       box-shadow: 0 2px 8px rgba(0,0,0,.45);
     }
+    #cursor.has-profile #label { margin-left: 25px; }
+    .profile {
+      position: fixed;
+      width: 26px;
+      height: 26px;
+      overflow: hidden;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: #5865f2;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,.58);
+      font: 700 11px/22px "Segoe UI", sans-serif;
+      text-align: center;
+      pointer-events: none;
+    }
+    .profile img { display: none; width: 100%; height: 100%; object-fit: cover; }
+    .profile.has-image img { display: block; }
+    .profile.has-image span { display: none; }
+    #cursor-profile { position: absolute; top: 22px; left: 22px; }
+    #active-profile { opacity: 0; transform: translate3d(-100px, -100px, 0); }
+    #active-profile.visible { opacity: 1; }
   </style>
 </head>
 <body>
   <div id="cursor" aria-hidden="true">
     <svg viewBox="0 0 28 32"><path d="M3 2.5v24.2l6.2-6 4.6 9.1 4.1-2.1-4.5-8.8h8.7L3 2.5z"></path></svg>
     <span id="label"></span>
+    <span id="cursor-profile" class="profile"><img alt="" /><span></span></span>
   </div>
+  <span id="active-profile" class="profile" aria-hidden="true"><img alt="" /><span></span></span>
   <script>
     const cursor = document.getElementById('cursor');
     const label = document.getElementById('label');
+    const cursorProfile = document.getElementById('cursor-profile');
+    const activeProfile = document.getElementById('active-profile');
+
+    function updateProfile(element, profile) {
+      if (!profile || !profile.initial) {
+        element.style.display = 'none';
+        element.classList.remove('has-image');
+        element.querySelector('img').removeAttribute('src');
+        return;
+      }
+      element.style.display = 'block';
+      element.querySelector('span').textContent = profile.initial;
+      const img = element.querySelector('img');
+      if (profile.avatar) {
+        img.src = profile.avatar;
+        element.classList.add('has-image');
+      } else {
+        img.removeAttribute('src');
+        element.classList.remove('has-image');
+      }
+    }
+
     window.cursorOverlay.onUpdate((data) => {
       if (!data || !data.visible) {
         cursor.classList.remove('visible');
+        activeProfile.classList.remove('visible');
         return;
       }
       label.textContent = data.label || '';
       label.style.display = data.label ? 'block' : 'none';
+      cursor.classList.toggle('has-profile', Boolean(data.profile));
+      updateProfile(cursorProfile, data.profile);
       cursor.style.transform = `translate3d(${data.x - 3}px, ${data.y - 3}px, 0)`;
       cursor.classList.add('visible');
+      updateProfile(activeProfile, data.activeProfile);
+      if (data.activeProfile) {
+        activeProfile.style.transform = `translate3d(${data.activeProfile.x + 19}px, ${data.activeProfile.y + 19}px, 0)`;
+        activeProfile.classList.add('visible');
+      } else {
+        activeProfile.classList.remove('visible');
+      }
+    });
+    document.querySelectorAll('.profile img').forEach((img) => {
+      img.addEventListener('error', () => img.parentElement.classList.remove('has-image'));
     });
   </script>
 </body>

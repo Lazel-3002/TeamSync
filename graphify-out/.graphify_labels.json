@@ -60,5 +60,12 @@
   "58": "Moves Data",
   "59": "Game State",
   "60": "React Entry Point",
-  "61": "Vite Config"
+  "61": "Vite Config",
+  "62": "devDependencies",
+  "63": "connectGlobalBroker",
+  "64": "scripts",
+  "65": "package.json",
+  "66": "cross-fetch",
+  "67": "preload-cursor-overlay.js",
+  "68": "uiohook-napi"
 }

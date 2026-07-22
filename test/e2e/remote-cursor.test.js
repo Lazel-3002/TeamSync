@@ -11,6 +11,8 @@ module.exports = async function run() {
         const pointer = document.getElementById('remote-pointer');
         const sent = [];
 
+        setAuthorizedCursorProfile('CursorTester', 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E');
+
         state.activeControl = { hostId: 'fake-host' };
         broadcastTo = function(peerId, message) { sent.push({ peerId, message }); };
         document.getElementById('remote-modal').classList.remove('hidden');
@@ -29,6 +31,7 @@ module.exports = async function run() {
         const passive = {
           visible: pointer.classList.contains('visible'),
           active: pointer.classList.contains('active'),
+          avatar: document.getElementById('remote-pointer-avatar').getAttribute('src'),
           messages: sent.map(item => item.message.type)
         };
 
@@ -64,7 +67,10 @@ module.exports = async function run() {
       })()
     `, true);
 
-    assert.deepStrictEqual(result.passive, { visible: true, active: false, messages: ['ctrl-pointer'] });
+    assert.strictEqual(result.passive.visible, true);
+    assert.strictEqual(result.passive.active, false);
+    assert.match(result.passive.avatar, /^data:image\/svg\+xml/);
+    assert.deepStrictEqual(result.passive.messages, ['ctrl-pointer']);
     assert.deepStrictEqual(result.firstClick, { active: true, messages: ['ctrl-pointer', 'ctrl-takeover'] });
     assert.deepStrictEqual(result.secondClick.eventTypes, ['mousedown', 'mouseup']);
     assert.strictEqual(result.secondClick.hostPointerVisible, true);
@@ -77,7 +83,12 @@ module.exports = async function run() {
       (async function() {
         window.electronAPI.setRemoteControl(true);
         await new Promise(resolve => setTimeout(resolve, 100));
-        window.electronAPI.updateControlPointer({ x: 0.4, y: 0.6, label: 'CursorTester' });
+        window.electronAPI.updateControlPointer({
+          x: 0.4,
+          y: 0.6,
+          label: 'CursorTester',
+          avatar: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E'
+        });
         return window.electronAPI.setControlOwner('remote');
       })()
     `, true);
@@ -97,6 +108,12 @@ module.exports = async function run() {
       label: document.getElementById('label').textContent
     })`);
     assert.deepStrictEqual(overlayState, { visible: true, label: 'Paylaşan' });
+    const overlayProfile = await evalJS(overlayClient, `({
+      visible: document.getElementById('active-profile').classList.contains('visible'),
+      avatar: document.querySelector('#active-profile img').getAttribute('src')
+    })`);
+    assert.strictEqual(overlayProfile.visible, true);
+    assert.match(overlayProfile.avatar, /^data:image\/svg\+xml/);
     overlayClient.ws.close();
     await evalJS(peer.client, `window.electronAPI.setRemoteControl(false); true`);
   } finally {
