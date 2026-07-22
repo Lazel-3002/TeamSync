@@ -2853,3 +2853,263 @@ input:checked + .slider:before {
   .u-fly { transition: none !important; }
 }
 
+
+/* ==================== Uzaktan kontrol: köşe bildirimi + pill ==================== */
+/* İstek, ekranı kilitleyen modal yerine sağ üstte engellemeyen bir kart olarak
+   gelir; altındaki bar 30 sn'lik otomatik ret süresini gösterir. */
+.ctrl-note {
+  position: fixed;
+  top: 52px;
+  right: 16px;
+  z-index: 10001;
+  width: 300px;
+  background: rgba(18, 26, 43, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 12px 14px 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  animation: ctrlNoteIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+.ctrl-note.hidden { display: none; }
+@keyframes ctrlNoteIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.ctrl-note-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+  font-size: 14px;
+  color: #ffd166;
+}
+.ctrl-note p {
+  margin: 8px 0 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.ctrl-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.ctrl-note-timer {
+  height: 3px;
+  margin: 10px -14px -8px;
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+#ctrl-timer-bar {
+  height: 100%;
+  width: 100%;
+  background: #ffd166;
+}
+
+/* Kontrol edilen tarafta görünen kalıcı uyarı */
+.ctrl-pill {
+  position: fixed;
+  bottom: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(120, 30, 30, 0.92);
+  border: 1px solid rgba(255, 120, 120, 0.45);
+  border-radius: 999px;
+  padding: 8px 10px 8px 16px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.ctrl-pill.hidden { display: none; }
+.ctrl-pill-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff5c5c;
+  animation: ctrlPillBlink 1.2s ease-in-out infinite;
+}
+@keyframes ctrlPillBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ==================== UNO: kurallar paneli + kick ==================== */
+.u-settings {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 9, 18, 0.72);
+  backdrop-filter: blur(4px);
+}
+.u-settings.hidden { display: none; }
+.u-settings-box {
+  width: min(680px, 92%);
+  max-height: 88%;
+  overflow-y: auto;
+  background: rgba(16, 24, 44, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.u-settings-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.u-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+/* "Kare" kural kartı: içinde görsel örnek, ad, açıklama ve açık/kapalı slider */
+.u-rule-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 14px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+.u-rule-card.on {
+  border-color: rgba(46, 204, 113, 0.55);
+  background: rgba(46, 204, 113, 0.07);
+  box-shadow: 0 0 18px rgba(46, 204, 113, 0.12) inset;
+}
+.u-rule-visual {
+  position: relative;
+  height: 84px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Görsel örnekteki mini kartlar (oyun kartlarının küçük kopyası) */
+.u-card.u-ex {
+  width: 44px;
+  height: 64px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 0 0 2px #fff, inset 0 0 0 3px rgba(0,0,0,0.07);
+  pointer-events: none;
+}
+.u-card.u-ex .u-val { font-size: 18px; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+.u-card.u-ex .u-oval, .u-card.u-ex .u-corner { display: none; }
+.u-card.u-ex.ex1 { transform: rotate(-9deg) translateX(-14px); }
+.u-card.u-ex.ex2 { transform: rotate(8deg) translateX(12px) translateY(-6px); z-index: 2; }
+.u-rule-sum {
+  position: absolute;
+  right: 8%;
+  bottom: 2px;
+  font-weight: bold;
+  font-size: 13px;
+  color: #ffd166;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+}
+.u-rule-name { font-weight: bold; font-size: 15px; }
+.u-rule-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+}
+.u-rule-switch { margin-top: 4px; }
+.u-rule-switch input:disabled + .slider { cursor: not-allowed; opacity: 0.55; }
+.u-rule-state { font-size: 12px; color: rgba(255,255,255,0.55); }
+.u-rule-state.on { color: #2ecc71; font-weight: bold; }
+
+/* Lobi listesinde kurucuya görünen at (kick) düğmesi */
+.u-lobby-player { position: relative; }
+.u-kick {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 100, 100, 0.5);
+  background: rgba(255, 70, 70, 0.15);
+  color: #ff7b7b;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.u-kick:hover { background: rgba(255, 70, 70, 0.4); color: #fff; transform: scale(1.1); }
+
+/* ==================== UNO: joker renk boyama + At/Beklet ==================== */
+/* Renk seçilen joker/+4 ıskartada seçilen renge boyanır. Katman kartın TAMAMINI
+   kaplar (dış kenar dahil — gökkuşağı bandı kalmasın) ve gerçek renkli kartlarla
+   aynı beyaz çerçeveyi kendi üstünde yeniden çizer. */
+.u-card.u-tint::after, .u-card.u-tint-anim::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: var(--tc, #999);
+  box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 5px rgba(0, 0, 0, 0.07);
+  z-index: 1;
+}
+.u-card.u-tint .u-val, .u-card.u-tint-anim .u-val { position: relative; z-index: 2; }
+.u-tint-red, .u-tint-anim.u-tint-red { --tc: #d9282f; }
+.u-tint-yellow, .u-tint-anim.u-tint-yellow { --tc: #f4b41a; }
+.u-tint-green, .u-tint-anim.u-tint-green { --tc: #2f9e44; }
+.u-tint-blue, .u-tint-anim.u-tint-blue { --tc: #1a71c9; }
+/* Yeni inen jokerde renk merkezden dışa doğru süpürerek dolar */
+.u-card.u-tint-anim::after {
+  clip-path: circle(0% at 50% 50%);
+  animation: uTintIn 0.55s ease-out 0.5s forwards;
+}
+@keyframes uTintIn {
+  to { clip-path: circle(75% at 50% 50%); }
+}
+
+/* "At / Beklet" karar çubuğu */
+.u-draw-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px auto 0;
+  padding: 8px 14px;
+  width: fit-content;
+  background: rgba(255, 209, 102, 0.12);
+  border: 1px solid rgba(255, 209, 102, 0.45);
+  border-radius: 999px;
+  animation: uChoiceIn 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.u-draw-choice.hidden { display: none; }
+.u-draw-choice-text { font-size: 13px; font-weight: bold; color: #ffd166; }
+@keyframes uChoiceIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Karar beklenen çekilmiş kart: parlayan vurgu */
+.u-card.u-drawn {
+  box-shadow: 0 0 0 3px #ffd166, 0 0 22px rgba(255, 209, 102, 0.65), 0 6px 14px rgba(0,0,0,0.5);
+  transform: translateY(-10px);
+  z-index: 30 !important;
+}
+
+/* Kurallar panelindeki sayı seçici */
+.u-rule-select {
+  margin-top: 4px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+.u-rule-select:disabled { opacity: 0.55; cursor: not-allowed; }

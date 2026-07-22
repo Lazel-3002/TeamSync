@@ -22,7 +22,6 @@
   "20": "Mega Pokemon Injector",
   "21": "Sprite / Image Assets",
   "22": "Watch Together",
-  "23": "build",
   "24": "Pokemon Data Fetch",
   "25": "HTML Fix Patch",
   "26": "HTML Fix Patch 2",
@@ -60,9 +59,5 @@
   "58": "Moves Data",
   "59": "Game State",
   "60": "React Entry Point",
-  "61": "Vite Config",
-  "62": "files",
-  "63": "scripts",
-  "64": "package.json",
-  "65": "crypto-js"
+  "61": "Vite Config"
 }

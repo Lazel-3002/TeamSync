@@ -64,7 +64,9 @@ function unoFlyBetween(fromEl, toEl, faceHTML, faceClass, endRot, endDx, endDy) 
   // Başlangıçta hedef açının tersine hafif eğik dur; uçarken hedefe döner
   // (elden fırlatılıp masaya konuyormuş gibi doğal bir dönüş).
   fly.style.transform = 'translate(-50%,-50%) rotate(' + (-rot * 0.4) + 'deg)';
-  document.body.appendChild(fly);
+  // Tam ekran odak modunda tarayıcı yalnızca fullscreen elemanını çizer;
+  // body'ye eklenen uçan kart görünmez. Kartı aktif fullscreen köküne ekle.
+  (document.fullscreenElement || document.body).appendChild(fly);
   requestAnimationFrame(() => {
     fly.style.transform = 'translate(-50%,-50%) translate(' + (ex - sx) + 'px,' + (ey - sy) + 'px) rotate(' + rot + 'deg)';
   });
@@ -108,6 +110,24 @@ function unoCanPlay(card, top, color) {
   return card.color === color || card.value === top.value;
 }
 
+// Bekleyen +2/+4 cezası varken oynanabilecek yanıt kartları (ev kurallarına göre):
+//  - Kombo: +2 üstüne +2 veya +4; +4 üstüne yalnız +4 (ceza katlanır).
+//  - Bloklama: Engel (⊘) cezayı iptal eder, sıra normal ilerler.
+function unoCanRespondPending(card) {
+  if (!state.uno.pendingCount) return false;
+  const r = state.uno.rules || {};
+  if (r.stack && card.value === 'wild4') return true;
+  if (r.stack && card.value === 'draw2' && state.uno.pendingKind === 'draw2') return true;
+  if (r.block && card.value === 'skip') return true;
+  return false;
+}
+
+// Ev kurallarından herhangi biri ceza bekletmeyi gerektiriyor mu?
+function unoPenaltyIsPending() {
+  const r = state.uno.rules || {};
+  return !!(r.stack || r.block);
+}
+
 function unoNameOf(id) {
   const p = state.uno.players.find(x => x.id === id);
   return p ? p.name : '?';
@@ -137,6 +157,15 @@ function unoRenderLobby() {
       el.innerHTML = `<span class="u-av">${escapeHtml(unoInitial(p.name))}</span>${escapeHtml(p.name)}` +
         `${p.id === state.uno.host ? ' 👑' : ''}${isBot ? ' 🤖' : ''}` +
         `${p.id === state.myId ? ' <span class="u-you">(sen)</span>' : ''}`;
+      // Kurucu, kendisi dışındaki oyuncu ve botları atabilir.
+      if (unoIsHost() && p.id !== state.myId) {
+        const kick = document.createElement('button');
+        kick.className = 'u-kick';
+        kick.title = (isBot ? 'Botu' : 'Oyuncuyu') + ' at';
+        kick.textContent = '✕';
+        kick.addEventListener('click', (e) => { e.stopPropagation(); unoHostKick(p.id); });
+        el.appendChild(kick);
+      }
       list.appendChild(el);
     });
   }
@@ -147,6 +176,7 @@ function unoRenderLobby() {
   state.uno._celebrated = null;
   const hostSettings = document.getElementById('uno-host-settings');
   if (hostSettings) hostSettings.classList.toggle('hidden', !unoIsHost() || state.uno.started);
+  unoRenderSettings(); // panel açıksa kural/rol değişikliklerini anında yansıt
   const maxSel = document.getElementById('uno-max');
   if (maxSel) maxSel.value = String(state.uno.maxPlayers);
   const addBot = document.getElementById('uno-add-bot');
@@ -191,6 +221,8 @@ function unoRenderPile(hideTop) {
     outer.style.zIndex = String(i);
     const inner = document.createElement('div');
     inner.className = 'u-card ' + (card.color || 'wild');
+    // Renk seçilmiş joker/+4: kart seçilen renge boyanır (eski kartlar statik).
+    if (card._tint) inner.classList.add('u-tint', 'u-tint-' + card._tint);
     inner.innerHTML = unoCardFaceHTML(card);
     outer.appendChild(inner);
     if (i === pile.length - 1) { topOuter = outer; if (hideTop) outer.classList.add('u-pile-hidden'); }
@@ -242,11 +274,27 @@ function unoRenderGame() {
     colorBadge.textContent = ({ red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi' })[state.uno.color] || '';
   }
 
+  const pendingN = state.uno.pendingCount || 0;
+  const awaitingMe = state.uno.awaitId === state.myId;
   const turnEl = document.getElementById('uno-turn');
   if (turnEl) {
-    turnEl.textContent = myTurn ? 'Sıra sende!' : `Sıra: ${unoNameOf(state.uno.turnId)}`;
+    if (awaitingMe) {
+      turnEl.textContent = 'Çektiğin kart oynanabilir — at ya da beklet!';
+    } else if (state.uno.awaitId) {
+      turnEl.textContent = `${unoNameOf(state.uno.awaitId)} çektiği kartı düşünüyor…`;
+    } else if (pendingN > 0) {
+      turnEl.textContent = myTurn
+        ? `Sıra sende! +${pendingN} ceza — yanıtla ya da desteden çek`
+        : `Sıra: ${unoNameOf(state.uno.turnId)} (+${pendingN} ceza bekliyor)`;
+    } else {
+      turnEl.textContent = myTurn ? 'Sıra sende!' : `Sıra: ${unoNameOf(state.uno.turnId)}`;
+    }
     turnEl.classList.toggle('me', myTurn);
   }
+
+  // "At / Beklet" karar çubuğu yalnızca kararı beklenen oyuncuda görünür.
+  const choiceEl = document.getElementById('uno-draw-choice');
+  if (choiceEl) choiceEl.classList.toggle('hidden', !awaitingMe);
 
   // Yön göstergesi — yön değişince döndür
   const dirEl = document.getElementById('uno-dir');
@@ -259,7 +307,10 @@ function unoRenderGame() {
   }
 
   const deckEl = document.getElementById('uno-deck');
-  if (deckEl) deckEl.classList.toggle('u-actionable', myTurn);
+  if (deckEl) {
+    deckEl.classList.toggle('u-actionable', myTurn);
+    deckEl.title = (pendingN > 0 && myTurn) ? `Cezayı çek (+${pendingN})` : 'Kart çek';
+  }
 
   // Iskarta YIĞINI — kart atıldıysa atan kişiden yığının üstüne, KONACAĞI
   // açı ve konuma dönerek uçar; inişte "slam". Eski kartlar yerinde kalır.
@@ -276,11 +327,14 @@ function unoRenderGame() {
         (typeof t._dx === 'number' ? t._dx : 0),
         (typeof t._dy === 'number' ? t._dy : 0)
       );
+      // Yeni inen jokerde renk statik değil animasyonla dolsun (iniş sonrası süpürme).
+      if (topInner && t._tint) { topInner.classList.remove('u-tint'); topInner.classList.add('u-tint-anim'); }
       setTimeout(() => {
         topOuter.classList.remove('u-pile-hidden');
         if (topInner) { topInner.classList.remove('u-slam'); void topInner.offsetWidth; topInner.classList.add('u-slam'); }
       }, 440);
     } else if (topInner && state.uno.playSeq !== state.uno._lastSeq) {
+      if (state.uno.top && state.uno.top._tint) { topInner.classList.remove('u-tint'); topInner.classList.add('u-tint-anim'); }
       topInner.classList.remove('u-slam'); void topInner.offsetWidth; topInner.classList.add('u-slam');
     }
     state.uno._lastSeq = state.uno.playSeq;
@@ -298,8 +352,17 @@ function unoRenderGame() {
     const pendingEls = [];
     cards.forEach((card, i) => {
       const el = document.createElement('div');
-      const playable = myTurn && unoCanPlay(card, state.uno.top, state.uno.color);
+      let playable;
+      if (awaitingMe) {
+        // Yalnızca çekilen (son) kart oynanabilir; digerleri kilitli.
+        playable = i === cards.length - 1;
+      } else {
+        playable = myTurn && (pendingN > 0
+          ? unoCanRespondPending(card)
+          : unoCanPlay(card, state.uno.top, state.uno.color));
+      }
       el.className = 'u-card ' + (card.color || 'wild') + (playable ? ' playable' : '') + (myTurn && !playable ? ' dimmed' : '');
+      if (awaitingMe && i === cards.length - 1) el.classList.add('u-drawn');
       if (i >= prevLen) {
         if (animMine) { el.classList.add('u-pending'); pendingEls.push(el); }
         else { el.classList.add('u-deal-in'); el.style.setProperty('--d', ((i - prevLen) * 0.05) + 's'); }
@@ -380,7 +443,17 @@ function unoPlayFromHand(index) {
   const card = (state.uno.hand || [])[index];
   if (!card) return;
   if (state.uno.turnId !== state.myId) { showToast('Sıra sende değil.', 'warn'); return; }
-  if (!unoCanPlay(card, state.uno.top, state.uno.color)) { showToast('Bu kart oynanamaz.', 'warn'); return; }
+  // "At / Beklet" beklerken yalnızca çekilen (son) kart oynanabilir.
+  if (state.uno.awaitId === state.myId && index !== state.uno.hand.length - 1) {
+    showToast('Yalnızca çektiğin kartı oynayabilir ya da bekletebilirsin.', 'warn');
+    return;
+  }
+  if (state.uno.pendingCount > 0) {
+    if (!unoCanRespondPending(card)) {
+      showToast(`+${state.uno.pendingCount} ceza bekliyor: yanıt kartı oyna ya da desteden çek.`, 'warn');
+      return;
+    }
+  } else if (!unoCanPlay(card, state.uno.top, state.uno.color)) { showToast('Bu kart oynanamaz.', 'warn'); return; }
 
   if (unoIsWild(card)) {
     unoOpenColorPicker(chosen => unoRequestPlay(card, chosen));
@@ -396,8 +469,16 @@ function unoRequestPlay(card, chosenColor) {
 
 function unoRequestDraw() {
   if (state.uno.turnId !== state.myId) { showToast('Sıra sende değil.', 'warn'); return; }
+  // Karar beklerken desteye tıklamak = beklet.
+  if (state.uno.awaitId === state.myId) { unoRequestKeep(); return; }
   if (unoIsHost()) unoHostApplyDraw(state.myId);
   else broadcastTo(state.uno.host, { type: 'uno-draw' });
+}
+
+function unoRequestKeep() {
+  if (state.uno.awaitId !== state.myId) return;
+  if (unoIsHost()) unoHostApplyKeep(state.myId);
+  else broadcastTo(state.uno.host, { type: 'uno-keep' });
 }
 
 function unoOpenColorPicker(cb) {
@@ -445,6 +526,15 @@ function unoBotPlay(botId) {
   if (!unoIsHost() || !state.uno.started) return;
   if (state.uno.turnId !== botId) return;
   const hand = state.uno.hands[botId] || [];
+  // Bekleyen ceza varsa: önce +2/blok gibi ucuz yanıt, sonra +4, yoksa cezayı çek.
+  if (state.uno.pendingCount > 0) {
+    let idx = hand.findIndex(c => !unoIsWild(c) && unoCanRespondPending(c));
+    if (idx === -1) idx = hand.findIndex(c => unoCanRespondPending(c));
+    if (idx === -1) { unoHostApplyDraw(botId); return; }
+    const card = hand[idx];
+    unoHostApplyPlay(botId, card, unoIsWild(card) ? unoBotPickColor(hand) : null);
+    return;
+  }
   // Önce oynanabilir renkli/sayı kartı, sonra joker, yoksa çek.
   let idx = hand.findIndex(c => !unoIsWild(c) && unoCanPlay(c, state.uno.top, state.uno.color));
   if (idx === -1) idx = hand.findIndex(c => unoIsWild(c));
@@ -471,7 +561,9 @@ function unoHostStart() {
   const deck = unoShuffle(unoMakeDeck());
   const hands = {};
   state.uno.players.forEach(p => { hands[p.id] = []; p.count = 0; });
-  for (let r = 0; r < 7; r++) for (const p of state.uno.players) hands[p.id].push(deck.pop());
+  // Başlangıç el sayısı ev kuralı (5-10, varsayılan 7).
+  const startCards = Math.max(5, Math.min(10, parseInt(state.uno.rules?.startCards, 10) || 7));
+  for (let r = 0; r < startCards; r++) for (const p of state.uno.players) hands[p.id].push(deck.pop());
 
   // İlk ıskarta sayı kartı olsun (joker/aksiyonla başlama karmaşasını önle)
   let first = deck.pop();
@@ -491,6 +583,10 @@ function unoHostStart() {
   state.uno.playSeq = 0;
   state.uno.actionSeq = 0;
   state.uno.events = [];
+  state.uno.pendingCount = 0;
+  state.uno.pendingKind = null;
+  state.uno.awaitId = null;
+  state.uno.awaitCard = null;
 
   unoHostSync();
 }
@@ -534,7 +630,18 @@ function unoHostApplyPlay(pid, card, chosenColor) {
   const idx = hand.findIndex(c => c.color === card.color && c.value === card.value);
   if (idx === -1) return;
   const played = hand[idx];
-  if (!unoCanPlay(played, state.uno.top, state.uno.color)) return;
+  // "At / Beklet" kararı beklenirken yalnızca çekilen kart oynanabilir.
+  if (state.uno.awaitId) {
+    if (state.uno.awaitId !== pid) return;
+    const ac = state.uno.awaitCard;
+    if (!ac || played.color !== ac.color || played.value !== ac.value) return;
+    state.uno.awaitId = null;
+    state.uno.awaitCard = null;
+  }
+  // Bekleyen ceza varken yalnızca kombo/blok yanıtları geçerli; yoksa normal kural.
+  if (state.uno.pendingCount > 0) {
+    if (!unoCanRespondPending(played)) return;
+  } else if (!unoCanPlay(played, state.uno.top, state.uno.color)) return;
 
   hand.splice(idx, 1);
   unoStampCard(played);
@@ -546,6 +653,8 @@ function unoHostApplyPlay(pid, card, chosenColor) {
   state.uno.color = unoIsWild(played)
     ? (UNO_COLORS.includes(chosenColor) ? chosenColor : UNO_COLORS[Math.floor(Math.random() * 4)])
     : played.color;
+  // Joker/+4: seçilen renk karta damgalanır; ıskartada kart animasyonla o renge boyanır.
+  if (unoIsWild(played)) played._tint = state.uno.color;
 
   // Kazanma
   if (hand.length === 0) {
@@ -560,6 +669,24 @@ function unoHostApplyPlay(pid, card, chosenColor) {
   if (hand.length === 1) broadcast({ type: 'uno-uno', id: pid, name: unoNameOf(pid) });
 
   const n = state.uno.players.length;
+
+  // Bekleyen cezaya yanıt (kombo/blok kuralları): kartın normal etkisi işlemez.
+  if (state.uno.pendingCount > 0) {
+    if (played.value === 'skip') {
+      // Blok: ceza iptal, Engel "cezayı savmak" için harcandı → sıra normal ilerler.
+      state.uno.pendingCount = 0;
+      state.uno.pendingKind = null;
+    } else if (played.value === 'draw2') {
+      state.uno.pendingCount += 2;
+    } else if (played.value === 'wild4') {
+      state.uno.pendingCount += 4;
+      state.uno.pendingKind = 'wild4'; // artık üstüne yalnız +4 yığılabilir
+    }
+    unoHostAdvance(1);
+    unoHostSync();
+    return;
+  }
+
   switch (played.value) {
     case 'reverse':
       if (n === 2) { unoHostAdvance(2); }           // 2 kişide ters = engel
@@ -569,6 +696,13 @@ function unoHostApplyPlay(pid, card, chosenColor) {
       unoHostAdvance(2);
       break;
     case 'draw2': {
+      if (unoPenaltyIsPending()) {
+        // Kombo/blok açık: kurban hemen çekmez; yanıt hakkıyla sırayı devralır.
+        state.uno.pendingCount = 2;
+        state.uno.pendingKind = 'draw2';
+        unoHostAdvance(1);
+        break;
+      }
       const victim = state.uno.players[unoPlayerIndexAt(1)];
       unoHostDraw(victim.id, 2);
       state.uno.events.push({ kind: 'draw', actorId: victim.id, count: 2 });
@@ -576,6 +710,12 @@ function unoHostApplyPlay(pid, card, chosenColor) {
       break;
     }
     case 'wild4': {
+      if (unoPenaltyIsPending()) {
+        state.uno.pendingCount = 4;
+        state.uno.pendingKind = 'wild4';
+        unoHostAdvance(1);
+        break;
+      }
       const victim = state.uno.players[unoPlayerIndexAt(1)];
       unoHostDraw(victim.id, 4);
       state.uno.events.push({ kind: 'draw', actorId: victim.id, count: 4 });
@@ -592,10 +732,51 @@ function unoHostApplyPlay(pid, card, chosenColor) {
 function unoHostApplyDraw(pid) {
   if (!unoIsHost() || !state.uno.started) return;
   if (state.uno.turnId !== pid) return;
-  unoHostDraw(pid, 1);
+  // "At / Beklet" kararı beklerken desteye tıklamak = beklet (kart zaten çekildi).
+  if (state.uno.awaitId === pid) { unoHostApplyKeep(pid); return; }
+  // Bekleyen ceza varsa desteye tıklamak cezanın tamamını çekmektir.
+  const count = state.uno.pendingCount > 0 ? state.uno.pendingCount : 1;
+  const wasPenalty = state.uno.pendingCount > 0;
+  state.uno.pendingCount = 0;
+  state.uno.pendingKind = null;
+  const hand = state.uno.hands[pid] || [];
+  const beforeLen = hand.length;
+  unoHostDraw(pid, count);
+  const drawn = hand.length > beforeLen ? hand[hand.length - 1] : null;
   state.uno.actionSeq = (state.uno.actionSeq || 0) + 1;
-  state.uno.events = [{ kind: 'draw', actorId: pid, count: 1 }];
+  state.uno.events = [{ kind: 'draw', actorId: pid, count }];
+
+  // Normal (ceza olmayan) çekişte kart oynanabilirse sıra hemen bitmez:
+  // insan oyuncuya "At / Beklet" seçimi sunulur; bot anında oynar.
+  if (!wasPenalty && drawn && unoCanPlay(drawn, state.uno.top, state.uno.color)) {
+    const p = state.uno.players.find(x => x.id === pid);
+    if (p && p.isBot) {
+      unoHostSync(); // çekiş animasyonu herkese gitsin
+      clearTimeout(state.uno.botTimer);
+      state.uno.botTimer = setTimeout(() => {
+        if (!state.uno.started || state.uno.turnId !== pid) return;
+        unoHostApplyPlay(pid, drawn, unoIsWild(drawn) ? unoBotPickColor(hand) : null);
+      }, 700);
+      return;
+    }
+    state.uno.awaitId = pid;
+    state.uno.awaitCard = { color: drawn.color, value: drawn.value };
+    unoHostSync();
+    return;
+  }
+
   unoHostAdvance(1); // çekmek sırayı bitirir
+  unoHostSync();
+}
+
+// "Beklet" kararı: çekilen kart elde kalır, sıra bir sonrakine geçer.
+function unoHostApplyKeep(pid) {
+  if (!unoIsHost() || !state.uno.started) return;
+  if (state.uno.awaitId !== pid) return;
+  state.uno.awaitId = null;
+  state.uno.awaitCard = null;
+  state.uno.events = [];
+  unoHostAdvance(1);
   unoHostSync();
 }
 
@@ -620,7 +801,11 @@ function unoHostSync() {
     playSeq: state.uno.playSeq || 0,
     actionSeq: state.uno.actionSeq || 0,
     events: state.uno.events || [],
-    winnerId: state.uno.winnerId
+    winnerId: state.uno.winnerId,
+    rules: state.uno.rules,
+    pendingCount: state.uno.pendingCount || 0,
+    pendingKind: state.uno.pendingKind || null,
+    awaitId: state.uno.awaitId || null
   });
 
   state.uno.players.forEach(p => {
@@ -643,8 +828,50 @@ function unoHostBroadcastLobby() {
     host: state.uno.host,
     started: state.uno.started,
     maxPlayers: state.uno.maxPlayers,
-    players: state.uno.players.map(p => ({ id: p.id, name: p.name, count: 0 }))
+    players: state.uno.players.map(p => ({ id: p.id, name: p.name, count: 0 })),
+    rules: state.uno.rules
   });
+}
+
+/* ------------------------------ Kurallar paneli -------------------------- */
+
+// Herkes paneli açıp kuralları görebilir; anahtarları yalnızca kurucu ve yalnız
+// oyun başlamadan değiştirebilir.
+function unoRenderSettings() {
+  const rules = state.uno.rules || { stack: false, block: false, startCards: 7 };
+  const canEdit = unoIsHost() && !state.uno.started;
+  const scSel = document.getElementById('uno-rule-startcards');
+  const scVal = Math.max(5, Math.min(10, parseInt(rules.startCards, 10) || 7));
+  if (scSel) { scSel.value = String(scVal); scSel.disabled = !canEdit; }
+  const scSum = document.getElementById('uno-startcards-sum');
+  if (scSum) scSum.textContent = scVal + ' kart';
+  [['stack', 'uno-rule-stack'], ['block', 'uno-rule-block']].forEach(([key, id]) => {
+    const cb = document.getElementById(id);
+    if (cb) { cb.checked = !!rules[key]; cb.disabled = !canEdit; }
+    const label = document.querySelector(`.u-rule-state[data-for="${key}"]`);
+    if (label) {
+      label.textContent = rules[key] ? 'Açık' : 'Kapalı';
+      label.classList.toggle('on', !!rules[key]);
+    }
+    const cardEl = document.querySelector(`.u-rule-card[data-rule="${key}"]`);
+    if (cardEl) cardEl.classList.toggle('on', !!rules[key]);
+  });
+  const hint = document.getElementById('uno-settings-hint');
+  if (hint) {
+    if (canEdit) hint.textContent = 'Kurucu olarak kuralları buradan değiştirebilirsin.';
+    else if (unoIsHost()) hint.textContent = 'Kurallar oyun sırasında değiştirilemez.';
+    else hint.textContent = 'Kuralları yalnızca kurucu değiştirebilir.';
+  }
+}
+
+function unoHostSetRule(key, value) {
+  if (!unoIsHost() || state.uno.started) { unoRenderSettings(); return; }
+  state.uno.rules = Object.assign({ stack: false, block: false, startCards: 7 }, state.uno.rules);
+  state.uno.rules[key] = (key === 'startCards')
+    ? Math.max(5, Math.min(10, parseInt(value, 10) || 7))
+    : !!value;
+  unoRenderSettings();
+  broadcast({ type: 'uno-rules', rules: state.uno.rules });
 }
 
 /* ------------------------- Kart açılışı / katılım ------------------------ */
@@ -689,6 +916,7 @@ function handleUnoMessage(peerId, msg) {
       state.uno.host = msg.host;
       state.uno.started = msg.started;
       if (msg.maxPlayers) state.uno.maxPlayers = msg.maxPlayers;
+      if (msg.rules) state.uno.rules = Object.assign({ stack: false, block: false }, msg.rules);
       state.uno.players = msg.players || [];
       if (!msg.started) {
         unoOpenCard();
@@ -724,6 +952,9 @@ function handleUnoMessage(peerId, msg) {
     case 'uno-draw':
       if (state.uno.host === state.myId) unoHostApplyDraw(peerId);
       break;
+    case 'uno-keep':
+      if (state.uno.host === state.myId) unoHostApplyKeep(peerId);
+      break;
     case 'uno-state': {
       if (state.uno.host === state.myId) return; // kendi yayınım
       state.uno.started = msg.started;
@@ -737,6 +968,11 @@ function handleUnoMessage(peerId, msg) {
       state.uno.actionSeq = msg.actionSeq || 0;
       state.uno.events = msg.events || [];
       state.uno.winnerId = msg.winnerId || null;
+      if (msg.rules) state.uno.rules = Object.assign({ stack: false, block: false, startCards: 7 }, msg.rules);
+      state.uno.pendingCount = msg.pendingCount || 0;
+      state.uno.pendingKind = msg.pendingKind || null;
+      state.uno.awaitId = msg.awaitId || null;
+      unoRenderSettings();
       unoOpenCard();
       if (!msg.started && msg.winnerId) unoRenderOver();
       else if (msg.started) unoRenderGame();
@@ -763,7 +999,61 @@ function handleUnoMessage(peerId, msg) {
         unoCloseLocal();
       }
       break;
+    case 'uno-kick':
+      if (peerId !== state.uno.host) return; // yalnızca kurucu atabilir
+      showToast('Kurucu seni UNO oyunundan attı.', 'warn');
+      if (typeof leaveActiveLobby === 'function' && state.activeLobbyId) leaveActiveLobby();
+      unoCloseLocal();
+      break;
+    case 'uno-rules':
+      if (peerId !== state.uno.host) return; // kuralları yalnızca kurucu değiştirir
+      state.uno.rules = Object.assign({ stack: false, block: false }, msg.rules);
+      unoRenderSettings();
+      showToast('Kurucu oyun kurallarını güncelledi.', 'info');
+      break;
   }
+}
+
+// Host tarafında bir oyuncuyu (bot/insan) oyundan çıkarır; ayrılma ve kick
+// aynı yoldan geçer. Lobide ve oyun ortasında doğru çalışır.
+function unoHostRemovePlayer(pid) {
+  if (!unoIsHost()) return;
+  const removedIdx = state.uno.players.findIndex(p => p.id === pid);
+  if (removedIdx === -1) return;
+  state.uno.players.splice(removedIdx, 1);
+  if (state.uno.hands) delete state.uno.hands[pid];
+  clearTimeout(state.uno.botTimer);
+  if (state.uno.awaitId === pid) { state.uno.awaitId = null; state.uno.awaitCard = null; }
+
+  if (state.uno.started) {
+    if (state.uno.players.length < 2) {
+      state.uno.started = false;
+      state.uno.winnerId = state.uno.players[0] ? state.uno.players[0].id : null;
+      if (state.uno.winnerId) broadcast({ type: 'uno-over', winnerId: state.uno.winnerId, winnerName: unoNameOf(state.uno.winnerId) });
+      unoHostSync();
+      return;
+    }
+    // Çıkan oyuncu sıradakinden ÖNCE oturuyorsa dizideki herkes bir sola kayar;
+    // turnIndex'i de kaydırmazsak sıra yanlışlıkla bir kişi atlar.
+    if (removedIdx < state.uno.turnIndex) state.uno.turnIndex--;
+    if (state.uno.turnIndex >= state.uno.players.length) state.uno.turnIndex = 0;
+    unoHostSync();
+  } else {
+    unoHostBroadcastLobby();
+    unoRenderLobby();
+  }
+}
+
+// Kurucu bir oyuncuyu/botu atar. Gerçek oyuncuya haber verilir ki kartı kapansın.
+function unoHostKick(pid) {
+  if (!unoIsHost() || pid === state.myId) return;
+  const p = state.uno.players.find(x => x.id === pid);
+  if (!p) return;
+  if (!String(pid).startsWith('bot-')) {
+    broadcastTo(pid, { type: 'uno-kick' });
+  }
+  showToast(`${p.name} oyundan atıldı.`, 'info');
+  unoHostRemovePlayer(pid);
 }
 
 // renderer.js peer kopunca çağırır.
@@ -778,25 +1068,7 @@ function unoHandlePeerLeft(peerId) {
     return;
   }
   if (state.uno.host !== state.myId) return;
-  // Host olarak ayrılan oyuncuyu temizle.
-  const wasTurn = state.uno.started && state.uno.turnId === peerId;
-  state.uno.players = state.uno.players.filter(p => p.id !== peerId);
-  if (state.uno.hands) delete state.uno.hands[peerId];
-  if (state.uno.players.length < 2 && state.uno.started) {
-    state.uno.started = false;
-    state.uno.winnerId = state.uno.players[0] ? state.uno.players[0].id : null;
-    if (state.uno.winnerId) broadcast({ type: 'uno-over', winnerId: state.uno.winnerId, winnerName: unoNameOf(state.uno.winnerId) });
-    unoHostSync();
-    return;
-  }
-  if (state.uno.started) {
-    if (state.uno.turnIndex >= state.uno.players.length) state.uno.turnIndex = 0;
-    if (wasTurn) { /* sıradaki oyuncuya geç: turnIndex zaten kaydı, aynı index yeni oyuncuya denk gelir */ }
-    unoHostSync();
-  } else {
-    unoHostBroadcastLobby();
-    unoRenderLobby();
-  }
+  unoHostRemovePlayer(peerId);
 }
 
 // renderer.js geç katılan peer'e senkron için çağırır (yalnızca host).
@@ -808,12 +1080,15 @@ function unoSyncNewPeer(peerId) {
       started: true,
       players: state.uno.players.map(p => ({ id: p.id, name: p.name, count: p.count })),
       turnId: state.uno.turnId, dir: state.uno.dir, color: state.uno.color, top: state.uno.top, pile: state.uno.discard.slice(-5), playSeq: state.uno.playSeq || 0,
-      actionSeq: state.uno.actionSeq || 0, events: [], winnerId: null
+      actionSeq: state.uno.actionSeq || 0, events: [], winnerId: null,
+      rules: state.uno.rules, pendingCount: state.uno.pendingCount || 0, pendingKind: state.uno.pendingKind || null,
+      awaitId: state.uno.awaitId || null
     });
   } else {
     broadcastTo(peerId, {
       type: 'uno-lobby', host: state.uno.host, started: false,
-      players: state.uno.players.map(p => ({ id: p.id, name: p.name, count: 0 }))
+      players: state.uno.players.map(p => ({ id: p.id, name: p.name, count: 0 })),
+      rules: state.uno.rules
     });
   }
 }
@@ -828,6 +1103,11 @@ function unoCloseLocal() {
   state.uno.hands = {};
   state.uno.deck = [];
   state.uno.winnerId = null;
+  state.uno.pendingCount = 0;
+  state.uno.pendingKind = null;
+  state.uno.awaitId = null;
+  state.uno.awaitCard = null;
+  document.getElementById('uno-settings')?.classList.add('hidden');
   const card = document.getElementById('uno-card');
   if (card && !card.classList.contains('hidden')) {
     if (focusedCard && focusedCard.id === 'uno-card') toggleFocus(card);
@@ -864,6 +1144,25 @@ function initUno() {
 
   document.getElementById('uno-start')?.addEventListener('click', unoHostStart);
   document.getElementById('uno-add-bot')?.addEventListener('click', unoAddBot);
+
+  // Kurallar paneli: herkes açar, kurucu değiştirir.
+  document.getElementById('uno-settings-btn')?.addEventListener('click', () => {
+    unoRenderSettings();
+    document.getElementById('uno-settings')?.classList.remove('hidden');
+  });
+  document.getElementById('uno-settings-close')?.addEventListener('click', () => {
+    document.getElementById('uno-settings')?.classList.add('hidden');
+  });
+  document.getElementById('uno-rule-stack')?.addEventListener('change', (e) => unoHostSetRule('stack', e.target.checked));
+  document.getElementById('uno-rule-block')?.addEventListener('change', (e) => unoHostSetRule('block', e.target.checked));
+  document.getElementById('uno-rule-startcards')?.addEventListener('change', (e) => unoHostSetRule('startCards', e.target.value));
+
+  // "At / Beklet" karar çubuğu
+  document.getElementById('uno-draw-play')?.addEventListener('click', () => {
+    if (state.uno.awaitId !== state.myId) return;
+    unoPlayFromHand((state.uno.hand || []).length - 1);
+  });
+  document.getElementById('uno-draw-keep')?.addEventListener('click', unoRequestKeep);
   document.getElementById('uno-max')?.addEventListener('change', (e) => {
     if (!unoIsHost()) return;
     let v = Math.max(2, Math.min(8, parseInt(e.target.value, 10) || 4));
