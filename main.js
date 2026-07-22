@@ -627,9 +627,13 @@ ipcMain.on('register-ptt', (event, key) => {
   } catch (e) {
     console.error('PTT kayıt hatası:', e);
   }
+  // unregisterAll kill-switch'i de sildiği için geri yükle
+  syncControlKillSwitch();
 });
 ipcMain.on('unregister-ptt', () => {
   globalShortcut.unregisterAll();
+  // unregisterAll kill-switch'i de sildiği için geri yükle
+  syncControlKillSwitch();
 });
 
 ipcMain.on('notify', (event, { title, body }) => {
@@ -644,9 +648,46 @@ ipcMain.on('notify', (event, { title, body }) => {
 // Not: tray-action-show / tray-action-quit dinleyicileri whenReady içinde
 // kayıtlı (tray kurulumuyla birlikte); burada ikinci kez kaydedilmemeli.
 
+// GÜVENLİK — Denetim kill-switch'i: denetim aktifken Ctrl+X'e kısa aralıkla İKİ KEZ
+// basılırsa denetim anında kapatılır. globalShortcut şart, çünkü denetim sırasında
+// pencere odakta olmayabilir (karşı taraf tüm masaüstünü yönetiyor). Kısayol yalnızca
+// denetim süresince kayıtlıdır; bu sürede tek Ctrl+X (kes) sistem genelinde yutulur —
+// güvenlik için bilinçli ödünleşim. Karşı tarafın robotjs ile bastırdığı Ctrl+X de
+// OS seviyesinde aynı kısayolu tetikler; bu da güvenli yönde (oturum kapanır).
+const CTRL_KILL_ACCEL = 'CommandOrControl+X';
+const CTRL_KILL_WINDOW_MS = 1500;
+let ctrlKillLastPress = 0;
+
+function syncControlKillSwitch() {
+  if (remoteControlActive) {
+    if (globalShortcut.isRegistered(CTRL_KILL_ACCEL)) return;
+    ctrlKillLastPress = 0;
+    try {
+      globalShortcut.register(CTRL_KILL_ACCEL, () => {
+        const now = Date.now();
+        if (now - ctrlKillLastPress <= CTRL_KILL_WINDOW_MS) {
+          remoteControlActive = false;
+          syncControlKillSwitch();
+          console.log('Uzaktan kontrol: Ctrl+X x2 kill-switch ile KAPATILDI');
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('remote-control-killed');
+          }
+        } else {
+          ctrlKillLastPress = now;
+        }
+      });
+    } catch (e) {
+      console.error('Kill-switch kayıt hatası:', e);
+    }
+  } else {
+    try { globalShortcut.unregister(CTRL_KILL_ACCEL); } catch (e) {}
+  }
+}
+
 ipcMain.on('set-remote-control', (event, active) => {
   remoteControlActive = !!active;
   console.log('Uzaktan kontrol:', remoteControlActive ? 'AKTİF' : 'KAPALI');
+  syncControlKillSwitch();
 });
 
 ipcMain.on('remote-input', (event, data) => {

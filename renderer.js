@@ -5723,6 +5723,18 @@ function stopBeingControlled(notifyPeer) {
 
 document.getElementById('ctrl-pill-stop').addEventListener('click', () => stopBeingControlled(true));
 
+// GÜVENLİK kill-switch'i: denetim aktifken Ctrl+X'e iki kez basılınca main süreç
+// (globalShortcut, pencere odakta olmasa bile) denetimi zaten kapatmıştır; burada
+// UI temizlenir ve karşı tarafa ctrl-revoke gönderilir.
+if (window.electronAPI.onRemoteControlKilled) {
+  window.electronAPI.onRemoteControlKilled(() => {
+    if (state.controlledBy) {
+      stopBeingControlled(true);
+      showToast('Denetim, güvenlik kısayoluyla (Ctrl+X ×2) kapatıldı.', 'info');
+    }
+  });
+}
+
 document.getElementById('remote-stop').addEventListener('click', () => {
   if (state.activeControl) {
     broadcastTo(state.activeControl.hostId, { type: 'ctrl-revoke' });

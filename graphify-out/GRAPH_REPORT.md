@@ -1,16 +1,16 @@
-# Graph Report - kanka-voice  (2026-07-22)
+# Graph Report - ctrl-x-kill-switch  (2026-07-22)
 
 ## Corpus Check
-- 69 files · ~181,530 words
+- 69 files · ~181,777 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 623 nodes · 1127 edges · 61 communities (40 shown, 21 thin omitted)
+- 624 nodes · 1128 edges · 61 communities (40 shown, 21 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 37 edges (avg confidence: 0.64)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `79ea0c41`
+- Built from commit: `e4c4bf00`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -115,8 +115,8 @@ Cohesion: 0.07
 Nodes (39): App(), Activities(), Chat(), Dashboard(), accountItemStyle, cardStyle, containerStyle, deleteBtnStyle (+31 more)
 
 ### Community 2 - "Package Dependencies"
-Cohesion: 0.04
-Nodes (45): concurrently, cross-env, electron, electron-builder, electron-packager, author, build, appId (+37 more)
+Cohesion: 0.12
+Nodes (16): build, appId, directories, files, productName, win, output, icon (+8 more)
 
 ### Community 3 - "Chat & TURN Resolution Utils"
 Cohesion: 0.07
@@ -127,7 +127,7 @@ Cohesion: 0.12
 Nodes (56): handleUnoMessage(), initUno(), UNO_COLORS, UNO_GLYPH, unoActorEl(), unoAddBot(), unoBecomeHost(), unoBotName() (+48 more)
 
 ### Community 5 - "Electron Main Process"
-Cohesion: 0.09
+Cohesion: 0.08
 Nodes (15): { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage }, baseUserData, deviceIdentityFile, dgram, _diagSettingsPath, envPath, fs, getBroadcastAddresses() (+7 more)
 
 ### Community 6 - "WebRTC Peer & ICE Management"
@@ -155,8 +155,8 @@ Cohesion: 0.32
 Nodes (15): handleSBMessage(), initSharedBrowser(), sbApplyRemoteNav(), sbBroadcastAuth(), sbCanInteract(), sbCurrentUrl(), sbHandleHostLeft(), sbIsHost() (+7 more)
 
 ### Community 12 - "Build Config & Reference Files"
-Cohesion: 0.11
-Nodes (19): acorn, cross-fetch, crypto-js, @ghostery/adblocker-electron, @jitsi/robotjs, dependencies, acorn, cross-fetch (+11 more)
+Cohesion: 0.04
+Nodes (48): acorn, author, dependencies, acorn, cross-fetch, crypto-js, @ghostery/adblocker-electron, @jitsi/robotjs (+40 more)
 
 ### Community 13 - "Device Auth & Presence"
 Cohesion: 0.19
@@ -258,8 +258,6 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.038) - this node is a cross-community bridge._
 - **Why does `WebRTC()` connect `React App / Signaling / Crypto Core` to `WebRTC Peer & ICE Management`?**
   _High betweenness centrality (0.038) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `Build Config & Reference Files` to `Package Dependencies`?**
-  _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
   _220 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `E2E Test Harness` be split into smaller, more focused modules?**
@@ -267,4 +265,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `React App / Signaling / Crypto Core` be split into smaller, more focused modules?**
   _Cohesion score 0.07205387205387205 - nodes in this community are weakly interconnected._
 - **Should `Package Dependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.043478260869565216 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.125 - nodes in this community are weakly interconnected._
+- **Should `Chat & TURN Resolution Utils` be split into smaller, more focused modules?**
+  _Cohesion score 0.07459677419354839 - nodes in this community are weakly interconnected._
