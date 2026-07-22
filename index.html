@@ -632,7 +632,72 @@
         <div id="uno-card" class="vcard hidden" style="background: radial-gradient(circle at 50% 25%, #1b2a4a, #0a1120); color: #fff; display: flex; flex-direction: column; overflow: hidden;">
           <div class="card-actions" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:rgba(0,0,0,0.35);">
             <span class="u-title">UNO</span>
-            <button id="uno-close" class="btn-sec btn-sm" style="background: rgba(0,0,0,0.5);">Odadan Çık</button>
+            <div style="display:flex; gap:8px;">
+              <button id="uno-settings-btn" class="btn-sec btn-sm" style="background: rgba(0,0,0,0.5);">⚙ Kurallar</button>
+              <button id="uno-close" class="btn-sec btn-sm" style="background: rgba(0,0,0,0.5);">Odadan Çık</button>
+            </div>
+          </div>
+
+          <!-- Oyun kuralları paneli: herkes açıp bakabilir, yalnızca kurucu değiştirir -->
+          <div id="uno-settings" class="u-settings hidden">
+            <div class="u-settings-box">
+              <div class="u-settings-head">
+                <h3 class="u-h" style="margin:0;">Oyun Kuralları</h3>
+                <button id="uno-settings-close" class="btn-sec btn-sm">Kapat</button>
+              </div>
+              <p id="uno-settings-hint" class="u-hint" style="margin:6px 0 14px;"></p>
+              <div class="u-rules-grid">
+
+                <div class="u-rule-card" data-rule="stack">
+                  <div class="u-rule-visual">
+                    <div class="u-card u-ex red ex1"><span class="u-val">+2</span></div>
+                    <div class="u-card u-ex wild ex2"><span class="u-val">+4</span></div>
+                    <span class="u-rule-sum">= +6</span>
+                  </div>
+                  <div class="u-rule-name">Kombo (Yığma)</div>
+                  <p class="u-rule-desc">+2/+4 yediğinde çekmek yerine elindeki +2 veya +4'ü üstüne atabilirsin; ceza katlanarak sıradakine geçer. İstersen desteye tıklayıp cezayı normal çekersin.</p>
+                  <label class="switch u-rule-switch">
+                    <input type="checkbox" id="uno-rule-stack">
+                    <span class="slider round"></span>
+                  </label>
+                  <span class="u-rule-state" data-for="stack">Kapalı</span>
+                </div>
+
+                <div class="u-rule-card" data-rule="block">
+                  <div class="u-rule-visual">
+                    <div class="u-card u-ex red ex1"><span class="u-val">+2</span></div>
+                    <div class="u-card u-ex blue ex2"><span class="u-val">⊘</span></div>
+                    <span class="u-rule-sum">ceza iptal</span>
+                  </div>
+                  <div class="u-rule-name">Bloklama</div>
+                  <p class="u-rule-desc">+2/+4 yiyeceğin sırada elinde Engel (⊘) varsa onu atıp cezayı bloklarsın; kart çekmezsin ve sıra düzgünce bir sonrakine geçer — Engel, cezayı savmak için kullanılmış olur.</p>
+                  <label class="switch u-rule-switch">
+                    <input type="checkbox" id="uno-rule-block">
+                    <span class="slider round"></span>
+                  </label>
+                  <span class="u-rule-state" data-for="block">Kapalı</span>
+                </div>
+
+                <div class="u-rule-card" data-rule="startCards">
+                  <div class="u-rule-visual">
+                    <div class="u-card u-ex back ex1"><span class="u-val">UNO</span></div>
+                    <div class="u-card u-ex back ex2"><span class="u-val">UNO</span></div>
+                    <span class="u-rule-sum" id="uno-startcards-sum">7 kart</span>
+                  </div>
+                  <div class="u-rule-name">Başlangıç Kartı</div>
+                  <p class="u-rule-desc">Her oyuncunun oyuna kaç kartla başlayacağını belirler.</p>
+                  <select id="uno-rule-startcards" class="u-select u-rule-select">
+                    <option value="5">5 kart</option>
+                    <option value="6">6 kart</option>
+                    <option value="7" selected>7 kart</option>
+                    <option value="8">8 kart</option>
+                    <option value="9">9 kart</option>
+                    <option value="10">10 kart</option>
+                  </select>
+                </div>
+
+              </div>
+            </div>
           </div>
 
           <!-- Bekleme salonu -->
@@ -678,6 +743,14 @@
               <span id="uno-color" class="u-color-badge"></span>
               <span id="uno-dir" class="u-dir">↻</span>
             </div>
+
+            <!-- Çekilen kart oynanabilirse: at ya da beklet -->
+            <div id="uno-draw-choice" class="u-draw-choice hidden">
+              <span class="u-draw-choice-text">Çektiğin kart oynanabilir!</span>
+              <button id="uno-draw-play" class="btn-pri btn-sm">Oyna</button>
+              <button id="uno-draw-keep" class="btn-sec btn-sm">Beklet</button>
+            </div>
+
             <div id="uno-hand" class="u-hand"></div>
 
             <div id="uno-color-picker" class="u-picker hidden">
@@ -1130,15 +1203,26 @@
       </div>
     </div>
 
-    <div id="ctrl-modal" class="modal hidden">
-      <div class="mcard">
-        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg> Uzaktan Kontrol İsteği</h3>
-        <p id="ctrl-text">Birisi bilgisayarınızı kontrol etmek istiyor.</p>
-        <div class="mactions">
-          <button id="ctrl-deny" class="btn-sec">Reddet</button>
-          <button id="ctrl-accept" class="btn-pri">Kabul Et</button>
-        </div>
+    <!-- Uzaktan kontrol isteği: ekranı kaplayan modal yerine köşe bildirimi.
+         Kullanıcı ne yapıyorsa engellenmez; 30 sn yanıtsız kalırsa reddedilir. -->
+    <div id="ctrl-modal" class="ctrl-note hidden">
+      <div class="ctrl-note-head">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg>
+        <span>Uzaktan Kontrol İsteği</span>
       </div>
+      <p id="ctrl-text">Birisi bilgisayarınızı kontrol etmek istiyor.</p>
+      <div class="ctrl-note-actions">
+        <button id="ctrl-deny" class="btn-sec btn-sm">Reddet</button>
+        <button id="ctrl-accept" class="btn-pri btn-sm">Kabul Et</button>
+      </div>
+      <div class="ctrl-note-timer"><div id="ctrl-timer-bar"></div></div>
+    </div>
+
+    <!-- Kontrol edilen tarafta görünen kalıcı uyarı + durdurma düğmesi -->
+    <div id="ctrl-active-pill" class="ctrl-pill hidden">
+      <span class="ctrl-pill-dot"></span>
+      <span id="ctrl-pill-text">Bilgisayarınız kontrol ediliyor</span>
+      <button id="ctrl-pill-stop" class="btn-sec btn-sm">Durdur</button>
     </div>
 
     <div id="remote-modal" class="modal hidden">

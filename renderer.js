@@ -2935,6 +2935,8 @@ function removePeer(peerId) {
   if (state.activeControl && state.activeControl.hostId === peerId) {
     document.getElementById('remote-stop').click();
   }
+  // Beni kontrol eden kişi koptuysa girişleri kapat, pill'i kaldır.
+  if (state.controlledBy === peerId) stopBeingControlled(false);
   showToast(peer.name + ' ayrıldı', 'warn');
   updateEmptyGrid();
 
@@ -4043,14 +4045,26 @@ async function handleDataMessage(peerId, msg) {
         document.getElementById('remote-vid').srcObject = peer.videoEl.srcObject;
       }
     } else {
-      alert('Kontrol isteği reddedildi.');
+      showToast('Kontrol isteği reddedildi.', 'warn');
     }
   } else if (msg.type === 'ctrl-revoke') {
-    document.getElementById('remote-modal').classList.add('hidden');
-    state.activeControl = null;
-    alert('Uzaktan kontrol izni kaldırıldı.');
-  } else if (msg.type === 'ctrl-event') {
+    // İki yönlü: kontrol EDEN vazgeçti → kontrol edilen taraf izni kapatır;
+    // kontrol EDİLEN durdurdu → kontrol eden taraf pencereyi kapatır.
+    if (state.controlledBy === peerId) {
+      stopBeingControlled(false);
+      showToast('Uzaktan kontrol sonlandırıldı.', 'info');
+    }
     if (state.activeControl && state.activeControl.hostId === peerId) {
+      document.getElementById('remote-modal').classList.add('hidden');
+      state.activeControl = null;
+      showToast('Uzaktan kontrol izni kaldırıldı.', 'info');
+    }
+  } else if (msg.type === 'ctrl-event') {
+    // DİKKAT: activeControl kontrol EDEN tarafta tutulur; kontrol EDİLEN taraf
+    // gelen girdileri controlledBy üzerinden doğrular. (Önceden activeControl'e
+    // bakılıyordu ve kontrol edilen tarafta hep null olduğundan hiçbir girdi
+    // işlenmiyordu — "uzaktan kontrol çalışmıyor" hatası buydu.)
+    if (state.controlledBy === peerId) {
       window.electronAPI.sendRemoteInput(msg.event);
     }
   } else if (msg.type.startsWith('wt-')) {
@@ -5639,19 +5653,47 @@ function stopRecording() {
 
 function requestControl(peerId) {
   broadcastTo(peerId, { type: 'ctrl-req', reqId: 'req-' + Date.now() });
-  alert('Kontrol isteği gönderildi.');
+  showToast('Kontrol isteği gönderildi.', 'info');
 }
+
+// İstek, ekranı kaplayan modal yerine sağ üstte bildirim kartı olarak gösterilir;
+// kullanıcının o an yaptığı işi engellemez. 30 sn yanıtsız kalırsa otomatik ret.
+const CTRL_REQ_TIMEOUT_MS = 30000;
+let ctrlReqTimer = null;
 
 function showControlModal(peerId, peerName, reqId) {
   state.pendingControlReq = { peerId, reqId };
-  document.getElementById('ctrl-text').textContent = `${peerName} bilgisayarınızı kontrol etmek istiyor. Onaylıyor musunuz?`;
-  document.getElementById('ctrl-modal').classList.remove('hidden');
+  document.getElementById('ctrl-text').textContent = `${peerName} bilgisayarınızı kontrol etmek istiyor.`;
+  const note = document.getElementById('ctrl-modal');
+  note.classList.remove('hidden');
+  const bar = document.getElementById('ctrl-timer-bar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    void bar.offsetWidth;
+    bar.style.transition = `width ${CTRL_REQ_TIMEOUT_MS}ms linear`;
+    bar.style.width = '0%';
+  }
+  clearTimeout(ctrlReqTimer);
+  ctrlReqTimer = setTimeout(() => {
+    if (state.pendingControlReq) {
+      broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: false });
+    }
+    closeCtrlModal();
+  }, CTRL_REQ_TIMEOUT_MS);
 }
 
 document.getElementById('ctrl-accept').addEventListener('click', () => {
   if (state.pendingControlReq) {
+    // Kabul: gelen ctrl-event'lerin işleneceği kaynak burada kaydedilir.
+    state.controlledBy = state.pendingControlReq.peerId;
     broadcastTo(state.pendingControlReq.peerId, { type: 'ctrl-res', accepted: true });
     window.electronAPI.setRemoteControl(true);
+    const pill = document.getElementById('ctrl-active-pill');
+    const peer = state.peers.get(state.controlledBy);
+    document.getElementById('ctrl-pill-text').textContent =
+      `${peer ? peer.name : 'Bir kullanıcı'} bilgisayarınızı kontrol ediyor`;
+    if (pill) pill.classList.remove('hidden');
   }
   closeCtrlModal();
 });
@@ -5662,9 +5704,24 @@ document.getElementById('ctrl-deny').addEventListener('click', () => {
   closeCtrlModal();
 });
 function closeCtrlModal() {
+  clearTimeout(ctrlReqTimer);
+  ctrlReqTimer = null;
   document.getElementById('ctrl-modal').classList.add('hidden');
   state.pendingControlReq = null;
 }
+
+// Kontrol edilen tarafın izni kapatması (pill'deki Durdur veya karşı tarafın revoke'u).
+function stopBeingControlled(notifyPeer) {
+  if (notifyPeer && state.controlledBy) {
+    broadcastTo(state.controlledBy, { type: 'ctrl-revoke' });
+  }
+  state.controlledBy = null;
+  window.electronAPI.setRemoteControl(false);
+  const pill = document.getElementById('ctrl-active-pill');
+  if (pill) pill.classList.add('hidden');
+}
+
+document.getElementById('ctrl-pill-stop').addEventListener('click', () => stopBeingControlled(true));
 
 document.getElementById('remote-stop').addEventListener('click', () => {
   if (state.activeControl) {

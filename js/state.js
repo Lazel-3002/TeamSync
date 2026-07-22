@@ -35,7 +35,8 @@ window.state = {
   pttActive: false,
   volume: 1.0,
   useAI: true,
-  activeControl: null,
+  activeControl: null,      // kontrol EDEN taraf: { hostId } (kimin masaüstünü yönetiyorum)
+  controlledBy: null,       // kontrol EDİLEN taraf: beni yöneten peer'in id'si
   pendingControlReq: null,
   speakingPeers: new Map(),
   analyser: null,
@@ -70,6 +71,11 @@ window.state = {
     playSeq: 0,      // oynanan kart sayacı (ıskarta "slam" animasyonu için)
     actionSeq: 0,    // her eylem grubu sayacı — uçan kart animasyonları için
     events: [],      // son eylem grubu: [{kind:'play'|'draw', actorId, count}]
+    rules: { stack: false, block: false, startCards: 7 }, // ev kuralları (kurucu ayarlar, herkes görür)
+    pendingCount: 0, // bekleyen +2/+4 ceza kartı sayısı (kombo/blok kuralları açıkken)
+    pendingKind: null, // 'draw2' | 'wild4' — yığının tabanındaki ceza türü
+    awaitId: null,   // desteden çektiği kart oynanabilir olup "At / Beklet" kararı beklenen oyuncu
+    awaitCard: null, // host-only: o oyuncunun çektiği kart (yalnız bu kart oynanabilir)
     deck: [],        // host-only
     discard: [],     // host-only
     hands: {},       // host-only: id -> [cards]
