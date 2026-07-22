@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function RemoteControl({ isHandshakeComplete, onRemoteControlGranted }) {
+export default function RemoteControl({ isHandshakeComplete, onRemoteControlGranted, onRemoteControlRevoked }) {
   const generateComplexPin = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$*!';
     let result = '';
@@ -57,7 +57,10 @@ export default function RemoteControl({ isHandshakeComplete, onRemoteControlGran
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
            <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 'bold' }}>🟢 Uzaktan Kontrol Aktif</span>
-           <button onClick={() => setStatus('idle')} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '10px' }}>Bitir</button>
+           <button onClick={() => {
+             setStatus('idle');
+             if (onRemoteControlRevoked) onRemoteControlRevoked();
+           }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '10px' }}>Bitir</button>
         </div>
       )}
     </div>

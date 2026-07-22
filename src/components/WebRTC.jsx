@@ -8,7 +8,10 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
   const [localStream, setLocalStream] = useState(null);
   const [micStream, setMicStream] = useState(null);
   const [hasRemoteStream, setHasRemoteStream] = useState(false);
+  const [isRemotePointerActive, setIsRemotePointerActive] = useState(false);
+  const [remotePointer, setRemotePointer] = useState({ x: 0, y: 0, visible: false });
   const dataChannelRef = useRef(null);
+  const remotePointerActiveRef = useRef(false);
 
   const sendRemoteInput = (type, data) => {
     if (isRemoteControlActive && dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
@@ -46,10 +49,22 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
   }, []);
 
   useEffect(() => {
-    if (!isRemoteControlActive) return;
+    if (!isRemoteControlActive || !isRemotePointerActive) return;
 
-    const handleKeyDown = (e) => { e.preventDefault(); sendRemoteInput('keydown', { key: e.key }); };
-    const handleKeyUp = (e) => { e.preventDefault(); sendRemoteInput('keyup', { key: e.key }); };
+    const handleKeyDown = (e) => {
+      e.preventDefault();
+      if (e.key === 'Escape') {
+        remotePointerActiveRef.current = false;
+        setIsRemotePointerActive(false);
+        return;
+      }
+      if (!e.repeat) sendRemoteInput('keydown', { key: e.key });
+    };
+    const handleKeyUp = (e) => {
+      if (e.key === 'Escape') return;
+      e.preventDefault();
+      sendRemoteInput('keyup', { key: e.key });
+    };
     
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -57,18 +72,63 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
+  }, [isRemoteControlActive, isRemotePointerActive]);
+
+  useEffect(() => {
+    if (isRemoteControlActive) return;
+    remotePointerActiveRef.current = false;
+    setIsRemotePointerActive(false);
+    setRemotePointer(pointer => ({ ...pointer, visible: false }));
   }, [isRemoteControlActive]);
 
-  const handleMouseEvent = (e, type) => {
-    if (!isRemoteControlActive || !remoteVideoRef.current) return;
+  const getRemoteVideoPoint = (e) => {
+    if (!remoteVideoRef.current) return null;
     const rect = remoteVideoRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    
-    // Bounds check
-    if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    
-    sendRemoteInput(type, { x, y, button: e.button });
+    const sourceWidth = remoteVideoRef.current.videoWidth || rect.width;
+    const sourceHeight = remoteVideoRef.current.videoHeight || rect.height;
+    const scale = Math.min(rect.width / sourceWidth, rect.height / sourceHeight);
+    const width = sourceWidth * scale;
+    const height = sourceHeight * scale;
+    const left = rect.left + (rect.width - width) / 2;
+    const top = rect.top + (rect.height - height) / 2;
+    const localX = e.clientX - left;
+    const localY = e.clientY - top;
+    if (localX < 0 || localY < 0 || localX > width || localY > height) return null;
+    return {
+      x: localX / width,
+      y: localY / height,
+      overlayX: e.clientX - rect.left,
+      overlayY: e.clientY - rect.top
+    };
+  };
+
+  const handleRemoteMouseMove = (e) => {
+    if (!isRemoteControlActive) return;
+    const point = getRemoteVideoPoint(e);
+    if (!point) {
+      setRemotePointer(pointer => ({ ...pointer, visible: false }));
+      return;
+    }
+    setRemotePointer({ x: point.overlayX, y: point.overlayY, visible: true });
+    if (remotePointerActiveRef.current) sendRemoteInput('mousemove', { x: point.x, y: point.y });
+  };
+
+  const handleRemoteClick = (e) => {
+    if (!isRemoteControlActive || remotePointerActiveRef.current || e.button !== 0) return;
+    const point = getRemoteVideoPoint(e);
+    if (!point) return;
+    e.preventDefault();
+    remotePointerActiveRef.current = true;
+    setIsRemotePointerActive(true);
+    sendRemoteInput('mousemove', { x: point.x, y: point.y });
+  };
+
+  const handleRemoteButton = (e, type) => {
+    if (!isRemoteControlActive || !remotePointerActiveRef.current) return;
+    const point = getRemoteVideoPoint(e);
+    if (!point) return;
+    e.preventDefault();
+    sendRemoteInput(type, { x: point.x, y: point.y, button: e.button });
   };
   useEffect(() => {
     let streamToStop;
@@ -302,19 +362,36 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
       {hasRemoteStream && (
         <div style={{ flex: 1, width: '100%' }}>
           <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#94a3b8' }}>Karşı Taraf (Ekran)</h3>
-          <video 
-            ref={remoteVideoRef} 
-            autoPlay 
-            style={{ width: '100%', borderRadius: '8px', background: '#000', display: 'block', cursor: isRemoteControlActive ? 'crosshair' : 'default' }}
-            onMouseMove={(e) => handleMouseEvent(e, 'mousemove')}
-            onMouseDown={(e) => handleMouseEvent(e, 'mousedown')}
-            onMouseUp={(e) => handleMouseEvent(e, 'mouseup')}
-            onClick={(e) => handleMouseEvent(e, 'click')}
-            onWheel={(e) => {
-              if (!isRemoteControlActive) return;
-              sendRemoteInput('scroll', { deltaX: e.deltaX, deltaY: e.deltaY });
-            }}
-          />
+          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '8px', background: '#000' }}>
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              style={{ width: '100%', borderRadius: '8px', background: '#000', display: 'block', objectFit: 'contain', cursor: isRemoteControlActive ? 'none' : 'default' }}
+              onMouseMove={handleRemoteMouseMove}
+              onMouseEnter={handleRemoteMouseMove}
+              onMouseLeave={() => setRemotePointer(pointer => ({ ...pointer, visible: false }))}
+              onMouseDown={(e) => handleRemoteButton(e, 'mousedown')}
+              onMouseUp={(e) => handleRemoteButton(e, 'mouseup')}
+              onClick={handleRemoteClick}
+              onContextMenu={(e) => e.preventDefault()}
+              onWheel={(e) => {
+                if (!isRemoteControlActive) return;
+                e.preventDefault();
+                if (remotePointerActiveRef.current) sendRemoteInput('scroll', { deltaX: e.deltaX, deltaY: e.deltaY });
+              }}
+            />
+            {isRemoteControlActive && (
+              <>
+                <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 10px', borderRadius: '999px', background: 'rgba(5,8,14,.78)', border: `1px solid ${isRemotePointerActive ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.2)'}`, color: '#fff', fontSize: '11px', pointerEvents: 'none' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isRemotePointerActive ? '#fff' : '#64748b', boxShadow: isRemotePointerActive ? '0 0 7px #fff' : 'none' }} />
+                  {isRemotePointerActive ? 'Kontrol sizde — ESC ile bırakın' : 'İzleme modu — kontrol için tıklayın'}
+                </div>
+                <svg viewBox="0 0 28 32" aria-hidden="true" style={{ position: 'absolute', left: 0, top: 0, width: '28px', height: '32px', opacity: remotePointer.visible ? 1 : 0, color: isRemotePointerActive ? '#fff' : '#080808', transform: `translate3d(${remotePointer.x - 3}px, ${remotePointer.y - 3}px, 0)`, pointerEvents: 'none', filter: isRemotePointerActive ? 'drop-shadow(0 1px 1px #000)' : 'drop-shadow(0 1px 1px #fff)' }}>
+                  <path d="M3 2.5v24.2l6.2-6 4.6 9.1 4.1-2.1-4.5-8.8h8.7L3 2.5z" fill="currentColor" stroke={isRemotePointerActive ? '#050505' : '#f8fafc'} strokeWidth="1.7" strokeLinejoin="round" />
+                </svg>
+              </>
+            )}
+          </div>
         </div>
       )}
       

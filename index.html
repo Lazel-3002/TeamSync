@@ -1229,9 +1229,18 @@
     <div id="remote-modal" class="modal hidden">
       <div class="mcard wide">
         <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> <span id="remote-name">Uzak Masaüstü</span></h3>
-        <p class="muted">Kontrol etmek için tıkla/sürükle. Çıkmak için ESC.</p>
+        <p id="remote-control-help" class="muted">Siyah imleci hareket ettirin. Kontrolü almak için ekrana tıklayın; bırakmak için ESC.</p>
         <div class="rwrap">
           <video id="remote-vid" autoplay playsinline></video>
+          <div id="remote-control-state" class="remote-control-state" aria-live="polite">
+            <span class="remote-control-state-dot"></span>
+            <span id="remote-control-state-text">İzleme modu — kontrol için tıklayın</span>
+          </div>
+          <div id="remote-pointer" class="remote-pointer" aria-hidden="true">
+            <svg viewBox="0 0 28 32" focusable="false">
+              <path d="M3 2.5v24.2l6.2-6 4.6 9.1 4.1-2.1-4.5-8.8h8.7L3 2.5z"></path>
+            </svg>
+          </div>
         </div>
         <div class="mactions">
           <button id="remote-stop" class="btn-sec">Kontrolü Bırak</button>

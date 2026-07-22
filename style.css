@@ -1477,8 +1477,69 @@ body { padding-top: 35px; } /* Prevent overlap */
   width: 100%;
   max-height: 75vh;
   display: block;
-  cursor: crosshair;
+  cursor: none;
   object-fit: contain;
+}
+
+/* Teams-style remote pointer. The captured desktop still shows the host's real
+   white system cursor; this overlay is the controller's separate pointer. */
+.remote-pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 32px;
+  color: #080808;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-100px, -100px, 0);
+  transition: opacity 0.08s ease, color 0.12s ease;
+  z-index: 3;
+  filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65));
+  will-change: transform;
+}
+.remote-pointer.visible { opacity: 1; }
+.remote-pointer svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.remote-pointer path {
+  fill: currentColor;
+  stroke: #f8fafc;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.remote-pointer.active {
+  color: #fff;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.35));
+}
+.remote-pointer.active path { stroke: #050505; }
+
+.remote-control-state {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(5, 8, 14, 0.78);
+  color: #e2e8f0;
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
+.remote-control-state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+}
+.remote-control-state.active { border-color: rgba(255, 255, 255, 0.42); color: #fff; }
+.remote-control-state.active .remote-control-state-dot {
+  background: #fff;
+  box-shadow: 0 0 7px rgba(255, 255, 255, 0.8);
 }
 
 /* ===== TOAST NOTIFICATIONS ===== */

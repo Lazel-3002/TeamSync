@@ -4337,6 +4337,7 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'ctrl-res') {
     if (msg.accepted) {
       state.activeControl = { hostId: peerId };
+      setRemotePointerActive(false);
       document.getElementById('remote-name').textContent = displayName(peerId, peer.name) + ' Masaüstü';
       document.getElementById('remote-modal').classList.remove('hidden');
       if (peer.videoEl.srcObject) {
@@ -4353,6 +4354,7 @@ async function handleDataMessage(peerId, msg) {
       showToast('Uzaktan kontrol sonlandırıldı.', 'info');
     }
     if (state.activeControl && state.activeControl.hostId === peerId) {
+      setRemotePointerActive(false);
       document.getElementById('remote-modal').classList.add('hidden');
       state.activeControl = null;
       showToast('Uzaktan kontrol izni kaldırıldı.', 'info');
@@ -6091,30 +6093,156 @@ document.getElementById('remote-stop').addEventListener('click', () => {
   if (state.activeControl) {
     broadcastTo(state.activeControl.hostId, { type: 'ctrl-revoke' });
   }
+  setRemotePointerActive(false);
   document.getElementById('remote-modal').classList.add('hidden');
   state.activeControl = null;
   window.electronAPI.setRemoteControl(false);
 });
 
 const remoteVid = document.getElementById('remote-vid');
-remoteVid.addEventListener('mousedown', e => sendCtrlEvent({ type: 'mousedown', x: relX(e), y: relY(e), button: e.button }));
-remoteVid.addEventListener('mouseup', e => sendCtrlEvent({ type: 'mouseup', x: relX(e), y: relY(e), button: e.button }));
-remoteVid.addEventListener('mousemove', throttle(e => sendCtrlEvent({ type: 'mousemove', x: relX(e), y: relY(e) }), 16));
-remoteVid.addEventListener('wheel', e => { e.preventDefault(); sendCtrlEvent({ type: 'scroll', deltaX: e.deltaX, deltaY: e.deltaY }); });
+const remoteWrap = remoteVid.closest('.rwrap');
+const remotePointer = document.getElementById('remote-pointer');
+const remoteControlState = document.getElementById('remote-control-state');
+const remoteControlStateText = document.getElementById('remote-control-state-text');
+const remoteControlHelp = document.getElementById('remote-control-help');
+let remotePointerActive = false;
+let lastRemotePoint = null;
+const remotePressedButtons = new Set();
+const remotePressedKeys = new Set();
+
+function setRemotePointerActive(active) {
+  const nextActive = Boolean(active && state.activeControl);
+  if (remotePointerActive && !nextActive && state.activeControl) {
+    if (lastRemotePoint) {
+      remotePressedButtons.forEach(button => {
+        sendCtrlEvent({ type: 'mouseup', x: lastRemotePoint.x, y: lastRemotePoint.y, button });
+      });
+    }
+    remotePressedKeys.forEach(key => sendCtrlEvent({ type: 'keyup', key }));
+  }
+  remotePointerActive = nextActive;
+  remotePressedButtons.clear();
+  remotePressedKeys.clear();
+  if (remotePointer) remotePointer.classList.toggle('active', remotePointerActive);
+  if (remoteControlState) remoteControlState.classList.toggle('active', remotePointerActive);
+  if (remoteControlStateText) {
+    remoteControlStateText.textContent = remotePointerActive
+      ? 'Kontrol sizde — bırakmak için ESC'
+      : 'İzleme modu — kontrol için tıklayın';
+  }
+  if (remoteControlHelp) {
+    remoteControlHelp.textContent = remotePointerActive
+      ? 'Beyaz imleç uzaktaki bilgisayarı kontrol ediyor. İzleme moduna dönmek için ESC.'
+      : 'Siyah imleci hareket ettirin. Kontrolü almak için ekrana tıklayın; bırakmak için ESC.';
+  }
+}
+
+// Return coordinates inside the actual video picture. object-fit: contain can add
+// letterboxing, so the element's full rectangle can map to the wrong screen point.
+function remoteVideoPoint(e) {
+  const rect = remoteVid.getBoundingClientRect();
+  const sourceWidth = remoteVid.videoWidth || rect.width;
+  const sourceHeight = remoteVid.videoHeight || rect.height;
+  const scale = Math.min(rect.width / sourceWidth, rect.height / sourceHeight);
+  const pictureWidth = sourceWidth * scale;
+  const pictureHeight = sourceHeight * scale;
+  const pictureLeft = rect.left + (rect.width - pictureWidth) / 2;
+  const pictureTop = rect.top + (rect.height - pictureHeight) / 2;
+  const localX = e.clientX - pictureLeft;
+  const localY = e.clientY - pictureTop;
+  if (localX < 0 || localY < 0 || localX > pictureWidth || localY > pictureHeight) return null;
+  const wrapRect = remoteWrap.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(1, localX / pictureWidth)),
+    y: Math.max(0, Math.min(1, localY / pictureHeight)),
+    overlayX: e.clientX - wrapRect.left,
+    overlayY: e.clientY - wrapRect.top
+  };
+}
+
+function positionRemotePointer(point) {
+  if (!remotePointer || !point) return;
+  lastRemotePoint = point;
+  remotePointer.style.transform = `translate3d(${point.overlayX - 3}px, ${point.overlayY - 3}px, 0)`;
+  remotePointer.classList.add('visible');
+}
+
+const sendRemoteMove = throttle(point => {
+  if (remotePointerActive && point) sendCtrlEvent({ type: 'mousemove', x: point.x, y: point.y });
+}, 16);
+
+remoteVid.addEventListener('mouseenter', e => {
+  const point = remoteVideoPoint(e);
+  if (point) positionRemotePointer(point);
+});
+remoteVid.addEventListener('mouseleave', () => {
+  if (remotePointer) remotePointer.classList.remove('visible');
+});
+remoteVid.addEventListener('mousemove', e => {
+  const point = remoteVideoPoint(e);
+  if (!point) {
+    if (remotePointer) remotePointer.classList.remove('visible');
+    return;
+  }
+  positionRemotePointer(point);
+  sendRemoteMove(point);
+});
+remoteVid.addEventListener('mousedown', e => {
+  const point = remoteVideoPoint(e);
+  if (!remotePointerActive || !point) return;
+  e.preventDefault();
+  remotePressedButtons.add(e.button);
+  sendCtrlEvent({ type: 'mousedown', x: point.x, y: point.y, button: e.button });
+});
+remoteVid.addEventListener('mouseup', e => {
+  const point = remoteVideoPoint(e);
+  if (!remotePointerActive || !point || !remotePressedButtons.has(e.button)) return;
+  e.preventDefault();
+  remotePressedButtons.delete(e.button);
+  sendCtrlEvent({ type: 'mouseup', x: point.x, y: point.y, button: e.button });
+});
+document.addEventListener('mouseup', e => {
+  if (!remotePointerActive || !remotePressedButtons.has(e.button) || !lastRemotePoint) return;
+  remotePressedButtons.delete(e.button);
+  sendCtrlEvent({ type: 'mouseup', x: lastRemotePoint.x, y: lastRemotePoint.y, button: e.button });
+});
+remoteVid.addEventListener('click', e => {
+  if (remotePointerActive || e.button !== 0) return;
+  const point = remoteVideoPoint(e);
+  if (!point) return;
+  e.preventDefault();
+  // Activation only takes control; it must not click an app remotely. Moving
+  // aligns the real white system cursor with the black preview cursor.
+  setRemotePointerActive(true);
+  sendCtrlEvent({ type: 'mousemove', x: point.x, y: point.y });
+});
+remoteVid.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (remotePointerActive) sendCtrlEvent({ type: 'scroll', deltaX: e.deltaX, deltaY: e.deltaY });
+}, { passive: false });
 remoteVid.addEventListener('contextmenu', e => e.preventDefault());
 
 document.addEventListener('keydown', e => {
   if (document.activeElement && document.activeElement.tagName === 'WEBVIEW') return;
-  if (state.activeControl && !e.repeat) sendCtrlEvent({ type: 'keydown', key: e.key });
+  if (e.key === 'Escape' && state.activeControl && remotePointerActive) {
+    e.preventDefault();
+    setRemotePointerActive(false);
+    return;
+  }
+  if (state.activeControl && remotePointerActive && !e.repeat) {
+    e.preventDefault();
+    remotePressedKeys.add(e.key);
+    sendCtrlEvent({ type: 'keydown', key: e.key });
+  }
 });
 document.addEventListener('keyup', e => {
   if (document.activeElement && document.activeElement.tagName === 'WEBVIEW') return;
-  if (state.activeControl) sendCtrlEvent({ type: 'keyup', key: e.key });
-  if (e.key === 'Escape' && state.activeControl) document.getElementById('remote-stop').click();
+  if (state.activeControl && remotePointerActive) {
+    e.preventDefault();
+    remotePressedKeys.delete(e.key);
+    sendCtrlEvent({ type: 'keyup', key: e.key });
+  }
 });
-
-function relX(e) { return (e.clientX - remoteVid.getBoundingClientRect().left) / remoteVid.clientWidth; }
-function relY(e) { return (e.clientY - remoteVid.getBoundingClientRect().top) / remoteVid.clientHeight; }
 
 function sendCtrlEvent(event) {
   if (!state.activeControl) return;
