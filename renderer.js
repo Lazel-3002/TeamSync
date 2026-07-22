@@ -227,6 +227,10 @@ function setupInternetSignaling(roomId, myId, myName) {
           type: 'hello',
           id: myId,
           name: myName,
+          // Kalıcı arkadaş kimliği (KNK-...): DM ve arkadaşlık istekleri
+          // teamsync/user/<friendId>/events konusuna gider; oda içi oturum
+          // UUID'siyle (myId) gönderilirse kimse dinlemediği için ulaşmaz.
+          friendId: state.friendId || null,
           avatar: state.myAvatar || null,
           isRoomFounder: state.isRoomFounder,
           isModerator: state.moderators.has(myId),
@@ -346,7 +350,7 @@ function setupInternetSignaling(roomId, myId, myName) {
           }
         }
         applySharedTurn(data.turn);
-        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder, isModerator: data.isModerator });
+        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder, isModerator: data.isModerator, friendId: data.friendId });
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
         if (!peer) {
@@ -2837,6 +2841,9 @@ async function handlePeerDiscovered(peer) {
   if (state.peers.has(peer.id)) {
     const existing = state.peers.get(peer.id);
     existing.lastSeen = Date.now();
+    // Kalıcı kimlik periyodik hello ile gelir; DM/arkadaşlık isteklerinin
+    // doğru konuya gidebilmesi için peer üzerinde güncel tutulur.
+    if (peer.friendId) existing.friendId = peer.friendId;
     if (existing.name !== peer.name) {
       existing.name = peer.name;
       const userEl = document.querySelector(`[data-uid="${peer.id}"] .uname`);
@@ -2897,6 +2904,10 @@ async function handlePeerDiscovered(peer) {
 
   const isInitiator = state.myId > peer.id;
   await createPeerConnection(peer.id, peer.name, isInitiator, peer.ip);
+  // createPeerConnection state.peers'a YENİ bir nesne koyar; keşifte gelen
+  // kalıcı kimliği (varsa) o nesneye aktar ki ilk hello beklenmesin.
+  const created = state.peers.get(peer.id);
+  if (created && peer.friendId) created.friendId = peer.friendId;
   showToast(peer.name + ' bulundu', 'info');
 }
 
@@ -4314,9 +4325,54 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
 // Odadaki bir kullanıcının (sağ/sol tık menüsünden "Profili Görüntüle")
 // kartını gösterir; avatar/rozetleri state.peers'tan, arkadaşlık ve
 // aksiyonları mevcut showUserContextMenu mantığıyla aynı şekilde kurar.
+// Oda içi oturum UUID'sini kişinin KALICI arkadaş kimliğine (KNK-...) çevirir.
+// DM ve arkadaşlık istekleri teamsync/user/<friendId>/events konusuna yayınlanır
+// ve herkes yalnızca kendi friendId konusunu dinler; oda UUID'siyle gönderilen
+// mesajlar kimsenin dinlemediği bir konuya gittiği için asla ulaşmıyordu.
+function resolvePeerFriendId(targetId) {
+  if (state.friends[targetId]) return targetId; // zaten kalıcı kimlik
+  const peer = state.peers.get(targetId);
+  return (peer && peer.friendId) ? peer.friendId : null;
+}
+
+// DM açma ortak akışı: kalıcı kimlik yoksa (karşı taraf eski sürüm ya da hello
+// henüz gelmedi) kullanıcıyı bilgilendir, sessizce kaybolan mesaj oluşturma.
+function openServerDM(targetId, targetName) {
+  const friendId = resolvePeerFriendId(targetId);
+  if (!friendId) {
+    showToast('Kullanıcının kimliği henüz alınamadı, birkaç saniye sonra tekrar deneyin.', 'warn');
+    return;
+  }
+  if (!state.friends[friendId]) {
+    state.friends[friendId] = { name: targetName, online: true, temporary: true };
+  }
+  openDM(friendId);
+  document.getElementById('server-dm-modal').classList.remove('hidden');
+}
+
+function sendRoomFriendRequest(targetId) {
+  const friendId = resolvePeerFriendId(targetId);
+  if (!friendId) {
+    showToast('Kullanıcının kimliği henüz alınamadı, birkaç saniye sonra tekrar deneyin.', 'warn');
+    return;
+  }
+  if (state.globalMqtt && state.globalMqtt.connected) {
+    state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
+      type: 'friend_request',
+      id: state.friendId,
+      name: state.myName
+    }));
+    showToast('Arkadaşlık isteği gönderildi!', 'ok');
+  } else {
+    showToast('Hata: Bağlantı hazır değil.', 'warn');
+  }
+}
+
 function showRoomUserProfile(targetId, targetName) {
   const peer = state.peers.get(targetId);
-  const isFriend = !!state.friends[targetId];
+  const friendId = resolvePeerFriendId(targetId);
+  // "temporary" girişler DM için açılmış geçici kayıtlardır, gerçek arkadaşlık değildir.
+  const isFriend = !!(friendId && state.friends[friendId] && !state.friends[friendId].temporary);
 
   const badges = [{ text: '🟢 Sunucuda', color: '#10b981' }];
   if (targetId === state.founderId) badges.unshift({ text: '👑 Kurucu', color: '#fbbf24' });
@@ -4325,13 +4381,7 @@ function showRoomUserProfile(targetId, targetName) {
   const actions = [
     {
       label: '💬 Mesaj Gönder',
-      onClick: () => {
-        if (!state.friends[targetId]) {
-          state.friends[targetId] = { name: targetName, online: true, temporary: true };
-        }
-        openDM(targetId);
-        document.getElementById('server-dm-modal').classList.remove('hidden');
-      }
+      onClick: () => openServerDM(targetId, targetName)
     }
   ];
 
@@ -4339,23 +4389,12 @@ function showRoomUserProfile(targetId, targetName) {
     actions.push({
       label: '❌ Arkadaşlıktan Çıkar',
       danger: true,
-      onClick: () => removeFriend(targetId)
+      onClick: () => removeFriend(friendId)
     });
   } else {
     actions.push({
       label: '➕ Arkadaş Ekle',
-      onClick: () => {
-        if (state.globalMqtt && state.globalMqtt.connected) {
-          state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
-            type: 'friend_request',
-            id: state.friendId,
-            name: state.myName
-          }));
-          showToast('Arkadaşlık isteği gönderildi!', 'ok');
-        } else {
-          showToast('Hata: Bağlantı hazır değil.', 'warn');
-        }
-      }
+      onClick: () => sendRoomFriendRequest(targetId)
     });
   }
 
@@ -4379,7 +4418,8 @@ function showUserContextMenu(e, targetId, targetName) {
   menu.style.left = `${e.clientX}px`;
   menu.style.top = `${e.clientY}px`;
 
-  const isFriend = !!state.friends[targetId];
+  const resolvedFriendId = resolvePeerFriendId(targetId);
+  const isFriend = !!(resolvedFriendId && state.friends[resolvedFriendId] && !state.friends[resolvedFriendId].temporary);
 
   const title = document.createElement('div');
   title.style.cssText = 'padding: 6px 12px; font-size: 11px; font-weight: bold; color: var(--txt-mut); border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 4px;';
@@ -4404,7 +4444,7 @@ function showUserContextMenu(e, targetId, targetName) {
     friendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="23" y1="11" x2="17" y2="11"></line></svg> Arkadaşı Sil';
     friendBtn.addEventListener('click', async () => {
       if (await window.showConfirm('⚠️ Arkadaşı Sil', `"${targetName}" arkadaşını silmek istediğinize emin misiniz?`)) {
-        removeFriend(targetId);
+        removeFriend(resolvedFriendId);
         showToast('Arkadaş silindi', 'info');
       }
       menu.remove();
@@ -4412,16 +4452,7 @@ function showUserContextMenu(e, targetId, targetName) {
   } else {
     friendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg> Arkadaş Ekle';
     friendBtn.addEventListener('click', () => {
-      if (state.globalMqtt && state.globalMqtt.connected) {
-        state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
-          type: 'friend_request',
-          id: state.friendId,
-          name: state.myName
-        }));
-        showToast('Arkadaşlık isteği gönderildi!', 'ok');
-      } else {
-        showToast('Hata: Bağlantı hazır değil.', 'warn');
-      }
+      sendRoomFriendRequest(targetId);
       menu.remove();
     });
   }
@@ -4432,11 +4463,7 @@ function showUserContextMenu(e, targetId, targetName) {
   msgBtn.className = 'user-context-menu-item';
   msgBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> Mesaj Gönder';
   msgBtn.addEventListener('click', () => {
-    if (!state.friends[targetId]) {
-      state.friends[targetId] = { name: targetName, online: true, temporary: true };
-    }
-    openDM(targetId);
-    document.getElementById('server-dm-modal').classList.remove('hidden');
+    openServerDM(targetId, targetName);
     menu.remove();
   });
   menu.appendChild(msgBtn);
@@ -6371,6 +6398,7 @@ window.sendDMText = async (text) => {
   state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
     type: 'dm_msg',
     fromId: state.friendId,
+    fromName: state.myName, // alıcı bizi arkadaş listesinde tanımıyorsa isim buradan gelir
     msgType: 'text',
     content: textToSend,
     isCensored: isCensored
@@ -6422,6 +6450,7 @@ window.sendDMFile = (file) => {
     state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
       type: 'dm_file_start',
       fromId: state.friendId,
+      fromName: state.myName,
       fileId: fileId,
       msgType: msgType,
       fileName: file.name,
@@ -6447,7 +6476,15 @@ state.incomingDMFiles = {};
 
 window.receiveDM = async (fromId, data) => {
   if (!state.dms[fromId]) state.dms[fromId] = [];
-  
+
+  // Sunucudan (arkadaş olmayan birinden) gelen DM: gönderen listede yoksa
+  // geçici bir kayıt aç ki mesaj görünür ve yanıtlanabilir olsun.
+  if (!state.friends[fromId] && data.fromName) {
+    state.friends[fromId] = { name: data.fromName, online: true, temporary: true };
+    if (typeof renderFriends === 'function') renderFriends();
+    if (typeof renderServerDMFriends === 'function') renderServerDMFriends();
+  }
+
   if (data.type === 'dm_msg') {
     let isCensored = data.isCensored || false;
     if (!isCensored && data.content) {

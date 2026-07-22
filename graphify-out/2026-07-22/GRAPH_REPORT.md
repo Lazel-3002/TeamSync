@@ -1,7 +1,7 @@
 # Graph Report - kanka-voice  (2026-07-22)
 
 ## Corpus Check
-- 69 files · ~181,507 words
+- 69 files · ~181,530 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -120,7 +120,7 @@ Nodes (45): concurrently, cross-env, electron, electron-builder, electron-packag
 
 ### Community 3 - "Chat & TURN Resolution Utils"
 Cohesion: 0.07
-Nodes (19): appendFileMsg(), badWordsList, badWordsRegex, chatBlobUrls, closeAllCards(), fileBuffer, getActiveActivity(), initFileTransfer() (+11 more)
+Nodes (18): appendChat(), badWordsList, badWordsRegex, chatBlobUrls, cleanText(), closeAllCards(), fileBuffer, getActiveActivity() (+10 more)
 
 ### Community 4 - "UNO Card Game"
 Cohesion: 0.12
@@ -131,8 +131,8 @@ Cohesion: 0.09
 Nodes (15): { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage }, baseUserData, deviceIdentityFile, dgram, _diagSettingsPath, envPath, fs, getBroadcastAddresses() (+7 more)
 
 ### Community 6 - "WebRTC Peer & ICE Management"
-Cohesion: 0.16
-Nodes (22): applyIceEscalationPolicy(), applySharedTurn(), applySpeakerTo(), applySpeakerToAll(), attemptIceRestart(), checkAvatar(), createPeerConnection(), detectTunnelInterference() (+14 more)
+Cohesion: 0.14
+Nodes (25): addUser(), applyIceEscalationPolicy(), applySharedTurn(), applySpeakerTo(), applySpeakerToAll(), attemptIceRestart(), checkAvatar(), createPeerConnection() (+17 more)
 
 ### Community 7 - "Landing Page & Docs Concepts"
 Cohesion: 0.11
@@ -143,8 +143,8 @@ Cohesion: 0.20
 Nodes (18): addVideoCard(), broadcastTo(), checkTextWithAI(), closeCtrlModal(), decryptMsg(), disconnectApp(), handleDataMessage(), makeCardFocusable() (+10 more)
 
 ### Community 9 - "Room Moderation & Audio Controls"
-Cohesion: 0.11
-Nodes (31): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), applyRoomNoiseSuppression(), attachVideo(), bindUI(), broadcast(), canManageRoom() (+23 more)
+Cohesion: 0.13
+Nodes (25): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), applyRoomNoiseSuppression(), bindUI(), canManageRoom(), canModerateTarget(), getAudioBitrate() (+17 more)
 
 ### Community 10 - "Sidebar UI Styles"
 Cohesion: 0.10
@@ -171,8 +171,8 @@ Cohesion: 0.30
 Nodes (4): { app }, fs, path, YapayDenetleyici
 
 ### Community 16 - "React Activities & UNO Components"
-Cohesion: 0.29
-Nodes (8): addUser(), appendChat(), cleanText(), escapeHtml(), requestControl(), saveChatToLocal(), showShareModal(), showUserContextMenu()
+Cohesion: 0.21
+Nodes (12): appendFileMsg(), attachVideo(), broadcast(), escapeHtml(), getVideoConstraints(), getVideoSender(), initFileTransfer(), isImageFile() (+4 more)
 
 ### Community 17 - "Smeargle Variant Generator"
 Cohesion: 0.29
