@@ -758,6 +758,55 @@ ipcMain.on('app-quit-force', () => {
   forceQuit();
 });
 
+// ---- OTOMATİK GÜNCELLEME (electron-updater + GitHub Releases) ----
+// Paketli (kurulu) sürümde açılışta güncelleme denetlenir, varsa arka planda
+// indirilir; renderer'a 'update-status' olaylarıyla durum bildirilir. Kurulum
+// yalnızca kullanıcı ana menüdeki butona basınca yapılır (quitAndInstall).
+// Dev modda (app.isPackaged=false) tamamen devre dışı — dev-app-update.yml yok.
+let autoUpdater = null;
+let updateStatus = { state: 'idle' };
+
+function sendUpdateStatus(payload) {
+  updateStatus = payload;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try { mainWindow.webContents.send('update-status', payload); } catch (e) {}
+  }
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+  } catch (e) {
+    console.warn('electron-updater yüklenemedi:', e.message);
+    return;
+  }
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true; // buton kaçırılsa bile çıkışta kurulur
+  autoUpdater.on('checking-for-update', () => sendUpdateStatus({ state: 'checking' }));
+  autoUpdater.on('update-available', (info) => sendUpdateStatus({ state: 'downloading', version: info.version, percent: 0 }));
+  autoUpdater.on('update-not-available', () => sendUpdateStatus({ state: 'none' }));
+  autoUpdater.on('download-progress', (p) => sendUpdateStatus({ state: 'downloading', percent: Math.round(p.percent || 0) }));
+  autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ state: 'downloaded', version: info.version }));
+  autoUpdater.on('error', (err) => sendUpdateStatus({ state: 'error', message: (err && err.message || '').slice(0, 200) }));
+  autoUpdater.checkForUpdates().catch(() => {});
+  // Uygulama açık kaldıkça 4 saatte bir yeniden denetle.
+  setInterval(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 4 * 3600 * 1000);
+}
+
+ipcMain.handle('update-check', async () => {
+  if (!autoUpdater) return { state: app.isPackaged ? 'error' : 'dev' };
+  try { await autoUpdater.checkForUpdates(); } catch (e) {}
+  return updateStatus;
+});
+ipcMain.handle('update-get-status', () => (autoUpdater ? updateStatus : { state: app.isPackaged ? 'idle' : 'dev' }));
+ipcMain.on('update-install', () => {
+  if (!autoUpdater) return;
+  // close→tray davranışı quitAndInstall'un pencereyi kapatmasını engellemesin.
+  isQuitting = true;
+  autoUpdater.quitAndInstall(true, true); // sessiz kur + otomatik yeniden başlat
+});
+
 ipcMain.handle('get-sources', async () => {
   try {
     const sources = await desktopCapturer.getSources({
@@ -1113,7 +1162,8 @@ app.whenReady().then(() => {
   });
 
   createWindow();
-  
+  setupAutoUpdater();
+
   tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')).resize({ width: 32, height: 32 })); // Bayrak üretilene dek logo
   tray.setToolTip('TeamSync');
 
@@ -1207,6 +1257,9 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+// Gerçek çıkış isteği (güncelleme kurulumu dahil) close→tray engeline takılmasın.
+app.on('before-quit', () => { isQuitting = true; });
 
 app.on('will-quit', () => {
   if (cloudflaredProcess) cloudflaredProcess.kill();

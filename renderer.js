@@ -1868,6 +1868,44 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (e) { /* sürüm alınamazsa statik metin kalır */ }
 
+  // Güncelleme butonu (ana menü sol alt). Durumlar main.js setupAutoUpdater'dan
+  // 'update-status' ile gelir; 'downloaded' durumunda tıklama sessiz kurulum +
+  // otomatik yeniden başlatma yapar (quitAndInstall). Dev modda buton gizli kalır.
+  try {
+    const upBtn = document.getElementById('update-btn');
+    if (upBtn && window.electronAPI && window.electronAPI.updateGetStatus) {
+      let upState = { state: 'idle' };
+      let upResetTimer = null;
+      const renderUpdateBtn = () => {
+        const s = upState.state;
+        if (s === 'dev') { upBtn.classList.add('hidden'); return; }
+        upBtn.classList.remove('hidden');
+        upBtn.disabled = (s === 'checking' || s === 'downloading');
+        upBtn.classList.toggle('update-ready', s === 'downloaded');
+        if (s === 'checking') upBtn.textContent = 'Denetleniyor…';
+        else if (s === 'downloading') upBtn.textContent = 'Güncelleme indiriliyor… %' + (upState.percent || 0);
+        else if (s === 'downloaded') upBtn.textContent = '🔄 Güncelle ve Yeniden Başlat' + (upState.version ? ' (v' + upState.version + ')' : '');
+        else if (s === 'none') upBtn.textContent = '✓ Uygulama güncel';
+        else if (s === 'error') upBtn.textContent = 'Güncelleme hatası — tekrar dene';
+        else upBtn.textContent = 'Güncellemeleri Denetle';
+        // "Güncel" bilgisi birkaç saniye görünüp normal etikete dönsün.
+        if (upResetTimer) { clearTimeout(upResetTimer); upResetTimer = null; }
+        if (s === 'none') {
+          upResetTimer = setTimeout(() => { upState = { state: 'idle' }; renderUpdateBtn(); }, 4000);
+        }
+      };
+      const applyStatus = (st) => { if (st && st.state) { upState = st; renderUpdateBtn(); } };
+      window.electronAPI.onUpdateStatus(applyStatus);
+      window.electronAPI.updateGetStatus().then(applyStatus).catch(() => {});
+      upBtn.addEventListener('click', () => {
+        if (upState.state === 'downloaded') { window.electronAPI.updateInstall(); return; }
+        if (upState.state === 'checking' || upState.state === 'downloading') return;
+        window.electronAPI.updateCheck().then(applyStatus).catch(() => {});
+      });
+      renderUpdateBtn();
+    }
+  } catch (e) { /* güncelleme UI kurulamazsa uygulama normal çalışmaya devam eder */ }
+
   // Donanım hızlandırma kapalıysa body'ye 'no-hw-accel' ekle: backdrop-filter
   // çalışmayacağı için cam buton opak nötr zemine düşer (bkz: style.css).
   if (window.electronAPI && window.electronAPI.getEffectiveHardwareAcceleration) {

@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setHardwareAcceleration: (enabled) => ipcRenderer.invoke('set-hardware-acceleration', enabled),
   // TEŞHİS: DIAG açık mı? ve canlı DOM'daki indirme butonlarını günlüğe gönder.
   diagEnabled: () => ipcRenderer.invoke('diag-enabled'),
-  diagCapture: (info) => ipcRenderer.send('diag-capture', info)
+  diagCapture: (info) => ipcRenderer.send('diag-capture', info),
+  // Otomatik güncelleme (electron-updater). Durumlar: idle|dev|checking|
+  // downloading|downloaded|none|error — bkz. main.js setupAutoUpdater.
+  updateCheck: () => ipcRenderer.invoke('update-check'),
+  updateGetStatus: () => ipcRenderer.invoke('update-get-status'),
+  updateInstall: () => ipcRenderer.send('update-install'),
+  onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, status) => cb(status))
 });
 

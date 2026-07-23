@@ -8,8 +8,9 @@
     "diag": "cross-env DIAG=1 electron .",
     "dev:react": "cross-env REACT_DEV=true concurrently \"vite\" \"electron .\"",
     "build:react": "vite build",
-    "build": "electron-builder --win portable --x64",
+    "build": "electron-builder --win nsis --x64",
     "build-full": "electron-builder --win --x64",
+    "release": "electron-builder --win nsis --x64 --publish always",
     "test:e2e": "node test/e2e/run-all.js"
   },
   "author": "TeamSync",
@@ -22,6 +23,7 @@
     "acorn": "^8.17.0",
     "cross-fetch": "^4.1.0",
     "crypto-js": "^4.2.0",
+    "electron-updater": "^6.8.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "uiohook-napi": "^1.5.5"
@@ -53,12 +55,27 @@
       "icon": "assets/icon.png",
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
         }
       ]
-    }
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "artifactName": "TeamSync-Setup-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Lazel-3002",
+        "repo": "TeamSync",
+        "releaseType": "release"
+      }
+    ]
   }
 }

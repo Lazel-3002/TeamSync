@@ -407,6 +407,33 @@ body { padding-top: 35px; } /* Prevent overlap */
   width: 18px; height: 18px; cursor: pointer; 
   accent-color: var(--acc);
 }
+/* Ana menü sol alt: güncelleme butonu (index.html #update-btn, renderer.js günceller) */
+#update-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--txt-mut);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+#update-btn:hover { background: rgba(255, 255, 255, 0.14); color: var(--txt-main); }
+#update-btn:disabled { opacity: 0.6; cursor: default; }
+#update-btn.update-ready {
+  color: white;
+  background: var(--acc);
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  animation: update-pulse 2s ease-in-out infinite;
+}
+#update-btn.update-ready:hover { background: var(--acc-hover); }
+@keyframes update-pulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35); }
+  50% { box-shadow: 0 4px 18px rgba(99, 102, 241, 0.65); }
+}
 .login-card button {
   width: 100%;
   padding: 14px;

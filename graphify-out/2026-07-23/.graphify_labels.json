@@ -66,5 +66,6 @@
   "64": "scripts",
   "65": "package.json",
   "66": "cross-fetch",
-  "67": "preload-cursor-overlay.js"
+  "67": "preload-cursor-overlay.js",
+  "68": "uiohook-napi"
 }
