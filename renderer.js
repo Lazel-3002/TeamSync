@@ -855,12 +855,12 @@ function renderFriends() {
             ${avatarHtml}
             <div class="friend-status ${isOnline}" id="status-${fId}" style="position:absolute; bottom:0; right:6px; border:2px solid #1e1e24; margin:0;"></div>
           </div>
-          <div>
-            <b>${escapeHtml(f.name)}</b>
-            ${inRoom ? '<div style="font-size: 11px; color: var(--ok); margin-top: 2px; display:flex; align-items:center;"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="margin-right:4px;"><circle cx="12" cy="12" r="12"></circle></svg> Sunucuda</div>' : ''}
+          <div class="friend-copy">
+            <b class="friend-name">${escapeHtml(f.name)}</b>
+            ${inRoom ? '<div class="friend-presence"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="12"></circle></svg><span>Sunucuda</span></div>' : ''}
           </div>
         </div>
-        <div class="friend-actions" style="display: flex; gap: 8px; align-items: center;">
+        <div class="friend-actions">
           <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3);" onclick="openDM('${fId}')" title="Mesaj Gönder">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           </button>

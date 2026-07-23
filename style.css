@@ -455,10 +455,12 @@ body { padding-top: 35px; } /* Prevent overlap */
 
 /* Friend List Items */
 .friend-item {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 10px;
   align-items: center;
   padding: 8px 12px;
+  min-width: 0;
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-sm);
   margin-bottom: 6px;
@@ -472,6 +474,35 @@ body { padding-top: 35px; } /* Prevent overlap */
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.friend-info > div:first-child {
+  flex: 0 0 auto;
+}
+.friend-copy {
+  min-width: 0;
+  overflow: hidden;
+}
+.friend-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friend-presence {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 2px;
+  color: var(--ok);
+  font-size: 11px;
+}
+.friend-presence span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .friend-status {
   width: 8px;
@@ -480,7 +511,15 @@ body { padding-top: 35px; } /* Prevent overlap */
   background: var(--txt-mut);
 }
 .friend-status.online { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
-.friend-actions { display: flex; gap: 4px; }
+.friend-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.friend-actions .icon-btn {
+  flex: 0 0 auto;
+}
 .invite-item {
   display: flex;
   justify-content: space-between;
@@ -743,6 +782,8 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 
 .menu-friends-section {
+  container-name: friends-panel;
+  container-type: inline-size;
   background: rgba(255, 255, 255, 0.04);
   padding: 16px;
   border-radius: var(--radius-md);
@@ -803,7 +844,30 @@ body { padding-top: 35px; } /* Prevent overlap */
   margin: 0;
   max-height: 160px;
   overflow-y: auto;
+  overflow-x: hidden;
   font-size: 13px;
+}
+
+@container friends-panel (max-width: 320px) {
+  .menu-friends-list .friend-item {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  .menu-friends-list .friend-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 7px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+}
+
+@container friends-panel (max-width: 220px) {
+  .menu-friends-list .friend-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 26px);
+    justify-content: end;
+  }
 }
 .menu-friends-list::-webkit-scrollbar { width: 4px; }
 .menu-friends-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
