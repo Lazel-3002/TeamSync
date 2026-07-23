@@ -1,6 +1,6 @@
 {
   "name": "teamsync",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "P2P sesli/görüntülü/ekran paylaşımı + uzaktan kontrol - sunucusuz",
   "main": "main.js",
   "scripts": {

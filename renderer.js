@@ -5079,6 +5079,7 @@ function enterFocus(card) {
   document.getElementById('focus-area').classList.remove('hidden');
   const controls = document.getElementById('focus-controls');
   controls.classList.remove('hidden');
+  controls.classList.remove('focus-controls-minimized');
   // Denetimler kartın içinde durur ki tam ekranda da görünsün (tam ekranda
   // yalnızca fullscreen öğenin alt ağacı çizilir).
   card.appendChild(controls);
@@ -5098,6 +5099,12 @@ function minimizeFocus() {
   clearFocusInlineLayout(focusedCard);
   document.querySelector('.main').classList.remove('focus-mode');
   document.getElementById('focus-area').classList.add('hidden');
+  // Küçültülen kart şeritte ekran dışında kalabilir. Kontroller kartın içinde
+  // bırakılırsa kullanıcı geri büyütme düğmesine de ulaşamaz. Küçültülmüş
+  // durumda üçlü grubu ana alana taşı ve viewport'a sabitle.
+  const controls = document.getElementById('focus-controls');
+  controls.classList.add('focus-controls-minimized');
+  document.querySelector('.main').appendChild(controls);
   focusMinimized = true;
   updateFocusFullscreenBtn();
   updateFocusExitBtn();
@@ -5106,6 +5113,9 @@ function minimizeFocus() {
 function restoreFocus() {
   if (!focusedCard || !focusMinimized || focusedCard.classList.contains('hidden')) return;
   focusMinimized = false;
+  const controls = document.getElementById('focus-controls');
+  controls.classList.remove('focus-controls-minimized');
+  focusedCard.appendChild(controls);
   focusedCard.classList.remove('focus-minimized');
   focusedCard.classList.add('focused');
   focusedCard.dataset.focusedAt = String(Date.now());
@@ -5130,6 +5140,7 @@ function exitFocus() {
   document.getElementById('focus-area').classList.add('hidden');
   const controls = document.getElementById('focus-controls');
   controls.classList.add('hidden');
+  controls.classList.remove('focus-controls-minimized');
   // Denetimleri kartın içinden çıkar: kart gizlense/silinse bile kaybolmasınlar.
   document.querySelector('.main').appendChild(controls);
   // Kilit bir odak oturumuna aittir; odak bitince sıfırlanır.
