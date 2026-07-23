@@ -3,22 +3,27 @@ function initLuckyWheel() {
     broadcast(msg);
   };
 
+  // openCardFocused: kartı açar + odaklanabilir yapar + odağa alır (renderer.js).
+  // Eskiden burada yalnızca hidden kaldırılıyordu; bu yüzden anket/film/çark
+  // kartlarında odak, kilit ve tam ekran hiç çalışmıyordu.
+  const openWheelActivityCard = (act) => {
+    if (act === 'poll') openCardFocused('poll-card');
+    if (act === 'lvs') openCardFocused('lvs-card');
+    if (act === 'wheel') openCardFocused('wheel-card');
+  };
+
   const setActivity = (act) => {
     closeAllCards();
     document.getElementById('activities-modal').classList.add('hidden');
     broadcast({ type: 'activity_change', activity: act });
-    if (act === 'poll') document.getElementById('poll-card').classList.remove('hidden');
-    if (act === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
-    if (act === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
+    openWheelActivityCard(act);
   };
 
   const handleActClick = (act) => {
     if (state.activeLobbyId && !state.isLobbyHost) {
       closeAllCards();
       document.getElementById('activities-modal').classList.add('hidden');
-      if (act === 'poll') document.getElementById('poll-card').classList.remove('hidden');
-      if (act === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
-      if (act === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
+      openWheelActivityCard(act);
       return;
     }
     setActivity(act);
@@ -280,9 +285,9 @@ function initLuckyWheel() {
     try {
       if (data.type === 'activity_change') {
         closeAllCards(data.activity === 'none');
-        if (data.activity === 'poll') document.getElementById('poll-card').classList.remove('hidden');
-        if (data.activity === 'lvs') document.getElementById('lvs-card').classList.remove('hidden');
-        if (data.activity === 'wheel') document.getElementById('wheel-card').classList.remove('hidden');
+        if (data.activity === 'poll') openCardFocused('poll-card');
+        if (data.activity === 'lvs') openCardFocused('lvs-card');
+        if (data.activity === 'wheel') openCardFocused('wheel-card');
       }
       if (data.type === 'poll_start') handlePollStart(data, false);
       if (data.type === 'poll_vote' && pollState && pollState.id === data.pollId) {

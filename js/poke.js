@@ -366,14 +366,16 @@ POKEMONS.fairy.push(
     closeAllCards(false, 'poke-card');
     document.getElementById('activities-modal').classList.add('hidden');
     broadcast({ type: 'activity_change', activity: act });
-    if (act === 'poke') document.getElementById('poke-card').classList.remove('hidden');
+    // openCardFocused: kartı açar + odaklanabilir yapar + odağa alır; eskiden
+    // yalnızca hidden kaldırıldığı için poke kartında odak/kilit/tam ekran yoktu.
+    if (act === 'poke') openCardFocused('poke-card');
   };
 
   document.getElementById('act-poke')?.addEventListener('click', () => {
     if (state.activeLobbyId && !state.isLobbyHost) {
       closeAllCards(false, 'poke-card');
       document.getElementById('activities-modal').classList.add('hidden');
-      document.getElementById('poke-card').classList.remove('hidden');
+      openCardFocused('poke-card');
       return;
     }
     setActivity('poke');
@@ -1781,6 +1783,9 @@ POKEMONS.fairy.push(
   // Handler
   window.pokeActivityHandler = (data) => {
     if (data.type === 'activity_change' && data.activity === 'poke') {
+      // Diğer aktivitelerle (poll/lvs/wheel) tutarlı: uzak taraf başlatınca
+      // kart burada da açılır ve odağa alınır.
+      openCardFocused('poke-card');
       renderPokeLobby();
     }
     if (data.type === 'poke_sync') {

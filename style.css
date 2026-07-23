@@ -1187,6 +1187,12 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 .main {
   flex: 1;
+  /* min-width:0 şart: flex öğesinin otomatik minimumu içerik genişliğidir.
+     Odak modunda alttaki küçük kart şeridi (sarmalanmayan flex satırı) kart
+     sayısı arttıkça .main'i viewport'tan geniş yapıyor, spacer da .main'i
+     izlediği için odaklı kart ve sağ-alttaki odak butonları ekranın sağından
+     taşıyordu. min-width:0 ile şerit kendi overflow-x:auto'suna kaydırılır. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1214,46 +1220,155 @@ body { padding-top: 35px; } /* Prevent overlap */
 .empty h2 { font-size: 24px; color: var(--txt-main); margin-bottom: 8px; font-weight: 600; }
 .empty p { font-size: 15px; max-width: 400px; }
 
-.focus-container {
+/* ===== ODAK MODU v2 =====
+   Odaklı kart DOM'da #grid içinde kalır (iframe/webview yeniden yüklenmesin);
+   .main'e göre mutlak konumlanır. top/left/width/height değerlerini JS
+   (syncFocusLayout) boş yer tutucunun (#focus-area) kutusuna eşitler. */
+.focus-spacer {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--bg-dark);
-  overflow: hidden;
+  min-height: 0;
+  margin: 14px 20px 6px 20px;
 }
-.focus-container .vcard {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
+
+.vcard.focused {
+  /* !important şart: bazı kartlar (wheel/poke/sb) index.html'de inline
+     "position: relative" taşıyor ve inline stil bu kuralı eziyordu — kart
+     akışta kalıp şeride flex öğesi olarak giriyor, .main her gir/çık
+     döngüsünde genişliyor ve odak düğmeleri ekran dışına taşıyordu. */
+  position: absolute !important;
+  z-index: 30;
+  margin: 0;
+  width: auto;
+  height: auto;
+  min-height: 0;
   aspect-ratio: auto;
   border-radius: var(--radius-lg);
   cursor: default;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
 }
-.focus-container .vcard video {
+.vcard.focused:hover {
+  transform: none;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.vcard.focused video {
   object-fit: contain;
 }
 
+/* Tam ekran kartın kendisinde açılır; inline top/left/width/height stillerini
+   ezmek için !important gerekir (inline stil UA :fullscreen kuralını ezer). */
+.vcard.focused:fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0;
+  border: none;
+  background: #000;
+}
+.vcard.focused:fullscreen::backdrop { background: #000; }
+
+/* Alttaki küçük kart şeridi */
 .main.focus-mode .grid {
   flex: none;
   display: flex;
   flex-direction: row;
+  align-items: center;
   overflow-x: auto;
+  overflow-y: hidden;
   height: 180px;
   padding: 12px 24px;
   gap: 16px;
   border-top: var(--border);
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.25);
 }
-.main.focus-mode .grid .vcard {
-  width: 240px;
-  height: 135px;
-  min-height: 135px;
-  flex-shrink: 0;
+.main.focus-mode .grid .vcard:not(.focused) {
+  /* !important şart: #poke-card gibi ID seçicili kurallar (min-height:620px,
+     dar ekranda 760px) bu sınıf kuralını eziyor, şeritteki küçük kart 620px'e
+     fırlayıp şeridi ve .main'i taşırıyordu — odak butonları ekran dışına
+     itiliyordu. */
+  width: 240px !important;
+  height: 135px !important;
+  min-height: 135px !important;
+  max-height: 135px !important;
+  flex: 0 0 240px;
   aspect-ratio: 16/9;
+  overflow: hidden;
+  cursor: pointer;
 }
+.main.focus-mode .grid .vcard:not(.focused):hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.25);
+}
+/* Şeritteki küçük kartların içeriği tıklanamaz: tek tık = odağa al.
+   (.card-actions ve katılım overlay'i pointer-events:all ile geri açılır —
+   kapatma/ses/katıl gibi düğmeler küçük halde de çalışsın.) */
+.main.focus-mode .grid .vcard:not(.focused) > *:not(.card-actions):not(.vlbl):not(.inactive-overlay) {
+  pointer-events: none;
+}
+.main.focus-mode .grid .vcard:not(.focused) .card-actions,
+.main.focus-mode .grid .vcard:not(.focused) .inactive-overlay {
+  pointer-events: all;
+}
+/* "Bağlantı Bekleniyor" yer tutucusu şeridi kirletmesin */
+.main.focus-mode .grid .empty { display: none; }
+/* Küçük kartın altına etkinlik adı şeridi */
+.main.focus-mode .grid .vcard:not(.focused)[data-focus-title]::after {
+  content: attr(data-focus-title);
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Odak denetim çubuğu: odaklı kartın İÇİNE eklenir ki tam ekranda da
+   görünür kalsın. Kullanılmıyorken hafif söner. */
+#focus-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  /* Kart içi overlay'lerin ÜSTÜNDE kalmalı: u-picker 300, u-fly 500,
+     poke-transform 1800 — aksi halde UNO oyun içinde butonlar örtülüyordu. */
+  z-index: 2000;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+#focus-controls:hover,
+#focus-controls:focus-within { opacity: 1; }
+#focus-controls button {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  transition: transform 0.15s, background 0.15s, border-color 0.15s;
+}
+#focus-controls button:hover {
+  transform: translateY(-2px);
+  background: rgba(0,0,0,0.85);
+}
+#focus-lock-btn.locked {
+  background: rgba(220,38,38,0.85);
+  border-color: rgba(239,68,68,1);
+}
+#focus-lock-btn.locked:hover { background: rgba(220,38,38,1); }
 
 .vcard {
   background: rgba(0,0,0,0.4);
@@ -1281,17 +1396,12 @@ body { padding-top: 35px; } /* Prevent overlap */
 .vcard.screen video { object-fit: contain; } /* screen share should be contained */
 
 /* Make the Whiteboard look like a thumbnail when minimized in the grid */
-.main.focus-mode .grid .vcard .wb-container {
+.main.focus-mode .grid .vcard:not(.focused) .wb-container {
   transform: scale(0.3);
   transform-origin: top left;
   width: 333%;
   height: 333%;
   pointer-events: none !important;
-}
-
-/* Ensure the card actions like Odadan Çık remain clickable */
-.main.focus-mode .grid .vcard .card-actions {
-  pointer-events: all;
 }
 
 .vlbl {
@@ -1327,7 +1437,7 @@ body { padding-top: 35px; } /* Prevent overlap */
   transition: opacity 0.2s;
 }
 .vcard:hover .card-actions { opacity: 1; }
-.focus-container .vcard .card-actions { opacity: 1; }
+.vcard.focused .card-actions { opacity: 1; }
 
 .vol-slider {
   width: 80px;
@@ -2895,7 +3005,7 @@ input:checked + .slider:before {
   box-shadow: inset 0 0 50px rgba(0,0,0,0.7), 0 24px 70px rgba(0,0,0,0.48) !important;
 }
 
-.focus-container #poke-card {
+#poke-card.focused {
   min-height: 0;
 }
 

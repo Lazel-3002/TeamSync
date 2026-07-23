@@ -56,6 +56,10 @@ async function run() {
       peer.client,
       `(() => {
          document.getElementById('act-poke').click();
+         // Odak modu v2 kartı .focused + position:absolute !important ile
+         // yer tutucuya sabitler; testin aşağıdaki tam-ekran hack'i çalışsın
+         // diye önce odaktan çık (lazy evrim görselleri viewport'a sığmalı).
+         if (typeof exitFocus === 'function') exitFocus();
          const pokeTestCard = document.getElementById('poke-card');
          pokeTestCard.classList.remove('hidden');
          Object.assign(pokeTestCard.style, {
