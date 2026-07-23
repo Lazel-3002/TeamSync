@@ -4993,6 +4993,7 @@ function updateEmptyGrid() {
 // (syncFocusLayout). Tam ekran da kartın kendisinde açılır — yine DOM
 // taşıması olmadan.
 let focusedCard = null;
+let focusMinimized = false;
 
 const FOCUS_CARD_TITLES = {
   'wb-card': 'Beyaz Tahta',
@@ -5010,7 +5011,7 @@ const FOCUS_CARD_TITLES = {
 // modunda konumlandırılmamış) — bu yüzden şerit yatay kaydırılsa da kart yerinde
 // durur ve #grid'in overflow'una takılmaz.
 function syncFocusLayout() {
-  if (!focusedCard || document.fullscreenElement) return;
+  if (!focusedCard || focusMinimized || document.fullscreenElement) return;
   const main = document.querySelector('.main');
   const spacer = document.getElementById('focus-area');
   if (!main || !spacer) return;
@@ -5052,14 +5053,27 @@ function updateFocusFullscreenBtn() {
   btn.title = fs ? 'Tam Ekrandan Çık (F)' : 'Tam Ekran (F)';
 }
 
+function updateFocusExitBtn() {
+  const btn = document.getElementById('focus-exit-btn');
+  if (!btn) return;
+  btn.innerHTML = focusMinimized
+    ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>'
+    : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>';
+  btn.title = focusMinimized ? 'Tekrar Büyüt' : 'Küçült';
+  btn.setAttribute('aria-label', btn.title);
+}
+
 function enterFocus(card) {
   if (!card || card.classList.contains('hidden') || focusedCard === card) return;
   if (focusedCard) {
     focusedCard.classList.remove('focused');
+    focusedCard.classList.remove('focus-minimized');
     clearFocusInlineLayout(focusedCard);
   }
   focusedCard = card;
+  focusMinimized = false;
   card.classList.add('focused');
+  card.classList.remove('focus-minimized');
   card.dataset.focusedAt = String(Date.now());
   document.querySelector('.main').classList.add('focus-mode');
   document.getElementById('focus-area').classList.remove('hidden');
@@ -5070,8 +5084,36 @@ function enterFocus(card) {
   card.appendChild(controls);
   updateFocusLockBtn();
   updateFocusFullscreenBtn();
+  updateFocusExitBtn();
   syncFocusLayout();
   // Yer tutucu bu karede daha yeni görünür oldu; kesin ölçüm sonraki karede.
+  requestAnimationFrame(syncFocusLayout);
+}
+
+function minimizeFocus() {
+  if (!focusedCard || focusMinimized) return;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  focusedCard.classList.remove('focused');
+  focusedCard.classList.add('focus-minimized');
+  clearFocusInlineLayout(focusedCard);
+  document.querySelector('.main').classList.remove('focus-mode');
+  document.getElementById('focus-area').classList.add('hidden');
+  focusMinimized = true;
+  updateFocusFullscreenBtn();
+  updateFocusExitBtn();
+}
+
+function restoreFocus() {
+  if (!focusedCard || !focusMinimized || focusedCard.classList.contains('hidden')) return;
+  focusMinimized = false;
+  focusedCard.classList.remove('focus-minimized');
+  focusedCard.classList.add('focused');
+  focusedCard.dataset.focusedAt = String(Date.now());
+  document.querySelector('.main').classList.add('focus-mode');
+  document.getElementById('focus-area').classList.remove('hidden');
+  updateFocusFullscreenBtn();
+  updateFocusExitBtn();
+  syncFocusLayout();
   requestAnimationFrame(syncFocusLayout);
 }
 
@@ -5080,7 +5122,9 @@ function exitFocus() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   const card = focusedCard;
   focusedCard = null;
+  focusMinimized = false;
   card.classList.remove('focused');
+  card.classList.remove('focus-minimized');
   clearFocusInlineLayout(card);
   document.querySelector('.main').classList.remove('focus-mode');
   document.getElementById('focus-area').classList.add('hidden');
@@ -5091,6 +5135,7 @@ function exitFocus() {
   // Kilit bir odak oturumuna aittir; odak bitince sıfırlanır.
   state.focusLocked = false;
   updateFocusLockBtn();
+  updateFocusExitBtn();
 }
 
 // API uyumluluğu: aktivite modülleri (uno, shared-browser, whiteboard, ...)
@@ -5099,7 +5144,11 @@ function exitFocus() {
 // donma sebebiydi). Farklı karta geçiş ise kilitliyken engellenir.
 function toggleFocus(card) {
   if (!card) return;
-  if (focusedCard === card) { exitFocus(); return; }
+  if (focusedCard === card) {
+    if (focusMinimized) restoreFocus();
+    else exitFocus();
+    return;
+  }
   if (state.focusLocked && focusedCard) return;
   enterFocus(card);
 }
@@ -5108,7 +5157,10 @@ async function toggleFocusFullscreen() {
   if (!focusedCard) return;
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
-    else await focusedCard.requestFullscreen();
+    else {
+      if (focusMinimized) restoreFocus();
+      await focusedCard.requestFullscreen();
+    }
   } catch (err) {
     console.warn('fullscreen toggle failed:', err);
   }
@@ -5133,9 +5185,12 @@ function makeCardFocusable(card) {
   if (title && !card.dataset.focusTitle) card.dataset.focusTitle = title;
   card.addEventListener('click', (e) => {
     // Odaklı kartın içine tıklamak odağı BOZMAZ (etkinlik kullanılırken
-    // kazara küçülme eski sistemin en can sıkıcı davranışıydı). Çıkış:
-    // odak denetim çubuğu, Esc veya şeritteki başka bir karta tıklamak.
-    if (focusedCard === card) return;
+    // kazara küçülme eski sistemin en can sıkıcı davranışıydı). Küçültme:
+    // odak denetim çubuğu; tam çıkış: Esc veya programatik kapatma yolları.
+    if (focusedCard === card) {
+      if (focusMinimized && !e.target.closest('#focus-controls, .card-actions, .inactive-overlay')) restoreFocus();
+      return;
+    }
     // Odakta DEĞİLKEN karta yapılan her tıklama odağa alır (pencereye tıklayınca
     // öne gelmesi gibi). Eski uzun hariç listesi (u-hand, u-card, wt-player...)
     // burada tuzaktı: UNO oyun ekranı bu öğelerle kaplı olduğundan odaktan
@@ -5291,7 +5346,7 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
 function removeVideoCard(peerId, isScreen) {
   const el = document.getElementById(`vc-${peerId}-${isScreen ? 's' : 'c'}`);
   if (el) {
-    if (focusedCard === el) toggleFocus(el);
+    if (focusedCard === el) exitFocus();
     el.remove();
   }
   if (isScreen && peerId !== 'self' && state.screenShares) {
@@ -6127,7 +6182,8 @@ function bindUI() {
       showToast('Odak kilitli — çıkmak için önce kilidi aç', 'info');
       return;
     }
-    exitFocus();
+    if (focusMinimized) restoreFocus();
+    else minimizeFocus();
   });
 
   // ESC ile tam ekrandan çıkış tarayıcı tarafından yapılır; buton görünümünü
