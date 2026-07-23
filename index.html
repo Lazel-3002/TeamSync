@@ -34,10 +34,11 @@
       transform: translateY(-10px) scale(1.1); border-color: #fbbf24; box-shadow: 0 15px 40px rgba(251, 191, 36, 0.4);
     }
     .poke-evo-card img { width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); margin-bottom: 20px; }
-    .poke-evo-name { color: #fbbf24; font-weight: 900; font-size: 22px; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,1); }
+    .poke-evo-name { color: #fbbf24; font-weight: 900; font-size: 22px; line-height: 1.15; text-align: center; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,1); }
     .poke-evo-card.poke-variant-card { width: 150px; padding: 16px 10px; }
     .poke-evo-card.poke-variant-card img { width: 110px; height: 110px; margin-bottom: 10px; }
     .poke-evo-card.poke-variant-card .poke-evo-name { font-size: 14px; line-height: 1.25; text-align: center; }
+    .poke-evo-stage { margin-top: 9px; color: #94a3b8; font-size: 10px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
     .poke-evo-type-badges { margin-top: 12px; }
     
     @keyframes idle-breathe-p1 {
@@ -1060,7 +1061,7 @@
           <div id="poke-move-selection-modal" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,0.95); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 40px 20px; overflow-y: auto;">
             <h2 style="color: white; font-size: 24px; margin-bottom: 5px;">Saldırılarını Seç</h2>
             <h3 id="poke-move-selection-pokename" style="color: #fbbf24; font-size: 20px; font-weight: 900; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 10px #fbbf24;"></h3>
-            <p style="color: #94a3b8; margin-bottom: 20px;">Pokemonun için 4 saldırı seç. (<span id="poke-move-count">0</span>/4)</p>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Pokemonun için en fazla 4 gerçek saldırı seç. (<span id="poke-move-count">0</span>/<span id="poke-move-required-count">4</span>)</p>
             <div id="poke-move-selection-list" style="display: flex; flex-wrap: wrap; gap: 8px; width: 100%; max-width: 1200px; justify-content: center; margin-bottom: 20px;">
                <!-- Moves will be injected here -->
             </div>

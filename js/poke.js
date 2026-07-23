@@ -869,6 +869,7 @@ POKEMONS.fairy.push(
               fighter.originalForm = fighter.originalForm || {
                 pokemon: fighter.pokemon,
                 evoName: fighter.evoName,
+                apiName: fighter.apiName,
                 type: fighter.type,
                 types: getFighterTypes(fighter),
                 stats: fighter.stats,
@@ -877,6 +878,7 @@ POKEMONS.fairy.push(
               };
               fighter.pokemon = source.pokemon;
               fighter.evoName = source.evoName;
+              fighter.apiName = source.apiName;
               fighter.type = source.type;
               fighter.types = getFighterTypes(source);
               fighter.stats = { ...(source.stats || {}) };
@@ -1188,6 +1190,22 @@ POKEMONS.fairy.push(
     };
   };
 
+  const getPokemonFormDefinition = (apiName) => {
+    for (const family of window.POKEMON_FAMILIES || []) {
+      const evolution = family.evolutions?.find(item => item.apiName === apiName);
+      if (evolution) return evolution;
+    }
+    return null;
+  };
+
+  const fetchPokemonPayload = async (apiName) => {
+    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${apiName}`);
+    if (!response.ok) {
+      throw new Error(`PokeAPI ${response.status}: ${apiName}`);
+    }
+    return response.json();
+  };
+
   const fetchPokemonStatsAndMoves = async (pokeName, targetType, fullList = false) => {
     try {
       let pokeApiName = pokeName.toLowerCase().replace(/ /g, '-').replace(/\./g, '').replace(/'/g, '');
@@ -1203,8 +1221,12 @@ POKEMONS.fairy.push(
       } else if (pokeApiName.startsWith('primal-')) {
           pokeApiName = pokeApiName.replace('primal-', '') + '-primal';
       }
-      const res = await fetch('https://pokeapi.co/api/v2/pokemon/' + pokeApiName);
-      const data = await res.json();
+      const data = await fetchPokemonPayload(pokeApiName);
+      const formDefinition = getPokemonFormDefinition(pokeApiName);
+      const moveSourceApiName = formDefinition?.moveSourceApiName || pokeApiName;
+      const moveData = moveSourceApiName === pokeApiName
+        ? data
+        : await fetchPokemonPayload(moveSourceApiName);
       const height = Number(data.height) || null;
       const pokemonTypes = (data.types || [])
         .sort((a, b) => a.slot - b.slot)
@@ -1220,8 +1242,8 @@ POKEMONS.fairy.push(
       }
 
       let allMoves = [];
-      if (data.moves) {
-          data.moves.forEach(m => {
+      if (moveData.moves) {
+          moveData.moves.forEach(m => {
               const moveName = m.move.name;
               const mObj = createBattleMove(moveName);
               if (mObj && !allMoves.find(x => x.name === mObj.name)) {
@@ -1271,7 +1293,7 @@ POKEMONS.fairy.push(
       
       // If NOT fullList (e.g. Bot), filter to good/high-level moves to pick smartly
       const goodMoveNames = [];
-      data.moves.forEach(m => {
+      moveData.moves.forEach(m => {
           let maxLvl = 0;
           m.version_group_details.forEach(v => {
               if (v.move_learn_method.name === 'level-up' && v.level_learned_at > maxLvl) {
@@ -1331,10 +1353,13 @@ POKEMONS.fairy.push(
   window.renderMoveSelection = (moves, mySpeed = 50) => {
      const list = document.getElementById('poke-move-selection-list');
      const count = document.getElementById('poke-move-count');
+     const requiredCountLabel = document.getElementById('poke-move-required-count');
      const btn = document.getElementById('poke-confirm-moves-btn');
+     const requiredMoveCount = Math.min(4, moves.length);
      list.innerHTML = '';
      selectedManualMoves = [];
      count.textContent = '0';
+     if (requiredCountLabel) requiredCountLabel.textContent = requiredMoveCount;
      btn.disabled = true;
      btn.style.opacity = '0.5';
      btn.style.cursor = 'not-allowed';
@@ -1373,7 +1398,7 @@ POKEMONS.fairy.push(
               }
            }
            count.textContent = selectedManualMoves.length;
-           if (selectedManualMoves.length === 4) {
+           if (selectedManualMoves.length === requiredMoveCount && requiredMoveCount > 0) {
               btn.disabled = false;
               btn.style.opacity = '1';
               btn.style.cursor = 'pointer';
@@ -1439,7 +1464,7 @@ POKEMONS.fairy.push(
     if (profileImage) {
       profileImage.style.display = fighter?.pokemon ? 'block' : 'none';
       if (fighter?.pokemon) {
-        profileImage.dataset.realname = fighter.evoName || getPokemonNameFromUrl(fighter.pokemon);
+        profileImage.dataset.realname = fighter.apiName || fighter.evoName || getPokemonNameFromUrl(fighter.pokemon);
         profileImage.dataset.errState = '0';
         profileImage.src = fighter.pokemon;
       }
@@ -1517,8 +1542,8 @@ POKEMONS.fairy.push(
       document.getElementById('poke-p2-pokename').style.display = 'block';
       document.getElementById('poke-p2-pokename').textContent = pokeState.p2.evoName || getPokemonNameFromUrl(pokeState.p2.pokemon);
 
-      if (pokeState.p1.evoName) p1Img.dataset.realname = pokeState.p1.evoName;
-      if (pokeState.p2.evoName) p2Img.dataset.realname = pokeState.p2.evoName;
+      p1Img.dataset.realname = pokeState.p1.apiName || pokeState.p1.evoName || '';
+      p2Img.dataset.realname = pokeState.p2.apiName || pokeState.p2.evoName || '';
       p1Img.dataset.errState = '0';
       p2Img.dataset.errState = '0';
       p1Img.src = pokeState.p1.pokemon || UNKNOWN_AVATAR;
@@ -1549,6 +1574,7 @@ POKEMONS.fairy.push(
         for (let i=0; i<4; i++) {
            const btn = document.querySelector('.poke-move-btn[data-move="'+i+'"]');
            if (btn && moves[i]) {
+              btn.classList.remove('hidden');
               const nameHtml = `${moves[i].name}<span class="move-info-icon">i<span class="tooltip-text">${window.getMoveTooltip(moves[i])}</span></span>`;
               btn.querySelector('.move-name').innerHTML = nameHtml;
               btn.querySelector('.move-type').textContent = (TYPE_NAMES[moves[i].type] || moves[i].type).toUpperCase();
@@ -1559,6 +1585,8 @@ POKEMONS.fairy.push(
               btn.querySelector('.move-type').className = 'move-type type-' + moves[i].type;
               btn.querySelector('.move-type').style.color = TYPE_COLORS[moves[i].type] || '#fff';
               btn.querySelector('.move-power').textContent = "Güç: " + moves[i].power;
+           } else if (btn) {
+              btn.classList.add('hidden');
            }
         }
       } else {
@@ -1639,8 +1667,8 @@ POKEMONS.fairy.push(
                 
                 broadcastPokeMsg({
                    type: 'poke_reveal',
-                   p1: { type: p1Data.types[0] || t1, types: p1Data.types, baseName: fam1.baseName, evoName: p1Evo.name, pokemon: p1Poke, moves: p1Data.moves, stats: p1Data.stats, height: p1Data.height },
-                   p2: { type: p2Data.types[0] || t2, types: p2Data.types, baseName: fam2.baseName, evoName: p2Evo.name, pokemon: p2Poke, moves: p2Data.moves, stats: p2Data.stats, height: p2Data.height }
+                   p1: { type: p1Data.types[0] || t1, types: p1Data.types, baseName: fam1.baseName, evoName: p1Evo.name, apiName: p1Evo.apiName, pokemon: p1Poke, moves: p1Data.moves, stats: p1Data.stats, height: p1Data.height },
+                   p2: { type: p2Data.types[0] || t2, types: p2Data.types, baseName: fam2.baseName, evoName: p2Evo.name, apiName: p2Evo.apiName, pokemon: p2Poke, moves: p2Data.moves, stats: p2Data.stats, height: p2Data.height }
                 });
             } else {
                 broadcastPokeMsg({ type: 'poke_base_selection_state' });
@@ -1671,7 +1699,7 @@ POKEMONS.fairy.push(
              const card = document.createElement('div');
              card.className = 'poke-base-card';
              card.innerHTML = `
-                <img src="${fam.evolutions[0].url}" data-realname="${fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
+                <img src="${fam.evolutions[0].url}" data-realname="${fam.evolutions[0].apiName || fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                 <div class="poke-base-name">${fam.displayName}</div>
                 <div class="poke-type-badges">${renderFamilyTypeBadges(fam)}</div>
              `;
@@ -1715,7 +1743,7 @@ POKEMONS.fairy.push(
                   const card = document.createElement('div');
                   card.className = 'poke-base-card';
                   card.innerHTML = `
-                     <img src="${fam.evolutions[0].url}" data-realname="${fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
+                     <img src="${fam.evolutions[0].url}" data-realname="${fam.evolutions[0].apiName || fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                      <div class="poke-base-name">${fam.displayName}</div>
                      <div class="poke-type-badges">${renderFamilyTypeBadges(fam)}</div>
                   `;
@@ -1762,8 +1790,9 @@ POKEMONS.fairy.push(
              const card = document.createElement('div');
              card.className = fam.baseName === 'smeargle' ? 'poke-evo-card poke-variant-card' : 'poke-evo-card';
              card.innerHTML = `
-                <img src="${evo.url}" data-realname="${evo.name}" loading="lazy" onerror="window.handlePokeImgError(this)" />
+                <img src="${evo.url}" data-realname="${evo.apiName || evo.name}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                 <div class="poke-evo-name">${evo.label || evo.name}</div>
+                <div class="poke-evo-stage">${evo.stage > 0 ? `${evo.stage}. EVRİM` : 'BAŞLANGIÇ'}${evo.isForm ? ' · FORM' : ''}</div>
                 <div class="poke-type-badges poke-evo-type-badges">${renderFamilyTypeBadges(evo)}</div>
              `;
              card.onclick = () => {
@@ -1925,8 +1954,8 @@ POKEMONS.fairy.push(
           if (isHostFallback) {
              broadcastPokeMsg({
                  type: 'poke_reveal',
-                 p1: { type: pokeState.p1.type, types: getFighterTypes(pokeState.p1), evoName: pokeState.p1.evoName, pokemon: pokeState.p1.pokemon, moves: pokeState.p1.moves, stats: pokeState.p1.stats, height: pokeState.p1.height },
-                 p2: { type: pokeState.p2.type, types: getFighterTypes(pokeState.p2), evoName: pokeState.p2.evoName, pokemon: pokeState.p2.pokemon, moves: pokeState.p2.moves, stats: pokeState.p2.stats, height: pokeState.p2.height }
+                 p1: { type: pokeState.p1.type, types: getFighterTypes(pokeState.p1), evoName: pokeState.p1.evoName, apiName: pokeState.p1.apiName, pokemon: pokeState.p1.pokemon, moves: pokeState.p1.moves, stats: pokeState.p1.stats, height: pokeState.p1.height },
+                 p2: { type: pokeState.p2.type, types: getFighterTypes(pokeState.p2), evoName: pokeState.p2.evoName, apiName: pokeState.p2.apiName, pokemon: pokeState.p2.pokemon, moves: pokeState.p2.moves, stats: pokeState.p2.stats, height: pokeState.p2.height }
              });
           }
        }
@@ -2029,6 +2058,7 @@ POKEMONS.fairy.push(
       if (data.p1.stats) pokeState.p1.stats = data.p1.stats;
       if (data.p1.height) pokeState.p1.height = data.p1.height;
       if (data.p1.evoName) pokeState.p1.evoName = data.p1.evoName;
+      if (data.p1.apiName) pokeState.p1.apiName = data.p1.apiName;
       //pokeState.p1.hp = 100;
       //pokeState.p1.maxHp = 100;
       
@@ -2039,6 +2069,7 @@ POKEMONS.fairy.push(
       if (data.p2.stats) pokeState.p2.stats = data.p2.stats;
       if (data.p2.height) pokeState.p2.height = data.p2.height;
       if (data.p2.evoName) pokeState.p2.evoName = data.p2.evoName;
+      if (data.p2.apiName) pokeState.p2.apiName = data.p2.apiName;
       
       const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
       if (data.p1.stats) {
@@ -2121,8 +2152,13 @@ POKEMONS.fairy.push(
                 return;
             }
             
-            let matches = window.POKEMON_FAMILIES.filter(fam => 
-                fam.displayName.toLowerCase().includes(val) || fam.baseName.includes(val)
+            let matches = window.POKEMON_FAMILIES.filter(fam =>
+                fam.displayName.toLowerCase().includes(val)
+                || fam.baseName.includes(val)
+                || fam.evolutions.some(evo =>
+                    String(evo.name || '').toLowerCase().includes(val)
+                    || String(evo.apiName || '').toLowerCase().includes(val)
+                )
             );
             
             searchDropdown.innerHTML = '';
