@@ -4848,3 +4848,22 @@ input:checked + .slider:before {
 }
 
 .ucm-vol-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+
+/* PokeSavaş: hamleyi seçmeden önce rakibe karşı tür etkinliğini gösterir. */
+#poke-card .move-effectiveness {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--effectiveness-color) 65%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--effectiveness-color) 16%, rgba(2, 6, 23, 0.9));
+  color: var(--effectiveness-color);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+#poke-card .move-effectiveness.hidden {
+  display: none;
+}

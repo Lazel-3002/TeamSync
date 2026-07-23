@@ -249,6 +249,119 @@ POKEMONS.fairy.push(
   fairy: { normal: 1, fire: 0.5, water: 1, electric: 1, grass: 1, ice: 1, fighting: 2, poison: 0.5, ground: 1, flying: 1, psychic: 1, bug: 1, rock: 1, ghost: 1, dragon: 2, dark: 2, steel: 0.5, fairy: 1 }
 };
 
+  const POKE_BATTLE_BALANCE = Object.freeze({
+    level: 50,
+    stabMultiplier: 1.5,
+    powerSoftCap: 100,
+    powerOverflowScale: 0.45,
+    minBaseStatRatio: 0.65,
+    maxBaseStatRatio: 1.6,
+    minStageRatio: 0.5,
+    maxStageRatio: 2,
+    maxDamageRatio: 0.68
+  });
+
+  const clampBattleValue = (value, min, max) => Math.max(min, Math.min(max, value));
+  const getStageMultiplier = (stage) => stage >= 0
+    ? (2 + stage) / 2
+    : 2 / (2 - Math.abs(stage));
+
+  const getPokeEffectivenessInfo = (multiplier) => {
+    if (multiplier === 0) return { label: 'ETKİSİZ', detail: '0×', color: '#94a3b8' };
+    if (multiplier >= 4) return { label: 'AŞIRI ETKİLİ', detail: `${multiplier}×`, color: '#fb7185' };
+    if (multiplier > 1) return { label: 'SÜPER ETKİLİ', detail: `${multiplier}×`, color: '#4ade80' };
+    if (multiplier <= 0.25) return { label: 'ÇOK AZ ETKİLİ', detail: `${multiplier}×`, color: '#94a3b8' };
+    if (multiplier < 1) return { label: 'ETKİSİ AZ', detail: `${multiplier}×`, color: '#fbbf24' };
+    return { label: 'NORMAL ETKİ', detail: '1×', color: '#cbd5e1' };
+  };
+
+  const calculatePokeDamage = (attacker, defender, move, randomFactor = 1) => {
+    const typeMultiplier = getTypeMultiplier(move.type, defender);
+    const stabMultiplier = getFighterTypes(attacker).includes(move.type)
+      ? POKE_BATTLE_BALANCE.stabMultiplier
+      : 1;
+    if (!(move.power > 0) || typeMultiplier === 0) {
+      return {
+        damage: 0,
+        typeMultiplier,
+        stabMultiplier,
+        attackStat: 0,
+        defenseStat: 0,
+        balancedPower: 0
+      };
+    }
+
+    const isSpecial = move.damage_class === 'special';
+    const attackKey = isSpecial ? 'special-attack' : 'attack';
+    const defenseKey = isSpecial ? 'special-defense' : 'defense';
+    const baseAttack = Number(attacker?.stats?.[attackKey]) || 70;
+    const baseDefense = Number(defender?.stats?.[defenseKey]) || 70;
+    const baseStatRatio = clampBattleValue(
+      baseAttack / Math.max(1, baseDefense),
+      POKE_BATTLE_BALANCE.minBaseStatRatio,
+      POKE_BATTLE_BALANCE.maxBaseStatRatio
+    );
+    const stageRatio = clampBattleValue(
+      getStageMultiplier(attacker?.atkStage || 0) / getStageMultiplier(defender?.defStage || 0),
+      POKE_BATTLE_BALANCE.minStageRatio,
+      POKE_BATTLE_BALANCE.maxStageRatio
+    );
+    const statRatio = baseStatRatio * stageRatio;
+    const balancedPower = move.power <= POKE_BATTLE_BALANCE.powerSoftCap
+      ? move.power
+      : POKE_BATTLE_BALANCE.powerSoftCap
+        + (move.power - POKE_BATTLE_BALANCE.powerSoftCap) * POKE_BATTLE_BALANCE.powerOverflowScale;
+    const levelFactor = (2 * POKE_BATTLE_BALANCE.level / 5) + 2;
+    const variance = clampBattleValue(randomFactor, 0.85, 1);
+    const rawDamage = (((levelFactor * balancedPower * statRatio) / 50) + 2)
+      * stabMultiplier
+      * typeMultiplier
+      * variance;
+    const maxDamage = Math.max(1, Math.floor(
+      (Number(defender?.maxHp) || 250) * POKE_BATTLE_BALANCE.maxDamageRatio
+    ));
+
+    return {
+      damage: Math.max(1, Math.min(maxDamage, Math.floor(rawDamage))),
+      typeMultiplier,
+      stabMultiplier,
+      attackStat: baseAttack,
+      defenseStat: baseDefense,
+      balancedPower
+    };
+  };
+
+  window.getPokeTypeMultiplier = getTypeMultiplier;
+  window.getPokeEffectivenessInfo = getPokeEffectivenessInfo;
+  window.calculatePokeDamage = calculatePokeDamage;
+  window.POKE_BATTLE_BALANCE = POKE_BATTLE_BALANCE;
+
+  const updatePokeMoveEffectivenessBadge = (button, move, defender) => {
+    if (!button) return;
+
+    let badge = button.querySelector('.move-effectiveness');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'move-effectiveness hidden';
+      button.appendChild(badge);
+    }
+
+    if (!(move?.power > 0) || !defender) {
+      badge.classList.add('hidden');
+      button.removeAttribute('data-effectiveness');
+      return;
+    }
+
+    const multiplier = getTypeMultiplier(move.type, defender);
+    const info = getPokeEffectivenessInfo(multiplier);
+    button.dataset.effectiveness = String(multiplier);
+    badge.textContent = `${info.label} • ${info.detail}`;
+    badge.style.setProperty('--effectiveness-color', info.color);
+    badge.classList.toggle('hidden', multiplier === 1);
+  };
+
+  window.updatePokeMoveEffectivenessBadge = updatePokeMoveEffectivenessBadge;
+
   const setActivity = (act) => {
     closeAllCards(false, 'poke-card');
     document.getElementById('activities-modal').classList.add('hidden');
@@ -338,16 +451,23 @@ POKEMONS.fairy.push(
   const generateGuide = () => {
     const guideContent = document.getElementById('poke-guide-content');
     if (!guideContent) return;
-    guideContent.innerHTML = '';
+    guideContent.innerHTML = `
+      <div style="grid-column: 1 / -1; background: rgba(59,130,246,0.12); border: 1px solid rgba(96,165,250,0.3); border-radius: 12px; padding: 12px 15px; color: #bfdbfe; font-size: 13px; line-height: 1.5;">
+        Tür çarpanları çift türlerde birleşir: örneğin Ateş saldırısı Çimen/Böcek rakibe
+        <b style="color:#fb7185;">4×</b>, Su/Ejderha rakibe <b style="color:#fbbf24;">0.25×</b> etki eder.
+      </div>
+    `;
     
     for (const type in typeChart) {
       const strengths = [];
-      const weaknesses = [];
+      const resistances = [];
+      const immunities = [];
       
       for (const target in typeChart[type]) {
         const dmg = typeChart[type][target];
         if (dmg === 2) strengths.push(target);
-        if (dmg === 0.5 || dmg === 0) weaknesses.push(target);
+        if (dmg === 0.5) resistances.push(target);
+        if (dmg === 0) immunities.push(target);
       }
       
       const translateName = (t) => TYPE_NAMES[t] || t.toUpperCase();
@@ -366,7 +486,11 @@ POKEMONS.fairy.push(
           </div>
           <div>
             <div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">🛡️ <b>Zayıf Vurur (0.5x)</b></div>
-            <div>${weaknesses.length > 0 ? renderBadges(weaknesses) : '<span style="color: #64748b; font-size: 12px; font-style: italic;">Kimseye</span>'}</div>
+            <div>${resistances.length > 0 ? renderBadges(resistances) : '<span style="color: #64748b; font-size: 12px; font-style: italic;">Kimseye</span>'}</div>
+          </div>
+          <div style="margin-top: 10px;">
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">🚫 <b>Etki Etmez (0x)</b></div>
+            <div>${immunities.length > 0 ? renderBadges(immunities) : '<span style="color: #64748b; font-size: 12px; font-style: italic;">Kimseye</span>'}</div>
           </div>
         </div>
       `;
@@ -757,7 +881,7 @@ POKEMONS.fairy.push(
       }
   };
 
-  const playBattleAnimation = (attackerSlot, defenderSlot, moveName, moveType, damage, isSuper, isResisted, effectLog, moveCategory, animTarget) => {
+  const playBattleAnimation = (attackerSlot, defenderSlot, moveName, moveType, damage, typeMultiplier, effectLog, moveCategory, animTarget) => {
     const atkImg = document.getElementById('poke-' + attackerSlot + '-pokemon');
     const defImg = document.getElementById('poke-' + defenderSlot + '-pokemon');
     const proj = document.getElementById('poke-projectile');
@@ -797,12 +921,20 @@ POKEMONS.fairy.push(
             updateHpUI(attackerSlot);
         }
         
+        const effectiveness = getPokeEffectivenessInfo(typeMultiplier);
         let effectMsg = "";
-        if (isSuper && damage > 0) effectMsg = " Süper Etkili!";
-        else if (isResisted && damage > 0) effectMsg = " Etkisi Az!";
-        
-        if (effectLog) logBox.textContent = effectLog;
-        else logBox.textContent = moveName + " " + damage + " hasar verdi." + effectMsg;
+        if (typeMultiplier >= 4 && damage > 0) effectMsg = " Aşırı Etkili!";
+        else if (typeMultiplier > 1 && damage > 0) effectMsg = " Süper Etkili!";
+        else if (typeMultiplier < 1 && typeMultiplier > 0 && damage > 0) effectMsg = " Etkisi Az!";
+
+        if (effectLog) {
+          logBox.textContent = effectLog;
+        } else if (typeMultiplier === 0) {
+          logBox.textContent = `${moveName} rakibe hiç etki etmedi!`;
+        } else {
+          logBox.textContent = `${moveName} ${damage} hasar verdi.${effectMsg}`;
+        }
+        logBox.dataset.effectiveness = effectiveness.detail;
         
         setTimeout(() => {
            if (pokeState[defenderSlot].hp <= 0) {
@@ -826,28 +958,46 @@ POKEMONS.fairy.push(
        window.pokeAnimPlaying = true;
        const m1 = pokeState.p1.moves[action1.moveIdx];
        const m2 = pokeState.p2.moves[action2.moveIdx];
-       const rawS1 = (pokeState.p1.speed || 50) + (100 - m1.power) * 0.5;
+       const rawS1 = (pokeState.p1.speed || 50) + (100 - (m1.power || 0)) * 0.5;
        const s1 = Math.max(1, Math.min(10, Math.round(rawS1 / 15)));
        
-       const rawS2 = (pokeState.p2.speed || 50) + (100 - m2.power) * 0.5;
+       const rawS2 = (pokeState.p2.speed || 50) + (100 - (m2.power || 0)) * 0.5;
        const s2 = Math.max(1, Math.min(10, Math.round(rawS2 / 15)));
+       const p1Priority = Number(m1.priority) || 0;
+       const p2Priority = Number(m2.priority) || 0;
        
        let first = 'p1', second = 'p2';
        let firstMove = m1, secondMove = m2;
        
-       if (s2 > s1 || (s2 === s1 && Math.random() > 0.5)) {
+       if (
+         p2Priority > p1Priority
+         || (
+           p2Priority === p1Priority
+           && (s2 > s1 || (s2 === s1 && Math.random() > 0.5))
+         )
+       ) {
           first = 'p2'; second = 'p1';
           firstMove = m2; secondMove = m1;
        }
-
-       const getStageMultiplier = (stage) => stage >= 0 ? (2 + stage) / 2 : 2 / (2 - Math.abs(stage));
        
        const execSingle = (attacker, defender, move, action, cb) => {
           if (pokeState[attacker].hp <= 0) return cb();
           
-          let dmg = 0, effectLog = null, isSuper = false, isResisted = false, animCategory = move.category || 'damage', animTarget = defender;
+          let dmg = 0;
+          let effectLog = null;
+          let typeMultiplier = 1;
+          let animCategory = move.category || 'damage';
+          let animTarget = defender;
+          const hasAccuracy = move.accuracy !== null && move.accuracy !== undefined;
+          const accuracy = Number(move.accuracy);
+          const moveMissed = hasAccuracy
+            && Number.isFinite(accuracy)
+            && Math.random() * 100 >= accuracy;
 
-          if (move.isTransform) {
+          if (moveMissed) {
+              effectLog = `${move.name} ıskaladı!`;
+              animCategory = 'miss';
+          } else if (move.isTransform) {
               const source = pokeState[defender];
               const fighter = pokeState[attacker];
               const sourceMoves = source.moves || [];
@@ -895,15 +1045,14 @@ POKEMONS.fairy.push(
               animTarget = attacker;
               customRenderBattleArena();
           } else if (move.power > 0) {
-              const multiplier = getTypeMultiplier(move.type, pokeState[defender]);
-              const stabMultiplier = getFighterTypes(pokeState[attacker]).includes(move.type) ? 1.2 : 1;
-              
-              isSuper = multiplier > 1.5;
-              isResisted = multiplier < 0.9;
-              let baseDmg = Math.floor(move.power * 0.45 * multiplier * stabMultiplier * (Math.random() * 0.15 + 0.85));
-              let atkMod = getStageMultiplier(pokeState[attacker].atkStage || 0);
-              let defMod = getStageMultiplier(pokeState[defender].defStage || 0);
-              dmg = Math.floor(baseDmg * atkMod / defMod);
+              const damageResult = calculatePokeDamage(
+                pokeState[attacker],
+                pokeState[defender],
+                move,
+                Math.random() * 0.15 + 0.85
+              );
+              dmg = damageResult.damage;
+              typeMultiplier = damageResult.typeMultiplier;
           } else if (move.damage_class === 'status') {
               animTarget = (move.target === 'user' || move.target === 'user-and-allies') ? attacker : defender;
               if (move.healing > 0) {
@@ -927,7 +1076,17 @@ POKEMONS.fairy.push(
               }
           }
           
-          playBattleAnimation(attacker, defender, move.name, move.type, dmg, isSuper, isResisted, effectLog, animCategory, animTarget);
+          playBattleAnimation(
+            attacker,
+            defender,
+            move.name,
+            move.type,
+            dmg,
+            typeMultiplier,
+            effectLog,
+            animCategory,
+            animTarget
+          );
           
           setTimeout(() => {
              cb();
@@ -1005,9 +1164,16 @@ POKEMONS.fairy.push(
           let score = 0;
           
           if (move.power > 0) {
-              const multiplier = getTypeMultiplier(move.type, pokeState.p1);
-              score = move.power * multiplier;
-              score += Math.random() * 20; // add slight randomness
+              const estimatedDamage = calculatePokeDamage(pokeState.p2, pokeState.p1, move, 1);
+              const parsedAccuracy = Number(move.accuracy);
+              const accuracy = move.accuracy === null
+                || move.accuracy === undefined
+                || !Number.isFinite(parsedAccuracy)
+                ? 1
+                : clampBattleValue(parsedAccuracy / 100, 0, 1);
+              score = estimatedDamage.damage * accuracy;
+              score += (Number(move.priority) || 0) * 4;
+              score += Math.random() * 10;
           } else if (move.damage_class === 'status') {
               if (move.isTransform) {
                   score = pokeState.p2.transformed ? 20 : 135 + Math.random() * 20;
@@ -1570,6 +1736,7 @@ POKEMONS.fairy.push(
         
         // Populate moves
         const moves = pokeState[mySlot].moves;
+        const opponentSlot = mySlot === 'p1' ? 'p2' : 'p1';
 
         for (let i=0; i<4; i++) {
            const btn = document.querySelector('.poke-move-btn[data-move="'+i+'"]');
@@ -1581,10 +1748,16 @@ POKEMONS.fairy.push(
                 const rawSpeed = (pokeState[mySlot].speed || 50) + (100 - moves[i].power) * 0.5;
                 const calcSpeed = Math.max(1, Math.min(10, Math.round(rawSpeed / 15)));
                 const speedObj = btn.querySelector('.move-speed');
-                if(speedObj) speedObj.textContent = "Hız: " + calcSpeed + "/10";
+                if (speedObj) {
+                  const priority = Number(moves[i].priority) || 0;
+                  speedObj.textContent = priority
+                    ? `Öncelik: ${priority > 0 ? '+' : ''}${priority}`
+                    : `Hız: ${calcSpeed}/10`;
+                }
               btn.querySelector('.move-type').className = 'move-type type-' + moves[i].type;
               btn.querySelector('.move-type').style.color = TYPE_COLORS[moves[i].type] || '#fff';
               btn.querySelector('.move-power').textContent = "Güç: " + moves[i].power;
+              updatePokeMoveEffectivenessBadge(btn, moves[i], pokeState[opponentSlot]);
            } else if (btn) {
               btn.classList.add('hidden');
            }
