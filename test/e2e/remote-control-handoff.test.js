@@ -36,7 +36,14 @@ module.exports = async function run() {
     await evalJS(host.client, `state.isSharing = true; broadcast({ type: 'sharing', sharing: true }); true`);
     await waitFor(controller.client, `Array.from(state.peers.values()).some(peer => peer.sharing)`, 10000, 'screen sharing state');
     await evalJS(controller.client, `state.myAvatar = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E'; true`);
-    await evalJS(controller.client, `requestControl(Array.from(state.peers.keys())[0]); true`);
+
+    const blockedClosedScreenRequest = await evalJS(controller.client, `requestControl(Array.from(state.peers.keys())[0])`);
+    assert.strictEqual(blockedClosedScreenRequest, false);
+
+    await waitFor(controller.client, `!!document.querySelector('.inactive-overlay button')`, 10000, 'screen share open button');
+    await evalJS(controller.client, `document.querySelector('.inactive-overlay button').click(); true`);
+    const openScreenRequest = await evalJS(controller.client, `requestControl(Array.from(state.peers.keys())[0])`);
+    assert.strictEqual(openScreenRequest, true);
     await waitFor(host.client, `!document.getElementById('ctrl-modal').classList.contains('hidden')`, 10000, 'control request');
     await clickWhenReady(host.client, 'ctrl-accept');
     await waitFor(controller.client, `state.activeControl && state.controlOwner === 'host'`, 10000, 'control accepted');

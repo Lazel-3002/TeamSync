@@ -4604,6 +4604,23 @@ function updateFounderMenuVisibility() {
   }
 }
 
+function isPeerScreenOpen(peerId) {
+  const peer = state.peers.get(peerId);
+  const screenShare = state.screenShares && state.screenShares[peerId];
+  const screenCard = document.getElementById(`vc-${peerId}-s`);
+  return Boolean(peer && peer.sharing && screenShare && screenShare.joined && screenCard);
+}
+
+function updateControlRequestButton(peerId) {
+  const button = document.querySelector(`[data-ctrl="${peerId}"]`);
+  if (!button) return;
+  const canRequestControl = isPeerScreenOpen(peerId);
+  button.disabled = !canRequestControl;
+  button.title = canRequestControl
+    ? 'Uzaktan kontrol iste'
+    : 'Kontrol isteği göndermek için önce ekran paylaşımını açın';
+}
+
 function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) {
   if (document.querySelector(`[data-uid="${id}"]`)) return;
   const li = document.createElement('li');
@@ -4633,6 +4650,7 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
   document.getElementById('users').appendChild(li);
   if (!self) {
     li.querySelector(`[data-ctrl="${id}"]`).addEventListener('click', () => requestControl(id));
+    updateControlRequestButton(id);
 
     // Menü hem normal (sol) tıkla hem de sağ tıkla açılır (Discord gibi)
     const openMenu = (e) => {
@@ -4864,10 +4882,14 @@ function showUserContextMenu(e, targetId, targetName) {
   const ctrlBtn = document.createElement('button');
   ctrlBtn.className = 'user-context-menu-item';
   const targetPeer = state.peers.get(targetId);
-  const canRequestControl = Boolean(targetPeer && targetPeer.sharing);
+  const canRequestControl = isPeerScreenOpen(targetId);
   ctrlBtn.disabled = !canRequestControl;
-  ctrlBtn.title = canRequestControl ? '' : 'Denetim izni yalnızca ekran paylaşılırken istenebilir.';
-  ctrlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> ' + (canRequestControl ? 'Uzaktan Kontrol İste' : 'Ekran paylaşılmıyor');
+  ctrlBtn.title = canRequestControl
+    ? ''
+    : (targetPeer && targetPeer.sharing
+      ? 'Kontrol isteği göndermek için önce ekran paylaşımını açın.'
+      : 'Denetim izni yalnızca ekran paylaşılırken istenebilir.');
+  ctrlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> ' + (canRequestControl ? 'Uzaktan Kontrol İste' : (targetPeer && targetPeer.sharing ? 'Önce ekranı açın' : 'Ekran paylaşılmıyor'));
   ctrlBtn.addEventListener('click', () => {
     requestControl(targetId);
     menu.remove();
@@ -5057,10 +5079,12 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
          state.screenShares[peerId].joined = true;
          removeInactiveOverlay(card.id);
          videoEl.muted = false;
+         updateControlRequestButton(peerId);
          if (!focusedCard) toggleFocus(card);
          videoEl.play().catch(err => console.warn('videoEl play failed on join click:', err));
       });
     } else {
+      updateControlRequestButton(peerId);
       if (!focusedCard) toggleFocus(card);
     }
   }
@@ -5071,6 +5095,10 @@ function removeVideoCard(peerId, isScreen) {
   if (el) {
     if (focusedCard === el) toggleFocus(el);
     el.remove();
+  }
+  if (isScreen && peerId !== 'self' && state.screenShares) {
+    delete state.screenShares[peerId];
+    updateControlRequestButton(peerId);
   }
   updateEmptyGrid();
 }
@@ -6068,6 +6096,10 @@ function requestControl(peerId) {
   const peer = state.peers.get(peerId);
   if (!peer || !peer.sharing) {
     showToast('Denetim izni yalnızca ekran paylaşılırken istenebilir.', 'warn');
+    return false;
+  }
+  if (!isPeerScreenOpen(peerId)) {
+    showToast('Kontrol isteği göndermek için önce ekran paylaşımını açın.', 'warn');
     return false;
   }
   broadcastTo(peerId, { type: 'ctrl-req', reqId: 'req-' + Date.now() });
