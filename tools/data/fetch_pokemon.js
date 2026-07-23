@@ -62,6 +62,36 @@ async function run() {
         speciesMap.set(s.name, id);
     });
 
+    console.log("Fetching real Pokemon types...");
+    const typeMap = new Map();
+    const pokemonApiNameMap = new Map();
+    const allSpeciesNames = [...new Set(chains.flatMap(chain => extractEvolutions(chain)))];
+    const allSpecies = allSpeciesNames
+        .map(name => ({ name, id: speciesMap.get(name) }))
+        .filter(species => Number.isFinite(species.id) && species.id <= 1500);
+
+    for (let i = 0; i < allSpecies.length; i += 20) {
+        const batch = allSpecies.slice(i, i + 20);
+        await Promise.all(batch.map(async species => {
+            try {
+                // National Pokedex species IDs match the default Pokemon entries.
+                // Fetching by ID also works for species whose API form name differs
+                // (for example giratina-altered or tornadus-incarnate).
+                const pokemon = await fetchJson(`https://pokeapi.co/api/v2/pokemon/${species.id}`);
+                const types = (pokemon.types || [])
+                    .sort((a, b) => a.slot - b.slot)
+                    .map(entry => entry.type.name);
+                typeMap.set(species.name, types.length ? types : ['normal']);
+                pokemonApiNameMap.set(species.name, pokemon.name || species.name);
+            } catch (e) {
+                console.log(`Type fetch failed for ${species.name}:`, e.message);
+                typeMap.set(species.name, ['normal']);
+                pokemonApiNameMap.set(species.name, species.name);
+            }
+        }));
+        process.stdout.write(`.` + Math.min(i + 20, allSpecies.length) + `.`);
+    }
+
     for (let chain of chains) {
         const baseName = chain.species.name;
         
@@ -75,35 +105,39 @@ async function run() {
         for (let evoName of allEvos) {
             const displayName = evoName.charAt(0).toUpperCase() + evoName.slice(1);
             const cleanName = evoName.replace(/-/g, '');
+            const evoTypes = typeMap.get(evoName) || ['normal'];
             evolutions.push({
+                id: speciesMap.get(evoName) || null,
                 name: displayName,
+                apiName: pokemonApiNameMap.get(evoName) || evoName,
+                type: evoTypes[0],
+                types: evoTypes,
                 url: `https://play.pokemonshowdown.com/sprites/ani/${cleanName}.gif`
             });
         }
         
+        const types = typeMap.get(baseName) || ['normal'];
         families.push({
             id: id,
             baseName: baseName,
             displayName: baseName.charAt(0).toUpperCase() + baseName.slice(1),
-            type: 'normal', // We skip type fetching to save 500 API calls! They will just have gray badges or default.
+            type: types[0],
+            types,
             hp: 200, 
             evolutions: evolutions
         });
     }
-
-    // Since we skipped fetching 'types' for 500 base pokemons to avoid rate limits,
-    // they will just fallback to 'normal' color, which is acceptable for the massive expansion.
     
     // Add Mega X and Y for Charizard and Mewtwo
     const charizardFam = families.find(f => f.baseName === 'charmander');
     if (charizardFam) {
-        charizardFam.evolutions.push({ name: 'Mega Charizard X', url: 'https://play.pokemonshowdown.com/sprites/ani/charizardmegax.gif' });
-        charizardFam.evolutions.push({ name: 'Mega Charizard Y', url: 'https://play.pokemonshowdown.com/sprites/ani/charizardmegay.gif' });
+        charizardFam.evolutions.push({ name: 'Mega Charizard X', apiName: 'charizard-mega-x', type: 'fire', types: ['fire', 'dragon'], url: 'https://play.pokemonshowdown.com/sprites/ani/charizardmegax.gif' });
+        charizardFam.evolutions.push({ name: 'Mega Charizard Y', apiName: 'charizard-mega-y', type: 'fire', types: ['fire', 'flying'], url: 'https://play.pokemonshowdown.com/sprites/ani/charizardmegay.gif' });
     }
     const mewtwoFam = families.find(f => f.baseName === 'mewtwo');
     if (mewtwoFam) {
-        mewtwoFam.evolutions.push({ name: 'Mega Mewtwo X', url: 'https://play.pokemonshowdown.com/sprites/ani/mewtwomegax.gif' });
-        mewtwoFam.evolutions.push({ name: 'Mega Mewtwo Y', url: 'https://play.pokemonshowdown.com/sprites/ani/mewtwomegay.gif' });
+        mewtwoFam.evolutions.push({ name: 'Mega Mewtwo X', apiName: 'mewtwo-mega-x', type: 'psychic', types: ['psychic', 'fighting'], url: 'https://play.pokemonshowdown.com/sprites/ani/mewtwomegax.gif' });
+        mewtwoFam.evolutions.push({ name: 'Mega Mewtwo Y', apiName: 'mewtwo-mega-y', type: 'psychic', types: ['psychic'], url: 'https://play.pokemonshowdown.com/sprites/ani/mewtwomegay.gif' });
     }
 
     families.sort((a,b) => a.id - b.id);

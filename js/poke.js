@@ -9,6 +9,20 @@ function initPoke() {
   // Tooltip Helper
   window.getMoveTooltip = (move) => {
      let effects = [];
+     const typeName = TYPE_NAMES?.[move.type] || move.type || 'NORMAL';
+     const damageClass = move.damage_class === 'physical'
+       ? 'Fiziksel'
+       : move.damage_class === 'special'
+         ? 'Özel'
+         : 'Durum';
+     if (move.isTransform) {
+        return 'Rakibin görünümünü, türlerini, özelliklerini ve maksimum canını kopyalar. Rakibin seçtiğin bir saldırısını kendi seçtiğin saldırı yuvasına geçirir.';
+     }
+     if (move.power > 0) {
+        effects.push(`${typeName} türünde ${move.power} güçte ${damageClass.toLowerCase()} hasar verir.`);
+     } else {
+        effects.push(`${typeName} türünde bir ${damageClass.toLowerCase()} hareketidir.`);
+     }
      if (move.healing > 0) {
         effects.push(`Maksimum canın %${move.healing}'i kadar iyileştirir.`);
      }
@@ -23,8 +37,32 @@ function initPoke() {
            effects.push(`${isBuff ? 'Kendi' : 'Rakibin'} ${statName} statını ${Math.abs(sc.change)} kademe ${sc.change > 0 ? 'artırır' : 'düşürür'}.`);
         });
      }
-     if (effects.length === 0) {
-        effects.push(move.power === 0 ? "Özel bir etkisi var (Durum hamlesi)." : "Rakibe hasar verir.");
+     if (move.category && move.category.includes('ailment')) {
+        effects.push('Rakipte özel bir durum etkisi oluşturabilir.');
+     }
+     if (Number.isFinite(move.accuracy)) {
+        effects.push(`İsabet oranı: %${move.accuracy}.`);
+     }
+     const ailmentNames = {
+       paralysis: 'felç', burn: 'yanma', freeze: 'donma', poison: 'zehirlenme',
+       sleep: 'uyku', confusion: 'kafa karışıklığı', trap: 'tuzağa düşme'
+     };
+     if (move.ailment && move.ailment !== 'none') {
+        const chance = move.ailmentChance > 0 ? `%${move.ailmentChance} ihtimalle ` : '';
+        effects.push(`${chance}${ailmentNames[move.ailment] || move.ailment} etkisi uygular.`);
+     }
+     if (move.flinchChance > 0) effects.push(`%${move.flinchChance} ihtimalle rakibi sersemletir.`);
+     if (move.drain > 0) effects.push(`Verdiği hasarın %${move.drain}'i kadar can yeniler.`);
+     if (move.drain < 0) effects.push(`Verdiği hasarın %${Math.abs(move.drain)}'i kadar geri tepme hasarı alır.`);
+     if (move.minHits && move.maxHits) effects.push(`${move.minHits}-${move.maxHits} kez vurabilir.`);
+     if (move.critRate > 0) effects.push('Kritik vuruş ihtimali yüksektir.');
+     if (move.priority > 0) effects.push('Öncelikli hareket ederek daha erken uygulanır.');
+     if (move.description) {
+        const safeDescription = String(move.description)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        effects.push(`<span style="color:#a5b4fc">PokeAPI oyun etkisi: ${safeDescription}</span>`);
      }
      return effects.join("<br/>");
   };
@@ -166,6 +204,27 @@ POKEMONS.fairy.push(
 );
 
   const TYPE_NAMES = { normal: 'NORMAL', fire: 'ATEŞ', water: 'SU', electric: 'ELEKTRİK', grass: 'ÇİMEN', ice: 'BUZ', fighting: 'DÖVÜŞ', poison: 'ZEHİR', ground: 'TOPRAK', flying: 'UÇAN', psychic: 'PSİŞİK', bug: 'BÖCEK', rock: 'KAYA', ghost: 'HAYALET', dragon: 'EJDERHA', dark: 'KARANLIK', steel: 'ÇELİK', fairy: 'PERİ' };
+  const getFamilyTypes = (family) => {
+    const types = Array.isArray(family?.types) && family.types.length
+      ? family.types
+      : [family?.type || 'normal'];
+    return [...new Set(types)];
+  };
+  const renderFamilyTypeBadges = (family) => getFamilyTypes(family).map(type => `
+    <span class="poke-type-badge" style="background: ${TYPE_COLORS[type] || '#777'};">
+      ${TYPE_NAMES[type] || type}
+    </span>
+  `).join('');
+  const getFighterTypes = (fighter) => {
+    const types = Array.isArray(fighter?.types) && fighter.types.length
+      ? fighter.types
+      : [fighter?.type || 'normal'];
+    return [...new Set(types)];
+  };
+  const getTypeMultiplier = (moveType, defender) => getFighterTypes(defender).reduce((total, defenderType) => {
+    const chartValue = typeChart[moveType]?.[defenderType];
+    return total * (chartValue === undefined ? 1 : chartValue);
+  }, 1);
   const TYPE_COLORS = { normal: '#9ca3af', fire: '#ef4444', water: '#3b82f6', electric: '#eab308', grass: '#22c55e', ice: '#38bdf8', fighting: '#f97316', poison: '#a855f7', ground: '#d97706', flying: '#818cf8', psychic: '#f43f5e', bug: '#84cc16', rock: '#78716c', ghost: '#6366f1', dragon: '#3b82f6', dark: '#1e293b', steel: '#94a3b8', fairy: '#ec4899' };
   const UNKNOWN_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23333'/%3E%3Ctext x='50' y='65' font-size='40' text-anchor='middle' fill='%23fff'%3E?%3C/text%3E%3C/svg%3E";
 
@@ -783,19 +842,63 @@ POKEMONS.fairy.push(
 
        const getStageMultiplier = (stage) => stage >= 0 ? (2 + stage) / 2 : 2 / (2 - Math.abs(stage));
        
-       const execSingle = (attacker, defender, move, cb) => {
+       const execSingle = (attacker, defender, move, action, cb) => {
           if (pokeState[attacker].hp <= 0) return cb();
           
           let dmg = 0, effectLog = null, isSuper = false, isResisted = false, animCategory = move.category || 'damage', animTarget = defender;
 
-          if (move.power > 0) {
-              const defType = pokeState[defender].type;
-              let multiplier = 1;
-              if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) multiplier = typeChart[move.type][defType];
+          if (move.isTransform) {
+              const source = pokeState[defender];
+              const fighter = pokeState[attacker];
+              const sourceMoves = source.moves || [];
+              const requestedCopy = Number(action?.transformCopyMoveIdx);
+              const strongestIdx = sourceMoves.reduce((bestIdx, candidate, index) => {
+                const bestPower = sourceMoves[bestIdx]?.power || 0;
+                return (candidate.power || 0) > bestPower ? index : bestIdx;
+              }, 0);
+              const copyIdx = Number.isInteger(requestedCopy) && sourceMoves[requestedCopy]
+                ? requestedCopy
+                : strongestIdx;
+              const requestedReplace = Number(action?.transformReplaceMoveIdx);
+              const replaceIdx = Number.isInteger(requestedReplace) && fighter.moves[requestedReplace]
+                ? requestedReplace
+                : action.moveIdx;
+              const copiedMove = sourceMoves[copyIdx] ? { ...sourceMoves[copyIdx], copiedFrom: source.evoName } : null;
+              const hpRatio = fighter.maxHp > 0 ? fighter.hp / fighter.maxHp : 1;
+
+              fighter.originalForm = fighter.originalForm || {
+                pokemon: fighter.pokemon,
+                evoName: fighter.evoName,
+                type: fighter.type,
+                types: getFighterTypes(fighter),
+                stats: fighter.stats,
+                height: fighter.height,
+                maxHp: fighter.maxHp
+              };
+              fighter.pokemon = source.pokemon;
+              fighter.evoName = source.evoName;
+              fighter.type = source.type;
+              fighter.types = getFighterTypes(source);
+              fighter.stats = { ...(source.stats || {}) };
+              fighter.height = source.height;
+              fighter.speed = source.speed;
+              fighter.maxHp = source.maxHp;
+              fighter.hp = Math.max(1, Math.round(source.maxHp * Math.min(1, hpRatio)));
+              fighter.transformed = true;
+              if (copiedMove) fighter.moves[replaceIdx] = copiedMove;
+
+              effectLog = `${fighter.name}, ${source.evoName || 'rakip Pokémon'} formuna dönüştü!`
+                + (copiedMove ? ` ${copiedMove.name} saldırısını kopyaladı.` : '');
+              animCategory = 'unique';
+              animTarget = attacker;
+              customRenderBattleArena();
+          } else if (move.power > 0) {
+              const multiplier = getTypeMultiplier(move.type, pokeState[defender]);
+              const stabMultiplier = getFighterTypes(pokeState[attacker]).includes(move.type) ? 1.2 : 1;
               
               isSuper = multiplier > 1.5;
               isResisted = multiplier < 0.9;
-              let baseDmg = Math.floor(move.power * 0.45 * multiplier * (Math.random() * 0.15 + 0.85));
+              let baseDmg = Math.floor(move.power * 0.45 * multiplier * stabMultiplier * (Math.random() * 0.15 + 0.85));
               let atkMod = getStageMultiplier(pokeState[attacker].atkStage || 0);
               let defMod = getStageMultiplier(pokeState[defender].defStage || 0);
               dmg = Math.floor(baseDmg * atkMod / defMod);
@@ -829,13 +932,16 @@ POKEMONS.fairy.push(
           }, 2000);
        };
        
-       execSingle(first, second, firstMove, () => {
+       const firstAction = first === 'p1' ? action1 : action2;
+       const secondAction = second === 'p1' ? action1 : action2;
+
+       execSingle(first, second, firstMove, firstAction, () => {
           if (pokeState[second].hp <= 0) {
              window.pokeAnimPlaying = false;
              endBattle(first);
              return;
           }
-          execSingle(second, first, secondMove, () => {
+          execSingle(second, first, secondMove, secondAction, () => {
              window.pokeAnimPlaying = false;
              if (pokeState[first].hp <= 0) {
                 endBattle(second);
@@ -889,8 +995,6 @@ POKEMONS.fairy.push(
        if (pokeState.status !== 'revealed' || pokeState.actionP2 !== null) return;
        
        const myMoves = pokeState.p2.moves;
-       const targetType = pokeState.p1.type;
-       
        let bestMoveIdx = 0;
        let bestScore = -1000;
        
@@ -899,12 +1003,13 @@ POKEMONS.fairy.push(
           let score = 0;
           
           if (move.power > 0) {
-              let multiplier = 1;
-              if (typeChart[move.type] && typeChart[move.type][targetType] !== undefined) multiplier = typeChart[move.type][targetType];
+              const multiplier = getTypeMultiplier(move.type, pokeState.p1);
               score = move.power * multiplier;
               score += Math.random() * 20; // add slight randomness
           } else if (move.damage_class === 'status') {
-              if (move.healing > 0) {
+              if (move.isTransform) {
+                  score = pokeState.p2.transformed ? 20 : 135 + Math.random() * 20;
+              } else if (move.healing > 0) {
                   const hpPct = pokeState.p2.hp / pokeState.p2.maxHp;
                   if (hpPct < 0.4) score = 150 + Math.random() * 50; // Priority!
                   else if (hpPct < 0.7) score = 80 + Math.random() * 20;
@@ -930,7 +1035,87 @@ POKEMONS.fairy.push(
           }
        }
        
-       broadcastPokeMsg({ type: 'poke_action_select', id: 'BOT', moveIdx: bestMoveIdx });
+       const botAction = { type: 'poke_action_select', id: 'BOT', moveIdx: bestMoveIdx };
+       if (myMoves[bestMoveIdx]?.isTransform) {
+          botAction.transformCopyMoveIdx = (pokeState.p1.moves || []).reduce((bestIdx, move, index, moves) => {
+             return (move.power || 0) > (moves[bestIdx]?.power || 0) ? index : bestIdx;
+          }, 0);
+          botAction.transformReplaceMoveIdx = bestMoveIdx;
+       }
+       broadcastPokeMsg(botAction);
+    };
+
+    const submitPokeBattleAction = (slot, action) => {
+      if (slot === 'p1') pokeState.actionP1 = action;
+      else pokeState.actionP2 = action;
+      customRenderBattleArena();
+      broadcastPokeMsg(action);
+    };
+
+    const openTransformSelection = (slot, transformMoveIdx) => {
+      const opponentSlot = slot === 'p1' ? 'p2' : 'p1';
+      const fighter = pokeState[slot];
+      const opponent = pokeState[opponentSlot];
+      if (!fighter || !opponent) return;
+
+      document.getElementById('poke-transform-selection-modal')?.remove();
+      const modal = document.createElement('div');
+      modal.id = 'poke-transform-selection-modal';
+      modal.className = 'poke-transform-selection-modal';
+      const strongestIdx = (opponent.moves || []).reduce((bestIdx, move, index, moves) => {
+        return (move.power || 0) > (moves[bestIdx]?.power || 0) ? index : bestIdx;
+      }, 0);
+      let selectedCopy = strongestIdx;
+      let selectedReplace = transformMoveIdx;
+
+      const moveChoice = (move, index, group, selected) => `
+        <button type="button" class="poke-transform-choice${selected ? ' selected' : ''}" data-group="${group}" data-index="${index}">
+          <span>${move.name}</span>
+          <small>${TYPE_NAMES[move.type] || move.type} · ${move.power > 0 ? `Güç ${move.power}` : 'Durum'}</small>
+          <span class="move-info-icon">i<span class="tooltip-text">${window.getMoveTooltip(move)}</span></span>
+        </button>
+      `;
+
+      modal.innerHTML = `
+        <div class="poke-transform-dialog">
+          <button type="button" class="poke-transform-close" aria-label="Kapat">×</button>
+          <div class="poke-transform-kicker">DÖNÜŞÜM YETENEĞİ</div>
+          <h3>${opponent.evoName || 'Rakip Pokémon'} formunu kopyala</h3>
+          <p>Rakibin bir saldırısını ve onun yerine geçeceği kendi saldırını seç.</p>
+          <h4>1. Kopyalanacak rakip saldırısı</h4>
+          <div class="poke-transform-grid">
+            ${(opponent.moves || []).map((move, index) => moveChoice(move, index, 'copy', index === selectedCopy)).join('')}
+          </div>
+          <h4>2. Değiştirilecek kendi saldırın</h4>
+          <div class="poke-transform-grid">
+            ${(fighter.moves || []).map((move, index) => moveChoice(move, index, 'replace', index === selectedReplace)).join('')}
+          </div>
+          <button type="button" class="poke-transform-confirm">DÖNÜŞÜMÜ ONAYLA</button>
+        </div>
+      `;
+
+      modal.querySelectorAll('.poke-transform-choice').forEach(choice => {
+        choice.addEventListener('click', () => {
+          const group = choice.dataset.group;
+          const index = Number(choice.dataset.index);
+          modal.querySelectorAll(`.poke-transform-choice[data-group="${group}"]`).forEach(item => item.classList.remove('selected'));
+          choice.classList.add('selected');
+          if (group === 'copy') selectedCopy = index;
+          else selectedReplace = index;
+        });
+      });
+      modal.querySelector('.poke-transform-close').onclick = () => modal.remove();
+      modal.querySelector('.poke-transform-confirm').onclick = () => {
+        modal.remove();
+        submitPokeBattleAction(slot, {
+          type: 'poke_action_select',
+          id: state.myId,
+          moveIdx: transformMoveIdx,
+          transformCopyMoveIdx: selectedCopy,
+          transformReplaceMoveIdx: selectedReplace
+        });
+      };
+      document.getElementById('poke-card').appendChild(modal);
     };
 
     document.querySelectorAll('.poke-move-btn').forEach(btn => {
@@ -943,10 +1128,17 @@ POKEMONS.fairy.push(
       }
       
       const moveIdx = parseInt(target.getAttribute('data-move'));
-    if (pokeState.p1 && pokeState.p1.id === state.myId) pokeState.actionP1 = { id: state.myId, moveIdx: moveIdx };
-    else if (pokeState.p2 && pokeState.p2.id === state.myId) pokeState.actionP2 = { id: state.myId, moveIdx: moveIdx };
-    customRenderBattleArena();
-    broadcastPokeMsg({ type: 'poke_action_select', id: state.myId, moveIdx: moveIdx });
+      const mySlot = pokeState.p1 && pokeState.p1.id === state.myId
+        ? 'p1'
+        : pokeState.p2 && pokeState.p2.id === state.myId
+          ? 'p2'
+          : null;
+      if (!mySlot) return;
+      if (pokeState[mySlot].moves[moveIdx]?.isTransform) {
+        openTransformSelection(mySlot, moveIdx);
+        return;
+      }
+      submitPokeBattleAction(mySlot, { type: 'poke_action_select', id: state.myId, moveIdx });
   });
 });
 
@@ -980,6 +1172,19 @@ POKEMONS.fairy.push(
       category: dictMove.category,
       stat_changes: dictMove.stat_changes || [],
       target: dictMove.target
+      ,
+      apiName: moveName,
+      isTransform: moveName === 'transform',
+      accuracy: dictMove.accuracy,
+      priority: dictMove.priority || 0,
+      ailment: dictMove.ailment,
+      ailmentChance: dictMove.ailment_chance || 0,
+      flinchChance: dictMove.flinch_chance || 0,
+      drain: dictMove.drain || 0,
+      critRate: dictMove.crit_rate || 0,
+      minHits: dictMove.min_hits,
+      maxHits: dictMove.max_hits,
+      description: dictMove.description
     };
   };
 
@@ -1000,6 +1205,10 @@ POKEMONS.fairy.push(
       }
       const res = await fetch('https://pokeapi.co/api/v2/pokemon/' + pokeApiName);
       const data = await res.json();
+      const height = Number(data.height) || null;
+      const pokemonTypes = (data.types || [])
+        .sort((a, b) => a.slot - b.slot)
+        .map(entry => entry.type.name);
       
       let stats = { hp: 70, speed: 50, attack: 50, defense: 50, 'special-attack': 50, 'special-defense': 50 };
       if (data.stats) {
@@ -1029,12 +1238,35 @@ POKEMONS.fairy.push(
               }
           });
       }
+
+      const canTransform = pokeApiName === 'ditto'
+        || pokeApiName === 'mew'
+        || pokeApiName === 'mewtwo'
+        || pokeApiName.startsWith('mewtwo-');
+      if (canTransform && !allMoves.some(move => move.isTransform)) {
+          allMoves.unshift({
+            name: 'TRANSFORM',
+            apiName: 'transform',
+            type: 'normal',
+            power: 0,
+            damage_class: 'status',
+            healing: 0,
+            category: 'unique',
+            stat_changes: [],
+            target: 'user',
+            isTransform: true
+          });
+      }
       
       allMoves.sort((a, b) => b.power - a.power);
+      const transformIdx = allMoves.findIndex(move => move.isTransform);
+      if (transformIdx > 0) {
+          allMoves.unshift(allMoves.splice(transformIdx, 1)[0]);
+      }
       
       if (fullList) {
          if (allMoves.length === 0) allMoves = [{name: "STRUGGLE", type: "normal", power: 50}];
-         return { stats, moves: allMoves };
+         return { stats, moves: allMoves, height, types: pokemonTypes.length ? pokemonTypes : [targetType || 'normal'] };
       }
       
       // If NOT fullList (e.g. Bot), filter to good/high-level moves to pick smartly
@@ -1054,8 +1286,9 @@ POKEMONS.fairy.push(
       const goodMoves = allMoves.filter(m => goodMoveNames.includes(m.name));
       const poolForBot = goodMoves.length > 5 ? goodMoves : allMoves;
       
-      const stabMoves = poolForBot.filter(m => m.type === targetType).slice(0, 10);
-      const otherMoves = poolForBot.filter(m => m.type !== targetType).slice(0, 15);
+      const actualTypes = pokemonTypes.length ? pokemonTypes : [targetType || 'normal'];
+      const stabMoves = poolForBot.filter(m => actualTypes.includes(m.type)).slice(0, 10);
+      const otherMoves = poolForBot.filter(m => !actualTypes.includes(m.type)).slice(0, 15);
       
       const selectedMoves = [];
       if (stabMoves.length > 0) {
@@ -1073,12 +1306,14 @@ POKEMONS.fairy.push(
          selectedMoves.push({ name: "TACKLE", type: "normal", power: 40 });
       }
       
-      return { stats, moves: selectedMoves };
+      return { stats, moves: selectedMoves, height, types: actualTypes };
       
     } catch(err) {
       console.log('Stats/Move fetch err', err);
       return {
         stats: { hp: 70, speed: 50 },
+        height: null,
+        types: [targetType || 'normal'],
         moves: [
           {name: "TACKLE", type: "normal", power: 40},
           {name: "QUICK ATTACK", type: "normal", power: 40},
@@ -1120,10 +1355,7 @@ POKEMONS.fairy.push(
         d.style.justifyContent = 'center';
         d.style.minWidth = '130px';
         
-        let nameHtml = move.name;
-        if (move.power === 0 || move.damage_class === 'status') {
-           nameHtml += `<span class="move-info-icon" style="margin-left:5px;">i<span class="tooltip-text">${window.getMoveTooltip(move)}</span></span>`;
-        }
+        const nameHtml = `${move.name}<span class="move-info-icon" style="margin-left:5px;">i<span class="tooltip-text">${window.getMoveTooltip(move)}</span></span>`;
         d.innerHTML = `<span style="color:white; font-weight:bold; font-size:15px; text-align:center; display:flex; align-items:center; justify-content:center;">${nameHtml}</span>
                        <span style="font-size:12px; text-align:center; margin-top:4px; color:${TYPE_COLORS[move.type] || '#ccc'};">${move.type.toUpperCase()} | Güç: ${move.power} | Hız: ${moveSpeed}/10</span>`;
         
@@ -1160,17 +1392,100 @@ POKEMONS.fairy.push(
      document.getElementById('poke-confirm-moves-btn').style.display = 'none';
      document.getElementById('poke-waiting-moves-msg').style.display = 'block';
      const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
-     const myStats = isP1 ? pokeState.p1.stats : pokeState.p2.stats;
-     broadcastPokeMsg({ type: 'poke_moves_ready', id: state.myId, moves: selectedManualMoves, stats: myStats });
+     const myState = isP1 ? pokeState.p1 : pokeState.p2;
+     broadcastPokeMsg({
+       type: 'poke_moves_ready',
+       id: state.myId,
+       moves: selectedManualMoves,
+       stats: myState?.stats,
+       height: myState?.height,
+       types: getFighterTypes(myState)
+     });
   });
+
+  const getPokeStageSize = (heightDm) => {
+    const numericHeight = Number(heightDm);
+    if (!Number.isFinite(numericHeight) || numericHeight <= 0) return 190;
+
+    // PokeAPI boyu desimetre cinsinden verir. Logaritmik ölçek gerçek tür
+    // farkını korurken 0.1 m ve 20 m gibi uçların sahneyi bozmasını engeller.
+    const heightMeters = Math.max(0.3, numericHeight / 10);
+    const scale = Math.max(0.55, Math.min(1.15, 0.82 + (0.26 * Math.log2(heightMeters))));
+    return Math.round(200 * scale);
+  };
+
+  const syncPokeBattleProfile = (slot) => {
+    const fighter = pokeState[slot];
+    const profile = document.getElementById(`poke-profile-${slot}`);
+    if (!profile) return;
+
+    const type = fighter?.type || 'normal';
+    const typeColor = TYPE_COLORS[type] || '#94a3b8';
+    profile.style.setProperty('--poke-type-color', typeColor);
+
+    const stage = document.getElementById(`poke-${slot}-pokemon-container`);
+    if (stage) {
+      const stageSize = getPokeStageSize(fighter?.height);
+      stage.style.setProperty('--poke-stage-size', `${stageSize}px`);
+      stage.dataset.pokemonHeight = Number.isFinite(Number(fighter?.height))
+        ? String(fighter.height)
+        : '';
+    }
+
+    const trainerAvatar = document.getElementById(`poke-${slot}-trainer-avatar`);
+    if (trainerAvatar) trainerAvatar.src = fighter?.avatar || UNKNOWN_AVATAR;
+
+    const profileImage = document.getElementById(`poke-${slot}-profile-img`);
+    if (profileImage) {
+      profileImage.style.display = fighter?.pokemon ? 'block' : 'none';
+      if (fighter?.pokemon) {
+        profileImage.dataset.realname = fighter.evoName || getPokemonNameFromUrl(fighter.pokemon);
+        profileImage.dataset.errState = '0';
+        profileImage.src = fighter.pokemon;
+      }
+    }
+
+    const pokemonName = document.getElementById(`poke-${slot}-pokename`);
+    if (pokemonName) {
+      pokemonName.style.display = 'block';
+      pokemonName.textContent = fighter?.pokemon
+        ? (fighter.evoName || getPokemonNameFromUrl(fighter.pokemon))
+        : 'POKÉMON HAZIRLANIYOR';
+    }
+
+    const typeBadge = document.getElementById(`poke-${slot}-type`);
+    if (typeBadge) {
+      typeBadge.textContent = getFighterTypes(fighter)
+        .map(fighterType => `${TYPE_EMOJIS[fighterType] || ''} ${TYPE_NAMES[fighterType] || fighterType}`.trim().toUpperCase())
+        .join(' • ');
+    }
+
+    const stats = fighter?.stats || {};
+    const stageMultiplier = (stage) => stage >= 0 ? (2 + stage) / 2 : 2 / (2 - Math.abs(stage));
+    const values = {
+      attack: Math.round((stats.attack || 50) * stageMultiplier(fighter?.atkStage || 0)),
+      defense: Math.round((stats.defense || 50) * stageMultiplier(fighter?.defStage || 0)),
+      speed: Math.round((stats.speed || fighter?.speed || 50) * stageMultiplier(fighter?.spdStage || 0)),
+      special: Math.round(((stats['special-attack'] || 50) + (stats['special-defense'] || 50)) / 2)
+    };
+
+    Object.entries(values).forEach(([stat, value]) => {
+      const valueEl = document.getElementById(`poke-${slot}-stat-${stat}`);
+      const barEl = document.getElementById(`poke-${slot}-stat-${stat}-bar`);
+      if (valueEl) valueEl.textContent = String(value);
+      if (barEl) barEl.style.width = `${Math.max(8, Math.min(100, (value / 160) * 100))}%`;
+    });
+  };
 
   const customRenderBattleArena = () => {
     const badge = document.getElementById('poke-vs-badge');
-    if (badge) badge.innerHTML = '<span style="font-size: 50px; font-style: italic; font-weight: 900; color: #cbd5e1; text-shadow: 0 4px 10px rgba(0,0,0,0.8);">VS</span>';
+    if (badge) badge.innerHTML = '<span>VS</span>';
 
     // Top headers
     document.getElementById('poke-p1-header').textContent = pokeState.p1 ? pokeState.p1.name : "Oyuncu 1";
     document.getElementById('poke-p2-header').textContent = pokeState.p2 ? pokeState.p2.name : "Oyuncu 2";
+    syncPokeBattleProfile('p1');
+    syncPokeBattleProfile('p2');
 
     const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
     const isP2 = pokeState.p2 && pokeState.p2.id === state.myId;
@@ -1198,9 +1513,9 @@ POKEMONS.fairy.push(
       p1Img.style.display = 'block'; p2Img.style.display = 'block';
       
       document.getElementById('poke-p1-pokename').style.display = 'block';
-      document.getElementById('poke-p1-pokename').textContent = getPokemonNameFromUrl(pokeState.p1.pokemon);
+      document.getElementById('poke-p1-pokename').textContent = pokeState.p1.evoName || getPokemonNameFromUrl(pokeState.p1.pokemon);
       document.getElementById('poke-p2-pokename').style.display = 'block';
-      document.getElementById('poke-p2-pokename').textContent = getPokemonNameFromUrl(pokeState.p2.pokemon);
+      document.getElementById('poke-p2-pokename').textContent = pokeState.p2.evoName || getPokemonNameFromUrl(pokeState.p2.pokemon);
 
       if (pokeState.p1.evoName) p1Img.dataset.realname = pokeState.p1.evoName;
       if (pokeState.p2.evoName) p2Img.dataset.realname = pokeState.p2.evoName;
@@ -1234,10 +1549,7 @@ POKEMONS.fairy.push(
         for (let i=0; i<4; i++) {
            const btn = document.querySelector('.poke-move-btn[data-move="'+i+'"]');
            if (btn && moves[i]) {
-              let nameHtml = moves[i].name;
-              if (moves[i].power === 0 || moves[i].damage_class === 'status') {
-                 nameHtml += `<span class="move-info-icon">i<span class="tooltip-text">${window.getMoveTooltip(moves[i])}</span></span>`;
-              }
+              const nameHtml = `${moves[i].name}<span class="move-info-icon">i<span class="tooltip-text">${window.getMoveTooltip(moves[i])}</span></span>`;
               btn.querySelector('.move-name').innerHTML = nameHtml;
               btn.querySelector('.move-type').textContent = (TYPE_NAMES[moves[i].type] || moves[i].type).toUpperCase();
                 const rawSpeed = (pokeState[mySlot].speed || 50) + (100 - moves[i].power) * 0.5;
@@ -1281,7 +1593,7 @@ POKEMONS.fairy.push(
       }
     }
     if (data.type === 'poke_join') {
-      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, pokemon: null, hp: 0, maxHp: 0, moves: [], atkStage: 0, defStage: 0, spdStage: 0 };
+      const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, types: [], pokemon: null, hp: 0, maxHp: 0, moves: [], atkStage: 0, defStage: 0, spdStage: 0, transformed: false };
       if (data.slot === 1) pokeState.p1 = pData;
       else if (data.slot === 2) pokeState.p2 = pData;
       renderPokeLobby();
@@ -1296,8 +1608,8 @@ POKEMONS.fairy.push(
     }
     if (data.type === 'poke_start') {
       pokeState.status = 'selecting';
-      if (pokeState.p1) { pokeState.p1.ready = false; pokeState.p1.atkStage = 0; pokeState.p1.defStage = 0; pokeState.p1.spdStage = 0; }
-      if (pokeState.p2) { pokeState.p2.ready = false; pokeState.p2.atkStage = 0; pokeState.p2.defStage = 0; pokeState.p2.spdStage = 0; }
+      if (pokeState.p1) { pokeState.p1.ready = false; pokeState.p1.atkStage = 0; pokeState.p1.defStage = 0; pokeState.p1.spdStage = 0; pokeState.p1.transformed = false; pokeState.p1.originalForm = null; }
+      if (pokeState.p2) { pokeState.p2.ready = false; pokeState.p2.atkStage = 0; pokeState.p2.defStage = 0; pokeState.p2.spdStage = 0; pokeState.p2.transformed = false; pokeState.p2.originalForm = null; }
       document.getElementById('poke-battle-view').classList.remove('hidden');
       document.getElementById('poke-lobby-view').classList.add('hidden');
       customRenderBattleArena();
@@ -1311,25 +1623,24 @@ POKEMONS.fairy.push(
                 const fam1 = window.POKEMON_FAMILIES[Math.floor(Math.random() * window.POKEMON_FAMILIES.length)];
                 const fam2 = window.POKEMON_FAMILIES[Math.floor(Math.random() * window.POKEMON_FAMILIES.length)];
                 
-                const t1 = fam1.type;
-                const t2 = fam2.type;
-                
                 const p1Evo = fam1.evolutions[Math.floor(Math.random() * fam1.evolutions.length)];
                 const p2Evo = fam2.evolutions[Math.floor(Math.random() * fam2.evolutions.length)];
+                const t1 = p1Evo.type || fam1.type;
+                const t2 = p2Evo.type || fam2.type;
                 
                 const p1Poke = p1Evo.url;
                 const p2Poke = p2Evo.url;
                 
-                const n1 = getPokemonNameFromUrl(p1Poke);
-                const n2 = getPokemonNameFromUrl(p2Poke);
+                const n1 = p1Evo.apiName || getPokemonNameFromUrl(p1Poke);
+                const n2 = p2Evo.apiName || getPokemonNameFromUrl(p2Poke);
                 
                 const p1Data = await fetchPokemonStatsAndMoves(n1, t1, false);
                 const p2Data = await fetchPokemonStatsAndMoves(n2, t2, false);
                 
                 broadcastPokeMsg({
                    type: 'poke_reveal',
-                   p1: { type: t1, baseName: fam1.baseName, evoName: p1Evo.name, pokemon: p1Poke, moves: p1Data.moves, stats: p1Data.stats },
-                   p2: { type: t2, baseName: fam2.baseName, evoName: p2Evo.name, pokemon: p2Poke, moves: p2Data.moves, stats: p2Data.stats }
+                   p1: { type: p1Data.types[0] || t1, types: p1Data.types, baseName: fam1.baseName, evoName: p1Evo.name, pokemon: p1Poke, moves: p1Data.moves, stats: p1Data.stats, height: p1Data.height },
+                   p2: { type: p2Data.types[0] || t2, types: p2Data.types, baseName: fam2.baseName, evoName: p2Evo.name, pokemon: p2Poke, moves: p2Data.moves, stats: p2Data.stats, height: p2Data.height }
                 });
             } else {
                 broadcastPokeMsg({ type: 'poke_base_selection_state' });
@@ -1362,12 +1673,12 @@ POKEMONS.fairy.push(
              card.innerHTML = `
                 <img src="${fam.evolutions[0].url}" data-realname="${fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                 <div class="poke-base-name">${fam.displayName}</div>
-                <div class="poke-type-badge" style="background: ${TYPE_COLORS[fam.type] || '#777'};">${TYPE_NAMES[fam.type] || fam.type}</div>
+                <div class="poke-type-badges">${renderFamilyTypeBadges(fam)}</div>
              `;
              card.onclick = () => {
                 document.getElementById('poke-base-selection-grid').innerHTML = '';
                 document.getElementById('poke-waiting-base-msg').style.display = 'block';
-                broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type });
+                broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type, types: getFamilyTypes(fam) });
              };
              grid.appendChild(card);
           });
@@ -1380,7 +1691,7 @@ POKEMONS.fairy.push(
        if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
           setTimeout(() => {
              const rFam = window.POKEMON_FAMILIES[Math.floor(Math.random() * window.POKEMON_FAMILIES.length)];
-             broadcastPokeMsg({ type: 'poke_action_base_select', id: 'BOT', baseName: rFam.baseName, typeStr: rFam.type });
+             broadcastPokeMsg({ type: 'poke_action_base_select', id: 'BOT', baseName: rFam.baseName, typeStr: rFam.type, types: getFamilyTypes(rFam) });
           }, 300);
        }
     }
@@ -1406,12 +1717,12 @@ POKEMONS.fairy.push(
                   card.innerHTML = `
                      <img src="${fam.evolutions[0].url}" data-realname="${fam.displayName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                      <div class="poke-base-name">${fam.displayName}</div>
-                     <div class="poke-type-badge" style="background: ${TYPE_COLORS[fam.type] || '#777'};">${TYPE_NAMES[fam.type] || fam.type}</div>
+                     <div class="poke-type-badges">${renderFamilyTypeBadges(fam)}</div>
                   `;
                   card.onclick = () => {
                      document.getElementById('poke-base-selection-grid').innerHTML = '';
                      document.getElementById('poke-waiting-base-msg').style.display = 'block';
-                     broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type });
+                     broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type, types: getFamilyTypes(fam) });
                   };
                   grid.appendChild(card);
                });
@@ -1423,6 +1734,7 @@ POKEMONS.fairy.push(
        if (pokeState.p1 && pokeState.p1.id === data.id) {
     pokeState.p1.baseName = data.baseName;
     pokeState.p1.type = data.typeStr;
+    pokeState.p1.types = Array.isArray(data.types) && data.types.length ? data.types : [data.typeStr];
     pokeState.p1.baseReady = true;
     pokeState.p1.atkStage = 0; pokeState.p1.defStage = 0; pokeState.p1.spdStage = 0;
     const fam1 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
@@ -1431,6 +1743,7 @@ POKEMONS.fairy.push(
        if (pokeState.p2 && pokeState.p2.id === data.id) {
     pokeState.p2.baseName = data.baseName;
     pokeState.p2.type = data.typeStr;
+    pokeState.p2.types = Array.isArray(data.types) && data.types.length ? data.types : [data.typeStr];
     pokeState.p2.baseReady = true;
     pokeState.p2.atkStage = 0; pokeState.p2.defStage = 0; pokeState.p2.spdStage = 0;
     const fam2 = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
@@ -1451,11 +1764,20 @@ POKEMONS.fairy.push(
              card.innerHTML = `
                 <img src="${evo.url}" data-realname="${evo.name}" loading="lazy" onerror="window.handlePokeImgError(this)" />
                 <div class="poke-evo-name">${evo.label || evo.name}</div>
+                <div class="poke-type-badges poke-evo-type-badges">${renderFamilyTypeBadges(evo)}</div>
              `;
              card.onclick = () => {
                 document.getElementById('poke-evolution-selection-flex').innerHTML = '';
                 document.getElementById('poke-waiting-evo-msg').style.display = 'block';
-                broadcastPokeMsg({ type: 'poke_action_evo_select', id: state.myId, evoName: evo.name, evoUrl: evo.url });
+                broadcastPokeMsg({
+                  type: 'poke_action_evo_select',
+                  id: state.myId,
+                  evoName: evo.name,
+                  evoUrl: evo.url,
+                  apiName: evo.apiName,
+                  typeStr: evo.type,
+                  types: getFamilyTypes(evo)
+                });
              };
              flex.appendChild(card);
           });
@@ -1468,7 +1790,15 @@ POKEMONS.fairy.push(
              setTimeout(() => {
                 const fam = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
                 const rEvo = fam.evolutions[Math.floor(Math.random() * fam.evolutions.length)];
-                broadcastPokeMsg({ type: 'poke_action_evo_select', id: 'BOT', evoName: rEvo.name, evoUrl: rEvo.url });
+                broadcastPokeMsg({
+                  type: 'poke_action_evo_select',
+                  id: 'BOT',
+                  evoName: rEvo.name,
+                  evoUrl: rEvo.url,
+                  apiName: rEvo.apiName,
+                  typeStr: rEvo.type,
+                  types: getFamilyTypes(rEvo)
+                });
              }, 300);
           }
        }
@@ -1478,11 +1808,17 @@ POKEMONS.fairy.push(
        if (pokeState.p1 && pokeState.p1.id === data.id) {
           pokeState.p1.pokemon = data.evoUrl;
           pokeState.p1.evoName = data.evoName;
+          pokeState.p1.apiName = data.apiName || data.evoName;
+          pokeState.p1.type = data.typeStr || pokeState.p1.type;
+          pokeState.p1.types = Array.isArray(data.types) && data.types.length ? data.types : [pokeState.p1.type];
           pokeState.p1.evoReady = true;
        }
        if (pokeState.p2 && pokeState.p2.id === data.id) {
           pokeState.p2.pokemon = data.evoUrl;
           pokeState.p2.evoName = data.evoName;
+          pokeState.p2.apiName = data.apiName || data.evoName;
+          pokeState.p2.type = data.typeStr || pokeState.p2.type;
+          pokeState.p2.types = Array.isArray(data.types) && data.types.length ? data.types : [pokeState.p2.type];
           pokeState.p2.evoReady = true;
        }
 
@@ -1492,8 +1828,11 @@ POKEMONS.fairy.push(
           const isP1 = pokeState.p1 && pokeState.p1.id === state.myId;
           const myState = isP1 ? pokeState.p1 : pokeState.p2;
           
-          fetchPokemonStatsAndMoves(myState.evoName || myState.baseName, myState.type, true).then(res => {
+          fetchPokemonStatsAndMoves(myState.apiName || myState.evoName || myState.baseName, myState.type, true).then(res => {
              myState.stats = res.stats;
+             myState.height = res.height;
+             myState.types = res.types;
+             myState.type = res.types[0] || myState.type;
              document.getElementById('poke-move-selection-modal').classList.remove('hidden');
              document.getElementById('poke-confirm-moves-btn').style.display = 'block';
              document.getElementById('poke-waiting-moves-msg').style.display = 'none';
@@ -1507,9 +1846,9 @@ POKEMONS.fairy.push(
           const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
           if (isHostFallback) {
              setTimeout(() => {
-                fetchPokemonStatsAndMoves(pokeState.p2.evoName || pokeState.p2.baseName, pokeState.p2.type, true).then(res => {
+                fetchPokemonStatsAndMoves(pokeState.p2.apiName || pokeState.p2.evoName || pokeState.p2.baseName, pokeState.p2.type, true).then(res => {
                    const bMoves = res.moves.sort(() => 0.5 - Math.random()).slice(0, 4);
-                   broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves, stats: res.stats });
+                   broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves, stats: res.stats, height: res.height, types: res.types });
                 });
              }, 300);
           }
@@ -1519,11 +1858,13 @@ POKEMONS.fairy.push(
     if (data.type === 'poke_select_moves_state') {
        pokeState.status = 'move_selection';
        pokeState.p1.type = data.p1.type;
+       pokeState.p1.types = data.p1.types || [data.p1.type];
        pokeState.p1.pokemon = data.p1.pokemon;
        pokeState.p1.moves = [];
        pokeState.p1.ready = false;
        
        pokeState.p2.type = data.p2.type;
+       pokeState.p2.types = data.p2.types || [data.p2.type];
        pokeState.p2.pokemon = data.p2.pokemon;
        pokeState.p2.moves = [];
        pokeState.p2.ready = false;
@@ -1560,11 +1901,21 @@ POKEMONS.fairy.push(
        if (pokeState.p1 && pokeState.p1.id === data.id) {
           pokeState.p1.moves = data.moves;
           if (data.stats) pokeState.p1.stats = data.stats;
+          if (data.height) pokeState.p1.height = data.height;
+          if (data.types?.length) {
+             pokeState.p1.types = data.types;
+             pokeState.p1.type = data.types[0];
+          }
           pokeState.p1.ready = true;
        }
        if (pokeState.p2 && pokeState.p2.id === data.id) {
           pokeState.p2.moves = data.moves;
           if (data.stats) pokeState.p2.stats = data.stats;
+          if (data.height) pokeState.p2.height = data.height;
+          if (data.types?.length) {
+             pokeState.p2.types = data.types;
+             pokeState.p2.type = data.types[0];
+          }
           pokeState.p2.ready = true;
        }
        
@@ -1574,8 +1925,8 @@ POKEMONS.fairy.push(
           if (isHostFallback) {
              broadcastPokeMsg({
                  type: 'poke_reveal',
-                 p1: { type: pokeState.p1.type, evoName: pokeState.p1.evoName, pokemon: pokeState.p1.pokemon, moves: pokeState.p1.moves },
-                 p2: { type: pokeState.p2.type, evoName: pokeState.p2.evoName, pokemon: pokeState.p2.pokemon, moves: pokeState.p2.moves }
+                 p1: { type: pokeState.p1.type, types: getFighterTypes(pokeState.p1), evoName: pokeState.p1.evoName, pokemon: pokeState.p1.pokemon, moves: pokeState.p1.moves, stats: pokeState.p1.stats, height: pokeState.p1.height },
+                 p2: { type: pokeState.p2.type, types: getFighterTypes(pokeState.p2), evoName: pokeState.p2.evoName, pokemon: pokeState.p2.pokemon, moves: pokeState.p2.moves, stats: pokeState.p2.stats, height: pokeState.p2.height }
              });
           }
        }
@@ -1672,15 +2023,21 @@ POKEMONS.fairy.push(
         pokeState.actionP2 = null;
       
       pokeState.p1.type = data.p1.type;
+      pokeState.p1.types = data.p1.types || [data.p1.type];
       pokeState.p1.pokemon = data.p1.pokemon;
       pokeState.p1.moves = data.p1.moves;
+      if (data.p1.stats) pokeState.p1.stats = data.p1.stats;
+      if (data.p1.height) pokeState.p1.height = data.p1.height;
       if (data.p1.evoName) pokeState.p1.evoName = data.p1.evoName;
       //pokeState.p1.hp = 100;
       //pokeState.p1.maxHp = 100;
       
       pokeState.p2.type = data.p2.type;
+      pokeState.p2.types = data.p2.types || [data.p2.type];
       pokeState.p2.pokemon = data.p2.pokemon;
       pokeState.p2.moves = data.p2.moves;
+      if (data.p2.stats) pokeState.p2.stats = data.p2.stats;
+      if (data.p2.height) pokeState.p2.height = data.p2.height;
       if (data.p2.evoName) pokeState.p2.evoName = data.p2.evoName;
       
       const fam1 = window.POKEMON_FAMILIES.find(f => data.p1.baseName ? f.baseName === data.p1.baseName : f.type === data.p1.type);
@@ -1792,12 +2149,12 @@ POKEMONS.fairy.push(
                 item.innerHTML = `
                     <img src="${fam.evolutions[0].url}" style="width: 30px; height: 30px; object-fit: contain;">
                     <span>${fam.displayName}</span>
-                    <span style="margin-left: auto; font-size: 11px; background: ${TYPE_COLORS[fam.type] || '#777'}; padding: 2px 6px; border-radius: 4px;">${(TYPE_NAMES[fam.type] || fam.type).toUpperCase()}</span>
+                    <span class="poke-type-badges poke-type-badges-compact" style="margin-left: auto;">${renderFamilyTypeBadges(fam)}</span>
                 `;
                 item.onclick = () => {
                     document.getElementById('poke-base-selection-grid').innerHTML = '';
                     document.getElementById('poke-waiting-base-msg').style.display = 'block';
-                    broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type });
+                    broadcastPokeMsg({ type: 'poke_action_base_select', id: state.myId, baseName: fam.baseName, typeStr: fam.type, types: getFamilyTypes(fam) });
                     searchDropdown.classList.add('hidden');
                     searchInput.value = '';
                 };

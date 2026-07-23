@@ -4996,6 +4996,36 @@ function makeCardFocusable(card) {
   });
 }
 
+function normalizeActivitySearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ı/g, 'i')
+    .trim();
+}
+
+function filterActivityCards(query = '') {
+  const picker = document.getElementById('act-list-card');
+  if (!picker) return;
+  const normalizedQuery = normalizeActivitySearchText(query);
+  const cards = Array.from(picker.querySelectorAll('.card-act-btn'));
+  let visibleCount = 0;
+
+  cards.forEach(card => {
+    const searchableText = normalizeActivitySearchText(`${card.dataset.search || ''} ${card.textContent || ''}`);
+    const matches = !normalizedQuery || searchableText.includes(normalizedQuery);
+    card.classList.toggle('activity-filtered', !matches);
+    if (matches) visibleCount += 1;
+  });
+
+  picker.classList.toggle('activity-picker-searching', Boolean(normalizedQuery));
+  const count = picker.querySelector('.activity-section-hint');
+  if (count) count.textContent = `${visibleCount} etkinlik`;
+  const empty = document.getElementById('activity-empty');
+  if (empty) empty.classList.toggle('hidden', visibleCount !== 0);
+}
+
 function showInactiveOverlay(cardId, title, onJoin) {
   if (state.activeLobbyId) {
     onJoin();
@@ -5884,7 +5914,11 @@ function bindUI() {
   document.getElementById('act-btn').addEventListener('click', () => {
     broadcast({ type: 'lobby-sync-request' });
     updateActivityCounts();
+    const search = document.getElementById('activity-search');
+    if (search) search.value = '';
+    filterActivityCards('');
     document.getElementById('activities-modal').classList.remove('hidden');
+    requestAnimationFrame(() => search?.focus({ preventScroll: true }));
   });
   document.getElementById('act-close').addEventListener('click', () => {
     document.getElementById('activities-modal').classList.add('hidden');
@@ -7461,6 +7495,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- LOBBY SYSTEM UI BINDINGS ---
   const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'poke'];
+  const activitySearch = document.getElementById('activity-search');
+  if (activitySearch) {
+    activitySearch.addEventListener('input', () => filterActivityCards(activitySearch.value));
+  }
+  document.querySelectorAll('[data-activity-shortcut]').forEach(shortcut => {
+    shortcut.addEventListener('click', () => {
+      const card = document.getElementById(`card-act-${shortcut.dataset.activityShortcut}`);
+      if (card) card.click();
+    });
+  });
   activities.forEach(act => {
     const card = document.getElementById(`card-act-${act}`);
     if (card) {
@@ -7476,6 +7520,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
+      });
+      card.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        card.click();
       });
     }
 
