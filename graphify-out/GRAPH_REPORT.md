@@ -1,16 +1,16 @@
-# Graph Report - kanka-voice  (2026-07-23)
+# Graph Report - TeamSync  (2026-07-23)
 
 ## Corpus Check
-- 78 files · ~323,350 words
+- 80 files · ~328,139 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 752 nodes · 1423 edges · 70 communities (48 shown, 22 thin omitted)
+- 776 nodes · 1476 edges · 78 communities (56 shown, 22 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `3fa4641c`
+- Built from commit: `ee8a9d8f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -80,18 +80,26 @@
 - preload-cursor-overlay.js
 - enterFocus
 - applyRoomNoiseSuppression
+- setupInternetSignaling
+- evalJS
+- cleanupPeer
+- shared-browser.test.js
+- lucky-wheel-redesign.test.js
+- focus-minimize-responsive.test.js
+- friend-list-responsive.test.js
+- pokemon-real-moves.test.js
 
 ## God Nodes (most connected - your core abstractions)
-1. `handleDataMessage()` - 38 edges
-2. `bindUI()` - 37 edges
-3. `evalJS()` - 28 edges
-4. `showToast()` - 24 edges
-5. `waitFor()` - 23 edges
-6. `spawnPeer()` - 22 edges
-7. `unoIsHost()` - 18 edges
-8. `unoHostApplyPlay()` - 18 edges
-9. `createPeerConnection()` - 17 edges
-10. `cleanupPeer()` - 16 edges
+1. `bindUI()` - 39 edges
+2. `handleDataMessage()` - 38 edges
+3. `evalJS()` - 34 edges
+4. `spawnPeer()` - 25 edges
+5. `showToast()` - 24 edges
+6. `waitFor()` - 24 edges
+7. `cleanupPeer()` - 19 edges
+8. `unoIsHost()` - 18 edges
+9. `unoHostApplyPlay()` - 18 edges
+10. `createPeerConnection()` - 17 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `P2P Voice & Video` --semantically_similar_to--> `P2P Serverless Architecture`  [INFERRED] [semantically similar]
@@ -113,11 +121,11 @@
 - **Serverless P2P Communication Platform** — readme_p2p_serverless, docs_index_p2p_voice_video, index_relay_option, index_emqx_broker [INFERRED 0.75]
 - **TeamSync Marketed Feature Set** — docs_index_p2p_voice_video, docs_index_device_id_auth, docs_index_screen_share_remote, docs_index_activities [EXTRACTED 0.75]
 
-## Communities (70 total, 22 thin omitted)
+## Communities (78 total, 22 thin omitted)
 
 ### Community 0 - "E2E Test Harness"
-Cohesion: 0.05
-Nodes (68): fs, { launch, getPageTarget, cdp, evalJS, waitFor }, os, path, assert, fs, inspectButton(), { launch, getPageTarget, cdp, evalJS, waitFor } (+60 more)
+Cohesion: 0.15
+Nodes (16): fs, { launch, getPageTarget, cdp, evalJS, waitFor }, os, path, assert, fs, inspectButton(), { launch, getPageTarget, cdp, evalJS, waitFor } (+8 more)
 
 ### Community 1 - "React App / Signaling / Crypto Core"
 Cohesion: 0.07
@@ -129,7 +137,7 @@ Nodes (9): build, appId, directories, productName, publish, win, output, icon (+
 
 ### Community 3 - "Chat & TURN Resolution Utils"
 Cohesion: 0.04
-Nodes (46): acceptServerInvite(), appendChat(), appendFileMsg(), badWordsList, badWordsRegex, chatBlobUrls, cleanText(), closeJoinRequestNote() (+38 more)
+Nodes (47): acceptServerInvite(), appendFileMsg(), badWordsList, badWordsRegex, chatBlobUrls, closeAllCards(), closeJoinRequestNote(), connectGlobalBroker() (+39 more)
 
 ### Community 4 - "UNO Card Game"
 Cohesion: 0.12
@@ -137,23 +145,23 @@ Nodes (56): handleUnoMessage(), initUno(), UNO_COLORS, UNO_GLYPH, unoActorEl(), 
 
 ### Community 5 - "Electron Main Process"
 Cohesion: 0.07
-Nodes (33): { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage }, baseUserData, createCursorOverlay(), cursorProfile(), deviceIdentityFile, dgram, _diagSettingsPath, envPath (+25 more)
+Nodes (34): { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage }, baseUserData, createCursorOverlay(), cursorProfile(), deviceIdentityFile, dgram, _diagSettingsPath, envPath (+26 more)
 
 ### Community 6 - "WebRTC Peer & ICE Management"
-Cohesion: 0.17
-Nodes (20): applyIceEscalationPolicy(), applySharedTurn(), attemptIceRestart(), createPeerConnection(), detectTunnelInterference(), diagnoseIceFailure(), dohResolve(), expandTurnFamily() (+12 more)
+Cohesion: 0.14
+Nodes (23): applyIceEscalationPolicy(), applySharedTurn(), attemptIceRestart(), createPeerConnection(), detectTunnelInterference(), diagnoseIceFailure(), dohResolve(), expandTurnFamily() (+15 more)
 
 ### Community 7 - "Landing Page & Docs Concepts"
 Cohesion: 0.11
 Nodes (23): Together Activities (UNO, Wheel, Synced Video, Whiteboard), Device Identity Login, Family-Friendly AI Mode, GitHub Repository (Lazel-3002/TeamSync), TeamSync Landing Page, P2P Voice & Video, Screen Sharing & Remote Control, TeamSync App Shell (Main UI) (+15 more)
 
 ### Community 8 - "Screen Share & File Transfer"
-Cohesion: 0.16
-Nodes (24): addVideoCard(), broadcastTo(), checkTextWithAI(), closeActiveControlSession(), closeCtrlModal(), decryptMsg(), disconnectApp(), handleDataMessage() (+16 more)
+Cohesion: 0.13
+Nodes (29): addVideoCard(), attachVideo(), broadcastTo(), checkTextWithAI(), closeActiveControlSession(), closeCtrlModal(), decryptMsg(), getVideoConstraints() (+21 more)
 
 ### Community 9 - "Room Moderation & Audio Controls"
-Cohesion: 0.15
-Nodes (23): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), bindUI(), broadcast(), canManageRoom(), canModerateTarget(), getAudioBitrate() (+15 more)
+Cohesion: 0.12
+Nodes (32): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), bindUI(), broadcast(), canManageRoom(), canModerateTarget(), clearFocusInlineLayout() (+24 more)
 
 ### Community 10 - "Sidebar UI Styles"
 Cohesion: 0.10
@@ -180,8 +188,8 @@ Cohesion: 0.30
 Nodes (4): { app }, fs, path, YapayDenetleyici
 
 ### Community 16 - "React Activities & UNO Components"
-Cohesion: 0.40
-Nodes (5): attachVideo(), getVideoConstraints(), getVideoSender(), showShareModal(), startScreenShare()
+Cohesion: 0.17
+Nodes (13): APP_DIR, ELECTRON_BIN, fs, joinRoom(), os, path, setValueWhenReady(), { spawn } (+5 more)
 
 ### Community 17 - "Smeargle Variant Generator"
 Cohesion: 0.29
@@ -192,8 +200,8 @@ Cohesion: 0.43
 Nodes (6): canCompileWasm(), createNoiseFilter(), isSupported(), loadArrayBuffer(), loadWasmBinary(), supportsWasmSimd()
 
 ### Community 19 - "showToast"
-Cohesion: 0.14
-Nodes (26): addUser(), applyPeerVolume(), checkAvatar(), displayName(), ensurePeerBoostChain(), getNickname(), getUserVolume(), handlePeerDiscovered() (+18 more)
+Cohesion: 0.16
+Nodes (22): applyPeerVolume(), applyRoomNoiseSuppression(), applySpeakerTo(), applySpeakerToAll(), ensurePeerBoostChain(), getNickname(), getUserVolume(), intendedPeerVolumeIsZero() (+14 more)
 
 ### Community 20 - "Mega Pokemon Injector"
 Cohesion: 0.33
@@ -280,32 +288,105 @@ Cohesion: 0.47
 Nodes (5): cleanEffectText(), fetchJson(), fs, https, run()
 
 ### Community 68 - "enterFocus"
-Cohesion: 0.22
-Nodes (11): clearFocusInlineLayout(), closeAllCards(), enterFocus(), exitFocus(), makeCardFocusable(), openCardFocused(), resetSharedBrowserState(), syncFocusLayout() (+3 more)
+Cohesion: 0.29
+Nodes (5): assert, fs, inspectPoll(), path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+}
 
 ### Community 69 - "applyRoomNoiseSuppression"
+Cohesion: 0.23
+Nodes (11): { spawnPeer, cleanupPeer, waitFor, evalJS, createRoom }, clickWhenReady(), createRoom(), waitFor(), assert, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
+}, fs, inspectFamily() (+3 more)
+
+### Community 70 - "setupInternetSignaling"
+Cohesion: 0.31
+Nodes (10): addUser(), appendChat(), checkAvatar(), cleanText(), displayName(), escapeHtml(), handlePeerDiscovered(), refreshUserRowName() (+2 more)
+
+### Community 71 - "evalJS"
+Cohesion: 0.27
+Nodes (8): assert, audioState(), setFounderToggle(), {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  joinRoom,
+  waitForPeerConnected,
+  evalJS,
+  waitFor,
+}, evalJS(), assert, inboundRtpStats(), { spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected, evalJS }
+
+### Community 72 - "cleanupPeer"
+Cohesion: 0.22
+Nodes (6): { spawnPeer, cleanupPeer, waitFor }, cleanupPeer(), assert, { spawnPeer, cleanupPeer, createRoom, evalJS, waitFor }, assert, { spawnPeer, cleanupPeer, evalJS }
+
+### Community 73 - "shared-browser.test.js"
+Cohesion: 0.25
+Nodes (5): armNavCounter(), assert, http, navigateVia(), { spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected, evalJS, waitFor }
+
+### Community 74 - "lucky-wheel-redesign.test.js"
+Cohesion: 0.29
+Nodes (5): assert, fs, inspectWheel(), path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
+}
+
+### Community 75 - "focus-minimize-responsive.test.js"
+Cohesion: 0.33
+Nodes (5): assert, fs, inspectControls(), path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+}
+
+### Community 76 - "friend-list-responsive.test.js"
+Cohesion: 0.33
+Nodes (5): assert, fs, inspectAtWidth(), path, {
+  spawnPeer,
+  cleanupPeer,
+  evalJS,
+  waitFor,
+}
+
+### Community 77 - "pokemon-real-moves.test.js"
 Cohesion: 0.40
-Nodes (5): applyRoomNoiseSuppression(), applySpeakerTo(), applySpeakerToAll(), setupDeviceList(), setupLocalAudio()
+Nodes (4): assert, fs, path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
+}
 
 ## Knowledge Gaps
-- **262 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+257 more)
+- **275 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+270 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `handleSignal()` connect `showToast` to `Room Moderation & Audio Controls`, `Chat & TURN Resolution Utils`, `WebRTC Peer & ICE Management`, `React App / Signaling / Crypto Core`?**
-  _High betweenness centrality (0.036) - this node is a cross-community bridge._
-- **Why does `WebRTC()` connect `React App / Signaling / Crypto Core` to `showToast`?**
-  _High betweenness centrality (0.036) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `Build Config & Reference Files` to `package.json`?**
+- **Why does `handleSignal()` connect `WebRTC Peer & ICE Management` to `Room Moderation & Audio Controls`, `Chat & TURN Resolution Utils`, `setupInternetSignaling`, `React App / Signaling / Crypto Core`?**
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._
+- **Why does `WebRTC()` connect `React App / Signaling / Crypto Core` to `WebRTC Peer & ICE Management`?**
+  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+- **Why does `evalJS()` connect `evalJS` to `E2E Test Harness`, `enterFocus`, `applyRoomNoiseSuppression`, `cleanupPeer`, `shared-browser.test.js`, `lucky-wheel-redesign.test.js`, `focus-minimize-responsive.test.js`, `friend-list-responsive.test.js`, `pokemon-real-moves.test.js`, `React Activities & UNO Components`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
-  _262 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `E2E Test Harness` be split into smaller, more focused modules?**
-  _Cohesion score 0.05479818230419674 - nodes in this community are weakly interconnected._
+  _275 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `React App / Signaling / Crypto Core` be split into smaller, more focused modules?**
   _Cohesion score 0.07205387205387205 - nodes in this community are weakly interconnected._
 - **Should `Chat & TURN Resolution Utils` be split into smaller, more focused modules?**
-  _Cohesion score 0.044420941300899 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04352278545826933 - nodes in this community are weakly interconnected._
+- **Should `UNO Card Game` be split into smaller, more focused modules?**
+  _Cohesion score 0.11779448621553884 - nodes in this community are weakly interconnected._

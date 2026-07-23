@@ -68,5 +68,13 @@
   "66": "cross-fetch",
   "67": "preload-cursor-overlay.js",
   "68": "enterFocus",
-  "69": "applyRoomNoiseSuppression"
+  "69": "applyRoomNoiseSuppression",
+  "70": "setupInternetSignaling",
+  "71": "evalJS",
+  "72": "cleanupPeer",
+  "73": "shared-browser.test.js",
+  "74": "lucky-wheel-redesign.test.js",
+  "75": "focus-minimize-responsive.test.js",
+  "76": "friend-list-responsive.test.js",
+  "77": "pokemon-real-moves.test.js"
 }

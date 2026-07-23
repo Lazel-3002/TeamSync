@@ -8083,17 +8083,25 @@ window.checkSpectatorUI = function() {
   // Poll
   const pollSetup = document.getElementById('poll-setup');
   const pollEnd = document.getElementById('poll-end');
+  const pollNew = document.getElementById('poll-new');
   if (pollSetup && isSpec) pollSetup.classList.add('hidden');
-  if (pollEnd) pollEnd.classList.toggle('hidden', isSpec);
+  if (isSpec) {
+    if (pollEnd) pollEnd.classList.add('hidden');
+    if (pollNew) pollNew.classList.add('hidden');
+  } else if (typeof window.syncPollHostControls === 'function') {
+    window.syncPollHostControls();
+  }
   const pollContainer = document.getElementById('poll-opts-container');
   if (pollContainer) pollContainer.style.pointerEvents = isSpec ? 'none' : 'auto';
   
   // Lucky Wheel
   const wheelSetup = document.getElementById('wheel-setup');
   const wheelSpin = document.getElementById('wheel-spin-btn');
+  const wheelSpinAgain = document.getElementById('wheel-spin-again');
   const wheelReset = document.getElementById('wheel-reset-btn');
   if (wheelSetup && isSpec) wheelSetup.classList.add('hidden');
   if (wheelSpin) wheelSpin.classList.toggle('hidden', isSpec);
+  if (wheelSpinAgain) wheelSpinAgain.classList.toggle('hidden', isSpec);
   if (wheelReset) wheelReset.classList.toggle('hidden', isSpec);
   
   // Yerel Film (LVS)

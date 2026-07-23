@@ -195,7 +195,7 @@
   <div id="login" class="login-wrap">
     <div style="position:absolute; left:14px; bottom:12px; z-index:5; display:flex; flex-direction:column; align-items:flex-start; gap:6px;">
       <button id="update-btn" class="hidden" title="Uygulamayı güncelle">Güncellemeleri Denetle</button>
-      <div id="app-version" style="font-size:12px; color:var(--txt-mut); opacity:0.55; user-select:none;">v1.0.0</div>
+      <div id="app-version" style="font-size:12px; color:var(--txt-mut); opacity:0.55; user-select:none;">v1.0.3</div>
     </div>
     <div class="login-card">
       <h1 style="display:flex; align-items:center; justify-content:center; gap:8px;">
@@ -733,24 +733,167 @@
           </div>
         </div>
 
-        <div id="poll-card" class="vcard hidden" style="background: #1e293b; display: flex; flex-direction: column; padding: 20px;">
-          <div class="card-actions" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; font-family: 'Arial Black', sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #f8fafc; text-shadow: 0 2px 10px rgba(255,255,255,0.3);">⚔️ PokeSavaş ⚔️</h3>
-            <button id="poll-close" class="btn-sec btn-sm">Kapat</button>
-          </div>
-          <div id="poll-setup" style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
-            <input type="text" id="poll-q" placeholder="Soru: Örn. Akşam ne oynayalım?" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
-            <input type="text" id="poll-opt1" placeholder="Seçenek 1" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
-            <input type="text" id="poll-opt2" placeholder="Seçenek 2" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
-            <input type="text" id="poll-opt3" placeholder="Seçenek 3 (Opsiyonel)" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
-            <input type="text" id="poll-opt4" placeholder="Seçenek 4 (Opsiyonel)" style="padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff;" />
-            <button id="poll-create" class="btn-pri" style="margin-top: 10px;">Anketi Başlat</button>
-          </div>
-          <div id="poll-view" class="hidden" style="flex: 1; display: flex; flex-direction: column;">
-            <h3 id="poll-view-q" style="margin-bottom: 20px; text-align: center;">...</h3>
-            <div id="poll-opts-container" style="display: flex; flex-direction: column; gap: 15px; flex: 1;"></div>
-            <p id="poll-total-votes" class="muted" style="text-align: center; margin-top: 20px;">0 Oy</p>
-            <button id="poll-end" class="btn-sec hidden" style="margin-top: 10px; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);">Anketi Bitir (Kurucu)</button>
+        <div id="poll-card" class="vcard poll-card hidden">
+          <div class="poll-ambient poll-ambient-one" aria-hidden="true"></div>
+          <div class="poll-ambient poll-ambient-two" aria-hidden="true"></div>
+
+          <header class="poll-header">
+            <div class="poll-title-group">
+              <div class="poll-title-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+                  <path d="M5 20v-7M12 20V5M19 20v-11"></path>
+                  <path d="m3.5 10.5 4-3 4 2 8-6"></path>
+                </svg>
+              </div>
+              <div>
+                <span class="poll-eyebrow">TEAMSYNC KARAR ALANI</span>
+                <h3>Hızlı Anket</h3>
+              </div>
+            </div>
+            <button id="poll-close" class="poll-icon-button" type="button" aria-label="Hızlı anketi kapat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m6 6 12 12M18 6 6 18"></path>
+              </svg>
+            </button>
+          </header>
+
+          <div class="poll-content">
+            <section id="poll-setup" class="poll-setup" aria-labelledby="poll-setup-title">
+              <div class="poll-builder-panel">
+                <div class="poll-section-heading">
+                  <div>
+                    <span class="poll-step-label">01 · SORUNU HAZIRLA</span>
+                    <h4 id="poll-setup-title">Birlikte karar verin</h4>
+                    <p>Soruyu yaz, seçenekleri belirle ve odadaki herkesin fikrini saniyeler içinde gör.</p>
+                  </div>
+                  <span id="poll-option-count" class="poll-count-pill" aria-live="polite">4 / 6</span>
+                </div>
+
+                <div class="poll-template-row" aria-label="Hazır anketler">
+                  <button class="poll-template" type="button" data-question="Bu akşam ne yapalım?" data-options="Film izleyelim|Oyun oynayalım|Sohbet edelim|Müzik dinleyelim">Akşam planı</button>
+                  <button class="poll-template" type="button" data-question="Ne zaman buluşalım?" data-options="Bugün|Yarın|Hafta sonu">Buluşma zamanı</button>
+                  <button class="poll-template" type="button" data-question="Kararımız ne olsun?" data-options="Evet|Hayır|Kararsızım">Hızlı karar</button>
+                </div>
+
+                <label class="poll-field poll-question-field" for="poll-q">
+                  <span>Anket sorusu</span>
+                  <div>
+                    <input type="text" id="poll-q" maxlength="120" placeholder="Örn. Bu akşam ne oynayalım?" autocomplete="off" />
+                    <small id="poll-question-count">0 / 120</small>
+                  </div>
+                </label>
+
+                <div class="poll-options-heading">
+                  <span>Seçenekler</span>
+                  <button id="poll-add-option" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                    Seçenek ekle
+                  </button>
+                </div>
+                <div id="poll-options-editor" class="poll-options-editor">
+                  <label class="poll-option-editor" for="poll-opt1">
+                    <i style="--poll-color:#8b5cf6">A</i>
+                    <input type="text" id="poll-opt1" maxlength="56" placeholder="İlk seçenek" autocomplete="off" />
+                    <button type="button" class="poll-remove-option" aria-label="İlk seçeneği kaldır" disabled>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+                    </button>
+                  </label>
+                  <label class="poll-option-editor" for="poll-opt2">
+                    <i style="--poll-color:#ec4899">B</i>
+                    <input type="text" id="poll-opt2" maxlength="56" placeholder="İkinci seçenek" autocomplete="off" />
+                    <button type="button" class="poll-remove-option" aria-label="İkinci seçeneği kaldır" disabled>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+                    </button>
+                  </label>
+                  <label class="poll-option-editor" for="poll-opt3">
+                    <i style="--poll-color:#14b8a6">C</i>
+                    <input type="text" id="poll-opt3" maxlength="56" placeholder="Üçüncü seçenek (isteğe bağlı)" autocomplete="off" />
+                    <button type="button" class="poll-remove-option" aria-label="Üçüncü seçeneği kaldır">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+                    </button>
+                  </label>
+                  <label class="poll-option-editor" for="poll-opt4">
+                    <i style="--poll-color:#f59e0b">D</i>
+                    <input type="text" id="poll-opt4" maxlength="56" placeholder="Dördüncü seçenek (isteğe bağlı)" autocomplete="off" />
+                    <button type="button" class="poll-remove-option" aria-label="Dördüncü seçeneği kaldır">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+                    </button>
+                  </label>
+                </div>
+
+                <div class="poll-builder-footer">
+                  <label class="poll-switch">
+                    <input id="poll-allow-change" type="checkbox" checked />
+                    <span aria-hidden="true"></span>
+                    <div><strong>Oy değiştirilebilir</strong><small>Katılımcılar kararını güncelleyebilir.</small></div>
+                  </label>
+                  <button id="poll-create" class="poll-primary-button" type="button" disabled>
+                    Anketi başlat
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"></path></svg>
+                  </button>
+                </div>
+                <p id="poll-setup-error" class="poll-setup-error" role="alert" aria-live="polite"></p>
+              </div>
+
+              <aside class="poll-preview-panel" aria-label="Anket önizlemesi">
+                <div class="poll-preview-top">
+                  <div><span>CANLI ÖNİZLEME</span><strong id="poll-preview-state">Sorunu yazmaya başla</strong></div>
+                  <i><b></b> HAZIRLANIYOR</i>
+                </div>
+                <div class="poll-preview-card">
+                  <span>HIZLI ANKET</span>
+                  <h5 id="poll-preview-question">Sence en iyi seçenek hangisi?</h5>
+                  <div id="poll-preview-options" class="poll-preview-options">
+                    <div><i style="--poll-color:#8b5cf6">A</i><span>İlk seçenek</span></div>
+                    <div><i style="--poll-color:#ec4899">B</i><span>İkinci seçenek</span></div>
+                  </div>
+                </div>
+                <div class="poll-preview-note">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path></svg>
+                  Oylar oda içinde canlı ve eş zamanlı güncellenir.
+                </div>
+              </aside>
+            </section>
+
+            <section id="poll-view" class="poll-view hidden" aria-labelledby="poll-view-q">
+              <main class="poll-voting-panel">
+                <div class="poll-view-topline">
+                  <span id="poll-live-badge" class="poll-live-badge"><i></i> OYLAMA AÇIK</span>
+                  <span id="poll-vote-hint">Bir seçeneğe dokunarak oy ver</span>
+                </div>
+                <h2 id="poll-view-q">...</h2>
+                <div id="poll-finished-banner" class="poll-finished-banner hidden">
+                  <span>✓</span>
+                  <div><strong>Oylama tamamlandı</strong><small>Sonuçlar artık değiştirilemez.</small></div>
+                </div>
+                <div id="poll-opts-container" class="poll-options-live" role="radiogroup" aria-label="Anket seçenekleri"></div>
+              </main>
+
+              <aside class="poll-results-panel">
+                <div class="poll-results-heading">
+                  <div><span>CANLI SONUÇLAR</span><strong id="poll-total-votes">0 oy</strong></div>
+                  <span id="poll-participation">Henüz oy yok</span>
+                </div>
+                <div class="poll-donut-wrap">
+                  <div id="poll-donut" class="poll-donut"><span><strong id="poll-donut-total">0</strong><small>OY</small></span></div>
+                </div>
+                <div class="poll-leader-card">
+                  <span id="poll-leader-icon">–</span>
+                  <div><small>ŞU AN ÖNDE</small><strong id="poll-leader-text">Sonuç bekleniyor</strong></div>
+                </div>
+                <p id="poll-change-note">Oyunu sonuçlanana kadar değiştirebilirsin.</p>
+                <div class="poll-host-actions">
+                  <button id="poll-end" class="poll-danger-button hidden" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+                    Oylamayı bitir
+                  </button>
+                  <button id="poll-new" class="poll-primary-button hidden" type="button">
+                    Yeni anket
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+                  </button>
+                </div>
+              </aside>
+            </section>
           </div>
         </div>
 
@@ -768,38 +911,143 @@
           </div>
         </div>
 
-        <div id="wheel-card" class="vcard hidden" style="background: #1e1e24; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-          <div class="card-actions" style="position: absolute; top: 0; left: 0; right: 0; justify-content: space-between; padding: 10px 20px;">
-            <h3 style="margin: 0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; color:#10b981;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line><line x1="4.93" y1="19.07" x2="19.07" y2="4.93"></line></svg> Şans Çarkı</h3>
-            <button id="wheel-close" class="btn-sec btn-sm">Kapat</button>
-          </div>
-          
-          <div id="wheel-setup" style="display: flex; flex-direction: column; gap: 10px; z-index: 10; background: rgba(0,0,0,0.6); padding: 20px; border-radius: 12px; backdrop-filter: blur(5px);">
-            <h4 style="margin: 0; text-align: center;">Çark Öğeleri (Max 15)</h4>
-            <div id="wheel-items-list" style="display: flex; flex-direction: column; gap: 5px; max-height: 200px; overflow-y: auto;">
-              <!-- Items here -->
+        <div id="wheel-card" class="vcard wheel-card hidden">
+          <div class="wheel-ambient wheel-ambient-one" aria-hidden="true"></div>
+          <div class="wheel-ambient wheel-ambient-two" aria-hidden="true"></div>
+
+          <header class="wheel-header">
+            <div class="wheel-title-group">
+              <div class="wheel-title-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="8.5"></circle>
+                  <path d="M12 3.5v8.5l5.9 5.9M5.2 7.2l6.8 4.8 7.8-2.1M5 17.4l7-5.4-1-8.4"></path>
+                </svg>
+              </div>
+              <div>
+                <span class="wheel-eyebrow">TEAMSYNC OYUNU</span>
+                <h3>Şans Çarkı</h3>
+              </div>
             </div>
-            <div style="display: flex; gap: 5px;">
-              <input type="text" id="wheel-new-item" placeholder="Örn. Film İzle" maxlength="15" style="flex: 1; padding: 6px; border-radius: 4px; border: none;" />
-              <button id="wheel-add-item" class="btn-sec btn-sm">Ekle</button>
-            </div>
-            <button id="wheel-ready" class="btn-pri" style="margin-top: 10px;">Hazır</button>
+            <button id="wheel-close" class="wheel-icon-button" type="button" aria-label="Şans çarkını kapat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m6 6 12 12M18 6 6 18"></path>
+              </svg>
+            </button>
+          </header>
+
+          <div class="wheel-content">
+            <section id="wheel-setup" class="wheel-setup" aria-labelledby="wheel-setup-title">
+              <div class="wheel-editor-panel">
+                <div class="wheel-section-heading">
+                  <div>
+                    <span class="wheel-step-label">01 · ÇARKI HAZIRLA</span>
+                    <h4 id="wheel-setup-title">Seçeneklerini ekle</h4>
+                    <p>Kararı çarka bırak. En az 2, en fazla 15 seçenek kullanabilirsin.</p>
+                  </div>
+                  <span id="wheel-item-count" class="wheel-count-pill" aria-live="polite">0 / 15</span>
+                </div>
+
+                <div class="wheel-quick-picks" aria-label="Hazır seçenekler">
+                  <button class="wheel-preset" type="button" data-wheel-items="Evet|Hayır|Belki">Hızlı karar</button>
+                  <button class="wheel-preset" type="button" data-wheel-items="Film|Dizi|Oyun|Müzik">Akşam planı</button>
+                  <button class="wheel-preset" type="button" data-wheel-items="Kırmızı Takım|Mavi Takım|Yeşil Takım">Takımlar</button>
+                </div>
+
+                <div class="wheel-input-row">
+                  <label class="wheel-input-wrap" for="wheel-new-item">
+                    <span>Yeni seçenek</span>
+                    <input type="text" id="wheel-new-item" placeholder="Örn. Film izleyelim" maxlength="32" autocomplete="off" />
+                  </label>
+                  <button id="wheel-add-item" class="wheel-add-button" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"></path></svg>
+                    Ekle
+                  </button>
+                </div>
+
+                <div id="wheel-items-list" class="wheel-items-list" aria-label="Çark seçenekleri"></div>
+                <div id="wheel-empty-state" class="wheel-empty-state">
+                  <span class="wheel-empty-icon" aria-hidden="true">✦</span>
+                  <div><strong>Çarkın henüz boş</strong><span>Yukarıdan bir seçenek ekle veya hazır bir liste seç.</span></div>
+                </div>
+
+                <div class="wheel-setup-footer">
+                  <span id="wheel-setup-hint">Başlamak için en az 2 seçenek ekle.</span>
+                  <button id="wheel-ready" class="wheel-primary-button" type="button" disabled>
+                    Çarkı hazırla
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              <aside class="wheel-preview-panel" aria-label="Çark önizlemesi">
+                <div class="wheel-preview-copy">
+                  <span>CANLI ÖNİZLEME</span>
+                  <strong id="wheel-preview-status">Seçenek bekleniyor</strong>
+                </div>
+                <div class="wheel-preview-stage">
+                  <div class="wheel-preview-pointer" aria-hidden="true"></div>
+                  <canvas id="wheel-preview-canvas" width="600" height="600" aria-label="Şans çarkı önizlemesi"></canvas>
+                  <div class="wheel-preview-hub" aria-hidden="true">TS</div>
+                </div>
+                <p>Odadaki herkes aynı dönüşü ve aynı sonucu görür.</p>
+              </aside>
+            </section>
+
+            <section id="wheel-play" class="wheel-play hidden" aria-labelledby="wheel-play-title">
+              <div class="wheel-game-area">
+                <div class="wheel-game-heading">
+                  <div>
+                    <span class="wheel-step-label">02 · ŞANSINI DENE</span>
+                    <h4 id="wheel-play-title">Hazır olduğunda çevir</h4>
+                  </div>
+                  <span id="wheel-live-status" class="wheel-live-status" aria-live="polite"><i></i> Çark hazır</span>
+                </div>
+                <div id="wheel-stage" class="wheel-stage">
+                  <div id="wheel-pointer" class="wheel-pointer" aria-hidden="true"><span></span></div>
+                  <canvas id="wheel-canvas" width="900" height="900" aria-label="Şans çarkı"></canvas>
+                  <div class="wheel-hub" aria-hidden="true"><span>TS</span></div>
+                </div>
+                <button id="wheel-spin-btn" class="wheel-spin-button" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 7v5h-5M4 17v-5h5"></path><path d="M6.1 9a7 7 0 0 1 11.8-2L20 12M4 12l2.1 5a7 7 0 0 0 11.8-2"></path></svg>
+                  <span>ÇARKI ÇEVİR</span>
+                </button>
+              </div>
+
+              <aside class="wheel-side-panel">
+                <div class="wheel-side-card wheel-options-card">
+                  <div class="wheel-side-heading"><span>SEÇENEKLER</span><strong id="wheel-play-count">0</strong></div>
+                  <div id="wheel-play-items" class="wheel-play-items"></div>
+                </div>
+                <div class="wheel-side-card wheel-history-card">
+                  <div class="wheel-side-heading"><span>SONUÇ GEÇMİŞİ</span><strong id="wheel-history-count">0</strong></div>
+                  <div id="wheel-history-list" class="wheel-history-list">
+                    <p id="wheel-history-empty">İlk sonuç burada görünecek.</p>
+                  </div>
+                </div>
+                <button id="wheel-reset-btn" class="wheel-secondary-button" type="button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>
+                  Seçenekleri düzenle
+                </button>
+              </aside>
+            </section>
           </div>
 
-          <div id="wheel-play" class="hidden" style="display: flex; flex-direction: column; align-items: center; z-index: 5;">
-            <div style="position: relative; width: 350px; height: 350px; margin-bottom: 30px;">
-              <div id="wheel-pointer" style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #ef4444; z-index: 20;"></div>
-              <canvas id="wheel-canvas" width="350" height="350" style="border-radius: 50%; box-shadow: 0 0 20px rgba(0,0,0,0.5); transition: transform 4s cubic-bezier(0.1, 0, 0.1, 1);"></canvas>
+          <div id="wheel-winner-overlay" class="wheel-winner-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wheel-winner-text">
+            <div class="wheel-confetti wheel-confetti-left" aria-hidden="true"></div>
+            <div class="wheel-confetti wheel-confetti-right" aria-hidden="true"></div>
+            <div class="wheel-winner-card">
+              <div class="wheel-winner-badge" aria-hidden="true">✦</div>
+              <span>ÇARKIN SEÇİMİ</span>
+              <h2 id="wheel-winner-text">...</h2>
+              <p>Şans bugün bu seçenekten yana.</p>
+              <div class="wheel-winner-actions">
+                <button id="wheel-winner-close" class="wheel-secondary-button" type="button">Sonucu kapat</button>
+                <button id="wheel-spin-again" class="wheel-primary-button" type="button">
+                  Tekrar çevir
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7v5h-5M4 17v-5h5"></path><path d="M6.1 9a7 7 0 0 1 11.8-2L20 12M4 12l2.1 5a7 7 0 0 0 11.8-2"></path></svg>
+                </button>
+              </div>
             </div>
-            <button id="wheel-spin-btn" class="btn-pri" style="font-size: 20px; padding: 12px 30px; font-weight: bold; border-radius: 50px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin-right:4px;"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg> ÇEVİR!</button>
-            <button id="wheel-reset-btn" class="btn-sec btn-sm" style="margin-top: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">Yeniden Düzenle</button>
-          </div>
-
-          <!-- Winner Overlay -->
-          <div id="wheel-winner-overlay" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; flex-direction: column; animation: fadeIn 0.3s forwards;">
-            <div style="font-size: 60px; animation: bounce 1s infinite;">🎉</div>
-            <h1 id="wheel-winner-text" style="font-size: 48px; color: gold; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); text-align: center; margin: 20px 0; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">...</h1>
-            <button id="wheel-winner-close" class="btn-sec" style="font-size: 18px; padding: 10px 24px;">Tamam</button>
           </div>
         </div>
       </div>
