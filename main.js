@@ -78,7 +78,8 @@ const baseUserData = app.getPath('userData');
 const lockFile = path.join(baseUserData, 'teamsync.lock');
 let isSecondInstance = false;
 
-// Load .env variables
+// Load .env variables. Bu blok process.env'i modül yüklenirken (pencere/preload
+// oluşturulmadan ÖNCE) doldurur; renderer/preload süreçleri bu değerleri kalıtır.
 const envPath = path.join(__dirname, '.env');
 if (fs.existsSync(envPath)) {
   const envFile = fs.readFileSync(envPath, 'utf8');
@@ -87,6 +88,20 @@ if (fs.existsSync(envPath)) {
     const val = rest.join('=');
     if (key && val) process.env[key.trim()] = val.trim();
   });
+}
+
+// Gömülü Supabase yapılandırması (fallback). KURULU sürümde pakete .env
+// KONMADIĞI için (electron-builder files: "!.env") .env okuması boş kalır ve
+// Supabase istemcisi kurulamazdı → "Sunucu yapılandırması eksik" hatası. Anon
+// key public bir anahtardır (JWT role=anon), istemcilere dağıtılmak üzere
+// tasarlanmıştır ve veritabanını RLS korur; URL zaten CSP'de açıkça yazılıdır.
+// .env varsa (dev) onun değerleri bunları EZER — yukarıdaki blok önce çalışır.
+const SUPABASE_DEFAULTS = {
+  SUPABASE_URL: 'https://zperyrjpfumtblossyod.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZXJ5cmpwZnVtdGJsb3NzeW9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NjU5ODAsImV4cCI6MjA5OTU0MTk4MH0.BwA7IabSS3qySc0EF3XI__a4J8RlBSa5cLf1HhT4Bc4',
+};
+for (const [k, v] of Object.entries(SUPABASE_DEFAULTS)) {
+  if (!process.env[k]) process.env[k] = v;
 }
 
 function isPidRunning(pid) {
