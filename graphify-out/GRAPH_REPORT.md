@@ -1,16 +1,16 @@
 # Graph Report - kanka-voice  (2026-07-23)
 
 ## Corpus Check
-- 77 files · ~321,147 words
+- 78 files · ~322,348 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 741 nodes · 1391 edges · 68 communities (46 shown, 22 thin omitted)
+- 744 nodes · 1399 edges · 68 communities (46 shown, 22 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4dc5567d`
+- Built from commit: `ebcb6d81`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -82,14 +82,14 @@
 ## God Nodes (most connected - your core abstractions)
 1. `handleDataMessage()` - 38 edges
 2. `bindUI()` - 32 edges
-3. `evalJS()` - 27 edges
+3. `evalJS()` - 28 edges
 4. `showToast()` - 23 edges
-5. `waitFor()` - 22 edges
-6. `spawnPeer()` - 21 edges
+5. `waitFor()` - 23 edges
+6. `spawnPeer()` - 22 edges
 7. `unoIsHost()` - 18 edges
 8. `unoHostApplyPlay()` - 18 edges
 9. `createPeerConnection()` - 17 edges
-10. `setupInternetSignaling()` - 15 edges
+10. `cleanupPeer()` - 16 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `P2P Voice & Video` --semantically_similar_to--> `P2P Serverless Architecture`  [INFERRED] [semantically similar]
@@ -114,8 +114,8 @@
 ## Communities (68 total, 22 thin omitted)
 
 ### Community 0 - "E2E Test Harness"
-Cohesion: 0.06
-Nodes (66): fs, { launch, getPageTarget, cdp, evalJS, waitFor }, os, path, assert, fs, inspectButton(), { launch, getPageTarget, cdp, evalJS, waitFor } (+58 more)
+Cohesion: 0.05
+Nodes (68): fs, { launch, getPageTarget, cdp, evalJS, waitFor }, os, path, assert, fs, inspectButton(), { launch, getPageTarget, cdp, evalJS, waitFor } (+60 more)
 
 ### Community 1 - "React App / Signaling / Crypto Core"
 Cohesion: 0.07
@@ -278,7 +278,7 @@ Cohesion: 0.47
 Nodes (5): cleanEffectText(), fetchJson(), fs, https, run()
 
 ## Knowledge Gaps
-- **259 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+254 more)
+- **261 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+256 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -292,9 +292,9 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `dependencies` connect `Build Config & Reference Files` to `package.json`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
-  _259 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _261 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `E2E Test Harness` be split into smaller, more focused modules?**
-  _Cohesion score 0.05651176133103844 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05479818230419674 - nodes in this community are weakly interconnected._
 - **Should `React App / Signaling / Crypto Core` be split into smaller, more focused modules?**
   _Cohesion score 0.07205387205387205 - nodes in this community are weakly interconnected._
 - **Should `Chat & TURN Resolution Utils` be split into smaller, more focused modules?**

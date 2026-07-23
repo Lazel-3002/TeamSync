@@ -5975,6 +5975,39 @@
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, joinroom, waitforpeerconnected, evaljs }"
     },
     {
+      "label": "pokemon-battle-balance.test.js",
+      "file_type": "code",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_e2e_pokemon_battle_balance_test",
+      "community": 0,
+      "community_name": "E2E Test Harness",
+      "norm_label": "pokemon-battle-balance.test.js"
+    },
+    {
+      "label": "assert",
+      "file_type": "code",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_e2e_pokemon_battle_balance_test_assert",
+      "community": 0,
+      "community_name": "E2E Test Harness",
+      "norm_label": "assert"
+    },
+    {
+      "label": "{\r\n  spawnPeer,\r\n  cleanupPeer,\r\n  createRoom,\r\n  evalJS,\r\n  waitFor,\r\n}",
+      "file_type": "code",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "test_e2e_pokemon_battle_balance_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
+      "community": 0,
+      "community_name": "E2E Test Harness",
+      "norm_label": "{\r\n  spawnpeer,\r\n  cleanuppeer,\r\n  createroom,\r\n  evaljs,\r\n  waitfor,\r\n}"
+    },
+    {
       "label": "pokemon-evolution-forms.test.js",
       "file_type": "code",
       "source_file": "test/e2e/pokemon-evolution-forms.test.js",
@@ -21250,6 +21283,18 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
+      "target": "test_e2e_lib_harness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "test/e2e/pokemon-evolution-forms.test.js",
       "source_location": "L3",
       "weight": 1.0,
@@ -21435,6 +21480,18 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "test_e2e_peer_cleanup_test",
+      "target": "test_e2e_lib_harness_evaljs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
       "target": "test_e2e_lib_harness_evaljs",
       "confidence_score": 1.0
     },
@@ -21658,6 +21715,18 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
+      "target": "test_e2e_lib_harness_waitfor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "test/e2e/pokemon-evolution-forms.test.js",
       "source_location": "L3",
       "weight": 1.0,
@@ -21838,6 +21907,18 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
+      "target": "test_e2e_lib_harness_spawnpeer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "test/e2e/pokemon-evolution-forms.test.js",
       "source_location": "L3",
       "weight": 1.0,
@@ -21958,6 +22039,18 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
+      "target": "test_e2e_lib_harness_cleanuppeer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "test/e2e/pokemon-evolution-forms.test.js",
       "source_location": "L3",
       "weight": 1.0,
@@ -22071,6 +22164,18 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "test_e2e_peer_cleanup_test",
+      "target": "test_e2e_lib_harness_createroom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
       "target": "test_e2e_lib_harness_createroom",
       "confidence_score": 1.0
     },
@@ -22274,6 +22379,28 @@
       "_origin": "ast",
       "source": "test_e2e_peer_cleanup_test",
       "target": "test_e2e_peer_cleanup_test_spawnpeer_cleanuppeer_createroom_joinroom_waitforpeerconnected_evaljs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
+      "target": "test_e2e_pokemon_battle_balance_test_assert",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-battle-balance.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_battle_balance_test",
+      "target": "test_e2e_pokemon_battle_balance_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
       "confidence_score": 1.0
     },
     {
@@ -24405,5 +24532,5 @@
       "source_file": "docs/index.html"
     }
   ],
-  "built_at_commit": "4dc5567d93700822eab1db1357e389ec499612f1"
+  "built_at_commit": "ebcb6d814c249e406b4c4b63c7ae7a1c9596839d"
 }
