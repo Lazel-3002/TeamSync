@@ -5030,6 +5030,24 @@ function clearFocusInlineLayout(card) {
   card.style.height = '';
 }
 
+// Etkinlikler kendi içeriklerini sık sık yeniden çizer. Odak denetimleri aktif
+// kartın çocuğu olduğu için bu çizimler veya etkinliğe özel katmanlar denetimleri
+// görünmez bırakmamalı. Bu yardımcı, odak oturumu boyunca tek görünür yerleşimi
+// yeniden kurar; kilitliyken denetimleri ayrıca sabit ve üst katmanda tutar.
+function ensureFocusControlsVisible() {
+  if (!focusedCard) return;
+  const controls = document.getElementById('focus-controls');
+  const main = document.querySelector('.main');
+  if (!controls || !main) return;
+
+  controls.classList.remove('hidden');
+  controls.classList.toggle('focus-controls-minimized', focusMinimized);
+  controls.classList.toggle('focus-controls-locked', !!state.focusLocked && !focusMinimized);
+
+  const host = focusMinimized ? main : focusedCard;
+  if (controls.parentElement !== host) host.appendChild(controls);
+}
+
 // Kilit düğmesinin görünümünü state.focusLocked ile eşitler. Kilit,
 // exitFocus gibi düğme dışı yollardan da sıfırlanabildiği için
 // görünüm güncellemesi tek yerden yapılmalı.
@@ -5041,25 +5059,34 @@ function updateFocusLockBtn() {
     ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>'
     : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>';
   btn.title = state.focusLocked ? 'Odak Kilidini Aç' : 'Odak Kilidi (yanlışlıkla çıkmayı engeller)';
+  ensureFocusControlsVisible();
+  updateFocusFullscreenBtn();
+  updateFocusExitBtn();
 }
 
 function updateFocusFullscreenBtn() {
   const btn = document.getElementById('focus-fullscreen-btn');
   if (!btn) return;
   const fs = !!document.fullscreenElement;
+  const locked = !!state.focusLocked;
   btn.innerHTML = fs
     ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>'
     : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>';
-  btn.title = fs ? 'Tam Ekrandan Çık (F)' : 'Tam Ekran (F)';
+  btn.disabled = locked;
+  btn.setAttribute('aria-disabled', String(locked));
+  btn.title = locked ? 'Tam ekran için önce odak kilidini aç' : (fs ? 'Tam Ekrandan Çık (F)' : 'Tam Ekran (F)');
 }
 
 function updateFocusExitBtn() {
   const btn = document.getElementById('focus-exit-btn');
   if (!btn) return;
+  const locked = !!state.focusLocked;
   btn.innerHTML = focusMinimized
     ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>'
     : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>';
-  btn.title = focusMinimized ? 'Tekrar Büyüt' : 'Küçült';
+  btn.disabled = locked;
+  btn.setAttribute('aria-disabled', String(locked));
+  btn.title = locked ? 'Boyutu değiştirmek için önce odak kilidini aç' : (focusMinimized ? 'Tekrar Büyüt' : 'Küçült');
   btn.setAttribute('aria-label', btn.title);
 }
 
@@ -5077,12 +5104,9 @@ function enterFocus(card) {
   card.dataset.focusedAt = String(Date.now());
   document.querySelector('.main').classList.add('focus-mode');
   document.getElementById('focus-area').classList.remove('hidden');
-  const controls = document.getElementById('focus-controls');
-  controls.classList.remove('hidden');
-  controls.classList.remove('focus-controls-minimized');
   // Denetimler kartın içinde durur ki tam ekranda da görünsün (tam ekranda
   // yalnızca fullscreen öğenin alt ağacı çizilir).
-  card.appendChild(controls);
+  ensureFocusControlsVisible();
   updateFocusLockBtn();
   updateFocusFullscreenBtn();
   updateFocusExitBtn();
@@ -5092,7 +5116,7 @@ function enterFocus(card) {
 }
 
 function minimizeFocus() {
-  if (!focusedCard || focusMinimized) return;
+  if (!focusedCard || focusMinimized || state.focusLocked) return;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   focusedCard.classList.remove('focused');
   focusedCard.classList.add('focus-minimized');
@@ -5102,25 +5126,21 @@ function minimizeFocus() {
   // Küçültülen kart şeritte ekran dışında kalabilir. Kontroller kartın içinde
   // bırakılırsa kullanıcı geri büyütme düğmesine de ulaşamaz. Küçültülmüş
   // durumda üçlü grubu ana alana taşı ve viewport'a sabitle.
-  const controls = document.getElementById('focus-controls');
-  controls.classList.add('focus-controls-minimized');
-  document.querySelector('.main').appendChild(controls);
   focusMinimized = true;
+  ensureFocusControlsVisible();
   updateFocusFullscreenBtn();
   updateFocusExitBtn();
 }
 
 function restoreFocus() {
-  if (!focusedCard || !focusMinimized || focusedCard.classList.contains('hidden')) return;
+  if (!focusedCard || !focusMinimized || focusedCard.classList.contains('hidden') || state.focusLocked) return;
   focusMinimized = false;
-  const controls = document.getElementById('focus-controls');
-  controls.classList.remove('focus-controls-minimized');
-  focusedCard.appendChild(controls);
   focusedCard.classList.remove('focus-minimized');
   focusedCard.classList.add('focused');
   focusedCard.dataset.focusedAt = String(Date.now());
   document.querySelector('.main').classList.add('focus-mode');
   document.getElementById('focus-area').classList.remove('hidden');
+  ensureFocusControlsVisible();
   updateFocusFullscreenBtn();
   updateFocusExitBtn();
   syncFocusLayout();
@@ -5141,6 +5161,7 @@ function exitFocus() {
   const controls = document.getElementById('focus-controls');
   controls.classList.add('hidden');
   controls.classList.remove('focus-controls-minimized');
+  controls.classList.remove('focus-controls-locked');
   // Denetimleri kartın içinden çıkar: kart gizlense/silinse bile kaybolmasınlar.
   document.querySelector('.main').appendChild(controls);
   // Kilit bir odak oturumuna aittir; odak bitince sıfırlanır.
@@ -5166,6 +5187,10 @@ function toggleFocus(card) {
 
 async function toggleFocusFullscreen() {
   if (!focusedCard) return;
+  if (state.focusLocked) {
+    showToast('Odak kilitli — tam ekranı değiştirmek için önce kilidi aç', 'info');
+    return;
+  }
   try {
     if (document.fullscreenElement) await document.exitFullscreen();
     else {
@@ -5194,6 +5219,16 @@ function makeCardFocusable(card) {
   card.dataset.focusable = 'true';
   const title = FOCUS_CARD_TITLES[card.id];
   if (title && !card.dataset.focusTitle) card.dataset.focusTitle = title;
+  // Bazı etkinlik kontrolleri click olayını durdurur veya içeriklerini aynı
+  // olay içinde yeniden çizer. Capture aşamasında alınan bu güvence, kilitli
+  // odakta olay tamamlanınca denetimlerin hâlâ görünür ve doğru kartta olmasını
+  // sağlar.
+  card.addEventListener('click', () => {
+    if (focusedCard !== card || !state.focusLocked) return;
+    requestAnimationFrame(() => {
+      if (focusedCard === card && state.focusLocked) ensureFocusControlsVisible();
+    });
+  }, true);
   card.addEventListener('click', (e) => {
     // Odaklı kartın içine tıklamak odağı BOZMAZ (etkinlik kullanılırken
     // kazara küçülme eski sistemin en can sıkıcı davranışıydı). Küçültme:
@@ -5220,8 +5255,8 @@ function makeCardFocusable(card) {
     if (e.target.tagName === 'CANVAS') return; // beyaz tahtada çizimi bozmasın
     if (e.target.closest('.sb-tools, .card-actions, button, select, input, label, .u-card, .u-swatch, .u-picker, .u-hand, #focus-controls, .mactions')) return;
     // Kilit, kazara boyut değişimlerini de engellemeli: kilitliyken çift tık
-    // tam ekranı AÇMAZ ve KAPATMAZ (düğme ve F kısayolu bilinçli işlem olarak
-    // çalışmaya devam eder).
+    // tam ekranı AÇMAZ ve KAPATMAZ. Kilit açıkken düğme ve F kısayolu da
+    // engellendiğinden ekran yalnızca kilit açıldıktan sonra değişebilir.
     if (state.focusLocked) return;
     // Şeritteki karta çift tıklanınca ilk tık odağa alır; ikinci tık hemen
     // tam ekrana fırlatmasın — odağa yeni girildiyse bekle.

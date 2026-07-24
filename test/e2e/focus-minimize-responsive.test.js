@@ -72,6 +72,8 @@ async function inspectControls(peer) {
              display: style.display,
              visibility: style.visibility,
              position: style.position,
+             opacity: style.opacity,
+             lockedPlacement: element.classList.contains('focus-controls-locked'),
              buttonCount: element.querySelectorAll('button').length,
              rect: {
                left: rect.left,
@@ -136,14 +138,52 @@ module.exports = async function run() {
     assert.strictEqual(result.focusControls.insideViewport, true, JSON.stringify(result, null, 2));
     assert.deepStrictEqual(unavailable, [], JSON.stringify(result, null, 2));
 
-    await evalJS(peer.client, `document.getElementById('focus-lock-btn').click(); 1`);
+    await evalJS(
+      peer.client,
+      `window.__focusFullscreenRequested = false;
+       document.getElementById('wb-card').requestFullscreen = async () => {
+         window.__focusFullscreenRequested = true;
+       };
+       document.getElementById('focus-lock-btn').click();
+       1`
+    );
     assert.strictEqual(
       await evalJS(peer.client, `document.getElementById('focus-lock-btn').classList.contains('locked')`),
+      true
+    );
+    assert.strictEqual(
+      await evalJS(peer.client, `document.getElementById('focus-fullscreen-btn').disabled`),
+      true
+    );
+    assert.strictEqual(
+      await evalJS(peer.client, `document.getElementById('focus-exit-btn').disabled`),
+      true
+    );
+    await evalJS(
+      peer.client,
+      `document.getElementById('focus-fullscreen-btn').click();
+       document.getElementById('focus-exit-btn').click();
+       document.getElementById('wb-card').click();
+       document.getElementById('wb-card').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', bubbles: true }));
+       1`
+    );
+    assert.strictEqual(await evalJS(peer.client, `window.__focusFullscreenRequested`), false);
+    assert.strictEqual(
+      await evalJS(peer.client, `document.getElementById('wb-card').classList.contains('focus-minimized')`),
       true
     );
     await evalJS(peer.client, `document.getElementById('focus-lock-btn').click(); 1`);
     assert.strictEqual(
       await evalJS(peer.client, `document.getElementById('focus-lock-btn').classList.contains('locked')`),
+      false
+    );
+    assert.strictEqual(
+      await evalJS(peer.client, `document.getElementById('focus-fullscreen-btn').disabled`),
+      false
+    );
+    assert.strictEqual(
+      await evalJS(peer.client, `document.getElementById('focus-exit-btn').disabled`),
       false
     );
 
@@ -269,6 +309,57 @@ module.exports = async function run() {
       await evalJS(peer.client, `document.getElementById('wb-card').classList.contains('focused')`),
       true
     );
+
+    // UNO gibi içeriğini sık güncelleyen etkinliklerde oyun alanına tıklamak,
+    // kilitli odak denetimlerini kaybetmemeli.
+    await evalJS(
+      peer.client,
+      `exitFocus();
+       const unoCard = document.getElementById('uno-card');
+       unoCard.classList.remove('hidden');
+       makeCardFocusable(unoCard);
+       enterFocus(unoCard);
+       window.__unoFullscreenRequested = false;
+       unoCard.requestFullscreen = async () => {
+         window.__unoFullscreenRequested = true;
+       };
+       document.getElementById('focus-lock-btn').click();
+       document.getElementById('uno-lobby').click();
+       document.getElementById('focus-fullscreen-btn').click();
+       document.getElementById('focus-exit-btn').click();
+       document.getElementById('uno-lobby').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', bubbles: true }));
+       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', bubbles: true }));
+       1`
+    );
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const lockedUno = await inspectControls(peer);
+    assert.strictEqual(
+      await evalJS(peer.client, `focusedCard && focusedCard.id`),
+      'uno-card',
+      JSON.stringify(lockedUno, null, 2)
+    );
+    assert.strictEqual(
+      await evalJS(peer.client, `state.focusLocked`),
+      true,
+      JSON.stringify(lockedUno, null, 2)
+    );
+    assert.strictEqual(await evalJS(peer.client, `window.__unoFullscreenRequested`), false);
+    assert.strictEqual(
+      await evalJS(peer.client, `document.getElementById('focus-fullscreen-btn').disabled`),
+      true
+    );
+    assert.strictEqual(
+      await evalJS(peer.client, `document.getElementById('focus-exit-btn').disabled`),
+      true
+    );
+    assert.strictEqual(lockedUno.focusControls.parentId, 'uno-card', JSON.stringify(lockedUno, null, 2));
+    assert.strictEqual(lockedUno.focusControls.display, 'flex', JSON.stringify(lockedUno, null, 2));
+    assert.strictEqual(lockedUno.focusControls.visibility, 'visible', JSON.stringify(lockedUno, null, 2));
+    assert.strictEqual(lockedUno.focusControls.position, 'fixed', JSON.stringify(lockedUno, null, 2));
+    assert.strictEqual(lockedUno.focusControls.opacity, '1', JSON.stringify(lockedUno, null, 2));
+    assert.strictEqual(lockedUno.focusControls.lockedPlacement, true, JSON.stringify(lockedUno, null, 2));
+    assert.strictEqual(lockedUno.focusControls.insideViewport, true, JSON.stringify(lockedUno, null, 2));
   } finally {
     cleanupPeer(peer);
   }
