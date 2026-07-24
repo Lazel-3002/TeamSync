@@ -9,6 +9,7 @@ window.state = {
   processedStream: null,
   audioCtx: null,
   remoteAudioCtx: null,
+  micVolumeGainNode: null,
   rnnoiseFilterNode: null,
   rnnoiseActive: false,
   rnnoiseStatus: 'off',
@@ -39,6 +40,9 @@ window.state = {
   globalMqtt: null,
   pttActive: false,
   volume: 1.0,
+  settingsMicTestActive: false,
+  settingsMicTestOwnsStream: false,
+  settingsMicTestRequestId: 0,
   useAI: true,
   activeControl: null,      // kontrol EDEN taraf: { hostId } (kimin masaüstünü yönetiyorum)
   controlledBy: null,       // kontrol EDİLEN taraf: beni yöneten peer'in id'si

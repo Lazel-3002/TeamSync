@@ -837,7 +837,7 @@ function renderFriends() {
   flist.innerHTML = '';
   const friendKeys = Object.keys(state.friends);
   if (friendKeys.length === 0) {
-    flist.innerHTML = '<li class="muted menu-empty-friends">Henüz hiç arkadaşın yok.</li>';
+    flist.innerHTML = `<li class="muted menu-empty-friends" data-i18n="menu.noFriends">${escapeHtml(t('menu.noFriends'))}</li>`;
   } else {
     friendKeys.forEach(fId => {
       const f = state.friends[fId];
@@ -2593,7 +2593,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('room-title').textContent = '# ' + serverName + (state.cryptoKey ? ' 🔒' : '');
       document.getElementById('display-server-id').textContent = roomId;
 
-      addUser({ id: 'self', name: state.myName + ' (sen)', mic: true, deaf: false, sharing: false, self: true, avatar: state.myAvatar, isFounder: state.isRoomFounder });
+      addUser({ id: 'self', name: `${state.myName} (${t('common.you')})`, mic: true, deaf: false, sharing: false, self: true, avatar: state.myAvatar, isFounder: state.isRoomFounder });
       
       window.electronAPI.startDiscovery(state.myId, state.myName, state.room);
       setupInternetSignaling(state.room, state.myId, state.myName);
@@ -2757,7 +2757,8 @@ async function setupLocalAudio(options = {}) {
   }
 
   const sel = document.getElementById('mic-select');
-  const deviceId = sel && sel.value ? { exact: sel.value } : undefined;
+  const selectedMicId = localStorage.getItem(USER_MIC_DEVICE_KEY) || (sel && sel.value) || '';
+  const deviceId = selectedMicId ? { exact: selectedMicId } : undefined;
 
   let useRnnoise = !!state.useAI
     && !forceSystemSuppression
@@ -2773,21 +2774,28 @@ async function setupLocalAudio(options = {}) {
 
   if (generation !== state.audioSetupGeneration) return;
 
-  const raw = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      deviceId: deviceId,
-      echoCancellation: true,
-      // RNNoise kendi AI modelini çalıştırırken Chromium'un gürültü/AGC
-      // işlemesini kapat; iki işlemciyi üst üste bindirmek konuşmayı boğar.
-      noiseSuppression: { ideal: !!state.useAI && !useRnnoise },
-      autoGainControl: { ideal: !!state.useAI && !useRnnoise },
-      sampleRate: { ideal: 48000 },
-      // Yankı iptali (AEC) Chromium'da yalnızca mono yakalamada güvenilir
-      // çalışır; stereo istek AEC'yi sessizce devre dışı bırakabiliyor
-      // (crbug 1071108). Sesli sohbet için stereonun bir faydası da yok.
-      channelCount: { ideal: 1 }
-    }
-  });
+  const audioConstraints = {
+    deviceId: deviceId,
+    echoCancellation: true,
+    // RNNoise kendi AI modelini çalıştırırken Chromium'un gürültü/AGC
+    // işlemesini kapat; iki işlemciyi üst üste bindirmek konuşmayı boğar.
+    noiseSuppression: { ideal: !!state.useAI && !useRnnoise },
+    autoGainControl: { ideal: !!state.useAI && !useRnnoise },
+    sampleRate: { ideal: 48000 },
+    // Yankı iptali (AEC) Chromium'da yalnızca mono yakalamada güvenilir
+    // çalışır; stereo istek AEC'yi sessizce devre dışı bırakabiliyor
+    // (crbug 1071108). Sesli sohbet için stereonun bir faydası da yok.
+    channelCount: { ideal: 1 }
+  };
+  let raw;
+  try {
+    raw = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+  } catch (error) {
+    if (!selectedMicId) throw error;
+    localStorage.removeItem(USER_MIC_DEVICE_KEY);
+    delete audioConstraints.deviceId;
+    raw = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+  }
 
   if (generation !== state.audioSetupGeneration) {
     raw.getTracks().forEach(track => track.stop());
@@ -2815,6 +2823,9 @@ async function setupLocalAudio(options = {}) {
 
   state.gateGainNode = vuCtx.createGain();
   vuSrc.connect(state.gateGainNode);
+  state.micVolumeGainNode = vuCtx.createGain();
+  state.micVolumeGainNode.gain.value = readPercentPreference(USER_MIC_VOLUME_KEY) / 100;
+  state.gateGainNode.connect(state.micVolumeGainNode);
   
   const dest = vuCtx.createMediaStreamDestination();
   let highpassNode = null, lowpassNode = null, compressorNode = null, gainNodeInst = null;
@@ -2846,7 +2857,7 @@ async function setupLocalAudio(options = {}) {
         try { vuCtx.close(); } catch (error) {}
         return;
       }
-      state.gateGainNode.connect(rnnoiseFilterNode);
+      state.micVolumeGainNode.connect(rnnoiseFilterNode);
       rnnoiseFilterNode.connect(dest);
       state.rnnoiseFilterNode = rnnoiseFilterNode;
       state.rnnoiseActive = true;
@@ -2884,14 +2895,14 @@ async function setupLocalAudio(options = {}) {
     gainNodeInst = vuCtx.createGain();
     gainNodeInst.gain.value = 1.0;
 
-    state.gateGainNode.connect(highpassNode);
+    state.micVolumeGainNode.connect(highpassNode);
     highpassNode.connect(lowpassNode);
     lowpassNode.connect(compressorNode);
     compressorNode.connect(gainNodeInst);
     gainNodeInst.connect(dest);
 
   } else {
-    state.gateGainNode.connect(dest);
+    state.micVolumeGainNode.connect(dest);
   }
   state.processedStream = dest.stream;
 
@@ -2900,6 +2911,7 @@ async function setupLocalAudio(options = {}) {
     vuSrc,
     vuAnalyser: state.vuAnalyser,
     gateGainNode: state.gateGainNode,
+    micVolumeGainNode: state.micVolumeGainNode,
     dest,
     highpassNode,
     lowpassNode,
@@ -2926,7 +2938,7 @@ async function setupLocalAudio(options = {}) {
   } else if (gainNodeInst) {
     gainNodeInst.connect(state.uiAnalyser);
   } else {
-    state.gateGainNode.connect(state.uiAnalyser);
+    state.micVolumeGainNode.connect(state.uiAnalyser);
   }
 
   if (state.peers && state.peers.size > 0) {
@@ -2996,6 +3008,7 @@ function setupVUMeter() {
     const rms = Math.sqrt(sum / data.length);
     const db = 20 * Math.log10(rms / 255 || 0.0001);
     const pct = Math.min(100, Math.max(0, (db + 60) * 100 / 60));
+    updateSettingsMicMeter(pct);
 
     const isSpeaking = pct > state.micThreshold;
 
@@ -3073,40 +3086,33 @@ async function setupDeviceList() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const sel = document.getElementById('mic-select');
-    sel.innerHTML = '';
-    devices.filter(d => d.kind === 'audioinput').forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.deviceId;
-      opt.textContent = d.label || 'Mikrofon ' + (sel.children.length + 1);
-      sel.appendChild(opt);
-    });
-    sel.onchange = async () => {
-      await setupLocalAudio();
-    };
+    const savedMic = localStorage.getItem(USER_MIC_DEVICE_KEY) || '';
+    fillAudioDeviceSelect(sel, devices, 'audioinput', t('settings.defaultMicrophone'), savedMic);
+    if (sel) {
+      sel.onchange = async () => {
+        if (sel.value) localStorage.setItem(USER_MIC_DEVICE_KEY, sel.value);
+        else localStorage.removeItem(USER_MIC_DEVICE_KEY);
+        const settingsSelect = document.getElementById('user-mic-select');
+        if (settingsSelect && [...settingsSelect.options].some(option => option.value === sel.value)) settingsSelect.value = sel.value;
+        await setupLocalAudio();
+        setupVUMeter();
+      };
+    }
 
     // Çıkış cihazı seçimi: yankı genelde ses hoparlörden çalıp mikrofona
     // geri girince oluşur; kulaklığı buradan seçmek bunu keser.
     const spk = document.getElementById('speaker-select');
     if (spk) {
-      spk.innerHTML = '';
-      const def = document.createElement('option');
-      def.value = '';
-      def.textContent = 'Varsayılan Çıkış';
-      spk.appendChild(def);
-      devices.filter(d => d.kind === 'audiooutput' && d.deviceId && d.deviceId !== 'default').forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d.deviceId;
-        opt.textContent = d.label || 'Hoparlör ' + spk.children.length;
-        spk.appendChild(opt);
-      });
       const saved = localStorage.getItem('teamsync_speaker_id') || '';
-      if (saved && [...spk.options].some(o => o.value === saved)) spk.value = saved;
-      else if (saved) { localStorage.removeItem('teamsync_speaker_id'); } // cihaz artık yok
+      fillAudioDeviceSelect(spk, devices, 'audiooutput', t('settings.defaultSpeaker'), saved);
+      if (saved && ![...spk.options].some(o => o.value === saved)) localStorage.removeItem('teamsync_speaker_id');
       spk.onchange = () => {
         if (spk.value) localStorage.setItem('teamsync_speaker_id', spk.value);
         else localStorage.removeItem('teamsync_speaker_id');
+        const settingsSelect = document.getElementById('user-speaker-select');
+        if (settingsSelect && [...settingsSelect.options].some(option => option.value === spk.value)) settingsSelect.value = spk.value;
         applySpeakerToAll();
-        showToast('Ses çıkış cihazı değiştirildi', 'info');
+        showToast(t('settings.deviceChanged'), 'info');
       };
       applySpeakerToAll();
       // Cihaz takılıp çıkarıldığında sink'leri yeniden uygula: kulaklık
@@ -3116,6 +3122,7 @@ async function setupDeviceList() {
         navigator.mediaDevices.addEventListener('devicechange', () => applySpeakerToAll());
       }
     }
+    populateSettingsAudioDevices();
   } catch (e) {}
 }
 
@@ -5522,7 +5529,7 @@ function loadLocalChatHistory() {
        const div = document.createElement('div');
        div.className = 'msg';
        const date = new Date(msg.time);
-       const t = date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+       const t = formatUserTime(date);
        
        let msgHtml = textToHtmlEscape(msg.text);
        if (msg.isCensored) {
@@ -5560,7 +5567,7 @@ function appendChat(uid, name, text, isCensored = false) {
     if (!isCensored && typeof text === 'string') text = cleanText(text);
   }
   const wrap = document.getElementById('msgs');
-  const t = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const t = formatUserTime(new Date());
 
   let notifyText = typeof text === 'string' ? text : String(text || '');
   if (isCensored) notifyText = "🚫 [Yapay Zeka Tarafından Sansürlendi]";
@@ -5650,6 +5657,750 @@ function broadcast(msg) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
+
+const USER_LANGUAGE_KEY = 'teamsync_language';
+const USER_TIME_FORMAT_KEY = 'teamsync_time_format';
+const USER_QUALITY_KEY = 'teamsync_media_quality';
+const USER_MIC_DEVICE_KEY = 'teamsync_mic_device_id';
+const USER_MIC_VOLUME_KEY = 'teamsync_mic_volume';
+const USER_SPEAKER_VOLUME_KEY = 'teamsync_speaker_volume';
+const USER_STREAM_PREVIEWS_KEY = 'teamsync_stream_previews';
+const USER_STREAM_FPS_KEY = 'teamsync_stream_fps';
+const USER_SHARE_SYSTEM_AUDIO_KEY = 'teamsync_share_system_audio';
+const SUPPORTED_LANGUAGES = ['tr', 'en'];
+
+const I18N = {
+  tr: {
+    'common.settings': 'Ayarlar',
+    'common.settingsShort': 'Ayar',
+    'common.close': 'Kapat',
+    'common.save': 'Kaydet',
+    'common.back': 'Geri',
+    'common.cancel': 'İptal',
+    'common.send': 'Gönder',
+    'common.sendFile': 'Dosya Gönder',
+    'common.join': 'Katıl',
+    'common.create': 'Oluştur',
+    'common.optional': '(opsiyonel)',
+    'common.you': 'sen',
+    'common.messagePlaceholder': 'Mesaj yaz...',
+    'menu.join': 'Sunucuya Katıl',
+    'menu.joinDesc': 'Bir odaya giriş yap',
+    'menu.create': 'Sunucu Oluştur',
+    'menu.createDesc': 'Kendi odanı kur',
+    'menu.friends': 'Arkadaşlar',
+    'menu.noFriends': 'Henüz hiç arkadaşın yok.',
+    'menu.switchAccount': 'Hesap Değiştir',
+    'menu.changeName': 'Adı Değiştir',
+    'menu.copyId': "ID'yi Kopyala",
+    'menu.invites': 'Davetler',
+    'menu.addFriend': 'Arkadaş Ekle',
+    'menu.selectFriend': 'Mesajlaşmaya başlamak için bir arkadaş seç.',
+    'menu.friendId': "Arkadaşının ID'si",
+    'menu.sendFriendRequest': 'Arkadaşlık İsteği Gönder',
+    'menu.serverId': 'Sunucu ID',
+    'menu.serverName': 'Sunucu Adı',
+    'menu.myServer': 'Benim Sunucum',
+    'menu.gameRoom': 'Oyun Odası',
+    'menu.noiseSuppression': 'RNNoise Gürültü Engelleme',
+    'menu.noiseSuppressionDesc': 'Ücretsiz, açık kaynak RNNoise AI ile arka plan seslerini temizler.',
+    'menu.relay': 'Sunucu Bilgisayarınız Olsun (Röle)',
+    'menu.relayDesc': 'WebRTC bağlanmıyorsa bunu açın.',
+    'menu.familyFriendly': 'Aile Dostu (Yapay Zeka Koruması)',
+    'menu.familyFriendlyDesc': 'Küfürleri ve +18 içerikleri yapay zekayla engeller.',
+    'menu.gameMode': 'Oyun Modu (Hafif Sürüm)',
+    'menu.gameModeDesc': 'RAM/CPU kullanımını azaltır (15 FPS kilit, yavaş tarama). Oyun arkasında önerilir.',
+    'menu.audioQuality': 'Ses Kalitesi (Bitrate)',
+    'menu.audioQualityDesc': 'Yüksek değer daha net ses ve daha fazla internet kullanımı demektir.',
+    'room.users': 'KULLANICILAR',
+    'room.voiceTest': 'SES TESTİ',
+    'room.chat': 'SOHBET',
+    'room.waiting': 'Bağlantı Bekleniyor',
+    'room.waitingDesc': 'Aynı oda anahtarını yazan biri bağlanınca burada görünecek.',
+    'share.chooseSource': 'Ekran / Pencere Seç',
+    'share.systemAudio': 'Sistem Sesini de Paylaş',
+    'toolbar.voice': 'Ses',
+    'toolbar.deafen': 'Sağır',
+    'toolbar.ptt': 'Bas',
+    'toolbar.screen': 'Ekran',
+    'toolbar.board': 'Tahta',
+    'toolbar.activity': 'Etkinlik',
+    'toolbar.record': 'Kayıt',
+    'toolbar.volume': 'Düzey',
+    'toolbar.manual': 'Manuel',
+    'toolbar.network': 'Uzak Ağ',
+    'toolbar.founder': 'Kurucu',
+    'toolbar.voiceTitle': 'Mikrofon (M)',
+    'toolbar.deafenTitle': 'Sağırlaştır (D)',
+    'toolbar.screenTitle': 'Ekran Paylaş (S)',
+    'toolbar.boardTitle': 'Beyaz Tahta (W)',
+    'toolbar.activityTitle': 'Etkinlikler (E)',
+    'toolbar.recordTitle': 'Kayıt (R)',
+    'toolbar.volumeTitle': 'Ses Seviyesi',
+    'toolbar.manualTitle': 'Manuel IP Ekle',
+    'toolbar.networkTitle': 'Çapraz Ağ (SDP)',
+    'toolbar.founderTitle': 'Kurucu Ayarları',
+    'settings.personal': 'Kişisel Ayarlar',
+    'settings.userSettings': 'KULLANICI AYARLARI',
+    'settings.appSettings': 'UYGULAMA AYARLARI',
+    'settings.general': 'Genel',
+    'settings.generalLead': "TeamSync'in görünümünü ve performansını yönet.",
+    'settings.voice': 'Ses ve Görüntü',
+    'settings.voiceLead': 'Mikrofon ve hoparlör cihazlarını, ses seviyelerini ve konuşma biçimini ayarla.',
+    'settings.microphone': 'Mikrofon',
+    'settings.speaker': 'Konuşmacı',
+    'settings.defaultMicrophone': 'Windows Varsayılanı',
+    'settings.defaultSpeaker': 'Windows Varsayılanı',
+    'settings.micVolume': 'Mikrofon Ses Seviyesi',
+    'settings.speakerVolume': 'Hoparlör Ses Seviyesi',
+    'settings.micTest': 'Mikrofon Testi',
+    'settings.stopMicTest': 'Testi Durdur',
+    'settings.micMeter': 'Canlı mikrofon ses seviyesi',
+    'settings.micTestHelp': 'Test sırasında konuş; çubuklar mikrofonundan gelen gerçek ses seviyesini gösterir.',
+    'settings.micPermissionError': 'Mikrofon testi başlatılamadı. Mikrofon iznini ve aygıtı kontrol et.',
+    'settings.broadcast': 'Yayın',
+    'settings.broadcastLead': 'Ekran paylaşımının önizleme ve kalite davranışını ayarla.',
+    'settings.showPreviews': 'Yayın Ön İzlemelerini göster',
+    'settings.showPreviewsDesc': 'Paylaşacağın ekranı seçerken pencere önizlemelerini gösterir.',
+    'settings.advancedBroadcast': 'Gelişmiş Yayın Ayarlarını Göster',
+    'settings.advancedBroadcastDesc': 'Yayın kalitesi, kare hızı ve sistem sesi',
+    'settings.frameRate': 'Yayın Kare Hızı',
+    'settings.shareSystemAudio': 'Sistem sesini varsayılan olarak paylaş',
+    'settings.shareSystemAudioDesc': 'Ekran paylaşım penceresi açıldığında sistem sesi seçeneğini açık getirir.',
+    'settings.previewHidden': 'Önizleme gizli',
+    'settings.deviceChanged': 'Ses cihazı değiştirildi.',
+    'settings.connections': 'Bağlantılar',
+    'settings.networkLead': 'Kısıtlı ağlarda bağlantı kurmak için özel TURN sunucusu kullan.',
+    'settings.languageTime': 'Dil ve Zaman',
+    'settings.languageLead': 'Arayüz dilini ve mesaj saatlerinin gösterimini seç.',
+    'settings.hwaccel': 'Donanım Hızlandırma',
+    'settings.hwaccelDesc': 'Daha akıcı arayüz ve efektler için GPU kullanır. Değişiklik yeniden başlatınca uygulanır.',
+    'settings.ptt': 'Bas-Konuş',
+    'settings.pttDesc': 'Yalnızca SPACE tuşuna basılıyken ses iletir.',
+    'settings.quality': 'Kamera / Ekran Kalitesi',
+    'settings.qualityHigh': 'Yüksek (1080p)',
+    'settings.qualityMedium': 'Orta (720p)',
+    'settings.qualityLow': 'Düşük (480p)',
+    'settings.turnUrl': 'TURN URL / Credentials API',
+    'settings.username': 'Kullanıcı Adı',
+    'settings.password': 'Şifre',
+    'settings.turnHelp': 'Bir kişinin TURN bilgisi girmesi yeterlidir; odadaki diğer katılımcılarla otomatik paylaşılır.',
+    'settings.chooseLanguage': 'Bir dil seç',
+    'settings.timeFormat': 'Zaman formatı',
+    'settings.timeAuto': 'Otomatik',
+    'settings.time12': '12 saatlik',
+    'settings.time24': '24 saatlik',
+    'settings.preview': 'Önizleme',
+    'settings.savedLocally': 'Tercihler bu cihazda saklanır.',
+    'settings.saved': 'Ayarlar kaydedildi!',
+    'settings.hwSaved': 'Donanım hızlandırma tercihi kaydedildi. Yeniden başlatınca etkin olacak.'
+  },
+  en: {
+    'common.settings': 'Settings',
+    'common.settingsShort': 'Settings',
+    'common.close': 'Close',
+    'common.save': 'Save Changes',
+    'common.back': 'Back',
+    'common.cancel': 'Cancel',
+    'common.send': 'Send',
+    'common.sendFile': 'Send File',
+    'common.join': 'Join',
+    'common.create': 'Create',
+    'common.optional': '(optional)',
+    'common.you': 'you',
+    'common.messagePlaceholder': 'Write a message...',
+    'menu.join': 'Join a Server',
+    'menu.joinDesc': 'Enter an existing room',
+    'menu.create': 'Create a Server',
+    'menu.createDesc': 'Start your own room',
+    'menu.friends': 'Friends',
+    'menu.noFriends': 'You do not have any friends yet.',
+    'menu.switchAccount': 'Switch Account',
+    'menu.changeName': 'Change Name',
+    'menu.copyId': 'Copy ID',
+    'menu.invites': 'Invites',
+    'menu.addFriend': 'Add Friend',
+    'menu.selectFriend': 'Select a friend to start messaging.',
+    'menu.friendId': "Your friend's ID",
+    'menu.sendFriendRequest': 'Send Friend Request',
+    'menu.serverId': 'Server ID',
+    'menu.serverName': 'Server Name',
+    'menu.myServer': 'My Server',
+    'menu.gameRoom': 'Game Room',
+    'menu.noiseSuppression': 'RNNoise Noise Suppression',
+    'menu.noiseSuppressionDesc': 'Removes background noise with free, open-source RNNoise AI.',
+    'menu.relay': 'Use Your Computer as Relay',
+    'menu.relayDesc': 'Enable this when WebRTC cannot connect.',
+    'menu.familyFriendly': 'Family Friendly (AI Protection)',
+    'menu.familyFriendlyDesc': 'Uses AI to block profanity and adult content.',
+    'menu.gameMode': 'Game Mode (Lightweight)',
+    'menu.gameModeDesc': 'Reduces RAM/CPU use (15 FPS cap and slower scans). Recommended behind games.',
+    'menu.audioQuality': 'Audio Quality (Bitrate)',
+    'menu.audioQualityDesc': 'Higher values provide clearer audio and use more bandwidth.',
+    'room.users': 'USERS',
+    'room.voiceTest': 'VOICE TEST',
+    'room.chat': 'CHAT',
+    'room.waiting': 'Waiting for Connection',
+    'room.waitingDesc': 'Anyone entering the same room key will appear here.',
+    'share.chooseSource': 'Choose a Screen / Window',
+    'share.systemAudio': 'Share System Audio',
+    'toolbar.voice': 'Voice',
+    'toolbar.deafen': 'Deafen',
+    'toolbar.ptt': 'Talk',
+    'toolbar.screen': 'Screen',
+    'toolbar.board': 'Board',
+    'toolbar.activity': 'Activity',
+    'toolbar.record': 'Record',
+    'toolbar.volume': 'Volume',
+    'toolbar.manual': 'Manual',
+    'toolbar.network': 'Remote',
+    'toolbar.founder': 'Owner',
+    'toolbar.voiceTitle': 'Microphone (M)',
+    'toolbar.deafenTitle': 'Deafen (D)',
+    'toolbar.screenTitle': 'Share Screen (S)',
+    'toolbar.boardTitle': 'Whiteboard (W)',
+    'toolbar.activityTitle': 'Activities (E)',
+    'toolbar.recordTitle': 'Record (R)',
+    'toolbar.volumeTitle': 'Volume Level',
+    'toolbar.manualTitle': 'Add Manual IP',
+    'toolbar.networkTitle': 'Cross-Network (SDP)',
+    'toolbar.founderTitle': 'Owner Settings',
+    'settings.personal': 'Personal Settings',
+    'settings.userSettings': 'USER SETTINGS',
+    'settings.appSettings': 'APP SETTINGS',
+    'settings.general': 'General',
+    'settings.generalLead': 'Manage the appearance and performance of TeamSync.',
+    'settings.voice': 'Voice & Video',
+    'settings.voiceLead': 'Choose microphone and speaker devices, volume levels, and voice behavior.',
+    'settings.microphone': 'Microphone',
+    'settings.speaker': 'Speaker',
+    'settings.defaultMicrophone': 'Windows Default',
+    'settings.defaultSpeaker': 'Windows Default',
+    'settings.micVolume': 'Microphone Volume',
+    'settings.speakerVolume': 'Speaker Volume',
+    'settings.micTest': 'Mic Test',
+    'settings.stopMicTest': 'Stop Test',
+    'settings.micMeter': 'Live microphone level',
+    'settings.micTestHelp': 'Speak during the test; the bars show the real level coming from your microphone.',
+    'settings.micPermissionError': 'The microphone test could not start. Check microphone permission and your device.',
+    'settings.broadcast': 'Broadcast',
+    'settings.broadcastLead': 'Configure screen-share preview and quality behavior.',
+    'settings.showPreviews': 'Show Broadcast Previews',
+    'settings.showPreviewsDesc': 'Shows window previews while choosing the screen you want to share.',
+    'settings.advancedBroadcast': 'Show Advanced Broadcast Settings',
+    'settings.advancedBroadcastDesc': 'Broadcast quality, frame rate, and system audio',
+    'settings.frameRate': 'Broadcast Frame Rate',
+    'settings.shareSystemAudio': 'Share system audio by default',
+    'settings.shareSystemAudioDesc': 'Opens the system-audio option enabled in the screen-share picker.',
+    'settings.previewHidden': 'Preview hidden',
+    'settings.deviceChanged': 'Audio device changed.',
+    'settings.connections': 'Connections',
+    'settings.networkLead': 'Use a custom TURN server to connect through restricted networks.',
+    'settings.languageTime': 'Language & Time',
+    'settings.languageLead': 'Choose the interface language and message time display.',
+    'settings.hwaccel': 'Hardware Acceleration',
+    'settings.hwaccelDesc': 'Uses the GPU for smoother visuals and effects. Applied after restarting the app.',
+    'settings.ptt': 'Push to Talk',
+    'settings.pttDesc': 'Transmits your voice only while the SPACE key is held.',
+    'settings.quality': 'Camera / Screen Quality',
+    'settings.qualityHigh': 'High (1080p)',
+    'settings.qualityMedium': 'Medium (720p)',
+    'settings.qualityLow': 'Low (480p)',
+    'settings.turnUrl': 'TURN URL / Credentials API',
+    'settings.username': 'Username',
+    'settings.password': 'Password',
+    'settings.turnHelp': 'Only one person needs to enter TURN details; they are shared automatically with the room.',
+    'settings.chooseLanguage': 'Choose a language',
+    'settings.timeFormat': 'Time format',
+    'settings.timeAuto': 'Automatic',
+    'settings.time12': '12-hour',
+    'settings.time24': '24-hour',
+    'settings.preview': 'Preview',
+    'settings.savedLocally': 'Preferences are stored on this device.',
+    'settings.saved': 'Settings saved!',
+    'settings.hwSaved': 'Hardware acceleration preference saved. It will apply after restart.'
+  }
+};
+
+// Eski ekranların tamamını tek seferde yeniden yazmadan dil değişimine dahil
+// etmek için yalnızca sabit arayüz metinlerinde çalışan uyumluluk sözlüğü.
+// Sohbet, arkadaş listesi ve kullanıcı adları özellikle kapsam dışıdır.
+const LEGACY_TEXT_EN = {
+  'İptal': 'Cancel',
+  'Kapat': 'Close',
+  'Bağlan': 'Connect',
+  'Kopyala': 'Copy',
+  'Uygula': 'Apply',
+  'Gönder': 'Send',
+  'Reddet': 'Deny',
+  'Kabul Et': 'Accept',
+  'Durdur': 'Stop',
+  'Kontrolü Bırak': 'Release Control',
+  'Manuel Bağlantı': 'Manual Connection',
+  "Arkadaşının IP adresi (veya SDP teklifi/cevabı)": "Your friend's IP address (or SDP offer/answer)",
+  'Çapraz Ağ Bağlantısı': 'Cross-Network Connection',
+  'Aynı ağda değilseniz SDP alışverişi yapın.': 'Exchange SDP details when you are not on the same network.',
+  'Senin Teklifin (arkadaşına gönder):': 'Your Offer (send to your friend):',
+  'Arkadaşının Cevabı:': "Your Friend's Answer:",
+  'Uzaktan Kontrol İsteği': 'Remote Control Request',
+  'Sunucu Katılma İsteği': 'Server Join Request',
+  'sunucuna katılmak istiyor.': 'wants to join your server.',
+  'Birisi bilgisayarınızı kontrol etmek istiyor.': 'Someone wants to control your computer.',
+  'Bilgisayarınız kontrol ediliyor': 'Your computer is being controlled',
+  'Acil kapatma: Ctrl+X ×2': 'Emergency stop: Ctrl+X ×2',
+  'Uzak Masaüstü': 'Remote Desktop',
+  'Siyah imleci hareket ettirin. Kontrolü almak için ekrana tıklayın; bırakmak için ESC.': 'Move the dark cursor. Click the screen to take control; press ESC to release it.',
+  'İzleme modu — kontrol için tıklayın': 'View mode — click to control',
+  'Paylaşan': 'Sharer',
+  'Kurucu Ayarları': 'Owner Settings',
+  'Sadece sunucuyu kuran kişi bu ayarları görebilir.': 'Only the person who created the server can view these settings.',
+  'Sadece Arkadaşlar Katılabilir': 'Friends Only',
+  'Yapay Zeka Koruması (+18/Küfür Engelleyici)': 'AI Protection (Adult Content / Profanity)',
+  'Oyun Modu (Hafif Sürüm)': 'Game Mode (Lightweight)',
+  'Ses Kalitesi (Bitrate)': 'Audio Quality (Bitrate)',
+  'Oyuncu Yönetimi': 'Player Management',
+  'Sunucuda kimse yok.': 'No one is in the server.',
+  'Sistem Sesini de Paylaş': 'Share System Audio',
+  'Ekran / Pencere Seç': 'Choose a Screen / Window',
+  'Beyaz Tahta': 'Whiteboard',
+  'Fırça': 'Brush',
+  'Dikdörtgen': 'Rectangle',
+  'Çember': 'Circle',
+  'Yazı': 'Text',
+  'Temizle': 'Clear',
+  'Etkinlikler': 'Activities',
+  'Hızlı Anket': 'Quick Poll',
+  'Şans Çarkı': 'Lucky Wheel',
+  'Kelime Tahmin': 'Word Guess',
+  'Henüz mesaj yok.': 'No messages yet.',
+  'Arkadaş Seçin': 'Select a Friend',
+  'Dosya Gönder': 'Send File',
+  'Adı Değiştir': 'Change Name',
+  "ID'yi Kopyala": 'Copy ID',
+  'Davetler': 'Invites',
+  'Arkadaş Ekle': 'Add Friend',
+  'Güncelleme Günlüğü': 'Update Log',
+  'İnternet Sunucusu Gecikmesi': 'Internet Server Latency',
+  'Odak Kilidi (yanlışlıkla çıkmayı engeller)': 'Focus Lock (prevents accidental exit)',
+  'Tam Ekran (F)': 'Fullscreen (F)',
+  'Küçült': 'Minimize'
+};
+const LEGACY_TEXT_TR = Object.fromEntries(Object.entries(LEGACY_TEXT_EN).map(([tr, en]) => [en, tr]));
+
+function translateLegacyStaticUI(language, root = document.body) {
+  if (!root) return;
+  const dictionary = language === 'en' ? LEGACY_TEXT_EN : LEGACY_TEXT_TR;
+  const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, .chat-msg, .dm-message, .uname-text, .vtitle';
+  const visitText = node => {
+    const parent = node.parentElement;
+    if (!parent || parent.closest(excludedSelector)) return;
+    const trimmed = node.nodeValue.trim();
+    const translated = dictionary[trimmed];
+    if (!translated) return;
+    node.nodeValue = node.nodeValue.replace(trimmed, translated);
+  };
+  if (root.nodeType === Node.TEXT_NODE) {
+    visitText(root);
+  } else {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) visitText(node);
+  }
+  const elements = root.nodeType === Node.ELEMENT_NODE
+    ? [root, ...root.querySelectorAll('[title], [placeholder]')]
+    : [];
+  elements.forEach(element => {
+    if (element.closest(excludedSelector)) return;
+    ['title', 'placeholder'].forEach(attribute => {
+      const value = element.getAttribute(attribute);
+      if (value && dictionary[value]) element.setAttribute(attribute, dictionary[value]);
+    });
+  });
+}
+
+function getUserLanguage() {
+  const saved = localStorage.getItem(USER_LANGUAGE_KEY);
+  return SUPPORTED_LANGUAGES.includes(saved) ? saved : 'tr';
+}
+
+function t(key) {
+  const lang = getUserLanguage();
+  return (I18N[lang] && I18N[lang][key]) || I18N.tr[key] || key;
+}
+
+function applyUserLanguage(language, persist = true) {
+  const lang = SUPPORTED_LANGUAGES.includes(language) ? language : 'tr';
+  if (persist) localStorage.setItem(USER_LANGUAGE_KEY, lang);
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const value = (I18N[lang] && I18N[lang][el.dataset.i18n]) || I18N.tr[el.dataset.i18n];
+    if (value) el.textContent = value;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const value = (I18N[lang] && I18N[lang][el.dataset.i18nPlaceholder]) || I18N.tr[el.dataset.i18nPlaceholder];
+    if (value) el.placeholder = value;
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const value = (I18N[lang] && I18N[lang][el.dataset.i18nTitle]) || I18N.tr[el.dataset.i18nTitle];
+    if (value) {
+      el.title = value;
+      el.setAttribute('aria-label', value);
+    }
+  });
+  translateLegacyStaticUI(lang);
+  const selectedLanguage = document.querySelector(`input[name="settings-language"][value="${lang}"]`);
+  if (selectedLanguage) selectedLanguage.checked = true;
+  const createName = document.getElementById('create-name');
+  if (createName && [I18N.tr['menu.gameRoom'], I18N.en['menu.gameRoom']].includes(createName.value)) {
+    createName.value = I18N[lang]['menu.gameRoom'];
+  }
+  const selfName = document.querySelector('[data-uid="self"] .uname-text');
+  if (selfName && state.myName) selfName.textContent = `${state.myName} (${t('common.you')})`;
+  updateSettingsTimePreview();
+  setMicTestButtonState(!!state.settingsMicTestActive);
+  populateSettingsAudioDevices();
+}
+
+function formatUserTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const lang = getUserLanguage();
+  const format = localStorage.getItem(USER_TIME_FORMAT_KEY) || 'auto';
+  const options = { hour: '2-digit', minute: '2-digit' };
+  if (format === '12') options.hour12 = true;
+  if (format === '24') options.hour12 = false;
+  const locale = format === 'auto' ? undefined : (lang === 'en' ? 'en-GB' : 'tr-TR');
+  return date.toLocaleTimeString(locale, options);
+}
+
+function updateSettingsTimePreview() {
+  const preview = document.getElementById('settings-time-preview');
+  if (preview) preview.textContent = formatUserTime(new Date());
+}
+
+function readPercentPreference(key, fallback = 100) {
+  const stored = localStorage.getItem(key);
+  if (stored === null || stored === '') return fallback;
+  const value = Number(stored);
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value))) : fallback;
+}
+
+function updateSettingsRange(id, value) {
+  const input = document.getElementById(id);
+  const output = document.getElementById(`${id}-value`);
+  const safeValue = Math.min(100, Math.max(0, Math.round(Number(value) || 0)));
+  if (input) {
+    input.value = String(safeValue);
+    input.style.setProperty('--range-progress', `${safeValue}%`);
+  }
+  if (output) output.value = `${safeValue}%`;
+}
+
+function applyMicrophoneVolume(value, persist = true) {
+  const percent = Math.min(100, Math.max(0, Math.round(Number(value) || 0)));
+  if (persist) localStorage.setItem(USER_MIC_VOLUME_KEY, String(percent));
+  updateSettingsRange('user-mic-volume', percent);
+  if (state.micVolumeGainNode && state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') {
+    state.micVolumeGainNode.gain.setTargetAtTime(percent / 100, state.gateAudioCtx.currentTime, 0.02);
+  }
+}
+
+function applySpeakerVolume(value, persist = true) {
+  const percent = Math.min(100, Math.max(0, Math.round(Number(value) || 0)));
+  if (persist) localStorage.setItem(USER_SPEAKER_VOLUME_KEY, String(percent));
+  state.volume = percent / 100;
+  updateSettingsRange('user-speaker-volume', percent);
+  const roomSlider = document.getElementById('volslider');
+  const roomValue = document.getElementById('volval');
+  if (roomSlider) roomSlider.value = String(percent);
+  if (roomValue) roomValue.textContent = `${percent}%`;
+  state.peers.forEach((peer, peerId) => applyPeerVolume(peerId));
+}
+
+function fillAudioDeviceSelect(select, devices, kind, defaultLabel, savedValue) {
+  if (!select) return;
+  select.innerHTML = '';
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = defaultLabel;
+  select.appendChild(defaultOption);
+  devices.filter(device => device.kind === kind && device.deviceId && device.deviceId !== 'default').forEach((device, index) => {
+    const option = document.createElement('option');
+    option.value = device.deviceId;
+    option.textContent = device.label || `${kind === 'audioinput' ? t('settings.microphone') : t('settings.speaker')} ${index + 1}`;
+    select.appendChild(option);
+  });
+  if (savedValue && [...select.options].some(option => option.value === savedValue)) select.value = savedValue;
+}
+
+async function populateSettingsAudioDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const savedMic = localStorage.getItem(USER_MIC_DEVICE_KEY) || document.getElementById('mic-select')?.value || '';
+    const savedSpeaker = localStorage.getItem('teamsync_speaker_id') || document.getElementById('speaker-select')?.value || '';
+    fillAudioDeviceSelect(document.getElementById('user-mic-select'), devices, 'audioinput', t('settings.defaultMicrophone'), savedMic);
+    fillAudioDeviceSelect(document.getElementById('user-speaker-select'), devices, 'audiooutput', t('settings.defaultSpeaker'), savedSpeaker);
+  } catch (error) {
+    console.warn('Ayarlar ses cihazları listelenemedi:', error);
+  }
+}
+
+function updateSettingsMicMeter(percent = 0) {
+  const meter = document.getElementById('user-mic-meter');
+  if (!meter) return;
+  const safePercent = state.settingsMicTestActive ? Math.min(100, Math.max(0, percent)) : 0;
+  const bars = [...meter.children];
+  const activeCount = Math.round((safePercent / 100) * bars.length);
+  bars.forEach((bar, index) => {
+    bar.classList.toggle('active', index < activeCount);
+    bar.classList.toggle('hot', index < activeCount && index >= Math.round(bars.length * 0.82));
+  });
+  meter.setAttribute('aria-valuenow', String(Math.round(safePercent)));
+}
+
+function setMicTestButtonState(active) {
+  const button = document.getElementById('user-mic-test');
+  if (!button) return;
+  button.classList.toggle('testing', active);
+  button.textContent = t(active ? 'settings.stopMicTest' : 'settings.micTest');
+}
+
+function stopSettingsMicTest() {
+  state.settingsMicTestRequestId = (state.settingsMicTestRequestId || 0) + 1;
+  state.settingsMicTestActive = false;
+  setMicTestButtonState(false);
+  updateSettingsMicMeter(0);
+  if (!state.settingsMicTestOwnsStream) return;
+  state.settingsMicTestOwnsStream = false;
+  state.audioSetupGeneration++;
+  if (state.rawMicStream) state.rawMicStream.getTracks().forEach(track => track.stop());
+  if (state.localStream) state.localStream.getTracks().forEach(track => track.stop());
+  if (state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') {
+    try { state.gateAudioCtx.close(); } catch (error) {}
+  }
+  if (state.vuInterval) clearInterval(state.vuInterval);
+  state.vuInterval = null;
+  state.rawMicStream = null;
+  state.localStream = null;
+  state.processedStream = null;
+  state.vuAnalyser = null;
+  state.uiAnalyser = null;
+  state.gateGainNode = null;
+  state.micVolumeGainNode = null;
+}
+
+async function toggleSettingsMicTest() {
+  if (state.settingsMicTestActive) {
+    stopSettingsMicTest();
+    return;
+  }
+  const ownedStream = !state.room && !state.rawMicStream;
+  const requestId = (state.settingsMicTestRequestId || 0) + 1;
+  state.settingsMicTestRequestId = requestId;
+  state.settingsMicTestOwnsStream = ownedStream;
+  try {
+    if (!state.vuAnalyser) await setupLocalAudio();
+    if (state.settingsMicTestRequestId !== requestId) return;
+    state.settingsMicTestActive = true;
+    setMicTestButtonState(true);
+    setupVUMeter();
+  } catch (error) {
+    if (state.settingsMicTestRequestId !== requestId) return;
+    state.settingsMicTestOwnsStream = false;
+    showToast(t('settings.micPermissionError'), 'warn');
+  }
+}
+
+function setSettingsPanel(name) {
+  document.querySelectorAll('[data-settings-panel]').forEach(button => {
+    button.classList.toggle('active', button.dataset.settingsPanel === name);
+  });
+  document.querySelectorAll('[data-settings-content]').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.settingsContent === name);
+  });
+  if (name !== 'voice' && state.settingsMicTestActive) stopSettingsMicTest();
+}
+
+function openUserSettings(panel = 'general') {
+  const modal = document.getElementById('settings-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  setSettingsPanel(panel);
+
+  const profileName = document.getElementById('settings-profile-name');
+  const profile = (() => {
+    try { return JSON.parse(localStorage.getItem('teamsync_profile') || '{}'); } catch (e) { return {}; }
+  })();
+  if (profileName) profileName.textContent = (typeof state !== 'undefined' && state.myName) || profile.name || 'TeamSync';
+
+  document.getElementById('user-turn-url').value = localStorage.getItem('teamsync_turn_url') || '';
+  document.getElementById('user-turn-user').value = localStorage.getItem('teamsync_turn_user') || '';
+  document.getElementById('user-turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
+  document.getElementById('user-settings-ptt').checked = localStorage.getItem('teamsync_ptt_enabled') === '1';
+  document.getElementById('user-quality-select').value = localStorage.getItem(USER_QUALITY_KEY) || document.getElementById('quality-select').value || 'medium';
+  document.getElementById('user-stream-fps').value = localStorage.getItem(USER_STREAM_FPS_KEY) || '30';
+  document.getElementById('user-stream-previews').checked = localStorage.getItem(USER_STREAM_PREVIEWS_KEY) !== '0';
+  document.getElementById('user-share-system-audio').checked = localStorage.getItem(USER_SHARE_SYSTEM_AUDIO_KEY) !== '0';
+  applyMicrophoneVolume(readPercentPreference(USER_MIC_VOLUME_KEY), false);
+  applySpeakerVolume(readPercentPreference(USER_SPEAKER_VOLUME_KEY), false);
+  populateSettingsAudioDevices();
+
+  const language = getUserLanguage();
+  const languageRadio = document.querySelector(`input[name="settings-language"][value="${language}"]`);
+  if (languageRadio) languageRadio.checked = true;
+  const timeFormat = localStorage.getItem(USER_TIME_FORMAT_KEY) || 'auto';
+  const timeRadio = document.querySelector(`input[name="settings-time-format"][value="${timeFormat}"]`);
+  if (timeRadio) timeRadio.checked = true;
+  updateSettingsTimePreview();
+
+  const hwEl = document.getElementById('user-settings-hwaccel');
+  if (hwEl && window.electronAPI && window.electronAPI.getHardwareAcceleration) {
+    window.electronAPI.getHardwareAcceleration().then(on => { hwEl.checked = !!on; }).catch(() => {});
+  }
+}
+
+function saveUserSettings() {
+  const turnUrl = document.getElementById('user-turn-url').value.trim();
+  const turnUser = document.getElementById('user-turn-user').value.trim();
+  const turnPass = document.getElementById('user-turn-pass').value.trim();
+  const pttEnabled = document.getElementById('user-settings-ptt').checked;
+  const quality = document.getElementById('user-quality-select').value;
+  const streamFps = document.getElementById('user-stream-fps').value;
+  const showStreamPreviews = document.getElementById('user-stream-previews').checked;
+  const shareSystemAudio = document.getElementById('user-share-system-audio').checked;
+
+  localStorage.setItem('teamsync_turn_url', turnUrl);
+  localStorage.setItem('teamsync_turn_user', turnUser);
+  localStorage.setItem('teamsync_turn_pass', turnPass);
+  localStorage.setItem('teamsync_ptt_enabled', pttEnabled ? '1' : '0');
+  localStorage.setItem(USER_QUALITY_KEY, quality);
+  localStorage.setItem(USER_STREAM_FPS_KEY, streamFps);
+  localStorage.setItem(USER_STREAM_PREVIEWS_KEY, showStreamPreviews ? '1' : '0');
+  localStorage.setItem(USER_SHARE_SYSTEM_AUDIO_KEY, shareSystemAudio ? '1' : '0');
+  applyMicrophoneVolume(document.getElementById('user-mic-volume').value, true);
+  applySpeakerVolume(document.getElementById('user-speaker-volume').value, true);
+
+  // Oda içindeki eski çalışma yolları bu alanları kullanıyor; görünür ayar
+  // merkezindeki değerlerle eşit tutarak mevcut ses/ağ davranışını koru.
+  document.getElementById('turn-url').value = turnUrl;
+  document.getElementById('turn-user').value = turnUser;
+  document.getElementById('turn-pass').value = turnPass;
+  document.getElementById('settings-ptt').checked = pttEnabled;
+  document.getElementById('quality-select').value = quality;
+  if (typeof state !== 'undefined' && state.room) applyPttMode(pttEnabled);
+
+  const status = document.getElementById('settings-save-status');
+  if (status) {
+    status.textContent = t('settings.saved');
+    setTimeout(() => {
+      if (status) status.textContent = t('settings.savedLocally');
+    }, 1800);
+  }
+  showToast(t('settings.saved'), 'ok');
+}
+
+function initUserSettings() {
+  // Ayarlar hem ana menüden hem oda içinden açılır. Modal başlangıçta #app
+  // altında tanımlı; #app ana menüde gizli olduğundan body'ye portal edilmelidir.
+  const settingsModal = document.getElementById('settings-modal');
+  if (settingsModal && settingsModal.parentElement !== document.body) document.body.appendChild(settingsModal);
+  applyUserLanguage(getUserLanguage(), false);
+  const quality = localStorage.getItem(USER_QUALITY_KEY);
+  if (quality && document.getElementById('quality-select')) document.getElementById('quality-select').value = quality;
+  applyMicrophoneVolume(readPercentPreference(USER_MIC_VOLUME_KEY), false);
+  applySpeakerVolume(readPercentPreference(USER_SPEAKER_VOLUME_KEY), false);
+
+  document.querySelectorAll('[data-settings-panel]').forEach(button => {
+    button.addEventListener('click', () => setSettingsPanel(button.dataset.settingsPanel));
+  });
+  document.getElementById('menu-settings')?.addEventListener('click', () => openUserSettings('general'));
+  document.getElementById('settings')?.addEventListener('click', () => openUserSettings('general'));
+  document.getElementById('settings-v2-close')?.addEventListener('click', () => {
+    stopSettingsMicTest();
+    document.getElementById('settings-modal').classList.add('hidden');
+  });
+  document.getElementById('settings-v2-save')?.addEventListener('click', saveUserSettings);
+  document.getElementById('user-mic-test')?.addEventListener('click', toggleSettingsMicTest);
+  document.getElementById('user-mic-volume')?.addEventListener('input', event => {
+    applyMicrophoneVolume(event.target.value, true);
+  });
+  document.getElementById('user-speaker-volume')?.addEventListener('input', event => {
+    applySpeakerVolume(event.target.value, true);
+  });
+  document.getElementById('user-mic-select')?.addEventListener('change', async event => {
+    const value = event.target.value;
+    if (value) localStorage.setItem(USER_MIC_DEVICE_KEY, value);
+    else localStorage.removeItem(USER_MIC_DEVICE_KEY);
+    const roomSelect = document.getElementById('mic-select');
+    if (roomSelect && [...roomSelect.options].some(option => option.value === value)) roomSelect.value = value;
+    if (state.room || state.rawMicStream) {
+      await setupLocalAudio();
+      setupVUMeter();
+    }
+    showToast(t('settings.deviceChanged'), 'info');
+  });
+  document.getElementById('user-speaker-select')?.addEventListener('change', event => {
+    const value = event.target.value;
+    if (value) localStorage.setItem('teamsync_speaker_id', value);
+    else localStorage.removeItem('teamsync_speaker_id');
+    const roomSelect = document.getElementById('speaker-select');
+    if (roomSelect && [...roomSelect.options].some(option => option.value === value)) roomSelect.value = value;
+    applySpeakerToAll();
+    showToast(t('settings.deviceChanged'), 'info');
+  });
+  document.getElementById('user-broadcast-advanced-toggle')?.addEventListener('click', event => {
+    const button = event.currentTarget;
+    const expanded = button.getAttribute('aria-expanded') !== 'true';
+    button.setAttribute('aria-expanded', String(expanded));
+    document.getElementById('user-broadcast-advanced')?.classList.toggle('hidden', !expanded);
+  });
+
+  document.querySelectorAll('input[name="settings-language"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) applyUserLanguage(radio.value, true);
+    });
+  });
+  document.querySelectorAll('input[name="settings-time-format"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      localStorage.setItem(USER_TIME_FORMAT_KEY, radio.value);
+      updateSettingsTimePreview();
+    });
+  });
+
+  const hwEl = document.getElementById('user-settings-hwaccel');
+  if (hwEl && window.electronAPI && window.electronAPI.setHardwareAcceleration) {
+    hwEl.addEventListener('change', e => {
+      window.electronAPI.setHardwareAcceleration(e.target.checked);
+      showToast(t('settings.hwSaved'), 'info');
+    });
+  }
+  if (navigator.mediaDevices && !state.settingsDeviceChangeHooked) {
+    state.settingsDeviceChangeHooked = true;
+    navigator.mediaDevices.addEventListener('devicechange', populateSettingsAudioDevices);
+  }
+  if (!state.legacyI18nObserver) {
+    state.legacyI18nObserver = new MutationObserver(mutations => {
+      const language = getUserLanguage();
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => translateLegacyStaticUI(language, node));
+      });
+    });
+    state.legacyI18nObserver.observe(document.body, { childList: true, subtree: true });
+  }
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Escape' && !document.getElementById('settings-modal')?.classList.contains('hidden')) {
+      stopSettingsMicTest();
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+  });
+}
+
+window.t = t;
+window.applyUserLanguage = applyUserLanguage;
+window.formatUserTime = formatUserTime;
+window.openUserSettings = openUserSettings;
+document.addEventListener('DOMContentLoaded', initUserSettings);
 
 function bindUI() {
   const mic = document.getElementById('mic');
@@ -5760,10 +6511,7 @@ function bindUI() {
 
   vol.addEventListener('click', () => volpop.classList.toggle('hidden'));
   volslider.addEventListener('input', (e) => {
-    state.volume = parseInt(e.target.value) / 100;
-    volval.textContent = e.target.value + '%';
-    // Ana ses, kişi bazlı ses ayarlarını ezmeden uygulanır (çarpılır).
-    state.peers.forEach((p, id) => applyPeerVolume(id));
+    applySpeakerVolume(e.target.value, true);
   });
 
   const shareCancel = document.getElementById('share-cancel');
@@ -6335,11 +7083,16 @@ function attachVideo(stream) {
 async function showShareModal() {
   const sources = await window.electronAPI.getSources();
   const wrap = document.getElementById('sources');
+  const showPreviews = localStorage.getItem(USER_STREAM_PREVIEWS_KEY) !== '0';
+  const shareAudio = document.getElementById('share-audio');
+  if (shareAudio) shareAudio.checked = localStorage.getItem(USER_SHARE_SYSTEM_AUDIO_KEY) !== '0';
   wrap.innerHTML = '';
   sources.forEach(s => {
     const div = document.createElement('div');
-    div.className = 'src';
-    div.innerHTML = `<img src="${s.thumbnail}" /><div>${escapeHtml(s.name)}</div>`;
+    div.className = `src${showPreviews ? '' : ' preview-hidden'}`;
+    div.innerHTML = showPreviews
+      ? `<img src="${s.thumbnail}" alt="" /><div>${escapeHtml(s.name)}</div>`
+      : `<div class="source-preview-placeholder"><span>▣</span><small>${escapeHtml(t('settings.previewHidden'))}</small></div><div>${escapeHtml(s.name)}</div>`;
     div.addEventListener('click', () => {
       document.getElementById('share-modal').classList.add('hidden');
       startScreenShare(s.id);
@@ -6353,22 +7106,30 @@ async function startScreenShare(sourceId) {
   try {
     const consts = getVideoConstraints();
     const shareAudio = document.getElementById('share-audio').checked;
+    const preferredFps = Number(localStorage.getItem(USER_STREAM_FPS_KEY)) || consts.frameRate.ideal || 30;
+    const frameRate = state.gameMode ? 15 : Math.min(60, Math.max(15, preferredFps));
     if (window.electronAPI && window.electronAPI.setScreenShareSource) {
       window.electronAPI.setScreenShareSource(sourceId);
     }
     state.screenStream = await navigator.mediaDevices.getDisplayMedia({
       audio: shareAudio,
-      video: { frameRate: state.gameMode ? 15 : (consts.frameRate.ideal || 30) }
+      video: {
+        width: consts.width,
+        height: consts.height,
+        frameRate: { ideal: frameRate, max: frameRate }
+      }
     });
     const track = state.screenStream.getVideoTracks()[0];
     state.peers.forEach(peer => {
       const sender = getVideoSender(peer.pc);
-      if (sender) sender.replaceTrack(track);
+      if (sender) {
+        sender.replaceTrack(track).then(() => applyVideoQuality(sender)).catch(console.error);
+      }
     });
     state.isSharing = true;
     document.getElementById('share').classList.add('off');
     broadcast({ type: 'sharing', sharing: true });
-    addVideoCard('self', state.myName + ' (sen)', attachVideo(state.screenStream), true);
+    addVideoCard('self', `${state.myName} (${t('common.you')})`, attachVideo(state.screenStream), true);
     track.onended = () => stopScreenShare();
   } catch (err) {
     alert('Ekran paylaşım hatası: ' + err.message);
@@ -7134,7 +7895,7 @@ function disconnectApp() {
     const empty = document.createElement('div');
     empty.id = 'empty-state';
     empty.className = 'empty';
-    empty.innerHTML = '<h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49"></path><path d="M7.76 16.24a6 6 0 0 1 0-8.49"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path></svg> Bağlantı Bekleniyor</h2><p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>';
+    empty.innerHTML = `<h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49"></path><path d="M7.76 16.24a6 6 0 0 1 0-8.49"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path></svg> <span data-i18n="room.waiting">${escapeHtml(t('room.waiting'))}</span></h2><p data-i18n="room.waitingDesc">${escapeHtml(t('room.waitingDesc'))}</p>`;
     grid.prepend(empty);
   }
   

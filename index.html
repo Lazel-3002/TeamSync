@@ -253,27 +253,31 @@
             <div class="profile-info">
               <div class="profile-name">
                 <span id="display-name" class="menu-username"></span>
-                <button id="btn-edit-name" class="icon-btn" title="Adı Değiştir" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
+                <button id="btn-edit-name" class="icon-btn" title="Adı Değiştir" data-i18n-title="menu.changeName" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></button>
               </div>
               <div class="profile-id-row">
                 <span class="muted" style="font-size:11px;">ID: </span>
                 <span id="my-friend-id" class="menu-id-value">------</span>
-                <button id="btn-copy-friend-id" class="icon-btn sm" title="ID'yi Kopyala" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                <button id="btn-copy-friend-id" class="icon-btn sm" title="ID'yi Kopyala" data-i18n-title="menu.copyId" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
               </div>
-              <button id="btn-logout" class="btn-sec btn-sm" style="margin-top: 8px; font-size: 11px; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 6px; color: var(--txt-mut); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; justify-content:center; gap:4px;"><img src="assets/icon.png" width="12" height="12" style="border-radius:3px; vertical-align:-2px;" alt="" /> Hesap Değiştir</button>
+              <button id="btn-logout" class="btn-sec btn-sm" style="margin-top: 8px; font-size: 11px; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.15); background: transparent; border-radius: 6px; color: var(--txt-mut); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; justify-content:center; gap:4px;"><img src="assets/icon.png" width="12" height="12" style="border-radius:3px; vertical-align:-2px;" alt="" /> <span data-i18n="menu.switchAccount">Hesap Değiştir</span></button>
+              <button id="menu-settings" class="btn-sec btn-sm menu-settings-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.05a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.05A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.05a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.4 9c.24.61.84 1 1.5 1H21a2 2 0 1 1 0 4h-.05c-.66 0-1.26.39-1.55 1z"></path></svg>
+                <span data-i18n="common.settings">Ayarlar</span>
+              </button>
             </div>
           </div>
 
           <div class="menu-main-actions">
             <button id="btn-show-join" class="action-card sec">
               <div class="ac-icon" style="display:flex; align-items:center; justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></div>
-              <div class="ac-text">Sunucuya Katıl</div>
-              <div class="ac-sub">Bir odaya giriş yap</div>
+              <div class="ac-text" data-i18n="menu.join">Sunucuya Katıl</div>
+              <div class="ac-sub" data-i18n="menu.joinDesc">Bir odaya giriş yap</div>
             </button>
             <button id="btn-show-create" class="action-card pri">
               <div class="ac-icon" style="display:flex; align-items:center; justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></div>
-              <div class="ac-text">Sunucu Oluştur</div>
-              <div class="ac-sub">Kendi odanı kur</div>
+              <div class="ac-text" data-i18n="menu.create">Sunucu Oluştur</div>
+              <div class="ac-sub" data-i18n="menu.createDesc">Kendi odanı kur</div>
             </button>
           </div>
         </div>
@@ -281,16 +285,16 @@
         <div class="menu-middle">
           <div class="menu-friends-section">
             <div class="menu-friends-header">
-              <h3 class="menu-friends-title" style="display:flex; align-items:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Arkadaşlar</h3>
+              <h3 class="menu-friends-title" style="display:flex; align-items:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> <span data-i18n="menu.friends">Arkadaşlar</span></h3>
               <div class="menu-friends-actions">
-                <button id="btn-show-invites" class="icon-btn has-badge" title="Davetler" style="display:flex; align-items:center; justify-content:center;">
+                <button id="btn-show-invites" class="icon-btn has-badge" title="Davetler" data-i18n-title="menu.invites" style="display:flex; align-items:center; justify-content:center;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg> <span id="invite-badge" class="badge">0</span>
                 </button>
-                <button id="btn-show-add-friend" class="icon-btn" title="Arkadaş Ekle" style="display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg></button>
+                <button id="btn-show-add-friend" class="icon-btn" title="Arkadaş Ekle" data-i18n-title="menu.addFriend" style="display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg></button>
               </div>
             </div>
             <ul id="friends-list" class="menu-friends-list">
-              <li class="muted menu-empty-friends">Henüz hiç arkadaşın yok.</li>
+              <li class="muted menu-empty-friends" data-i18n="menu.noFriends">Henüz hiç arkadaşın yok.</li>
             </ul>
           </div>
         </div>
@@ -304,41 +308,41 @@
           </div>
           <div id="dm-messages" class="dm-messages">
             <!-- Messages go here -->
-            <div class="muted" style="text-align:center; margin-top:50px;">Mesajlaşmaya başlamak için bir arkadaş seç.</div>
+            <div class="muted" style="text-align:center; margin-top:50px;" data-i18n="menu.selectFriend">Mesajlaşmaya başlamak için bir arkadaş seç.</div>
           </div>
           <div class="dm-input-area">
             <input type="file" id="dm-file-input" class="hidden" accept="image/*,application/pdf" />
-            <button id="dm-btn-file" title="Dosya Gönder" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
-            <input id="dm-input" type="text" placeholder="Mesaj yaz..." autocomplete="off" />
-            <button id="dm-btn-send" title="Gönder" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+            <button id="dm-btn-file" title="Dosya Gönder" data-i18n-title="common.sendFile" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
+            <input id="dm-input" type="text" data-i18n-placeholder="common.messagePlaceholder" placeholder="Mesaj yaz..." autocomplete="off" />
+            <button id="dm-btn-send" title="Gönder" data-i18n-title="common.send" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
           </div>
         </div>
       </div>
 
       <!-- Adım 2A: Arkadaş Ekle -->
       <div id="step-add-friend" class="hidden">
-        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Geri</button>
-        <label>Arkadaşının ID'si</label>
+        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> <span data-i18n="common.back">Geri</span></button>
+        <label data-i18n="menu.friendId">Arkadaşının ID'si</label>
         <input id="friend-id-input" type="text" placeholder="Örn: KNK-A1B2C3D4" />
-        <button id="btn-add-friend" class="btn-pri" style="margin-top: 10px;">Arkadaşlık İsteği Gönder</button>
+        <button id="btn-add-friend" class="btn-pri" style="margin-top: 10px;" data-i18n="menu.sendFriendRequest">Arkadaşlık İsteği Gönder</button>
       </div>
 
       <!-- Adım 3A: Katıl -->
       <div id="step-join" class="hidden">
-        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Geri</button>
-        <label>Sunucu ID</label>
+        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> <span data-i18n="common.back">Geri</span></button>
+        <label data-i18n="menu.serverId">Sunucu ID</label>
         <input id="join-id" type="text" placeholder="Örn: A7X9B2" />
         
-        <label>Şifre <span class="muted">(opsiyonel)</span></label>
+        <label><span data-i18n="settings.password">Şifre</span> <span class="muted" data-i18n="common.optional">(opsiyonel)</span></label>
         <input id="join-password" type="password" placeholder="•••••" />
         
         <div class="premium-option" onclick="document.getElementById('join-useAI').click()">
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-              RNNoise Gürültü Engelleme
+              <span data-i18n="menu.noiseSuppression">RNNoise Gürültü Engelleme</span>
             </div>
-            <div class="premium-option-desc">Ücretsiz, açık kaynak RNNoise AI ile arka plan seslerini temizler.</div>
+            <div class="premium-option-desc" data-i18n="menu.noiseSuppressionDesc">Ücretsiz, açık kaynak RNNoise AI ile arka plan seslerini temizler.</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
             <input type="checkbox" id="join-useAI" checked />
@@ -350,9 +354,9 @@
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-              Sunucu Bilgisayarınız Olsun (Röle)
+              <span data-i18n="menu.relay">Sunucu Bilgisayarınız Olsun (Röle)</span>
             </div>
-            <div class="premium-option-desc">WebRTC bağlanmıyorsa bunu açın (%100 Çözer).</div>
+            <div class="premium-option-desc" data-i18n="menu.relayDesc">WebRTC bağlanmıyorsa bunu açın (%100 Çözer).</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
             <input type="checkbox" id="join-useRelay" />
@@ -360,19 +364,19 @@
           </label>
         </div>
 
-        <button id="btn-join">Katıl</button>
+        <button id="btn-join" data-i18n="common.join">Katıl</button>
       </div>
 
       <!-- Adım 3B: Oluştur -->
       <div id="step-create" class="hidden">
-        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Geri</button>
+        <button class="btn-back btn-sec btn-sm" style="margin-bottom:10px; padding:4px 8px; background:transparent; border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> <span data-i18n="common.back">Geri</span></button>
         <div class="create-fields">
           <div class="create-field">
-            <label for="create-name">Sunucu Adı</label>
-            <input id="create-name" type="text" placeholder="Benim Sunucum" value="Oyun Odası" />
+            <label for="create-name" data-i18n="menu.serverName">Sunucu Adı</label>
+            <input id="create-name" type="text" data-i18n-placeholder="menu.myServer" placeholder="Benim Sunucum" value="Oyun Odası" />
           </div>
           <div class="create-field">
-            <label for="create-password">Şifre <span class="muted">(opsiyonel)</span></label>
+            <label for="create-password"><span data-i18n="settings.password">Şifre</span> <span class="muted" data-i18n="common.optional">(opsiyonel)</span></label>
             <input id="create-password" type="password" placeholder="•••••" />
           </div>
         </div>
@@ -382,9 +386,9 @@
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-              RNNoise Gürültü Engelleme
+              <span data-i18n="menu.noiseSuppression">RNNoise Gürültü Engelleme</span>
             </div>
-            <div class="premium-option-desc">Ücretsiz, açık kaynak RNNoise AI ile arka plan seslerini temizler.</div>
+            <div class="premium-option-desc" data-i18n="menu.noiseSuppressionDesc">Ücretsiz, açık kaynak RNNoise AI ile arka plan seslerini temizler.</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
             <input type="checkbox" id="create-useAI" checked />
@@ -396,9 +400,9 @@
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              Aile Dostu (Yapay Zeka Koruması)
+              <span data-i18n="menu.familyFriendly">Aile Dostu (Yapay Zeka Koruması)</span>
             </div>
-            <div class="premium-option-desc">Küfürleri ve +18 içerikleri yapay zekayla engeller. Açıldığında otomatik iner.</div>
+            <div class="premium-option-desc" data-i18n="menu.familyFriendlyDesc">Küfürleri ve +18 içerikleri yapay zekayla engeller. Açıldığında otomatik iner.</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
             <input type="checkbox" id="create-useSFW" />
@@ -409,9 +413,9 @@
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-              Oyun Modu (Hafif Sürüm)
+              <span data-i18n="menu.gameMode">Oyun Modu (Hafif Sürüm)</span>
             </div>
-            <div class="premium-option-desc">RAM/CPU kullanımını minimize eder (15FPS kilit, yavaş tarama). Oyun arkasında önerilir.</div>
+            <div class="premium-option-desc" data-i18n="menu.gameModeDesc">RAM/CPU kullanımını azaltır (15 FPS kilit, yavaş tarama). Oyun arkasında önerilir.</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
             <input type="checkbox" id="create-gameMode" />
@@ -423,9 +427,9 @@
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-              Sunucu Bilgisayarınız Olsun (Röle)
+              <span data-i18n="menu.relay">Sunucu Bilgisayarınız Olsun (Röle)</span>
             </div>
-            <div class="premium-option-desc">WebRTC bağlanmıyorsa bunu açın (%100 Çözer).</div>
+            <div class="premium-option-desc" data-i18n="menu.relayDesc">WebRTC bağlanmıyorsa bunu açın (%100 Çözer).</div>
           </div>
           <label class="switch" onclick="event.stopPropagation()">
             <input type="checkbox" id="create-useRelay" />
@@ -437,9 +441,9 @@
           <div class="premium-option-info">
             <div class="premium-option-title">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
-              Ses Kalitesi (Bitrate)
+              <span data-i18n="menu.audioQuality">Ses Kalitesi (Bitrate)</span>
             </div>
-            <div class="premium-option-desc">Yüksek değer = daha net ses, daha çok internet. Sonradan Kurucu Ayarları'ndan değiştirilebilir.</div>
+            <div class="premium-option-desc" data-i18n="menu.audioQualityDesc">Yüksek değer daha net ses ve daha fazla internet kullanımı demektir.</div>
           </div>
           <select id="create-bitrate" class="quality-select" style="min-width:130px;">
             <option value="32">32 kbps (Düşük)</option>
@@ -452,7 +456,7 @@
         </div>
         </div>
 
-        <button id="btn-create">Oluştur</button>
+        <button id="btn-create" data-i18n="common.create">Oluştur</button>
       </div>
       <p id="my-ip" class="hint"></p>
       <p class="hint" style="color:var(--ok); margin-top:0; display:flex; align-items:center; justify-content:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg> İnternet üzerinden bağlantı aktif</p>
@@ -467,10 +471,10 @@
         <button id="leave" class="leave" style="display:flex; align-items:center; justify-content:center; padding:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
 
-      <div class="lbl">KULLANICILAR</div>
+      <div class="lbl" data-i18n="room.users">KULLANICILAR</div>
       <ul id="users" class="users"></ul>
 
-      <div class="lbl">SES TESTİ</div>
+      <div class="lbl" data-i18n="room.voiceTest">SES TESTİ</div>
       <div class="vu">
         <div id="vu" class="vu-bar"></div>
       </div>
@@ -495,13 +499,13 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Yankı Kalkanı <span style="opacity:0.6;">(hoparlörden dinliyorsan)</span>
       </label>
 
-      <div class="lbl">SOHBET</div>
+      <div class="lbl" data-i18n="room.chat">SOHBET</div>
       <div class="chat">
         <div id="msgs" class="msgs"></div>
         <form id="cform" class="cform">
           <input type="file" id="finput" class="hidden" />
           <button type="button" id="fbtn" title="Dosya Gönder" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
-          <input id="cinput" placeholder="Mesaj yaz..." autocomplete="off" />
+          <input id="cinput" data-i18n-placeholder="common.messagePlaceholder" placeholder="Mesaj yaz..." autocomplete="off" />
           <button type="submit" id="csubmit" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
         </form>
       </div>
@@ -527,8 +531,8 @@
       </div>
       <div id="grid" class="grid">
         <div id="empty-state" class="empty">
-          <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49"></path><path d="M7.76 16.24a6 6 0 0 1 0-8.49"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path></svg> Bağlantı Bekleniyor</h2>
-          <p>Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>
+          <h2><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49"></path><path d="M7.76 16.24a6 6 0 0 1 0-8.49"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path></svg> <span data-i18n="room.waiting">Bağlantı Bekleniyor</span></h2>
+          <p data-i18n="room.waitingDesc">Aynı oda anahtarını yazan biri bağlanınca burada görünecek.</p>
         </div>
         
         <div id="wb-card" class="vcard hidden">
@@ -1339,67 +1343,67 @@
       </div>
     <div class="bar">
       <div class="bar-group">
-        <button id="mic" class="btn" title="Mikrofon (M)">
+        <button id="mic" class="btn" title="Mikrofon (M)" data-i18n-title="toolbar.voiceTitle">
           <svg class="icon icon-on" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
           <svg class="icon icon-off" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-          <span class="lbl">Ses</span>
+          <span class="lbl" data-i18n="toolbar.voice">Ses</span>
         </button>
-        <button id="deaf" class="btn" title="Sağırlaştır (D)">
+        <button id="deaf" class="btn" title="Sağırlaştır (D)" data-i18n-title="toolbar.deafenTitle">
           <svg class="icon icon-on" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>
           <svg class="icon icon-off" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>
-          <span class="lbl">Sağır</span>
+          <span class="lbl" data-i18n="toolbar.deafen">Sağır</span>
         </button>
-        <button id="ptt" class="btn ptt hidden" title="Bas-Konuş">
+        <button id="ptt" class="btn ptt hidden" title="Bas-Konuş" data-i18n-title="settings.ptt">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><line x1="9" x2="15" y1="12" y2="12"/></svg>
-          <span class="lbl">Bas</span>
+          <span class="lbl" data-i18n="toolbar.ptt">Bas</span>
         </button>
       </div>
 
       <div class="bar-group center-group">
-        <button id="share" class="btn" title="Ekran Paylaş (S)">
+        <button id="share" class="btn" title="Ekran Paylaş (S)" data-i18n-title="toolbar.screenTitle">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
-          <span class="lbl">Ekran</span>
+          <span class="lbl" data-i18n="toolbar.screen">Ekran</span>
         </button>
-        <button id="wb-btn" class="btn" title="Beyaz Tahta (W)">
+        <button id="wb-btn" class="btn" title="Beyaz Tahta (W)" data-i18n-title="toolbar.boardTitle">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-          <span class="lbl">Tahta</span>
+          <span class="lbl" data-i18n="toolbar.board">Tahta</span>
         </button>
-        <button id="act-btn" class="btn" title="Etkinlikler (E)">
+        <button id="act-btn" class="btn" title="Etkinlikler (E)" data-i18n-title="toolbar.activityTitle">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 3.86-8.86c.41-.53.96-.86 1.57-.96h3.4v3.4c-.1.61-.43 1.16-.96 1.57A22 22 0 0 1 12 15z"/></svg>
-          <span class="lbl">Etkinlik</span>
+          <span class="lbl" data-i18n="toolbar.activity">Etkinlik</span>
         </button>
-        <button id="rec" class="btn" title="Kayıt (R)">
+        <button id="rec" class="btn" title="Kayıt (R)" data-i18n-title="toolbar.recordTitle">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
-          <span class="lbl">Kayıt</span>
+          <span class="lbl" data-i18n="toolbar.record">Kayıt</span>
         </button>
       </div>
 
       <div class="bar-group">
         <div class="vol-wrap">
-          <button id="vol" class="btn" title="Ses Seviyesi">
+          <button id="vol" class="btn" title="Ses Seviyesi" data-i18n-title="toolbar.volumeTitle">
             <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-            <span class="lbl">Düzey</span>
+            <span class="lbl" data-i18n="toolbar.volume">Düzey</span>
           </button>
           <div id="volpop" class="pop hidden">
             <input id="volslider" type="range" min="0" max="100" value="100" />
             <span id="volval">100%</span>
           </div>
         </div>
-        <button id="addip" class="btn" title="Manuel IP Ekle">
+        <button id="addip" class="btn" title="Manuel IP Ekle" data-i18n-title="toolbar.manualTitle">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-          <span class="lbl">Manuel</span>
+          <span class="lbl" data-i18n="toolbar.manual">Manuel</span>
         </button>
-        <button id="addsdp" class="btn" title="Çapraz Ağ (SDP)">
+        <button id="addsdp" class="btn" title="Çapraz Ağ (SDP)" data-i18n-title="toolbar.networkTitle">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <span class="lbl">Uzak Ağ</span>
+          <span class="lbl" data-i18n="toolbar.network">Uzak Ağ</span>
         </button>
-        <button id="founder-settings" class="btn hidden" title="Kurucu Ayarları" style="color: #ffd700;">
+        <button id="founder-settings" class="btn hidden" title="Kurucu Ayarları" data-i18n-title="toolbar.founderTitle" style="color: #ffd700;">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span class="lbl">Kurucu</span>
+          <span class="lbl" data-i18n="toolbar.founder">Kurucu</span>
         </button>
-        <button id="settings" class="btn" title="Ayarlar">
+        <button id="settings" class="btn" title="Ayarlar" data-i18n-title="common.settings">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span class="lbl">Ayar</span>
+          <span class="lbl" data-i18n="common.settingsShort">Ayar</span>
         </button>
       </div>
     </div>
@@ -1407,14 +1411,14 @@
 
     <div id="share-modal" class="modal hidden">
       <div class="mcard">
-        <h3 style="display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> Ekran / Pencere Seç</h3>
+        <h3 style="display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> <span data-i18n="share.chooseSource">Ekran / Pencere Seç</span></h3>
         <div id="sources" class="sources"></div>
         <div class="check-row" style="margin-bottom: 16px;">
           <input type="checkbox" id="share-audio" checked />
-          <label for="share-audio">Sistem Sesini de Paylaş</label>
+          <label for="share-audio" data-i18n="share.systemAudio">Sistem Sesini de Paylaş</label>
         </div>
         <div class="mactions">
-          <button id="share-cancel" class="btn-sec">İptal</button>
+          <button id="share-cancel" class="btn-sec" data-i18n="common.cancel">İptal</button>
         </div>
       </div>
     </div>
@@ -1582,8 +1586,203 @@
       </div>
     </div>
 
-    <div id="settings-modal" class="modal hidden">
-      <div class="mcard" style="width: 420px;">
+    <div id="settings-modal" class="modal settings-modal hidden">
+      <div class="settings-shell" role="dialog" aria-modal="true" aria-labelledby="settings-view-title">
+        <aside class="settings-sidebar">
+          <div class="settings-profile">
+            <img src="assets/icon.png" alt="" />
+            <div>
+              <strong id="settings-profile-name">TeamSync</strong>
+              <span data-i18n="settings.personal">Kişisel Ayarlar</span>
+            </div>
+          </div>
+          <div class="settings-nav-label" data-i18n="settings.userSettings">KULLANICI AYARLARI</div>
+          <button class="settings-nav-item active" type="button" data-settings-panel="general">
+            <span class="settings-nav-icon">⚙</span><span data-i18n="settings.general">Genel</span>
+          </button>
+          <button class="settings-nav-item" type="button" data-settings-panel="voice">
+            <span class="settings-nav-icon">♫</span><span data-i18n="settings.voice">Ses ve Görüntü</span>
+          </button>
+          <button class="settings-nav-item" type="button" data-settings-panel="broadcast">
+            <span class="settings-nav-icon">▣</span><span data-i18n="settings.broadcast">Yayın</span>
+          </button>
+          <button class="settings-nav-item" type="button" data-settings-panel="network">
+            <span class="settings-nav-icon">⧉</span><span data-i18n="settings.connections">Bağlantılar</span>
+          </button>
+          <div class="settings-nav-label" data-i18n="settings.appSettings">UYGULAMA AYARLARI</div>
+          <button class="settings-nav-item" type="button" data-settings-panel="language">
+            <span class="settings-nav-icon">A</span><span data-i18n="settings.languageTime">Dil ve Zaman</span>
+          </button>
+        </aside>
+
+        <section class="settings-content">
+          <button id="settings-v2-close" class="settings-close" type="button" data-i18n-title="common.close" aria-label="Kapat">×</button>
+          <div class="settings-scroll">
+            <div class="settings-panel active" data-settings-content="general">
+              <h2 id="settings-view-title" data-i18n="settings.general">Genel</h2>
+              <p class="settings-lead" data-i18n="settings.generalLead">TeamSync'in görünümünü ve performansını yönet.</p>
+              <div class="settings-card settings-row">
+                <div>
+                  <strong data-i18n="settings.hwaccel">Donanım Hızlandırma</strong>
+                  <p data-i18n="settings.hwaccelDesc">Daha akıcı arayüz ve efektler için GPU kullanır. Değişiklik yeniden başlatınca uygulanır.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="user-settings-hwaccel"><span class="slider round"></span></label>
+              </div>
+            </div>
+
+            <div class="settings-panel" data-settings-content="voice">
+              <h2 data-i18n="settings.voice">Ses ve Görüntü</h2>
+              <p class="settings-lead" data-i18n="settings.voiceLead">Mikrofon ve hoparlör cihazlarını, ses seviyelerini ve konuşma biçimini ayarla.</p>
+              <div class="settings-audio-grid">
+                <div>
+                  <label class="settings-field-label" for="user-mic-select" data-i18n="settings.microphone">Mikrofon</label>
+                  <div class="settings-device-field">
+                    <span aria-hidden="true">●</span>
+                    <select id="user-mic-select" class="settings-select" data-i18n-title="settings.microphone"></select>
+                  </div>
+                </div>
+                <div>
+                  <label class="settings-field-label" for="user-speaker-select" data-i18n="settings.speaker">Konuşmacı</label>
+                  <div class="settings-device-field">
+                    <span aria-hidden="true">◉</span>
+                    <select id="user-speaker-select" class="settings-select" data-i18n-title="settings.speaker"></select>
+                  </div>
+                </div>
+                <div>
+                  <div class="settings-range-heading">
+                    <label for="user-mic-volume" data-i18n="settings.micVolume">Mikrofon Ses Seviyesi</label>
+                    <output id="user-mic-volume-value">100%</output>
+                  </div>
+                  <input id="user-mic-volume" class="settings-range" type="range" min="0" max="100" value="100" />
+                </div>
+                <div>
+                  <div class="settings-range-heading">
+                    <label for="user-speaker-volume" data-i18n="settings.speakerVolume">Hoparlör Ses Seviyesi</label>
+                    <output id="user-speaker-volume-value">100%</output>
+                  </div>
+                  <input id="user-speaker-volume" class="settings-range" type="range" min="0" max="100" value="100" />
+                </div>
+              </div>
+              <div class="settings-mic-test">
+                <button id="user-mic-test" class="settings-test-button" type="button" data-i18n="settings.micTest">Mikrofon Testi</button>
+                <div id="user-mic-meter" class="settings-mic-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-title="settings.micMeter">
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                </div>
+              </div>
+              <p class="settings-help settings-audio-help" data-i18n="settings.micTestHelp">Test sırasında konuş; çubuklar mikrofonundan gelen gerçek ses seviyesini gösterir.</p>
+              <div class="settings-card settings-row">
+                <div>
+                  <strong data-i18n="settings.ptt">Bas-Konuş</strong>
+                  <p data-i18n="settings.pttDesc">Yalnızca SPACE tuşuna basılıyken ses iletir.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="user-settings-ptt"><span class="slider round"></span></label>
+              </div>
+            </div>
+
+            <div class="settings-panel" data-settings-content="broadcast">
+              <h2 data-i18n="settings.broadcast">Yayın</h2>
+              <p class="settings-lead" data-i18n="settings.broadcastLead">Ekran paylaşımının önizleme ve kalite davranışını ayarla.</p>
+              <div class="settings-broadcast-row">
+                <div>
+                  <strong data-i18n="settings.showPreviews">Yayın Ön İzlemelerini göster</strong>
+                  <p data-i18n="settings.showPreviewsDesc">Paylaşacağın ekranı seçerken pencere önizlemelerini gösterir.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="user-stream-previews"><span class="slider round"></span></label>
+              </div>
+              <button id="user-broadcast-advanced-toggle" class="settings-broadcast-row settings-advanced-toggle" type="button" aria-expanded="false" aria-controls="user-broadcast-advanced">
+                <span>
+                  <strong data-i18n="settings.advancedBroadcast">Gelişmiş Yayın Ayarlarını Göster</strong>
+                  <small data-i18n="settings.advancedBroadcastDesc">Yayın kalitesi, kare hızı ve sistem sesi</small>
+                </span>
+                <i aria-hidden="true">⌄</i>
+              </button>
+              <div id="user-broadcast-advanced" class="settings-broadcast-advanced hidden">
+                <div>
+                  <label class="settings-field-label" for="user-quality-select" data-i18n="settings.quality">Kamera / Ekran Kalitesi</label>
+                  <select id="user-quality-select" class="settings-select">
+                    <option value="high" data-i18n="settings.qualityHigh">Yüksek (1080p)</option>
+                    <option value="medium" selected data-i18n="settings.qualityMedium">Orta (720p)</option>
+                    <option value="low" data-i18n="settings.qualityLow">Düşük (480p)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="settings-field-label" for="user-stream-fps" data-i18n="settings.frameRate">Yayın Kare Hızı</label>
+                  <select id="user-stream-fps" class="settings-select">
+                    <option value="15">15 FPS</option>
+                    <option value="30" selected>30 FPS</option>
+                    <option value="60">60 FPS</option>
+                  </select>
+                </div>
+                <div class="settings-card settings-row settings-system-audio-row">
+                  <div>
+                    <strong data-i18n="settings.shareSystemAudio">Sistem sesini varsayılan olarak paylaş</strong>
+                    <p data-i18n="settings.shareSystemAudioDesc">Ekran paylaşım penceresi açıldığında sistem sesi seçeneğini açık getirir.</p>
+                  </div>
+                  <label class="switch"><input type="checkbox" id="user-share-system-audio"><span class="slider round"></span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-panel" data-settings-content="network">
+              <h2 data-i18n="settings.connections">Bağlantılar</h2>
+              <p class="settings-lead" data-i18n="settings.networkLead">Kısıtlı ağlarda bağlantı kurmak için özel TURN sunucusu kullan.</p>
+              <div class="settings-card settings-network-card">
+                <label class="settings-field-label" for="user-turn-url" data-i18n="settings.turnUrl">TURN URL / Credentials API</label>
+                <input type="text" id="user-turn-url" class="settings-input" placeholder="turns:sunucu.com:443 veya https://...apiKey=..." />
+                <div class="settings-grid-2">
+                  <div>
+                    <label class="settings-field-label" for="user-turn-user" data-i18n="settings.username">Kullanıcı Adı</label>
+                    <input type="text" id="user-turn-user" class="settings-input" data-i18n-placeholder="settings.username" placeholder="Kullanıcı Adı" />
+                  </div>
+                  <div>
+                    <label class="settings-field-label" for="user-turn-pass" data-i18n="settings.password">Şifre</label>
+                    <input type="password" id="user-turn-pass" class="settings-input" data-i18n-placeholder="settings.password" placeholder="Şifre" />
+                  </div>
+                </div>
+                <p class="settings-help" data-i18n="settings.turnHelp">Bir kişinin TURN bilgisi girmesi yeterlidir; odadaki diğer katılımcılarla otomatik paylaşılır.</p>
+              </div>
+            </div>
+
+            <div class="settings-panel" data-settings-content="language">
+              <h2 data-i18n="settings.languageTime">Dil ve Zaman</h2>
+              <p class="settings-lead" data-i18n="settings.languageLead">Arayüz dilini ve mesaj saatlerinin gösterimini seç.</p>
+              <h3 class="settings-section-title" data-i18n="settings.chooseLanguage">Bir dil seç</h3>
+              <div class="language-options">
+                <label class="language-option">
+                  <input type="radio" name="settings-language" value="tr">
+                  <span class="language-flag">🇹🇷</span>
+                  <span><strong>Türkçe</strong><small>Turkish</small></span>
+                  <i>✓</i>
+                </label>
+                <label class="language-option">
+                  <input type="radio" name="settings-language" value="en">
+                  <span class="language-flag">🇬🇧</span>
+                  <span><strong>English</strong><small>İngilizce</small></span>
+                  <i>✓</i>
+                </label>
+              </div>
+              <h3 class="settings-section-title settings-time-title" data-i18n="settings.timeFormat">Zaman formatı</h3>
+              <div class="time-options">
+                <label><input type="radio" name="settings-time-format" value="auto"><span data-i18n="settings.timeAuto">Otomatik</span></label>
+                <label><input type="radio" name="settings-time-format" value="12"><span data-i18n="settings.time12">12 saatlik</span></label>
+                <label><input type="radio" name="settings-time-format" value="24"><span data-i18n="settings.time24">24 saatlik</span></label>
+              </div>
+              <div class="settings-time-preview"><span data-i18n="settings.preview">Önizleme</span><strong id="settings-time-preview">--:--</strong></div>
+            </div>
+          </div>
+
+          <div class="settings-actions">
+            <span id="settings-save-status" data-i18n="settings.savedLocally">Tercihler bu cihazda saklanır.</span>
+            <button id="settings-v2-save" class="btn-pri" type="button" data-i18n="common.save">Kaydet</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="mcard legacy-settings hidden" style="width: 420px;">
         <h3 style="display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Ayarlar</h3>
 
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 4px;">
