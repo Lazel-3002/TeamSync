@@ -38,7 +38,7 @@ module.exports = async function run() {
       })()`
     );
     assert.strictEqual(opened.hidden, false, JSON.stringify(opened, null, 2));
-    assert.strictEqual(opened.navCount, 5, JSON.stringify(opened, null, 2));
+    assert.strictEqual(opened.navCount, 6, JSON.stringify(opened, null, 2));
     assert.strictEqual(opened.activePanel, 'general', JSON.stringify(opened, null, 2));
     assert.ok(opened.rect.right - opened.rect.left >= 800, JSON.stringify(opened, null, 2));
     assert.ok(opened.rect.bottom - opened.rect.top >= 500, JSON.stringify(opened, null, 2));
@@ -67,6 +67,13 @@ module.exports = async function run() {
         menuSettings: document.querySelector('#menu-settings [data-i18n]').textContent,
         toolbarVoice: document.querySelector('#mic [data-i18n]').textContent,
         broadcast: document.querySelector('[data-settings-panel="broadcast"] [data-i18n]').textContent,
+        mediaNav: document.querySelector('[data-settings-panel="media"] [data-i18n]').textContent,
+        mediaTitle: document.querySelector('[data-settings-content="media"] h2').textContent,
+        mediaAdd: document.querySelector('#settings-media-add [data-i18n]').textContent,
+        mediaLocalTitle: document.querySelector('.media-local-notice strong').textContent,
+        mediaPickerTitle: document.getElementById('media-picker-title').textContent,
+        externalAttachment: document.querySelector('#dm-attach-external strong').textContent,
+        libraryAttachment: document.querySelector('#dm-attach-library strong').textContent,
         microphone: document.querySelector('label[for="user-mic-select"]').textContent,
         switchAccount: document.querySelector('#btn-logout [data-i18n]').textContent,
         back: document.querySelector('#step-join .btn-back [data-i18n]').textContent,
@@ -83,6 +90,13 @@ module.exports = async function run() {
     assert.strictEqual(english.menuSettings, 'Settings', JSON.stringify(english, null, 2));
     assert.strictEqual(english.toolbarVoice, 'Voice', JSON.stringify(english, null, 2));
     assert.strictEqual(english.broadcast, 'Broadcast', JSON.stringify(english, null, 2));
+    assert.strictEqual(english.mediaNav, 'GIF & Media', JSON.stringify(english, null, 2));
+    assert.strictEqual(english.mediaTitle, 'GIF & Media', JSON.stringify(english, null, 2));
+    assert.strictEqual(english.mediaAdd, 'Add Media', JSON.stringify(english, null, 2));
+    assert.strictEqual(english.mediaLocalTitle, 'Only on this computer', JSON.stringify(english, null, 2));
+    assert.strictEqual(english.mediaPickerTitle, 'Use your media', JSON.stringify(english, null, 2));
+    assert.strictEqual(english.externalAttachment, 'Choose an external file', JSON.stringify(english, null, 2));
+    assert.strictEqual(english.libraryAttachment, 'Use your media', JSON.stringify(english, null, 2));
     assert.strictEqual(english.microphone, 'Microphone', JSON.stringify(english, null, 2));
     assert.strictEqual(english.switchAccount, 'Switch Account', JSON.stringify(english, null, 2));
     assert.strictEqual(english.back, 'Back', JSON.stringify(english, null, 2));
@@ -250,6 +264,25 @@ module.exports = async function run() {
     assert.ok(compact.rect.left >= 0 && compact.rect.top >= 0, JSON.stringify(compact, null, 2));
     assert.ok(compact.rect.right <= compact.viewport.width, JSON.stringify(compact, null, 2));
     assert.ok(compact.rect.bottom <= compact.viewport.height, JSON.stringify(compact, null, 2));
+
+    await evalJS(peer.client, `document.querySelector('[data-settings-panel="media"]').click(); 1`);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const compactMedia = await evalJS(
+      peer.client,
+      `(() => {
+        const panel = document.querySelector('[data-settings-content="media"]');
+        return {
+          active: panel.classList.contains('active'),
+          panelWidth: panel.getBoundingClientRect().width,
+          scrollWidth: panel.scrollWidth,
+          dropzoneRight: document.getElementById('settings-media-dropzone').getBoundingClientRect().right,
+          viewportWidth: innerWidth
+        };
+      })()`
+    );
+    assert.strictEqual(compactMedia.active, true, JSON.stringify(compactMedia, null, 2));
+    assert.ok(compactMedia.scrollWidth <= compactMedia.panelWidth + 1, JSON.stringify(compactMedia, null, 2));
+    assert.ok(compactMedia.dropzoneRight <= compactMedia.viewportWidth, JSON.stringify(compactMedia, null, 2));
 
     const liveAudio = await evalJS(
       peer.client,

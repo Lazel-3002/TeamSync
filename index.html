@@ -311,7 +311,7 @@
             <div class="muted" style="text-align:center; margin-top:50px;" data-i18n="menu.selectFriend">Mesajlaşmaya başlamak için bir arkadaş seç.</div>
           </div>
           <div class="dm-input-area">
-            <input type="file" id="dm-file-input" class="hidden" accept="image/*,application/pdf" />
+            <input type="file" id="dm-file-input" class="hidden" />
             <button id="dm-btn-file" title="Dosya Gönder" data-i18n-title="common.sendFile" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
             <input id="dm-input" type="text" data-i18n-placeholder="common.messagePlaceholder" placeholder="Mesaj yaz..." autocomplete="off" />
             <button id="dm-btn-send" title="Gönder" data-i18n-title="common.send" style="display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
@@ -1610,6 +1610,9 @@
             <span class="settings-nav-icon">⧉</span><span data-i18n="settings.connections">Bağlantılar</span>
           </button>
           <div class="settings-nav-label" data-i18n="settings.appSettings">UYGULAMA AYARLARI</div>
+          <button class="settings-nav-item" type="button" data-settings-panel="media">
+            <span class="settings-nav-icon">✦</span><span data-i18n="settings.mediaLibrary">GIF ve Medya</span>
+          </button>
           <button class="settings-nav-item" type="button" data-settings-panel="language">
             <span class="settings-nav-icon">A</span><span data-i18n="settings.languageTime">Dil ve Zaman</span>
           </button>
@@ -1747,6 +1750,52 @@
               </div>
             </div>
 
+            <div class="settings-panel" data-settings-content="media">
+              <div class="media-settings-heading">
+                <div>
+                  <h2 data-i18n="settings.mediaLibrary">GIF ve Medya</h2>
+                  <p class="settings-lead" data-i18n="settings.mediaLibraryLead">Sık kullandığın GIF, fotoğraf ve kısa videoları bu cihazda sakla.</p>
+                </div>
+                <button id="settings-media-add" class="btn-pri media-add-button" type="button">
+                  <span aria-hidden="true">＋</span>
+                  <span data-i18n="settings.addMedia">Medya Ekle</span>
+                </button>
+              </div>
+              <input id="settings-media-input" class="hidden" type="file" accept="image/*,video/*,.gif" multiple />
+              <button id="settings-media-dropzone" class="media-dropzone" type="button">
+                <span class="media-dropzone-icon" aria-hidden="true">✦</span>
+                <span>
+                  <strong data-i18n="settings.dropMedia">GIF, fotoğraf veya videonu buraya bırak</strong>
+                  <small data-i18n="settings.dropMediaDesc">Dosya seçmek için tıklayabilirsin · Dosya başına en fazla 20 MB</small>
+                </span>
+              </button>
+              <div class="media-local-notice">
+                <span aria-hidden="true">✓</span>
+                <span>
+                  <strong data-i18n="settings.mediaLocalTitle">Yalnızca bu bilgisayarda</strong>
+                  <small data-i18n="settings.mediaLocalDesc">Kütüphanendeki GIF, fotoğraf ve videolar yerel olarak saklanır; buluta yüklenmez.</small>
+                </span>
+              </div>
+              <div class="media-library-toolbar">
+                <div class="media-library-stats">
+                  <span><strong id="settings-media-count">0</strong> <span data-i18n="settings.savedMedia">kayıtlı medya</span></span>
+                  <span id="settings-media-size">0 KB</span>
+                </div>
+                <div class="media-filter-chips" id="settings-media-filters">
+                  <button class="active" type="button" data-media-filter="all" data-i18n="settings.mediaAll">Tümü</button>
+                  <button type="button" data-media-filter="gif">GIF</button>
+                  <button type="button" data-media-filter="image" data-i18n="settings.mediaImages">Fotoğraflar</button>
+                  <button type="button" data-media-filter="video" data-i18n="settings.mediaVideos">Videolar</button>
+                </div>
+              </div>
+              <div id="settings-media-grid" class="media-library-grid" aria-live="polite"></div>
+              <div id="settings-media-empty" class="media-library-empty">
+                <span aria-hidden="true">✦</span>
+                <strong data-i18n="settings.mediaEmpty">Kütüphanen henüz boş</strong>
+                <p data-i18n="settings.mediaEmptyDesc">Eklediğin GIF ve görseller ataç menüsündeki “Kendi medyanı kullan” bölümünde görünecek.</p>
+              </div>
+            </div>
+
             <div class="settings-panel" data-settings-content="language">
               <h2 data-i18n="settings.languageTime">Dil ve Zaman</h2>
               <p class="settings-lead" data-i18n="settings.languageLead">Arayüz dilini ve mesaj saatlerinin gösterimini seç.</p>
@@ -1780,6 +1829,65 @@
             <button id="settings-v2-save" class="btn-pri" type="button" data-i18n="common.save">Kaydet</button>
           </div>
         </section>
+      </div>
+
+      <div id="media-picker-modal" class="modal media-picker-modal hidden">
+        <div class="media-picker-shell" role="dialog" aria-modal="true" aria-labelledby="media-picker-title">
+          <div class="media-picker-head">
+            <div>
+              <span class="media-picker-eyebrow" data-i18n="settings.mediaLibrary">GIF ve Medya</span>
+              <h3 id="media-picker-title" data-i18n="mediaPicker.title">Kendi medyanı kullan</h3>
+              <p data-i18n="mediaPicker.lead">Kaydettiğin bir GIF, fotoğraf veya videoyu seçip gönder.</p>
+            </div>
+            <button id="media-picker-close" class="settings-close media-picker-close" type="button" data-i18n-title="common.close" aria-label="Kapat">×</button>
+          </div>
+          <div class="media-picker-controls">
+            <div class="media-picker-search">
+              <span aria-hidden="true">⌕</span>
+              <input id="media-picker-search" type="search" data-i18n-placeholder="mediaPicker.search" placeholder="Kütüphanende ara..." autocomplete="off" />
+            </div>
+            <div class="media-filter-chips" id="media-picker-filters">
+              <button class="active" type="button" data-media-filter="all" data-i18n="settings.mediaAll">Tümü</button>
+              <button type="button" data-media-filter="gif">GIF</button>
+              <button type="button" data-media-filter="image" data-i18n="settings.mediaImages">Fotoğraflar</button>
+              <button type="button" data-media-filter="video" data-i18n="settings.mediaVideos">Videolar</button>
+            </div>
+          </div>
+          <div id="media-picker-grid" class="media-picker-grid"></div>
+          <div id="media-picker-empty" class="media-picker-empty hidden">
+            <span aria-hidden="true">✦</span>
+            <strong data-i18n="mediaPicker.empty">Gönderebileceğin kayıtlı medya yok</strong>
+            <p data-i18n="mediaPicker.emptyDesc">Ayarlar → GIF ve Medya bölümünden kütüphanene içerik ekleyebilirsin.</p>
+            <button id="media-picker-open-settings" class="btn-pri" type="button" data-i18n="mediaPicker.openSettings">Medya Ayarlarını Aç</button>
+          </div>
+          <div class="media-picker-foot">
+            <span id="media-picker-count">0</span>
+            <span data-i18n="mediaPicker.sendHint">Göndermek için bir medyaya tıkla</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="dm-attach-menu" class="dm-attach-menu hidden" role="menu">
+        <div class="dm-attach-menu-head">
+          <strong data-i18n="attach.title">Ne göndermek istiyorsun?</strong>
+          <span data-i18n="attach.limit">En fazla 20 MB</span>
+        </div>
+        <button id="dm-attach-external" class="dm-attach-option" type="button" role="menuitem">
+          <span class="dm-attach-option-icon external" aria-hidden="true">↑</span>
+          <span>
+            <strong data-i18n="attach.external">Dışarıdan dosya seç</strong>
+            <small data-i18n="attach.externalDesc">Fotoğraf, GIF, video veya dosya ekle</small>
+          </span>
+          <i aria-hidden="true">›</i>
+        </button>
+        <button id="dm-attach-library" class="dm-attach-option" type="button" role="menuitem">
+          <span class="dm-attach-option-icon library" aria-hidden="true">✦</span>
+          <span>
+            <strong data-i18n="attach.library">Kendi medyanı kullan</strong>
+            <small data-i18n="attach.libraryDesc">Ayarlarda kaydettiğin GIF ve fotoğraflardan seç</small>
+          </span>
+          <b id="dm-attach-library-count">0</b>
+        </button>
       </div>
 
       <div class="mcard legacy-settings hidden" style="width: 420px;">
@@ -2149,7 +2257,7 @@
           <div class="muted" style="text-align:center; margin-top:50px;">Mesajlaşmaya başlamak için bir arkadaş seç.</div>
         </div>
         <div class="dm-input-area" style="display: none;" id="server-dm-input-area">
-          <input type="file" id="server-dm-file-input" class="hidden" accept="image/*,application/pdf" />
+          <input type="file" id="server-dm-file-input" class="hidden" />
           <button id="server-dm-btn-file" title="Dosya Gönder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button>
           <input id="server-dm-input" type="text" placeholder="Mesaj yaz..." autocomplete="off" />
           <button id="server-dm-btn-send" title="Gönder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
@@ -2172,6 +2280,7 @@
   <script src="js/state.js"></script>
   <script src="js/rnnoise-noise-suppression.js"></script>
   <script src="renderer.js"></script>
+  <script src="js/media-library.js"></script>
   <script src="js/whiteboard.js"></script>
   <script src="js/watch-together.js"></script>
   <script src="js/shared-browser.js"></script>

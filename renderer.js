@@ -134,6 +134,7 @@ async function checkAvatar(base64Str) {
 }
 
 const CHUNK_SIZE = 64 * 1024;
+const MAX_DM_FILE_SIZE = 20 * 1024 * 1024;
 const fileBuffer = new Map();
 // Sohbette paylaşılan dosyaların blob URL'leri: revoke edilmezse dosyanın
 // tüm içeriği uygulama kapanana kadar bellekte kalır (sohbet DOM'u
@@ -152,6 +153,11 @@ function releaseChatBlobUrls() {
 function isImageFile(name, mime) {
   if (mime && mime.toLowerCase().startsWith('image/')) return true;
   return /\.(png|jpe?g|jfif|gif|webp|bmp|avif|svg|ico|heic|heif|tiff?)$/i.test(name || '');
+}
+
+function isVideoFile(name, mime) {
+  if (mime && mime.toLowerCase().startsWith('video/')) return true;
+  return /\.(mp4|webm|mov|m4v|ogv)$/i.test(name || '');
 }
 
 let mqttClient = null;
@@ -777,14 +783,23 @@ function saveDMs() {
       state.dms[fId] = state.dms[fId].slice(-DM_LIMIT);
     }
   });
+  // Kota temizliği canlı mesajları bozmamalı. Büyük medya mevcut oturumda
+  // görünmeye devam eder; gerekirse yalnızca localStorage'a yazılan kopyadan
+  // eski dosya içeriği çıkarılır.
+  const persistedDMs = Object.fromEntries(
+    Object.entries(state.dms).map(([friendId, messages]) => [
+      friendId,
+      (messages || []).map(message => ({ ...message }))
+    ])
+  );
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      localStorage.setItem('teamsync_dms', JSON.stringify(state.dms));
+      localStorage.setItem('teamsync_dms', JSON.stringify(persistedDMs));
       return;
     } catch (e) {
       const fileMsgs = [];
-      Object.values(state.dms).forEach(list => (list || []).forEach(m => {
-        if ((m.type === 'image' || m.type === 'file') && m.content) fileMsgs.push(m);
+      Object.values(persistedDMs).forEach(list => (list || []).forEach(m => {
+        if ((m.type === 'image' || m.type === 'video' || m.type === 'file') && m.content) fileMsgs.push(m);
       }));
       if (fileMsgs.length === 0) {
         console.warn('DM geçmişi kaydedilemedi (kota):', e && e.message);
@@ -5771,6 +5786,46 @@ const I18N = {
     'settings.deviceChanged': 'Ses cihazı değiştirildi.',
     'settings.connections': 'Bağlantılar',
     'settings.networkLead': 'Kısıtlı ağlarda bağlantı kurmak için özel TURN sunucusu kullan.',
+    'settings.mediaLibrary': 'GIF ve Medya',
+    'settings.mediaLibraryLead': 'Sık kullandığın GIF, fotoğraf ve kısa videoları bu cihazda sakla.',
+    'settings.addMedia': 'Medya Ekle',
+    'settings.dropMedia': 'GIF, fotoğraf veya videonu buraya bırak',
+    'settings.dropMediaDesc': 'Dosya seçmek için tıklayabilirsin · Dosya başına en fazla 20 MB',
+    'settings.mediaLocalTitle': 'Yalnızca bu bilgisayarda',
+    'settings.mediaLocalDesc': 'Kütüphanendeki GIF, fotoğraf ve videolar yerel olarak saklanır; buluta yüklenmez.',
+    'settings.savedMedia': 'kayıtlı medya',
+    'settings.mediaAll': 'Tümü',
+    'settings.mediaImages': 'Fotoğraflar',
+    'settings.mediaVideos': 'Videolar',
+    'settings.mediaEmpty': 'Kütüphanen henüz boş',
+    'settings.mediaEmptyDesc': 'Eklediğin GIF ve görseller ataç menüsündeki “Kendi medyanı kullan” bölümünde görünecek.',
+    'mediaPicker.title': 'Kendi medyanı kullan',
+    'mediaPicker.lead': 'Kaydettiğin bir GIF, fotoğraf veya videoyu seçip gönder.',
+    'mediaPicker.search': 'Kütüphanende ara...',
+    'mediaPicker.empty': 'Gönderebileceğin kayıtlı medya yok',
+    'mediaPicker.emptyDesc': 'Ayarlar → GIF ve Medya bölümünden kütüphanene içerik ekleyebilirsin.',
+    'mediaPicker.openSettings': 'Medya Ayarlarını Aç',
+    'mediaPicker.sendHint': 'Göndermek için bir medyaya tıkla',
+    'mediaPicker.sent': 'Kayıtlı medya gönderildi.',
+    'attach.title': 'Ne göndermek istiyorsun?',
+    'attach.limit': 'En fazla 20 MB',
+    'attach.external': 'Dışarıdan dosya seç',
+    'attach.externalDesc': 'Fotoğraf, GIF, video veya dosya ekle',
+    'attach.library': 'Kendi medyanı kullan',
+    'attach.libraryDesc': 'Ayarlarda kaydettiğin GIF ve fotoğraflardan seç',
+    'attach.selectFriend': 'Önce mesaj göndereceğin bir arkadaş seç.',
+    'mediaLibrary.deleteTitle': 'Medyayı sil',
+    'mediaLibrary.deleteConfirm': 'Bu medya kütüphanenden kalıcı olarak silinsin mi?',
+    'mediaLibrary.deleted': 'Medya kütüphaneden silindi.',
+    'mediaLibrary.delete': 'Sil',
+    'mediaLibrary.added': 'Medya bu bilgisayardaki kütüphanene eklendi.',
+    'mediaLibrary.duplicate': 'Bu medya zaten kütüphanende.',
+    'mediaLibrary.tooLarge': 'Dosya 20 MB sınırını aşıyor.',
+    'mediaLibrary.unsupported': 'Bu dosya fotoğraf, GIF veya desteklenen bir video değil.',
+    'mediaLibrary.emptyFile': 'Dosya boş veya okunamıyor.',
+    'mediaLibrary.storageError': 'Dosya bu bilgisayara kaydedilemedi. Boş disk alanını kontrol et.',
+    'dm.fileTooLarge': 'DM üzerinden en fazla 20 MB dosya gönderebilirsin.',
+    'dm.notConnected': 'Dosya göndermek için çevrimiçi bir arkadaş seç.',
     'settings.languageTime': 'Dil ve Zaman',
     'settings.languageLead': 'Arayüz dilini ve mesaj saatlerinin gösterimini seç.',
     'settings.hwaccel': 'Donanım Hızlandırma',
@@ -5896,6 +5951,46 @@ const I18N = {
     'settings.deviceChanged': 'Audio device changed.',
     'settings.connections': 'Connections',
     'settings.networkLead': 'Use a custom TURN server to connect through restricted networks.',
+    'settings.mediaLibrary': 'GIF & Media',
+    'settings.mediaLibraryLead': 'Keep your favorite GIFs, photos, and short videos on this device.',
+    'settings.addMedia': 'Add Media',
+    'settings.dropMedia': 'Drop a GIF, photo, or video here',
+    'settings.dropMediaDesc': 'Click to choose files · Up to 20 MB per file',
+    'settings.mediaLocalTitle': 'Only on this computer',
+    'settings.mediaLocalDesc': 'GIFs, photos, and videos in your library stay local and are not uploaded to the cloud.',
+    'settings.savedMedia': 'saved items',
+    'settings.mediaAll': 'All',
+    'settings.mediaImages': 'Photos',
+    'settings.mediaVideos': 'Videos',
+    'settings.mediaEmpty': 'Your library is empty',
+    'settings.mediaEmptyDesc': 'GIFs and photos you add will appear under “Use your media” in the attachment menu.',
+    'mediaPicker.title': 'Use your media',
+    'mediaPicker.lead': 'Choose and send a GIF, photo, or video you have saved.',
+    'mediaPicker.search': 'Search your library...',
+    'mediaPicker.empty': 'No saved media is ready to send',
+    'mediaPicker.emptyDesc': 'Add content from Settings → GIF & Media.',
+    'mediaPicker.openSettings': 'Open Media Settings',
+    'mediaPicker.sendHint': 'Click an item to send it',
+    'mediaPicker.sent': 'Saved media sent.',
+    'attach.title': 'What would you like to send?',
+    'attach.limit': 'Up to 20 MB',
+    'attach.external': 'Choose an external file',
+    'attach.externalDesc': 'Add a photo, GIF, video, or file',
+    'attach.library': 'Use your media',
+    'attach.libraryDesc': 'Choose from GIFs and photos saved in Settings',
+    'attach.selectFriend': 'Select a friend before sending a message.',
+    'mediaLibrary.deleteTitle': 'Delete media',
+    'mediaLibrary.deleteConfirm': 'Permanently remove this item from your media library?',
+    'mediaLibrary.deleted': 'Media removed from your library.',
+    'mediaLibrary.delete': 'Delete',
+    'mediaLibrary.added': 'Media added to this computer’s library.',
+    'mediaLibrary.duplicate': 'This media is already in your library.',
+    'mediaLibrary.tooLarge': 'The file exceeds the 20 MB limit.',
+    'mediaLibrary.unsupported': 'This file is not a photo, GIF, or supported video.',
+    'mediaLibrary.emptyFile': 'The file is empty or unreadable.',
+    'mediaLibrary.storageError': 'The file could not be saved on this computer. Check free disk space.',
+    'dm.fileTooLarge': 'You can send files up to 20 MB in direct messages.',
+    'dm.notConnected': 'Select an online friend before sending a file.',
     'settings.languageTime': 'Language & Time',
     'settings.languageLead': 'Choose the interface language and message time display.',
     'settings.hwaccel': 'Hardware Acceleration',
@@ -6059,6 +6154,7 @@ function applyUserLanguage(language, persist = true) {
   updateSettingsTimePreview();
   setMicTestButtonState(!!state.settingsMicTestActive);
   populateSettingsAudioDevices();
+  window.TeamSyncMediaLibrary?.refresh();
 }
 
 function formatUserTime(value) {
@@ -6219,6 +6315,8 @@ function setSettingsPanel(name) {
     panel.classList.toggle('active', panel.dataset.settingsContent === name);
   });
   if (name !== 'voice' && state.settingsMicTestActive) stopSettingsMicTest();
+  if (name === 'media') window.TeamSyncMediaLibrary?.renderSettings();
+  else window.releaseMediaLibrarySettingsUrls?.();
 }
 
 function openUserSettings(panel = 'general') {
@@ -6317,6 +6415,7 @@ function initUserSettings() {
   document.getElementById('settings')?.addEventListener('click', () => openUserSettings('general'));
   document.getElementById('settings-v2-close')?.addEventListener('click', () => {
     stopSettingsMicTest();
+    window.releaseMediaLibrarySettingsUrls?.();
     document.getElementById('settings-modal').classList.add('hidden');
   });
   document.getElementById('settings-v2-save')?.addEventListener('click', saveUserSettings);
@@ -6391,6 +6490,7 @@ function initUserSettings() {
   document.addEventListener('keydown', e => {
     if (e.code === 'Escape' && !document.getElementById('settings-modal')?.classList.contains('hidden')) {
       stopSettingsMicTest();
+      window.releaseMediaLibrarySettingsUrls?.();
       document.getElementById('settings-modal').classList.add('hidden');
     }
   });
@@ -8147,7 +8247,9 @@ window.renderDMs = () => {
       // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
       contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
     } else if (m.type === 'image') {
-      contentHtml = `<img src="${m.content}" />`;
+      contentHtml = `<img src="${m.content}" alt="${escapeHtml(m.fileName || 'Görsel')}" />`;
+    } else if (m.type === 'video') {
+      contentHtml = `<video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}"></video>`;
     } else if (m.type === 'file') {
       contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
     }
@@ -8257,71 +8359,69 @@ window.sendDMText = async (text) => {
   }));
 };
 
-window.sendDMFile = (file) => {
-  if (!state.activeDM || !state.globalMqtt || !state.globalMqtt.connected) return;
+window.sendDMFile = async (file) => {
+  if (!state.activeDM || !state.globalMqtt || !state.globalMqtt.connected) {
+    showToast(t('dm.notConnected'), 'warn');
+    return false;
+  }
   const friendId = state.activeDM;
   
-  if (file.size > 2 * 1024 * 1024) {
-    alert("DM üzerinden en fazla 2MB boyutunda dosya gönderebilirsiniz. Lütfen daha küçük bir dosya seçin.");
-    return;
+  if (file.size > MAX_DM_FILE_SIZE) {
+    showToast(t('dm.fileTooLarge'), 'warn');
+    return false;
   }
-  
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const base64Data = e.target.result;
-    const isImage = isImageFile(file.name, file.type);
-    const msgType = isImage ? 'image' : 'file';
 
-    // Local store
-    if (!state.dms[friendId]) state.dms[friendId] = [];
-    state.dms[friendId].push({ sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
-    saveDMs();
-    renderDMs();
+  let base64Data;
+  try {
+    base64Data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = event => resolve(event.target.result);
+      reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+      reader.readAsDataURL(file);
+    });
+  } catch (error) {
+    console.error('DM file read error:', error);
+    return false;
+  }
 
-    // Supabase Kayıt (Giden DM Dosyası)
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      supabaseClient.from('mesaj').insert([
-        {
-          gonderen_id: state.friendId || 'Anonim',
-          gonderen_adi: state.myName || 'Anonim',
-          alici_id: friendId,
-          alici_adi: state.friends[friendId]?.name || 'Arkadaş',
-          tip: 'dm',
-          icerik: `[${msgType === 'image' ? 'Görsel' : 'Dosya'}: ${file.name}] ${base64Data}`,
-          is_censored: false
-        }
-      ]).then(({ error }) => {
-        if (error) console.error('Supabase DM file send error:', error);
-      });
-    }
+  const isImage = isImageFile(file.name, file.type);
+  const isVideo = isVideoFile(file.name, file.type);
+  const msgType = isImage ? 'image' : (isVideo ? 'video' : 'file');
 
-    const CHUNK_SIZE = 60000; // ~60KB
-    const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
-    const fileId = crypto.randomUUID();
+  if (!state.dms[friendId]) state.dms[friendId] = [];
+  state.dms[friendId].push({ sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
+  saveDMs();
+  renderDMs();
 
+  // Fotoğraf/GIF/video kalıcı olarak kullanıcının kendi cihazında tutulur.
+  // Büyük base64 içeriğini Supabase'e yüklemiyoruz.
+
+  const dmChunkSize = 60000;
+  const totalChunks = Math.ceil(base64Data.length / dmChunkSize);
+  const fileId = crypto.randomUUID();
+
+  state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
+    type: 'dm_file_start',
+    fromId: state.friendId,
+    fromName: state.myName,
+    fileId,
+    msgType,
+    fileName: file.name,
+    totalChunks
+  }));
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = base64Data.substr(i * dmChunkSize, dmChunkSize);
     state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
-      type: 'dm_file_start',
+      type: 'dm_file_chunk',
       fromId: state.friendId,
-      fromName: state.myName,
-      fileId: fileId,
-      msgType: msgType,
-      fileName: file.name,
-      totalChunks: totalChunks
+      fileId,
+      chunkIndex: i,
+      data: chunk
     }));
-
-    for (let i = 0; i < totalChunks; i++) {
-      const chunk = base64Data.substr(i * CHUNK_SIZE, CHUNK_SIZE);
-      state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
-        type: 'dm_file_chunk',
-        fromId: state.friendId,
-        fileId: fileId,
-        chunkIndex: i,
-        data: chunk
-      }));
-      await new Promise(r => setTimeout(r, 15));
-    }
-  };
-  reader.readAsDataURL(file);
+    await new Promise(resolve => setTimeout(resolve, 15));
+  }
+  return true;
 };
 
 state.incomingDMFiles = {};
@@ -8390,22 +8490,8 @@ window.receiveDM = async (fromId, data) => {
         if (state.activeDM === fromId) renderDMs();
         else showToast(`${state.friends[fromId]?.name || 'Biri'} sana bir dosya gönderdi.`, 'info');
 
-        // Supabase Kayıt (Gelen DM Dosyası)
-        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-          supabaseClient.from('mesaj').insert([
-            {
-              gonderen_id: fromId,
-              gonderen_adi: state.friends[fromId]?.name || 'Arkadaş',
-              alici_id: state.friendId || 'Anonim',
-              alici_adi: state.myName || 'Anonim',
-              tip: 'dm',
-              icerik: `[${fileData.msgType === 'image' ? 'Görsel' : 'Dosya'}: ${fileData.fileName}] ${fullBase64}`,
-              is_censored: false
-            }
-          ]).then(({ error }) => {
-            if (error) console.error('Supabase DM file receive error:', error);
-          });
-        }
+        // Gelen medya da bulut veritabanına kopyalanmaz; yalnızca bu cihazdaki
+        // sohbet durumu ve yerel kütüphane kullanılır.
       }
     }
   }
@@ -8455,14 +8541,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  addEvt('dm-btn-file', 'click', () => document.getElementById('dm-file-input').click());
-  addEvt('dm-file-input', 'change', (e) => {
-    if (e.target.files.length) sendDMFile(e.target.files[0]);
+  addEvt('dm-btn-file', 'click', event => window.openDMAttachmentMenu?.(event.currentTarget, 'dm-file-input'));
+  addEvt('dm-file-input', 'change', async (e) => {
+    if (e.target.files.length) await sendDMFile(e.target.files[0]);
+    e.target.value = '';
   });
 
-  addEvt('server-dm-btn-file', 'click', () => document.getElementById('server-dm-file-input').click());
-  addEvt('server-dm-file-input', 'change', (e) => {
-    if (e.target.files.length) sendDMFile(e.target.files[0]);
+  addEvt('server-dm-btn-file', 'click', event => window.openDMAttachmentMenu?.(event.currentTarget, 'server-dm-file-input'));
+  addEvt('server-dm-file-input', 'change', async (e) => {
+    if (e.target.files.length) await sendDMFile(e.target.files[0]);
+    e.target.value = '';
   });
 
   addEvt('btn-edit-avatar', 'click', () => {
