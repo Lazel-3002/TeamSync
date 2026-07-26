@@ -5680,6 +5680,7 @@ function escapeHtml(s) {
 
 const USER_LANGUAGE_KEY = 'teamsync_language';
 const USER_TIME_FORMAT_KEY = 'teamsync_time_format';
+const USER_THEME_KEY = 'teamsync_theme';
 const USER_QUALITY_KEY = 'teamsync_media_quality';
 const USER_MIC_DEVICE_KEY = 'teamsync_mic_device_id';
 const USER_MIC_VOLUME_KEY = 'teamsync_mic_volume';
@@ -5765,6 +5766,19 @@ const I18N = {
     'settings.appSettings': 'UYGULAMA AYARLARI',
     'settings.general': 'Genel',
     'settings.generalLead': "TeamSync'in görünümünü ve performansını yönet.",
+    'settings.appearance': 'GÖRÜNÜM',
+    'settings.backgroundTheme': 'Arka plan teması',
+    'settings.backgroundThemeDesc': 'Kendine en rahat gelen görünümü seç. Tercihin yalnızca bu cihazda saklanır.',
+    'settings.personalPreference': 'Kişisel tercih',
+    'settings.themeAurora': 'Mevcut Mor',
+    'settings.themeAuroraDesc': 'Canlı ve yumuşak',
+    'settings.themeBlack': 'Gece Siyahı',
+    'settings.themeBlackDesc': 'Saf ve dikkat dağıtmayan',
+    'settings.themeNavy': 'Derin Lacivert',
+    'settings.themeNavyDesc': 'Sakin ve odaklı',
+    'settings.themeWhite': 'Temiz Beyaz',
+    'settings.themeWhiteDesc': 'Aydınlık ve ferah',
+    'settings.themeHint': 'Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.',
     'settings.voice': 'Ses ve Görüntü',
     'settings.voiceLead': 'Mikrofon ve hoparlör cihazlarını, ses seviyelerini ve konuşma biçimini ayarla.',
     'settings.microphone': 'Mikrofon',
@@ -5930,6 +5944,19 @@ const I18N = {
     'settings.appSettings': 'APP SETTINGS',
     'settings.general': 'General',
     'settings.generalLead': 'Manage the appearance and performance of TeamSync.',
+    'settings.appearance': 'APPEARANCE',
+    'settings.backgroundTheme': 'Background theme',
+    'settings.backgroundThemeDesc': 'Choose the look that feels most comfortable. Your preference is stored only on this device.',
+    'settings.personalPreference': 'Personal preference',
+    'settings.themeAurora': 'Current Purple',
+    'settings.themeAuroraDesc': 'Vibrant and soft',
+    'settings.themeBlack': 'Midnight Black',
+    'settings.themeBlackDesc': 'Pure and distraction-free',
+    'settings.themeNavy': 'Deep Navy',
+    'settings.themeNavyDesc': 'Calm and focused',
+    'settings.themeWhite': 'Clean White',
+    'settings.themeWhiteDesc': 'Bright and airy',
+    'settings.themeHint': 'Preview your choice, then select Save to keep it.',
     'settings.voice': 'Voice & Video',
     'settings.voiceLead': 'Choose microphone and speaker devices, volume levels, and voice behavior.',
     'settings.microphone': 'Microphone',
@@ -6116,6 +6143,27 @@ function translateLegacyStaticUI(language, root = document.body) {
       if (value && dictionary[value]) element.setAttribute(attribute, dictionary[value]);
     });
   });
+}
+
+const APP_THEMES = new Set(['aurora', 'black', 'navy', 'white']);
+
+function getUserTheme() {
+  const saved = localStorage.getItem(USER_THEME_KEY);
+  return APP_THEMES.has(saved) ? saved : 'aurora';
+}
+
+function syncThemeSelection(theme = getUserTheme()) {
+  const selected = APP_THEMES.has(theme) ? theme : 'aurora';
+  const input = document.querySelector(`input[name="settings-theme"][value="${selected}"]`);
+  if (input) input.checked = true;
+}
+
+function applyUserTheme(theme, persist = false) {
+  const selected = APP_THEMES.has(theme) ? theme : 'aurora';
+  document.documentElement.dataset.theme = selected;
+  if (persist) localStorage.setItem(USER_THEME_KEY, selected);
+  syncThemeSelection(selected);
+  return selected;
 }
 
 function getUserLanguage() {
@@ -6354,6 +6402,7 @@ function openUserSettings(panel = 'general') {
   const timeFormat = localStorage.getItem(USER_TIME_FORMAT_KEY) || 'auto';
   const timeRadio = document.querySelector(`input[name="settings-time-format"][value="${timeFormat}"]`);
   if (timeRadio) timeRadio.checked = true;
+  syncThemeSelection();
   updateSettingsTimePreview();
 
   const hwEl = document.getElementById('user-settings-hwaccel');
@@ -6371,6 +6420,7 @@ function saveUserSettings() {
   const streamFps = document.getElementById('user-stream-fps').value;
   const showStreamPreviews = document.getElementById('user-stream-previews').checked;
   const shareSystemAudio = document.getElementById('user-share-system-audio').checked;
+  const theme = document.querySelector('input[name="settings-theme"]:checked')?.value || getUserTheme();
 
   localStorage.setItem('teamsync_turn_url', turnUrl);
   localStorage.setItem('teamsync_turn_user', turnUser);
@@ -6380,6 +6430,7 @@ function saveUserSettings() {
   localStorage.setItem(USER_STREAM_FPS_KEY, streamFps);
   localStorage.setItem(USER_STREAM_PREVIEWS_KEY, showStreamPreviews ? '1' : '0');
   localStorage.setItem(USER_SHARE_SYSTEM_AUDIO_KEY, shareSystemAudio ? '1' : '0');
+  applyUserTheme(theme, true);
   applyMicrophoneVolume(document.getElementById('user-mic-volume').value, true);
   applySpeakerVolume(document.getElementById('user-speaker-volume').value, true);
 
@@ -6407,6 +6458,7 @@ function initUserSettings() {
   // altında tanımlı; #app ana menüde gizli olduğundan body'ye portal edilmelidir.
   const settingsModal = document.getElementById('settings-modal');
   if (settingsModal && settingsModal.parentElement !== document.body) document.body.appendChild(settingsModal);
+  applyUserTheme(getUserTheme());
   applyUserLanguage(getUserLanguage(), false);
   const quality = localStorage.getItem(USER_QUALITY_KEY);
   if (quality && document.getElementById('quality-select')) document.getElementById('quality-select').value = quality;
@@ -6421,6 +6473,7 @@ function initUserSettings() {
   document.getElementById('settings-v2-close')?.addEventListener('click', () => {
     stopSettingsMicTest();
     window.releaseMediaLibrarySettingsUrls?.();
+    applyUserTheme(getUserTheme());
     document.getElementById('settings-modal').classList.add('hidden');
   });
   document.getElementById('settings-v2-save')?.addEventListener('click', saveUserSettings);
@@ -6469,6 +6522,11 @@ function initUserSettings() {
       if (!radio.checked) return;
       localStorage.setItem(USER_TIME_FORMAT_KEY, radio.value);
       updateSettingsTimePreview();
+    });
+  });
+  document.querySelectorAll('input[name="settings-theme"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) applyUserTheme(radio.value);
     });
   });
 

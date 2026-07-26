@@ -43,6 +43,46 @@ module.exports = async function run() {
     await createRoom(peer);
     const host = await evalJS(peer.client, 'window.state.myId');
 
+    // Etkinlik kartı: emoji yerine oyun afişi ve özgün ikon kullanılmalı.
+    const activityCover = await evalJS(peer.client, `(() => {
+      const card = document.getElementById('card-act-vampire');
+      const image = card?.querySelector('.activity-vampire-cover-image');
+      return {
+        hasCard: !!card,
+        hasCover: !!image,
+        source: image?.getAttribute('src') || '',
+        hasCustomIcon: !!card?.querySelector('.activity-icon-vampire svg')
+      };
+    })()`);
+    assert.deepStrictEqual(activityCover, {
+      hasCard: true,
+      hasCover: true,
+      source: 'assets/vampire-villager-cover-v2.png',
+      hasCustomIcon: true
+    }, JSON.stringify(activityCover));
+
+    // Kişisel arka plan teması: dört seçenek görünmeli, önizleme anlık çalışmalı
+    // ve Kaydet ile cihazdaki tercih olarak kalmalı.
+    await evalJS(peer.client, `openUserSettings('general'); 1`);
+    const themeLayout = await evalJS(peer.client, `(() => ({
+      optionCount: document.querySelectorAll('input[name="settings-theme"]').length,
+      selected: document.querySelector('input[name="settings-theme"]:checked')?.value,
+      visible: !document.getElementById('settings-modal').classList.contains('hidden')
+    }))()`);
+    assert.strictEqual(themeLayout.optionCount, 4, JSON.stringify(themeLayout));
+    assert.strictEqual(themeLayout.selected, 'aurora', JSON.stringify(themeLayout));
+    assert.strictEqual(themeLayout.visible, true, JSON.stringify(themeLayout));
+    const savedTheme = await evalJS(peer.client, `(() => {
+      const black = document.querySelector('input[name="settings-theme"][value="black"]');
+      black.checked = true;
+      black.dispatchEvent(new Event('change', { bubbles: true }));
+      const preview = document.documentElement.dataset.theme;
+      document.getElementById('settings-v2-save').click();
+      return { preview, saved: localStorage.getItem('teamsync_theme') };
+    })()`);
+    assert.deepStrictEqual(savedTheme, { preview: 'black', saved: 'black' }, JSON.stringify(savedTheme));
+    await evalJS(peer.client, `(() => { document.getElementById('settings-v2-close').click(); return 1; })()`);
+
     // Lobi ayarları: geniş bir odada roller kart olarak üç sütuna yerleşmeli.
     await peer.client.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
     await evalJS(peer.client, `(() => {

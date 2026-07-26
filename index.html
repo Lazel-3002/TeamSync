@@ -7,6 +7,9 @@
   <meta name="referrer" content="no-referrer" />
   <title>TeamSync</title>
   <link rel="stylesheet" href="style.css?v=18" />
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem('teamsync_theme') || 'aurora'; } catch (_) {}
+  </script>
   <style>
     /* Pokemon Selection Styles */
     .poke-base-card {
@@ -1652,6 +1655,43 @@
             <div class="settings-panel active" data-settings-content="general">
               <h2 id="settings-view-title" data-i18n="settings.general">Genel</h2>
               <p class="settings-lead" data-i18n="settings.generalLead">TeamSync'in görünümünü ve performansını yönet.</p>
+              <section class="settings-theme-section" aria-labelledby="settings-theme-title">
+                <div class="settings-theme-heading">
+                  <div>
+                    <span class="settings-theme-eyebrow" data-i18n="settings.appearance">GÖRÜNÜM</span>
+                    <h3 id="settings-theme-title" data-i18n="settings.backgroundTheme">Arka plan teması</h3>
+                    <p data-i18n="settings.backgroundThemeDesc">Kendine en rahat gelen görünümü seç. Tercihin yalnızca bu cihazda saklanır.</p>
+                  </div>
+                  <span class="settings-theme-device" data-i18n="settings.personalPreference">Kişisel tercih</span>
+                </div>
+                <div class="settings-theme-options" role="radiogroup" data-i18n-title="settings.backgroundTheme">
+                  <label class="settings-theme-option" data-theme-option="aurora">
+                    <input type="radio" name="settings-theme" value="aurora">
+                    <span class="settings-theme-preview theme-preview-aurora"><i></i><b></b></span>
+                    <span class="settings-theme-copy"><strong data-i18n="settings.themeAurora">Mevcut Mor</strong><small data-i18n="settings.themeAuroraDesc">Canlı ve yumuşak</small></span>
+                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                  </label>
+                  <label class="settings-theme-option" data-theme-option="black">
+                    <input type="radio" name="settings-theme" value="black">
+                    <span class="settings-theme-preview theme-preview-black"><i></i><b></b></span>
+                    <span class="settings-theme-copy"><strong data-i18n="settings.themeBlack">Gece Siyahı</strong><small data-i18n="settings.themeBlackDesc">Saf ve dikkat dağıtmayan</small></span>
+                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                  </label>
+                  <label class="settings-theme-option" data-theme-option="navy">
+                    <input type="radio" name="settings-theme" value="navy">
+                    <span class="settings-theme-preview theme-preview-navy"><i></i><b></b></span>
+                    <span class="settings-theme-copy"><strong data-i18n="settings.themeNavy">Derin Lacivert</strong><small data-i18n="settings.themeNavyDesc">Sakin ve odaklı</small></span>
+                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                  </label>
+                  <label class="settings-theme-option" data-theme-option="white">
+                    <input type="radio" name="settings-theme" value="white">
+                    <span class="settings-theme-preview theme-preview-white"><i></i><b></b></span>
+                    <span class="settings-theme-copy"><strong data-i18n="settings.themeWhite">Temiz Beyaz</strong><small data-i18n="settings.themeWhiteDesc">Aydınlık ve ferah</small></span>
+                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                  </label>
+                </div>
+                <p class="settings-theme-hint"><span aria-hidden="true">✦</span><span data-i18n="settings.themeHint">Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.</span></p>
+              </section>
               <div class="settings-card settings-row">
                 <div>
                   <strong data-i18n="settings.hwaccel">Donanım Hızlandırma</strong>
@@ -2116,12 +2156,16 @@
             </div>
 
             <div class="src act-src card-act-btn" id="card-act-vampire" role="button" tabindex="0" data-search="vampir köylü kurt adam sosyal çıkarım gece gündüz oylama">
-              <div class="activity-cover" style="background:linear-gradient(135deg,#28143d,#701f52 55%,#d45156);">
+              <div class="activity-cover activity-cover-vampire">
                 <span class="activity-cover-badge">SOSYAL</span>
-                <div class="activity-art" aria-hidden="true" style="font-size:52px;display:flex;align-items:center;justify-content:center;height:100%;filter:drop-shadow(0 8px 10px rgba(0,0,0,.35));">🧛</div>
+                <img class="activity-vampire-cover-image" src="assets/vampire-villager-cover-v2.png" alt="" />
+                <div class="activity-vampire-cover-overlay" aria-hidden="true">
+                  <span class="activity-vampire-cover-label">GECE BAŞLAR</span>
+                  <span class="activity-vampire-cover-moon"></span>
+                </div>
               </div>
               <div class="activity-card-footer">
-                <div class="activity-icon" style="background:rgba(212,81,86,.18);color:#ff9fa5;">🧛</div>
+                <div class="activity-icon activity-icon-vampire" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 20v-5.2a6 6 0 0 1 12 0V20"/><path d="M8 11.5V8.7a4 4 0 0 1 8 0v2.8"/><path d="M9.2 16.5h5.6"/><path d="m10 16.5 1 2 1-2 1 2 1-2"/></svg></div>
                 <div class="activity-copy"><div class="activity-name">Vampir Köylü</div><p>Gece hayatta kal, gündüz oylayın</p></div>
                 <span class="act-count-badge hidden" id="act-vampire-count">0</span>
                 <div class="act-arrow-btn" id="arrow-act-vampire"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
