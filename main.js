@@ -506,12 +506,17 @@ function createWindow() {
     console.log(`[Renderer ${level}] ${message} (${line})`);
   });
 
-  const _loadTarget = process.env.REACT_DEV === 'true' ? 'http://localhost:5173' : 'index.html';
+  const _indexPath = path.join(__dirname, 'index.html');
+  const _loadTarget = process.env.REACT_DEV === 'true' ? 'http://localhost:5173' : _indexPath;
   if (process.env.REACT_DEV === 'true') {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173').catch((err) => {
+      console.error('[TeamSync] Geliştirme arayüzü yüklenemedi:', err.message);
+    });
     // mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile('index.html');
+    mainWindow.loadFile(_indexPath).catch((err) => {
+      console.error('[TeamSync] Üretim arayüzü yüklenemedi:', err.message);
+    });
   }
   Menu.setApplicationMenu(null);
 
