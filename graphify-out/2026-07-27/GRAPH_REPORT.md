@@ -1,16 +1,16 @@
 # Graph Report - TeamSync  (2026-07-27)
 
 ## Corpus Check
-- 85 files · ~392,639 words
+- 85 files · ~392,633 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 906 nodes · 1822 edges · 83 communities (59 shown, 24 thin omitted)
+- 905 nodes · 1821 edges · 82 communities (61 shown, 21 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 60 edges (avg confidence: 0.6)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `20318ef6`
+- Built from commit: `9ae8f954`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -94,7 +94,6 @@
 - nsis
 - media-library.test.js
 - settings-language.test.js
-- react-dom
 
 ## God Nodes (most connected - your core abstractions)
 1. `evalJS()` - 41 edges
@@ -129,7 +128,7 @@
 - **Create-Room premium options (RNNoise, SFW AI, Game Mode, Relay, Bitrate) configured together at room creation** — index_step_create_form, index_rnnoise_toggle_option, index_sfw_toggle_option, index_game_mode_toggle_option, index_relay_toggle_option, index_bitrate_select [EXTRACTED 0.90]
 - **TeamSync release pipeline: version bump in index/docs marketing pages triggers GitHub Actions build published to GitHub Releases** — github_workflows_release_release_workflow, docs_index_github_releases_link, index_teamsync_login_flow [INFERRED 0.65]
 
-## Communities (83 total, 24 thin omitted)
+## Communities (82 total, 21 thin omitted)
 
 ### Community 0 - "UNO Card Game"
 Cohesion: 0.12
@@ -160,8 +159,8 @@ Cohesion: 0.14
 Nodes (27): addUser(), appendChat(), applyPeerVolume(), checkAvatar(), cleanText(), displayName(), ensurePeerBoostChain(), getNickname() (+19 more)
 
 ### Community 7 - "Electron Builder Config"
-Cohesion: 0.09
-Nodes (22): build, appId, directories, files, nsis, productName, publish, win (+14 more)
+Cohesion: 0.22
+Nodes (9): build, appId, directories, productName, publish, win, output, icon (+1 more)
 
 ### Community 8 - "Sidebar UI Components"
 Cohesion: 0.10
@@ -184,8 +183,8 @@ Cohesion: 0.11
 Nodes (21): fs, { launch, getPageTarget, cdp, evalJS, waitFor }, os, path, assert, fs, inspectButton(), { launch, getPageTarget, cdp, evalJS, waitFor } (+13 more)
 
 ### Community 13 - "Native Dependencies"
-Cohesion: 0.12
-Nodes (17): acorn, cross-fetch, electron-updater, @ghostery/adblocker-electron, dependencies, acorn, cross-fetch, electron-updater (+9 more)
+Cohesion: 0.09
+Nodes (23): acorn, cross-fetch, crypto-js, electron-updater, @ghostery/adblocker-electron, @jitsi/robotjs, dependencies, acorn (+15 more)
 
 ### Community 14 - "Shared Browser Feature"
 Cohesion: 0.32
@@ -240,8 +239,8 @@ Cohesion: 0.29
 Nodes (7): assertSourceGif(), fs, generate(), outputDir, path, sourcePath, variants
 
 ### Community 27 - "Package Metadata"
-Cohesion: 0.25
-Nodes (7): author, description, license, main, name, releaseName, version
+Cohesion: 0.29
+Nodes (6): author, description, license, main, name, version
 
 ### Community 28 - "E2E Test: Lucky Wheel"
 Cohesion: 0.29
@@ -388,6 +387,14 @@ Nodes (14): initPoke(), assert, audioState(), setFounderToggle(), {
   waitFor,
 }, evalJS(), assert, botAction() (+6 more)
 
+### Community 70 - "Supabase Client Dependency"
+Cohesion: 0.29
+Nodes (7): files, **/*, !dist, !.env, !problemler.md, !tools/dev/yapaydenetleyici.js, !yapaydenetliyici.md
+
+### Community 79 - "nsis"
+Cohesion: 0.33
+Nodes (6): nsis, artifactName, deleteAppDataOnUninstall, oneClick, perMachine, runAfterFinish
+
 ### Community 80 - "media-library.test.js"
 Cohesion: 0.40
 Nodes (4): assert, fs, path, {
@@ -412,9 +419,9 @@ Nodes (4): assert, fs, path, {
   index.html · relation: calls
 
 ## Knowledge Gaps
-- **298 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+293 more)
+- **297 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+292 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **24 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -424,9 +431,9 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `t()` connect `Cross-Fetch Dependency` to `Video Call Controls`, `Chat & Renderer Utilities`, `Chat Messaging & Invites`, `Poke Feature Init`?**
   _High betweenness centrality (0.087) - this node is a cross-community bridge._
 - **Why does `initPoke()` connect `Poke Feature Init` to `Cross-Fetch Dependency`?**
-  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+  _High betweenness centrality (0.087) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
-  _298 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _297 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `UNO Card Game` be split into smaller, more focused modules?**
   _Cohesion score 0.11779448621553884 - nodes in this community are weakly interconnected._
 - **Should `App Shell & Pokedex Data` be split into smaller, more focused modules?**

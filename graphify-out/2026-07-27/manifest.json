@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1785100588.0219018,
-    "ast_hash": "cc4b2c23ab2bd446796666969c194cd3",
+    "mtime": 1785100358.3653543,
+    "ast_hash": "a27d749656533d9a914889542fcbb295",
     "semantic_hash": ""
   },
   "preload.js": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1785100588.023907,
-    "ast_hash": "173b45a3d2cf1fc4fb1c324d5a715fb0",
+    "mtime": 1785100358.3671968,
+    "ast_hash": "ba1b525d437f5334a60675a6757e23f6",
     "semantic_hash": ""
   },
   "src/index.html": {
