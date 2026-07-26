@@ -92,6 +92,9 @@ window.state = {
     hands: {},       // host-only: id -> [cards]
     winnerId: null
   },
+  // Vampir Köylü — roller yalnızca kurucuda tutulur; diğer istemciler kendi
+  // gizli rollerini alır (bkz. js/vampire-villager.js).
+  vampire: { host: null, started: false, phase: 'lobby', round: 0, players: [], roles: {}, localRole: null, votes: {}, nightVotes: {}, log: [] },
   lobbies: [],
   activeLobbyId: null,
   isLobbyHost: false,

@@ -4115,6 +4115,8 @@ async function handleDataMessage(peerId, msg) {
             broadcastTo(msg.peerId, { type: 'wheel_items', items: window.wheelItems });
             broadcastTo(msg.peerId, { type: 'wheel_ready' });
           }
+        } else if (lob.activity === 'vampire') {
+          if (typeof window.vampireVillagerSyncPeer === 'function') window.vampireVillagerSyncPeer(msg.peerId);
         } else if (lob.activity === 'lvs') {
           const lvsPlayer = document.getElementById('lvs-player');
           if (lvsPlayer) {
@@ -4161,6 +4163,7 @@ async function handleDataMessage(peerId, msg) {
 
   const isActivityMsg = msg.type.startsWith('wt-') ||
                         msg.type.startsWith('uno-') ||
+                        msg.type.startsWith('vv-') ||
                         msg.type.startsWith('sb-') ||
                         msg.type.startsWith('poke_') || 
                         ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
@@ -4481,6 +4484,8 @@ async function handleDataMessage(peerId, msg) {
     handleWTMessage(peerId, msg);
   } else if (msg.type.startsWith('uno-')) {
     handleUnoMessage(peerId, msg);
+  } else if (msg.type.startsWith('vv-')) {
+    if (window.vampireVillagerHandler) window.vampireVillagerHandler(msg, peerId);
   } else if (msg.type.startsWith('sb-')) {
     handleSBMessage(peerId, msg);
   } else if (msg.type.startsWith('poke_') || ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
@@ -8193,6 +8198,7 @@ function initActivitiesUI() {
   if (typeof initWatchTogether === 'function') initWatchTogether();
   if (typeof initSharedBrowser === 'function') initSharedBrowser();
   if (typeof initUno === 'function') initUno();
+  if (typeof initVampireVillager === 'function') initVampireVillager();
   if (typeof initLuckyWheel === 'function') initLuckyWheel();
   if (typeof initPoke === 'function') initPoke();
 }
@@ -8645,7 +8651,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- LOBBY SYSTEM UI BINDINGS ---
-  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'poke'];
+  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'poke', 'vampire'];
   const activitySearch = document.getElementById('activity-search');
   if (activitySearch) {
     activitySearch.addEventListener('input', () => filterActivityCards(activitySearch.value));
@@ -8667,7 +8673,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş', vampire: 'Vampir Köylü' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -8690,7 +8696,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş', vampire: 'Vampir Köylü' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -8719,7 +8725,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!act) return;
     
     // Create new lobby
-    const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş' };
+    const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş', vampire: 'Vampir Köylü' };
     const newLobby = {
       id: `LOB-${crypto.randomUUID()}`,
       activity: act,
@@ -8773,7 +8779,8 @@ window.updateActivityCounts = function() {
     poll: { l: 0, p: 0 },
     lvs: { l: 0, p: 0 },
     wheel: { l: 0, p: 0 },
-    poke: { l: 0, p: 0 }
+    poke: { l: 0, p: 0 },
+    vampire: { l: 0, p: 0 }
   };
   
   state.lobbies.forEach(lob => {

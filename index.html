@@ -737,6 +737,34 @@
           </div>
         </div>
 
+        <!-- Vampir Köylü -->
+        <div id="vampire-card" class="vcard hidden" style="background:radial-gradient(circle at 50% 0,#5f1f4c,#170d27 62%);color:#fff;overflow:auto;">
+          <div class="vv-card-header">
+            <div><span class="vv-card-kicker">SOSYAL ÇIKARIM OYUNU</span><h3>🧛 Vampir Köylü</h3></div>
+            <button id="vampire-close" class="btn-sec btn-sm">Odadan Çık</button>
+          </div>
+          <div class="vv-card-body">
+            <div id="vampire-role" class="vv-role-banner">Lobi hazırlanıyor…</div>
+            <div id="vampire-status" class="vv-status">Oyuncular bekleniyor</div>
+            <div id="vampire-players" class="vv-player-list"></div>
+            <div id="vampire-actions"></div>
+            <details id="vampire-guide" class="vv-guide" open>
+              <summary>Oyuna başlamadan önce: hızlı rehber ve roller</summary>
+              <div class="vv-guide-content">
+                <div><strong>Akış:</strong> Gece vampirler hedef seçer; bilgi ve koruma rolleri yeteneklerini kullanır. Gündüz herkes konuşur, sonra yaşayan oyuncular bir kişiyi oylayarak köyden sürer. Tüm vampirler elenirse köy, vampirler yaşayan köylülere eşitlenirse vampirler kazanır.</div>
+                <div><strong>Vampir:</strong> Her gece takımca hedef seçer. <strong>Köylü:</strong> Gündüz ipuçlarını tartışır ve oy verir. <strong>Büyücü:</strong> Gece bir kişinin tam rolünü öğrenir. <strong>Kâhin:</strong> Gece bir kişinin vampir mi köy tarafında mı olduğunu öğrenir. <strong>Doktor:</strong> Seçtiği kişiyi o geceki saldırıdan korur.</div>
+                <div><strong>Deli Köylü:</strong> Gece seçtiği kişi hakkında ters taraf bilgisi alır; bu nedenle sonucuna güvenmemelidir. <strong>Cellat:</strong> Bağımsız roldür; gizli hedefi gündüz oylamasıyla sürülürse tek başına kazanır.</div>
+                <div><strong>Şifacı:</strong> Oyun boyunca bir kez elenmiş kişiyi geri döndürür. <strong>Avcı:</strong> Elendiğinde bir kişiye son atış yapar. <strong>Savaşçı:</strong> Bir kez gece saldırı yapabilir. <strong>Casus:</strong> Gece bir kişinin vampir tarafında olup olmadığını araştırır.</div>
+                <div>Kurucu, aşağıdaki <strong>Lobi kuralları</strong> bölümünden rol setini seçer. Başlangıçta her oyuncu yalnızca kendi gizli rolünü görür; gündüz konuşmalar sesli sohbet üzerinden sürer.</div>
+              </div>
+            </details>
+            <div class="vv-log-panel">
+              <strong>OYUN GÜNLÜĞÜ</strong>
+              <div id="vampire-log"></div>
+            </div>
+          </div>
+        </div>
+
         <div id="poll-card" class="vcard poll-card hidden">
           <div class="poll-ambient poll-ambient-one" aria-hidden="true"></div>
           <div class="poll-ambient poll-ambient-two" aria-hidden="true"></div>
@@ -1958,6 +1986,7 @@
         <button id="act-lvs" style="display:none;"></button>
         <button id="act-wheel" style="display:none;"></button>
         <button id="act-poke" style="display:none;"></button>
+        <button id="act-vampire" style="display:none;"></button>
 
         <div class="activity-picker-scroll">
           <section class="activity-quick-section" aria-labelledby="activity-quick-title">
@@ -1986,7 +2015,7 @@
 
           <div class="activity-section-label">
             <span>Etkinlikler</span>
-            <span class="activity-section-hint">6 etkinlik</span>
+            <span class="activity-section-hint">7 etkinlik</span>
           </div>
 
           <div class="sources activity-grid">
@@ -2083,6 +2112,19 @@
                 <div class="activity-copy"><div class="activity-name">Şans Çarkı</div><p>Rastgele kazanan seçin</p></div>
                 <span class="act-count-badge hidden" id="act-wheel-count">0</span>
                 <div class="act-arrow-btn" id="arrow-act-wheel"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+              </div>
+            </div>
+
+            <div class="src act-src card-act-btn" id="card-act-vampire" role="button" tabindex="0" data-search="vampir köylü kurt adam sosyal çıkarım gece gündüz oylama">
+              <div class="activity-cover" style="background:linear-gradient(135deg,#28143d,#701f52 55%,#d45156);">
+                <span class="activity-cover-badge">SOSYAL</span>
+                <div class="activity-art" aria-hidden="true" style="font-size:52px;display:flex;align-items:center;justify-content:center;height:100%;filter:drop-shadow(0 8px 10px rgba(0,0,0,.35));">🧛</div>
+              </div>
+              <div class="activity-card-footer">
+                <div class="activity-icon" style="background:rgba(212,81,86,.18);color:#ff9fa5;">🧛</div>
+                <div class="activity-copy"><div class="activity-name">Vampir Köylü</div><p>Gece hayatta kal, gündüz oylayın</p></div>
+                <span class="act-count-badge hidden" id="act-vampire-count">0</span>
+                <div class="act-arrow-btn" id="arrow-act-vampire"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
               </div>
             </div>
           </div>
@@ -2285,6 +2327,7 @@
   <script src="js/watch-together.js"></script>
   <script src="js/shared-browser.js"></script>
   <script src="js/uno.js"></script>
+  <script src="js/vampire-villager.js"></script>
   <script src="js/lucky-wheel.js"></script>
   <script src="js/movesData.js"></script>
   <script src="js/pokeData.js"></script>

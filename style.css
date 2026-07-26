@@ -2683,6 +2683,90 @@ body { padding-top: 35px; } /* Prevent overlap */
 .btn-sec { background: rgba(255,255,255,0.1); color: var(--txt-main); }
 .btn-sec:hover { background: rgba(255,255,255,0.15); }
 
+/* ---------- Vampir Köylü: lobi ayarları ---------- */
+#vampire-card {
+  border: 1px solid rgba(244, 114, 182, 0.2);
+  box-shadow: 0 22px 70px rgba(5, 0, 12, 0.38), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+#vampire-card .vv-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(90deg, rgba(255,255,255,.045), transparent 68%);
+}
+#vampire-card .vv-card-header h3 { margin: 4px 0 0; font-size: 23px; letter-spacing: -.02em; }
+.vv-card-kicker { color: #f9a8d4; font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+.vv-card-body { width: min(800px, 100%); margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
+.vv-role-banner {
+  padding: 15px 17px; border: 1px solid rgba(255,255,255,.13); border-radius: 14px;
+  background: linear-gradient(110deg, rgba(255,255,255,.09), rgba(0,0,0,.18)); color: #fff; font-weight: 700;
+}
+.vv-status { color: #f8edf8; text-align: center; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+.vv-player-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.vv-guide, .vv-log-panel { border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: rgba(8,3,16,.24); }
+.vv-guide { padding: 14px 16px; }
+.vv-guide summary { cursor: pointer; color: #ffd1e3; font-weight: 800; }
+.vv-guide-content { display: grid; gap: 10px; margin-top: 12px; color: #e9e0ee; font-size: 13px; line-height: 1.5; }
+.vv-log-panel { padding: 14px 16px; }
+.vv-log-panel > strong { color: #f9a8d4; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+#vampire-log { display: grid; gap: 6px; margin-top: 10px; color: #d9d0e5; font-size: 13px; }
+#vampire-card #vampire-actions { width: 100%; }
+.vv-lobby-settings {
+  width: min(720px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255,255,255,0.09), rgba(42,12,55,0.38));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 14px 34px rgba(0,0,0,0.16);
+}
+.vv-settings-head { display: grid; gap: 4px; }
+.vv-settings-kicker { color: #f9a8d4; font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+.vv-settings-head strong { font-family: var(--font-head, inherit); font-size: 21px; letter-spacing: -.02em; }
+.vv-settings-head p { margin: 0; color: #d8c5dd; font-size: 13px; }
+.vv-setting-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.vv-field { display: grid; gap: 7px; min-width: 0; color: #e8dcea; font-size: 12px; font-weight: 700; }
+.vv-field span { color: #c8afcf; font-size: 11px; letter-spacing: .02em; }
+.vv-field select {
+  width: 100%; min-height: 39px; padding: 0 10px; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
+  background: rgba(10, 5, 20, 0.48); color: #fff; outline: none; cursor: pointer; font: inherit;
+}
+.vv-field select:hover, .vv-field select:focus { border-color: rgba(244,114,182,.72); box-shadow: 0 0 0 3px rgba(244,114,182,.12); }
+.vv-role-section { display: grid; gap: 10px; padding-top: 2px; }
+.vv-role-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.vv-role-section-title strong { font-size: 14px; }
+.vv-role-section-title span { color: #bda8c4; font-size: 11px; }
+.vv-role-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.vv-role-toggle {
+  min-width: 0; display: flex; align-items: center; gap: 8px; padding: 10px 11px; border: 1px solid rgba(255,255,255,.10); border-radius: 11px;
+  background: rgba(7, 4, 15, .23); color: #e7dbe9; font-size: 12px; font-weight: 700; cursor: pointer; transition: border-color .15s, background .15s, transform .15s;
+}
+.vv-role-toggle:hover { transform: translateY(-1px); border-color: rgba(244,114,182,.45); background: rgba(255,255,255,.08); }
+.vv-role-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.vv-role-check { width: 15px; height: 15px; flex: 0 0 15px; border: 1px solid rgba(255,255,255,.36); border-radius: 5px; background: rgba(0,0,0,.2); transition: .15s; }
+.vv-role-toggle input:checked + .vv-role-check { border-color: #f9a8d4; background: linear-gradient(135deg, #e879f9, #f43f5e); box-shadow: 0 0 0 3px rgba(244,114,182,.12); }
+.vv-role-toggle input:checked + .vv-role-check::after { content: '✓'; display: block; color: white; font-size: 11px; line-height: 14px; text-align: center; }
+.vv-role-toggle:has(input:checked) { border-color: rgba(244,114,182,.45); background: rgba(190,24,93,.15); color: #fff; }
+.vv-role-summary { padding: 11px 13px; border-left: 3px solid #f472b6; border-radius: 0 10px 10px 0; background: rgba(244,114,182,.08); }
+.vv-role-summary > span { color: #f9a8d4; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.vv-role-summary p { margin: 4px 0 0; color: #eadfeb; font-size: 12px; line-height: 1.45; }
+.vv-role-summary em { display: block; margin-top: 3px; color: #fcd34d; font-style: normal; }
+.vv-start-button { width: 100%; min-height: 46px; justify-content: center; border-radius: 12px; font-size: 14px; font-weight: 800; }
+.vv-start-button span { margin-left: 7px; padding-left: 8px; border-left: 1px solid rgba(255,255,255,.32); font-size: 12px; opacity: .9; }
+.vv-target { border-radius: 10px; border: 1px solid rgba(244,114,182,.24); }
+@media (max-width: 680px) {
+  #vampire-card .vv-card-header { align-items: flex-start; padding: 16px; }
+  #vampire-card .vv-card-header h3 { font-size: 20px; }
+  .vv-card-body { padding: 16px; }
+  .vv-setting-grid { grid-template-columns: 1fr; }
+  .vv-role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vv-lobby-settings { padding: 16px; border-radius: 14px; }
+}
+
 #copy-offer { margin-top: 8px; }
 
 .rwrap {
