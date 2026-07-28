@@ -4242,36 +4242,6 @@ async function handleDataMessage(peerId, msg) {
       if (!res.ok) isCensored = true;
     }
     appendChat(peerId, peer.name, msg.text || '', isCensored);
-    
-    // Supabase Kayıt (Gelen Oda Mesajı)
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      // Alıcılar (kendimiz + odadaki diğer kişiler - gönderen hariç)
-      const otherNamesList = [state.myName || 'Anonim'];
-      const otherIdsList = [state.myId || 'Anonim'];
-      for (const [id, p] of state.peers.entries()) {
-        if (id !== peerId) {
-          otherNamesList.push(p.name || 'Anonim');
-          otherIdsList.push(id);
-        }
-      }
-      const otherNames = otherNamesList.join(', ');
-      const otherIds = otherIdsList.join(', ');
-
-      supabaseClient.from('mesaj').insert([
-        {
-          gonderen_id: peerId,
-          gonderen_adi: peer.name || 'Anonim',
-          alici_id: otherIds,
-          alici_adi: otherNames,
-          tip: 'oda',
-          oda_adi: state.room || '',
-          icerik: msg.text || '',
-          is_censored: isCensored
-        }
-      ]).then(({ error }) => {
-        if (error) console.error('Supabase room message insert error:', error);
-      });
-    }
   } else if (msg.type === 'chat-enc') {
     let isCensored = msg.isCensored || false;
     if (state.cryptoKey) {
@@ -4282,35 +4252,6 @@ async function handleDataMessage(peerId, msg) {
             if (!res.ok) isCensored = true;
          }
          appendChat(peerId, peer.name, dec || '', isCensored);
-         
-         // Supabase Kayıt (Gelen Şifreli Oda Mesajı - Çözülmüş Hali)
-         if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-           const otherNamesList = [state.myName || 'Anonim'];
-           const otherIdsList = [state.myId || 'Anonim'];
-           for (const [id, p] of state.peers.entries()) {
-             if (id !== peerId) {
-               otherNamesList.push(p.name || 'Anonim');
-               otherIdsList.push(id);
-             }
-           }
-           const otherNames = otherNamesList.join(', ');
-           const otherIds = otherIdsList.join(', ');
-
-           supabaseClient.from('mesaj').insert([
-             {
-               gonderen_id: peerId,
-               gonderen_adi: peer.name || 'Anonim',
-               alici_id: otherIds,
-               alici_adi: otherNames,
-               tip: 'oda',
-               oda_adi: state.room || '',
-               icerik: dec || '',
-               is_censored: isCensored
-             }
-            ]).then(({ error }) => {
-              if (error) console.error('Supabase room encrypted message insert error:', error);
-            });
-         }
       } else {
          appendChat(peerId, peer.name, '🔒 [Şifre Çözülemedi]');
       }
@@ -5504,39 +5445,6 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   
   appendChat('self', state.myName, textToSend, isCensored);
   input.value = '';
-
-  // Supabase Kayıt (Oda Mesajı Gönderimi)
-  console.log('cform submit triggered, message:', textToSend);
-  console.log('supabaseClient exists?', !!supabaseClient);
-  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-    console.log('Attempting to insert room message into Supabase...');
-    
-    // Alıcılar (odadaki diğer tüm kişiler)
-    const otherNames = Array.from(state.peers.values()).map(p => p.name || 'Anonim').join(', ');
-    const otherIds = Array.from(state.peers.keys()).join(', ');
-
-    supabaseClient.from('mesaj').insert([
-      {
-        gonderen_id: state.myId || 'Anonim',
-        gonderen_adi: state.myName || 'Anonim',
-        alici_id: otherIds || null,
-        alici_adi: otherNames || null,
-        tip: 'oda',
-        oda_adi: state.room || '',
-        icerik: textToSend,
-        is_censored: isCensored
-      }
-    ]).then(
-      (result) => {
-        console.log('Supabase room insert resolved:', result);
-        if (result.error) console.error('Supabase room insert error:', result.error);
-        else console.log('Oda mesajı Supabase\'e başarıyla kaydedildi.');
-      },
-      (error) => {
-        console.error('Supabase room insert rejected:', error);
-      }
-    );
-  }
   });
 
 function saveChatToLocal(uid, name, text, isCensored) {
