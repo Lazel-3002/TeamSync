@@ -9041,6 +9041,9 @@ window.leaveActiveLobby = function() {
     } else if (lob.activity === 'sb') {
       broadcast({ type: 'sb-leave' });
     }
+    if (lob.activity === 'vampire' && typeof window.vampireVillagerLeave === 'function') {
+      window.vampireVillagerLeave();
+    }
   }
 
   state.activeLobbyId = null;

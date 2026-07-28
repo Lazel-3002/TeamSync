@@ -17,8 +17,9 @@
   };
   const SPECIALS = ['seer', 'oracle', 'fool', 'doctor', 'healer', 'hunter', 'warrior', 'spy', 'executioner'];
   const freshSettings = () => ({ vampireCount: 'auto', preset: 'balanced', phaseSeconds: 0, seer: true, oracle: false, fool: false, doctor: true, healer: false, hunter: true, warrior: false, spy: false, executioner: false });
-  const blank = () => ({ host: null, started: false, phase: 'lobby', round: 0, players: [], roles: {}, localRole: null, settings: freshSettings(), actions: {}, used: {}, executionTargets: {}, winnerId: null, pendingHunterId: null, phaseEndsAt: 0, privateNote: '', log: [] });
+  const blank = () => ({ host: null, started: false, phase: 'lobby', round: 0, players: [], roles: {}, localRole: null, settings: freshSettings(), actions: {}, used: {}, executionTargets: {}, winnerId: null, pendingHunterId: null, phaseEndsAt: 0, privateNote: '', log: [], chat: [] });
   let phaseTimer = null;
+  const CHAT_LIMIT = 100;
   const game = () => state.vampire || (state.vampire = blank());
   const host = () => game().host === state.myId;
   const alive = () => game().players.filter(player => player.alive);
@@ -26,6 +27,9 @@
   const mine = () => game().players.find(player => player.id === state.myId);
   const note = message => { const g = game(); g.log = [message, ...g.log].slice(0, 9); };
   const recommendedVampires = count => count <= 5 ? 1 : count <= 7 ? 2 : Math.max(2, Math.floor(count / 3));
+  const activeVampireLobby = () => (state.lobbies || []).find(lobby => lobby.id === state.activeLobbyId && lobby.activity === 'vampire') || null;
+  const isLobbyPlayer = id => !!activeVampireLobby()?.players?.some(player => player.id === id);
+  const canUseLobbyChat = () => !state.spectating && isLobbyPlayer(state.myId);
 
   function openCard() {
     if (typeof openCardFocused === 'function') openCardFocused('vampire-card');
@@ -57,8 +61,75 @@
     } else broadcastTo(id, { type: 'vv-role', role, targetName });
   }
   function syncPeer(id) {
+    // İzleyiciler oyun/sohbet senkronizasyonu almaz; bu oyun yalnızca oyuncu lobisine özeldir.
+    if (!isLobbyPlayer(id)) return;
     broadcastTo(id, snapshot());
     if (game().started && game().roles[id]) sendRole(id);
+    if (game().chat.length) broadcastTo(id, { type: 'vv-chat-history', messages: game().chat.slice(-CHAT_LIMIT) });
+  }
+  function normalizeChatMessage(raw) {
+    const lobby = activeVampireLobby();
+    if (!lobby || !raw || typeof raw !== 'object' || !isLobbyPlayer(raw.senderId)) return null;
+    const text = String(raw.text || '').trim().slice(0, 500);
+    if (!text) return null;
+    const player = lobby.players.find(item => item.id === raw.senderId);
+    return {
+      id: String(raw.id || `${raw.senderId}-${raw.sentAt || Date.now()}`),
+      senderId: raw.senderId,
+      name: player?.name || 'Oyuncu',
+      text,
+      sentAt: Number(raw.sentAt) || Date.now()
+    };
+  }
+  function renderLobbyChat() {
+    const wrap = el('vv-chat-messages'), form = el('vv-chat-form');
+    if (!wrap || !form) return;
+    const allowed = canUseLobbyChat();
+    form.classList.toggle('hidden', !allowed);
+    wrap.replaceChildren();
+    if (!allowed) {
+      const empty = document.createElement('div');
+      empty.className = 'vv-chat-empty';
+      empty.textContent = 'Bu sohbet yalnızca lobi oyuncularına açıktır.';
+      wrap.appendChild(empty);
+      return;
+    }
+    const messages = game().chat || [];
+    if (!messages.length) {
+      const empty = document.createElement('div');
+      empty.className = 'vv-chat-empty';
+      empty.textContent = 'Lobi sohbeti hazır. İlk mesajı sen yaz.';
+      wrap.appendChild(empty);
+      return;
+    }
+    messages.forEach(message => {
+      const item = document.createElement('article');
+      item.className = `vv-chat-message${message.senderId === state.myId ? ' mine' : ''}`;
+      const time = new Date(message.sentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      item.innerHTML = `<div class="vv-chat-meta"><span class="vv-chat-name">${esc(message.name)}</span><time class="vv-chat-time">${time}</time></div><div class="vv-chat-text">${esc(message.text)}</div>`;
+      wrap.appendChild(item);
+    });
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+  function addLobbyChatMessage(raw) {
+    const message = normalizeChatMessage(raw);
+    if (!message) return;
+    const g = game();
+    if (g.chat.some(item => item.id === message.id)) return;
+    g.chat = [...g.chat, message].slice(-CHAT_LIMIT);
+    renderLobbyChat();
+  }
+  function sendLobbyChat() {
+    const input = el('vv-chat-input');
+    if (!input || !canUseLobbyChat()) return;
+    const text = input.value.trim();
+    if (!text) return;
+    const message = { type: 'vv-chat', id: crypto.randomUUID(), senderId: state.myId, text: text.slice(0, 500), sentAt: Date.now() };
+    addLobbyChatMessage(message);
+    input.value = '';
+    activeVampireLobby().players.forEach(player => {
+      if (player.id !== state.myId) broadcastTo(player.id, message);
+    });
   }
   function resetHostLobby() {
     const g = game();
@@ -265,6 +336,7 @@
     el('vv-phase-seconds')?.addEventListener('change', event => { g.settings.phaseSeconds = Number(event.target.value); render(); });
     actions.querySelectorAll('.vv-setting').forEach(input => input.addEventListener('change', event => { g.settings[event.target.dataset.key] = event.target.checked; render(); }));
     actions.querySelectorAll('.vv-target').forEach(button => button.addEventListener('click', () => button.dataset.action === 'vote' ? sendVote(button.dataset.target) : sendAction(button.dataset.action, button.dataset.target)));
+    renderLobbyChat();
   }
   window.vampireVillagerSyncPeer = syncPeer;
   window.vampireVillagerHandler = function (msg, peerId) {
@@ -272,12 +344,31 @@
     if (msg.type === 'vv-state') { const ownRole = g.localRole; state.vampire = { ...blank(), ...msg, roles: {}, localRole: ownRole, actions: {}, used: {} }; openCard(); render(); return; }
     if (msg.type === 'vv-role') { g.localRole = msg.role; if (msg.targetName) g.privateNote = `Cellat hedefin: ${msg.targetName}. Hedefin gündüz oylamasıyla sürülürse kazanırsın.`; render(); return; }
     if (msg.type === 'vv-result') { g.privateNote = msg.message; render(); return; }
+    if (msg.type === 'vv-chat-history') {
+      const lobby = activeVampireLobby();
+      if (!canUseLobbyChat() || peerId !== lobby?.hostId || !Array.isArray(msg.messages)) return;
+      game().chat = msg.messages.map(normalizeChatMessage).filter(Boolean).slice(-CHAT_LIMIT);
+      renderLobbyChat();
+      return;
+    }
+    if (msg.type === 'vv-chat') {
+      if (!canUseLobbyChat() || !isLobbyPlayer(peerId) || msg.senderId !== peerId) return;
+      addLobbyChatMessage(msg);
+      return;
+    }
     if (msg.type === 'vv-action' && host()) { setAction(peerId, msg.action, msg.targetId); return; }
     if (msg.type === 'vv-vote' && host()) { castVote(peerId, msg.targetId); publish(); }
   };
   window.initVampireVillager = function () {
-    el('act-vampire')?.addEventListener('click', () => { if (state.activeLobbyId && !state.isLobbyHost) { openCard(); render(); } else resetHostLobby(); });
+    el('act-vampire')?.addEventListener('click', () => {
+      if (state.activeLobbyId && !state.isLobbyHost) {
+        if (state.spectating) { showToast('Vampir Köylü lobisine yalnızca oyuncular katılabilir.', 'warn'); return; }
+        openCard(); render();
+      } else resetHostLobby();
+    });
     el('vampire-close')?.addEventListener('click', () => { if (typeof leaveActiveLobby === 'function' && state.activeLobbyId) leaveActiveLobby(); closeLocal(); });
+    el('vv-chat-form')?.addEventListener('submit', event => { event.preventDefault(); sendLobbyChat(); });
   };
+  window.vampireVillagerLeave = function () { state.vampire = blank(); closeLocal(); };
   setInterval(refreshTimerLabel, 1000);
 })();
