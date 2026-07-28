@@ -5748,8 +5748,6 @@ const I18N = {
     'toolbar.activity': 'Etkinlik',
     'toolbar.record': 'Kayıt',
     'toolbar.volume': 'Düzey',
-    'toolbar.manual': 'Manuel',
-    'toolbar.network': 'Uzak Ağ',
     'toolbar.founder': 'Kurucu',
     'toolbar.voiceTitle': 'Mikrofon (M)',
     'toolbar.deafenTitle': 'Sağırlaştır (D)',
@@ -5758,8 +5756,6 @@ const I18N = {
     'toolbar.activityTitle': 'Etkinlikler (E)',
     'toolbar.recordTitle': 'Kayıt (R)',
     'toolbar.volumeTitle': 'Ses Seviyesi',
-    'toolbar.manualTitle': 'Manuel IP Ekle',
-    'toolbar.networkTitle': 'Çapraz Ağ (SDP)',
     'toolbar.founderTitle': 'Kurucu Ayarları',
     'settings.personal': 'Kişisel Ayarlar',
     'settings.userSettings': 'KULLANICI AYARLARI',
@@ -5926,8 +5922,6 @@ const I18N = {
     'toolbar.activity': 'Activity',
     'toolbar.record': 'Record',
     'toolbar.volume': 'Volume',
-    'toolbar.manual': 'Manual',
-    'toolbar.network': 'Remote',
     'toolbar.founder': 'Owner',
     'toolbar.voiceTitle': 'Microphone (M)',
     'toolbar.deafenTitle': 'Deafen (D)',
@@ -5936,8 +5930,6 @@ const I18N = {
     'toolbar.activityTitle': 'Activities (E)',
     'toolbar.recordTitle': 'Record (R)',
     'toolbar.volumeTitle': 'Volume Level',
-    'toolbar.manualTitle': 'Add Manual IP',
-    'toolbar.networkTitle': 'Cross-Network (SDP)',
     'toolbar.founderTitle': 'Owner Settings',
     'settings.personal': 'Personal Settings',
     'settings.userSettings': 'USER SETTINGS',
@@ -6574,7 +6566,6 @@ function bindUI() {
   const volpop = document.getElementById('volpop');
   const volslider = document.getElementById('volslider');
   const volval = document.getElementById('volval');
-  const addip = document.getElementById('addip');
   const leave = document.getElementById('leave');
 
   const micThresh = document.getElementById('mic-thresh');
@@ -6683,112 +6674,6 @@ function bindUI() {
       document.getElementById('share-modal').classList.add('hidden');
     });
   }
-
-  addip.addEventListener('click', () => {
-    document.getElementById('ip-modal').classList.remove('hidden');
-  });
-  document.getElementById('ip-cancel').addEventListener('click', () => {
-    document.getElementById('ip-modal').classList.add('hidden');
-  });
-  document.getElementById('ip-ok').addEventListener('click', () => {
-    const ip = document.getElementById('ip-input').value.trim();
-    if (ip) {
-      window.electronAPI.directConnect(ip);
-      showToast(ip + ' adresine ping gönderildi.', 'info');
-    }
-    document.getElementById('ip-modal').classList.remove('hidden');
-    document.getElementById('ip-input').value = '';
-  });
-
-  const addsdp = document.getElementById('addsdp');
-  if (addsdp) {
-    addsdp.addEventListener('click', async () => {
-      document.getElementById('sdp-modal').classList.remove('hidden');
-      document.getElementById('my-offer').value = 'Hazırlanıyor... Lütfen bekleyin.';
-      
-      let targetPeer = null;
-      let targetId = null;
-
-      if (state.peers.size === 0) {
-        targetId = crypto.randomUUID();
-        addUser({ id: targetId, name: 'Bilinmeyen (SDP)', mic: true, deaf: false, sharing: false });
-        await createPeerConnection(targetId, 'Bilinmeyen (SDP)', true, null);
-        targetPeer = state.peers.get(targetId);
-      } else {
-        for (const [id, peer] of state.peers) {
-          targetId = id;
-          targetPeer = peer;
-          break;
-        }
-      }
-
-      if (targetPeer.pc.iceGatheringState === 'complete') {
-        document.getElementById('my-offer').value = btoa(JSON.stringify(targetPeer.pc.localDescription));
-        document.getElementById('my-offer').dataset.targetId = targetId;
-      } else {
-        targetPeer.pc.addEventListener('icegatheringstatechange', () => {
-          if (targetPeer.pc.iceGatheringState === 'complete') {
-            document.getElementById('my-offer').value = btoa(JSON.stringify(targetPeer.pc.localDescription));
-            document.getElementById('my-offer').dataset.targetId = targetId;
-          }
-        });
-      }
-    });
-  }
-
-  document.getElementById('sdp-cancel').addEventListener('click', () => {
-    document.getElementById('sdp-modal').classList.add('hidden');
-  });
-
-  document.getElementById('copy-offer').addEventListener('click', () => {
-    const offerText = document.getElementById('my-offer').value;
-    navigator.clipboard.writeText(offerText);
-    showToast('Teklif kopyalandı!', 'ok');
-  });
-
-  document.getElementById('sdp-apply').addEventListener('click', async () => {
-    const friendSdpB64 = document.getElementById('friend-answer').value.trim();
-    if (!friendSdpB64) return;
-    try {
-      const friendSdp = JSON.parse(atob(friendSdpB64));
-      
-      if (friendSdp.type === 'offer') {
-        const newId = crypto.randomUUID();
-        addUser({ id: newId, name: 'Bilinmeyen (SDP)', mic: true, deaf: false, sharing: false });
-        await createPeerConnection(newId, 'Bilinmeyen (SDP)', false, null);
-        const peer = state.peers.get(newId);
-        await peer.pc.setRemoteDescription(new RTCSessionDescription(friendSdp));
-        const answer = await peer.pc.createAnswer();
-        answer.sdp = setMediaBitrates(answer.sdp);
-        await peer.pc.setLocalDescription(answer);
-        
-        document.getElementById('my-offer').value = 'Cevap hazırlanıyor (ICE)...';
-        if (peer.pc.iceGatheringState === 'complete') {
-          document.getElementById('my-offer').value = btoa(JSON.stringify(peer.pc.localDescription));
-          showToast('Cevap oluşturuldu, lütfen arkadaşına gönder.', 'info');
-        } else {
-          peer.pc.addEventListener('icegatheringstatechange', () => {
-            if (peer.pc.iceGatheringState === 'complete') {
-              document.getElementById('my-offer').value = btoa(JSON.stringify(peer.pc.localDescription));
-              showToast('Cevap oluşturuldu, lütfen arkadaşına gönder.', 'info');
-            }
-          });
-        }
-      } else {
-        const targetId = document.getElementById('my-offer').dataset.targetId;
-        if (targetId && state.peers.has(targetId)) {
-          const peer = state.peers.get(targetId);
-          await peer.pc.setRemoteDescription(new RTCSessionDescription(friendSdp));
-          showToast('Bağlantı kuruluyor...', 'info');
-        }
-      }
-      
-      document.getElementById('sdp-modal').classList.add('hidden');
-      document.getElementById('friend-answer').value = '';
-    } catch (e) {
-      showToast('Geçersiz SDP metni.', 'danger');
-    }
-  });
 
   document.getElementById('settings').addEventListener('click', () => {
     document.getElementById('settings-modal').classList.remove('hidden');
