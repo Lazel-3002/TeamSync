@@ -3320,6 +3320,9 @@ function removePeer(peerId) {
     syncLobbiesList();
   }
 
+  // Vampir Köylü: ayrılan kişi bir botun operatörüyse kurucu botu devralsın.
+  if (typeof window.vampireVillagerPeerLeft === 'function') window.vampireVillagerPeerLeft(peerId);
+
   // Ortak Tarayıcı: bağlantısı kopan kurucuysa halef seç (kimseyi atmadan),
   // değilse sadece yetki listesinden düş
   if (state.sb && state.sb.host === peerId) {

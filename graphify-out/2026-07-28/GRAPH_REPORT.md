@@ -1,11 +1,11 @@
 # Graph Report - kanka-voice  (2026-07-28)
 
 ## Corpus Check
-- 87 files · ~524,748 words
+- 87 files · ~523,793 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 958 nodes · 1957 edges · 80 communities (58 shown, 22 thin omitted)
+- 956 nodes · 1953 edges · 80 communities (58 shown, 22 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 61 edges (avg confidence: 0.6)
 - Token cost: 0 input · 0 output
 
@@ -370,8 +370,8 @@ Cohesion: 0.12
 Nodes (38): APP_THEMES, applyCustomThemeColors(), applyMicrophoneVolume(), applySpeakerVolume(), applyUserLanguage(), applyUserTheme(), CUSTOM_THEME_PRESETS, fillAudioDeviceSelect() (+30 more)
 
 ### Community 68 - "Lucky Wheel Feature"
-Cohesion: 0.08
-Nodes (62): initLuckyWheel(), addBot(), addBotMemory(), addLobbyChatMessage(), addressedMessageFor(), afterNight(), applyBotRole(), armPhaseTimer() (+54 more)
+Cohesion: 0.09
+Nodes (60): initLuckyWheel(), addBot(), addBotMemory(), addLobbyChatMessage(), afterNight(), applyBotRole(), armPhaseTimer(), botCandidates() (+52 more)
 
 ### Community 69 - "Poke Feature Init"
 Cohesion: 0.14
@@ -412,7 +412,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `t()` connect `Cross-Fetch Dependency` to `Audio Bitrate & Mic Controls`, `Chat & Renderer Utilities`, `Chat Messaging & Invites`, `Poke Feature Init`?**
   _High betweenness centrality (0.085) - this node is a cross-community bridge._
 - **Why does `initPoke()` connect `Poke Feature Init` to `Cross-Fetch Dependency`?**
-  _High betweenness centrality (0.084) - this node is a cross-community bridge._
+  _High betweenness centrality (0.085) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
   _302 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `UNO Card Game` be split into smaller, more focused modules?**

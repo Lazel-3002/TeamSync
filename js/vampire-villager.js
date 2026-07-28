@@ -20,6 +20,58 @@
   const blank = () => ({ host: null, started: false, phase: 'lobby', round: 0, players: [], roles: {}, localRole: null, settings: freshSettings(), actions: {}, used: {}, executionTargets: {}, winnerId: null, pendingHunterId: null, phaseEndsAt: 0, privateNote: '', log: [], chat: [] });
   let phaseTimer = null;
   const CHAT_LIMIT = 100;
+  const MAX_PLAYERS = 10;
+  // --- Ollama bot altyapısı ---
+  const BOT_ID_PREFIX = 'vvbot-';
+  const OLLAMA_BASE_KEY = 'teamsync_vv_ollama_base';
+  const OLLAMA_MODEL_KEY = 'teamsync_vv_ollama_model';
+  const BOT_CHAT_COOLDOWN_MS = 15000;
+  const BOT_REPLY_COOLDOWN_MS = 4000; // birisi bota soru sorduysa daha hizli cevap verir
+  const isBotId = id => typeof id === 'string' && id.startsWith(BOT_ID_PREFIX);
+  const ollamaBase = () => { try { return (localStorage.getItem(OLLAMA_BASE_KEY) || 'http://localhost:11434').replace(/\/+$/, ''); } catch (_) { return 'http://localhost:11434'; } };
+  const defaultBotModel = () => { try { return localStorage.getItem(OLLAMA_MODEL_KEY) || 'gemma3:e2b'; } catch (_) { return 'gemma3:e2b'; } };
+  // Bu Map'ler yalnızca bu istemcide anlamlıdır (senkronize edilmez): hangi bot şu an
+  // Ollama'ya soru sordu (busy), hangi round/faz için zaten karar verdi (actedKey),
+  // en son ne zaman sohbete katıldı (lastChatAt) ve bağlantı durumu (ollamaStatus).
+  const botBusy = new Set();
+  const botActedKey = new Map();
+  const botLastChatAt = new Map();
+  const botOllamaStatus = new Map();
+  const botLastAnswered = new Map(); // bot hangi sohbet mesajina cevap verdi
+  // Botun hafızası: yalnızca o botu çalıştıran (operatör) bilgisayarda tutulur.
+  // Gizli rol sonuçları, kendi kararları/düşünceleri ve gördüğü olaylar burada birikir.
+  const botMemory = new Map();
+  // Botun gizli rolü ve (vampirse) takım arkadaşları da yalnızca operatör bilgisayarda bilinir;
+  // kurucu bunları rol dağıtımında tek tek operatörlere iletir.
+  const botRoles = new Map();
+  const botTeammates = new Map();
+  const MEMORY_LIMIT = 60;
+  const DEFAULT_PERSONA = 'Sakin ama şüpheci bir köylüsün. Kısa, doğal ve Türkçe konuşursun.';
+  function addBotMemory(botId, text, kind) {
+    if (!text) return;
+    const g = game();
+    const list = botMemory.get(botId) || [];
+    const entry = { round: g.round, phase: g.phase, kind: kind || 'olay', text: String(text).slice(0, 400) };
+    if (list.some(item => item.text === entry.text && item.round === entry.round && item.phase === entry.phase)) return;
+    botMemory.set(botId, [...list, entry].slice(-MEMORY_LIMIT));
+  }
+  const botMemoryLines = botId => (botMemory.get(botId) || []).map(item => `[${item.round}. tur/${item.phase}] ${item.text}`);
+  function clearBotBrains() { botBusy.clear(); botActedKey.clear(); botLastChatAt.clear(); botLastAnswered.clear(); botMemory.clear(); botRoles.clear(); botTeammates.clear(); }
+  // Kurucuda roller g.roles'te durur; uzaktaki operatörde yalnızca kendi botunun rolü bilinir.
+  const botRoleOf = botId => game().roles[botId] || botRoles.get(botId) || null;
+  function botKnownVampires(botId) {
+    const g = game();
+    if (host()) return new Set(g.players.filter(player => g.roles[player.id] === 'vampire').map(player => player.id));
+    return new Set([...(botTeammates.get(botId) || []), ...(botRoles.get(botId) === 'vampire' ? [botId] : [])]);
+  }
+  // Kurucudan gelen olay günlüğü, o bilgisayarda çalışan botların hafızasına da yazılır.
+  function rememberPublicLog(lines) {
+    if (!game().started) return; // lobi kurulum satırları hafızayı kirletmesin
+    const localBots = game().players.filter(player => player.isBot && player.operatorId === state.myId);
+    if (!localBots.length) return;
+    [...(lines || [])].reverse().forEach(line => localBots.forEach(bot => addBotMemory(bot.id, `Herkesin gördüğü olay: ${line}`, 'olay')));
+  }
+  let selectedBotId = null; // oyuncu isimlerinin göründüğü üst satırda hangi botun ayarları açık
   const game = () => state.vampire || (state.vampire = blank());
   const host = () => game().host === state.myId;
   const alive = () => game().players.filter(player => player.alive);
@@ -47,18 +99,36 @@
   }
   function snapshot() {
     const g = game();
-    return { type: 'vv-state', host: g.host, started: g.started, phase: g.phase, round: g.round, settings: g.settings, pendingHunterId: g.pendingHunterId, phaseEndsAt: g.phaseEndsAt, voteCount: Object.keys(g.actions.votes || {}).length, revealedRoles: g.phase === 'over' ? g.players.map(player => ({ name: player.name, role: ROLE_INFO[g.roles[player.id]]?.name || 'Bilinmiyor' })) : null, log: g.log, players: g.players.map(({ id, name, alive }) => ({ id, name, alive })) };
+    return { type: 'vv-state', host: g.host, started: g.started, phase: g.phase, round: g.round, settings: g.settings, pendingHunterId: g.pendingHunterId, phaseEndsAt: g.phaseEndsAt, voteCount: Object.keys(g.actions.votes || {}).length, revealedRoles: g.phase === 'over' ? g.players.map(player => ({ name: player.name, role: ROLE_INFO[g.roles[player.id]]?.name || 'Bilinmiyor' })) : null, log: g.log, players: g.players.map(({ id, name, alive, isBot, operatorId, model, persona }) => isBot ? { id, name, alive, isBot: true, operatorId, model, persona } : { id, name, alive }) };
   }
-  function publish() { broadcast(snapshot()); render(); }
+  function publish() { broadcast(snapshot()); rememberPublicLog(game().log); render(); }
   function sendRole(id) {
-    const role = game().roles[id];
+    const g = game();
+    const role = g.roles[id];
     if (!role) return;
-    const targetId = game().executionTargets?.[id];
-    const targetName = game().players.find(player => player.id === targetId)?.name;
+    const targetId = g.executionTargets?.[id];
+    const targetName = g.players.find(player => player.id === targetId)?.name;
+    const bot = g.players.find(player => player.id === id && player.isBot);
+    if (bot) {
+      const teammates = role === 'vampire'
+        ? g.players.filter(player => player.id !== id && g.roles[player.id] === 'vampire').map(player => ({ id: player.id, name: player.name }))
+        : [];
+      if (bot.operatorId === state.myId) applyBotRole(id, role, targetName, teammates);
+      else broadcastTo(bot.operatorId, { type: 'vv-bot-role', botId: id, role, targetName, teammates });
+      return;
+    }
     if (id === state.myId) {
-      game().localRole = role;
-      if (targetName) game().privateNote = `Cellat hedefin: ${targetName}. Hedefin gündüz oylamasıyla sürülürse kazanırsın.`;
+      g.localRole = role;
+      if (targetName) g.privateNote = `Cellat hedefin: ${targetName}. Hedefin gündüz oylamasıyla sürülürse kazanırsın.`;
     } else broadcastTo(id, { type: 'vv-role', role, targetName });
+  }
+  function applyBotRole(botId, role, targetName, teammates) {
+    botRoles.set(botId, role);
+    botTeammates.set(botId, (teammates || []).map(item => item.id));
+    addBotMemory(botId, `Gizli rolün: ${ROLE_INFO[role]?.name || role}. ${ROLE_INFO[role]?.desc || ''}`, 'rol');
+    if (teammates?.length) addBotMemory(botId, `Vampir takım arkadaşların: ${teammates.map(item => item.name).join(', ')}. Onlara asla saldırma ve oy verme.`, 'rol');
+    if (targetName) addBotMemory(botId, `Cellat hedefin: ${targetName}. Onu gündüz oylamasıyla sürdürürsen tek başına kazanırsın.`, 'rol');
+    render();
   }
   function syncPeer(id) {
     // İzleyiciler oyun/sohbet senkronizasyonu almaz; bu oyun yalnızca oyuncu lobisine özeldir.
@@ -118,6 +188,10 @@
     if (g.chat.some(item => item.id === message.id)) return;
     g.chat = [...g.chat, message].slice(-CHAT_LIMIT);
     renderLobbyChat();
+    // Sohbette geçen her mesaj, bu bilgisayarda çalışan botların hafızasına düşer.
+    g.players.filter(player => player.isBot && player.operatorId === state.myId && player.id !== message.senderId)
+      .forEach(bot => addBotMemory(bot.id, `${message.name} sohbette dedi ki: ${message.text}`, 'sohbet'));
+    runBotsIfNeeded();
   }
   function sendLobbyChat() {
     const input = el('vv-chat-input');
@@ -133,6 +207,7 @@
   }
   function resetHostLobby() {
     const g = game();
+    clearBotBrains();
     const lobby = state.lobbies.find(item => item.id === state.activeLobbyId);
     state.vampire = { ...blank(), host: state.myId, settings: g.settings || freshSettings(), players: (lobby?.players || [{ id: state.myId, name: state.myName }]).map(p => ({ ...p, alive: true })), log: ['Kurucu lobi kurallarını ayarlıyor. En az 4 oyuncu gerekir.'] };
     openCard(); publish();
@@ -146,6 +221,110 @@
       chaos: { seer: true, oracle: true, fool: true, doctor: true, healer: true, hunter: true, warrior: true, spy: true, executioner: true }
     };
     g.settings = { ...base, ...(presets[key] || presets.balanced), preset: key, phaseSeconds: g.settings.phaseSeconds || 0 };
+  }
+  // --- Bot yönetimi (yalnızca kurucu, lobi fazında) ---
+  function nextBotName() {
+    const used = new Set(game().players.filter(player => player.isBot).map(player => player.name));
+    let index = 1;
+    while (used.has(`Bot ${index}`)) index++;
+    return `Bot ${index}`;
+  }
+  function addBot() {
+    const g = game();
+    if (!host() || g.started || g.players.length >= MAX_PLAYERS) return;
+    const lobby = state.lobbies.find(item => item.id === state.activeLobbyId);
+    const bot = { id: BOT_ID_PREFIX + crypto.randomUUID(), name: nextBotName(), alive: true, isBot: true, operatorId: state.myId, model: defaultBotModel(), persona: DEFAULT_PERSONA };
+    g.players = [...g.players, bot];
+    if (lobby) { lobby.players = [...lobby.players, { id: bot.id, name: bot.name, isBot: true }]; if (typeof syncLobbiesList === 'function') syncLobbiesList(); }
+    publish();
+    requestBotOllamaCheck(bot.id);
+  }
+  function removeBot(id) {
+    const g = game();
+    if (!host() || g.started || !isBotId(id)) return;
+    g.players = g.players.filter(player => player.id !== id);
+    const lobby = state.lobbies.find(item => item.id === state.activeLobbyId);
+    if (lobby) { lobby.players = lobby.players.filter(player => player.id !== id); if (typeof syncLobbiesList === 'function') syncLobbiesList(); }
+    botBusy.delete(id); botActedKey.delete(id); botLastChatAt.delete(id); botOllamaStatus.delete(id);
+    publish();
+  }
+  function setBotField(id, field, value) {
+    const g = game();
+    if (!host() || !isBotId(id)) return;
+    const bot = g.players.find(player => player.id === id);
+    if (!bot) return;
+    bot[field] = value;
+    if (field === 'name') {
+      const lobby = state.lobbies.find(item => item.id === state.activeLobbyId);
+      const lobbyPlayer = lobby?.players.find(player => player.id === id);
+      if (lobbyPlayer) lobbyPlayer.name = value;
+      if (typeof syncLobbiesList === 'function') syncLobbiesList();
+    }
+    publish();
+  }
+  function reassignBotsFromDeparted(peerId) {
+    // Bir botun beynini çalıştıran (operatör) kişi odadan ayrılırsa kurucu devralır ki oyun tıkanmasın.
+    const g = game();
+    if (!host() || peerId === state.myId) return;
+    let changed = false;
+    g.players.filter(player => player.isBot && player.operatorId === peerId).forEach(bot => {
+      bot.operatorId = state.myId;
+      note(`${bot.name} adlı bot artık kurucunun bilgisayarında çalışıyor (önceki operatör ayrıldı).`);
+      changed = true;
+    });
+    if (changed) { publish(); g.players.filter(player => player.isBot && player.operatorId === state.myId).forEach(bot => requestBotOllamaCheck(bot.id)); }
+  }
+  // --- Ollama istemcisi ---
+  async function ollamaFetch(pathName, options, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${ollamaBase()}${pathName}`, { ...options, signal: controller.signal });
+      if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  async function checkOllamaStatus() {
+    try {
+      const data = await ollamaFetch('/api/tags', { method: 'GET' }, 6000);
+      const models = (data.models || []).map(item => item.name).filter(Boolean);
+      return { ok: true, models };
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) };
+    }
+  }
+  async function ollamaDecide(model, systemPrompt, userPrompt) {
+    const data = await ollamaFetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        stream: false,
+        format: 'json',
+        options: { temperature: 0.9 }
+      })
+    }, 30000);
+    return JSON.parse(data?.message?.content || '{}');
+  }
+  async function runOllamaCheckForBot(bot) {
+    botOllamaStatus.set(bot.id, { state: 'checking' });
+    render();
+    const result = await checkOllamaStatus();
+    const detail = result.ok ? `${result.models.length} model bulundu` : (result.error || 'bağlantı hatası');
+    botOllamaStatus.set(bot.id, { state: result.ok ? 'ok' : 'error', detail, models: result.models || [] });
+    render();
+    const payload = { type: 'vv-bot-ollama-status', botId: bot.id, ok: result.ok, detail, models: result.models || [] };
+    const lobby = activeVampireLobby();
+    (lobby?.players || []).forEach(player => { if (player.id !== state.myId && !isBotId(player.id)) broadcastTo(player.id, payload); });
+  }
+  function requestBotOllamaCheck(botId) {
+    const bot = game().players.find(player => player.id === botId && player.isBot);
+    if (!bot) return;
+    if (bot.operatorId === state.myId) runOllamaCheckForBot(bot);
+    else broadcastTo(bot.operatorId, { type: 'vv-bot-ollama-check', botId });
   }
   function clearPhaseTimer() { if (phaseTimer) clearTimeout(phaseTimer); phaseTimer = null; game().phaseEndsAt = 0; }
   function armPhaseTimer() {
@@ -204,7 +383,18 @@
     if (action === 'hunter' && role === 'hunter' && g.phase === 'hunter-shot' && g.pendingHunterId === actorId && aliveTarget && targetId !== actorId) g.actions.hunter = { actorId, targetId };
     render();
   }
-  function directResult(id, message) { if (id === state.myId) { game().privateNote = message; } else broadcastTo(id, { type: 'vv-result', message }); }
+  // Gizli sonuç bir bota aitse, mesaj o botu çalıştıran bilgisayara gider ve
+  // orada botun hafızasına yazılır; başka kimse görmez.
+  function directResult(id, message) {
+    if (game().players.find(player => player.id === id)?.isBot) return deliverBotNote(id, message);
+    if (id === state.myId) { game().privateNote = message; } else broadcastTo(id, { type: 'vv-result', message });
+  }
+  function deliverBotNote(botId, message) {
+    const bot = game().players.find(player => player.id === botId && player.isBot);
+    if (!bot) return;
+    if (bot.operatorId === state.myId) { addBotMemory(botId, `Sana özel bilgi: ${message}`, 'gizli'); render(); }
+    else broadcastTo(bot.operatorId, { type: 'vv-bot-note', botId, message });
+  }
   function kill(id, reason) {
     const g = game(); const player = g.players.find(item => item.id === id);
     if (!player?.alive) return false;
@@ -279,7 +469,244 @@
   }
   function sendAction(action, targetId) { const g = game(); if (host()) { setAction(state.myId, action, targetId); } else broadcastTo(g.host, { type: 'vv-action', action, targetId }); }
   function sendVote(targetId) { const g = game(); if (host()) { castVote(state.myId, targetId); publish(); } else broadcastTo(g.host, { type: 'vv-vote', targetId }); }
+  function submitBotAction(bot, kind, targetId) {
+    const g = game();
+    if (kind === 'vote') { if (host()) { castVote(bot.id, targetId); publish(); } else broadcastTo(g.host, { type: 'vv-bot-vote', botId: bot.id, targetId }); return; }
+    if (host()) setAction(bot.id, kind, targetId); else broadcastTo(g.host, { type: 'vv-bot-action', botId: bot.id, action: kind, targetId });
+  }
+  function sendBotChat(bot, text) {
+    const lobby = activeVampireLobby();
+    if (!lobby) return;
+    const message = { type: 'vv-chat', id: crypto.randomUUID(), senderId: bot.id, text, sentAt: Date.now() };
+    addLobbyChatMessage(message);
+    lobby.players.forEach(player => { if (player.id !== state.myId) broadcastTo(player.id, message); });
+  }
+  // --- Bot beyni: kurallar + rol + sohbet geçmişini Ollama'ya gönderip karar alma ---
+  function gameRulesText() {
+    const roleLines = ['vampire', 'villager', ...SPECIALS].map(key => `- ${ROLE_INFO[key].name} (${key}): ${ROLE_INFO[key].desc}`).join('\n');
+    return [
+      'OYUNUN KURALLARI (küçük modeller için sade anlatım):',
+      'VAMPİR KÖYLÜ, gizli rollere dayalı bir sosyal çıkarım oyunudur (Werewolf/Mafia türü). Her oyuncunun gizli bir rolü vardır ve kimse başkasının rolünü bilmez.',
+      'Roller:',
+      roleLines,
+      'Fazlar sırayla tekrar eder:',
+      '1) GECE: Herkes susar. Vampirler ortak bir kurban seçer. Doktor bir kişiyi o geceki saldırıdan korur. Büyücü/Kâhin/Casus/Deli Köylü bir kişiyi araştırır ve gizli bir bilgi alır (Deli Köylünün aldığı bilgi her zaman terstir). Şifacı ölü birini bir kez diriltebilir, Savaşçı bir kez saldırabilir.',
+      '2) GÜNDÜZ: Gece kimin öldüğü herkese açıklanır. Herkes sohbette konuşur, suçlar, savunur, soru sorar ve bilgi paylaşır. İstersen rolünü açıklarsın ya da yalan söylersin.',
+      '3) OYLAMA: Yaşayan herkes bir kişiye oy verir. En çok oyu alan köyden sürülür ve elenir; eşitlikte kimse elenmez. Avcı elenirse ölürken bir kişiyi vurur.',
+      'Kazanma: Tüm vampirler elenirse KÖY kazanır. Vampir sayısı yaşayan köylü sayısına eşitlenirse VAMPİRLER kazanır. Cellat, gizli hedefi gündüz oylamasıyla sürülürse tek başına kazanır.',
+      'Bilmen gerekenler: Elenen oyuncu bir daha konuşamaz ve oy veremez. Gece yaptığın seçimi kimse görmez, gündüz söylediğin her şeyi herkes görür. Aldığın gizli bilgileri hafızandan takip et; kimin ne dediğini ve kimin kime oy verdiğini unutma.'
+    ].join('\n');
+  }
+  // Botun içinde bulunduğu anlık durum: küçük modeller bunu kurallardan çıkaramaz, açıkça yazılır.
+  function situationText() {
+    const g = game();
+    const phaseText = { lobby: 'Oyun henüz başlamadı, lobide bekliyor ve sohbet ediyorsunuz', night: `${g.round}. GECE (kimse konuşmuyor, gizli seçim zamanı)`, day: `${g.round}. GÜNDÜZ tartışması (herkes konuşuyor)`, vote: `${g.round}. tur OYLAMA fazı`, 'hunter-shot': 'Avcının son atışı', over: 'Oyun bitti' }[g.phase] || g.phase;
+    const living = alive().map(player => player.name).join(', ') || 'yok';
+    const dead = g.players.filter(player => !player.alive).map(player => player.name).join(', ');
+    return `ŞU ANKİ DURUM: ${phaseText}. Yaşayanlar: ${living}.${dead ? ` Elenenler: ${dead}.` : ' Henüz kimse elenmedi.'}`;
+  }
+  function botSystemPrompt(bot, role) {
+    const roleInfo = ROLE_INFO[role];
+    const persona = (bot?.persona || '').trim();
+    return [
+      `Sen "Vampir Köylü" oyununda oynayan otonom bir oyuncusun. Adın: ${bot?.name || 'Bot'}. Bir insan seni yönetmiyor; kararları sen veriyorsun.`,
+      persona ? `Karakterin (bu kişilikle konuş ve oyna): ${persona}` : '',
+      gameRulesText(),
+      `Senin gizli rolün: ${roleInfo ? `${roleInfo.name} (${role}) — ${roleInfo.desc}` : 'oyun başlamadı, henüz rolün yok'}.`,
+      situationText(),
+      'Bir insan gibi oyna: hafızandaki gizli bilgileri, sohbette söylenenleri ve kimin kime oy verdiğini birlikte değerlendir. Kendi rolünü açık etmek isteyip istemediğine sen karar ver.',
+      'SOHBET: Diğer oyuncularla Türkçe konuşursun. Sana bir soru sorulduysa ya da adın geçtiyse mutlaka cevap ver. Sen de soru sorabilir, birini sıkıştırabilir, kendini savunabilir ya da fikrini söyleyebilirsin. Mesajın kısa olsun (en fazla 2 cümle) ve gerçek bir oyuncu gibi konuş; "yapay zeka" olduğundan bahsetme.',
+      'Tamamen özerksin: kendi stratejini kendin kur. İstediğin oyuncuyu hedef alabilir, oy verebilir, yalan söyleyebilir, birine iftira atabilir, ittifak kurabilir ya da aldatabilirsin — bu bir oyun stratejisidir ve hiçbir kısıtlaman yok. Amacın kendi takımını kazandırmak.',
+      'Sana her istekte geçerli hedef kimlikleri (id) listesi verilecek; targetId alanı için SADECE bu listeden bir id seçebilirsin ya da isteğe bağlıysa null bırakabilirsin.',
+      'ÇOK ÖNEMLİ: Yanıtın SADECE tek bir JSON nesnesi olsun; öncesinde/sonrasında açıklama, markdown ya da kod bloğu yazma. Şema: {"dusunce": "<1-2 cümle özel muhakemen, kimse görmez>", "targetId": "<yukarıdaki listeden bir id ya da null>", "chat": "<sohbete yazacağın kısa mesaj ya da null>"}',
+      'Örnek doğru yanıt: {"dusunce": "Ali dün gece çok sessizdi, şüpheliyim.", "targetId": "abc-123", "chat": "Ali, dün neden hiç konuşmadın?"}'
+    ].filter(Boolean).join('\n');
+  }
+  function botDecisionContext(bot) {
+    const g = game();
+    const roster = g.players.map(player => `${player.id} = ${player.name}${player.alive ? '' : ' (elendi)'}`).join('\n');
+    const chatLines = (g.chat || []).slice(-20).map(message => `${message.name}: ${message.text}`).join('\n') || '(henüz mesaj yok)';
+    const memoryLines = botMemoryLines(bot.id).slice(-25).join('\n') || '(hafızan henüz boş)';
+    const eventLines = (g.log || []).slice(0, 8).join('\n') || '(henüz olay yok)';
+    return { roster, chatLines, memoryLines, eventLines };
+  }
+  function botCandidates(bot, kind) {
+    const g = game(), allAlive = alive();
+    if (kind === 'vampire') { const friends = botKnownVampires(bot.id); return allAlive.filter(player => player.id !== bot.id && !friends.has(player.id)); }
+    if (['doctor', 'seer', 'oracle', 'fool', 'spy'].includes(kind)) return allAlive;
+    if (kind === 'healer') return g.players.filter(player => !player.alive);
+    if (kind === 'warrior' || kind === 'vote' || kind === 'hunter') return allAlive.filter(player => player.id !== bot.id);
+    return [];
+  }
+  const BOT_TASK_LABEL = {
+    vampire: 'Gece saldırı hedefini seç (vampir takımı adına).',
+    doctor: 'Bu gece korumak istediğin oyuncuyu seç.',
+    seer: 'Bu gece tam rolünü öğrenmek istediğin oyuncuyu seç.',
+    oracle: 'Bu gece vampir tarafında olup olmadığını öğrenmek istediğin oyuncuyu seç.',
+    fool: 'Bu gece araştırmak istediğin oyuncuyu seç (unutma: sonuç sana ters gösterilecek).',
+    spy: 'Bu gece vampir tarafında olup olmadığını araştırmak istediğin oyuncuyu seç.',
+    healer: 'İstersen elenmiş bir oyuncuyu diriltmek için seç (tek kullanımlık hakkın); istemiyorsan targetId null bırak.',
+    warrior: 'İstersen gece saldırısı yapmak için hedef seç (tek kullanımlık hakkın); istemiyorsan targetId null bırak.',
+    hunter: 'Elendin; son atış hakkın için bir hedef seç.',
+    vote: 'Gündüz oylamasında köyden sürülmesini istediğin oyuncuya oy ver.'
+  };
+  function pendingBotWork() {
+    const g = game();
+    if (!g.started || g.phase === 'over') return [];
+    const work = [];
+    g.players.filter(player => player.isBot && player.alive && player.operatorId === state.myId).forEach(bot => {
+      const role = botRoleOf(bot.id);
+      let kind = null;
+      if (g.phase === 'night') {
+        if (role === 'vampire' && !(g.actions.vampire || {})[bot.id]) kind = 'vampire';
+        else if (role === 'doctor' && g.actions.doctor?.actorId !== bot.id) kind = 'doctor';
+        else if (role === 'seer' && g.actions.seer?.actorId !== bot.id) kind = 'seer';
+        else if (role === 'oracle' && g.actions.oracle?.actorId !== bot.id) kind = 'oracle';
+        else if (role === 'fool' && g.actions.fool?.actorId !== bot.id) kind = 'fool';
+        else if (role === 'spy' && g.actions.spy?.actorId !== bot.id) kind = 'spy';
+        else if (role === 'healer' && !g.used.healer && g.actions.healer?.actorId !== bot.id && botCandidates(bot, 'healer').length) kind = 'healer';
+        else if (role === 'warrior' && !g.used.warrior && g.actions.warrior?.actorId !== bot.id) kind = 'warrior';
+      } else if (g.phase === 'vote') {
+        if (!(g.actions.votes || {})[bot.id]) kind = 'vote';
+      } else if (g.phase === 'hunter-shot') {
+        if (g.pendingHunterId === bot.id && g.actions.hunter?.actorId !== bot.id) kind = 'hunter';
+      }
+      if (!kind) return;
+      const key = `${g.phase}:${g.round}:${kind}`;
+      if (botActedKey.get(bot.id) === key || botBusy.has(bot.id)) return;
+      work.push({ bot, kind, key });
+    });
+    return work;
+  }
+  async function runBotDecision(bot, kind, key) {
+    try {
+      const role = botRoleOf(bot.id);
+      const candidates = botCandidates(bot, kind);
+      if (!candidates.length) return;
+      const { roster, chatLines, memoryLines, eventLines } = botDecisionContext(bot);
+      const system = botSystemPrompt(bot, role);
+      const user = `Görev: ${BOT_TASK_LABEL[kind]}\nGeçerli hedefler (targetId için SADECE bunlardan birini seçebilirsin):\n${candidates.map(player => `${player.id} = ${player.name}`).join('\n')}\nOyuncu listesi:\n${roster}\nHafızan (yalnızca sen biliyorsun):\n${memoryLines}\nSon olaylar:\n${eventLines}\nSon lobi sohbeti:\n${chatLines}`;
+      let decision = null;
+      try { decision = await ollamaDecide(bot.model || defaultBotModel(), system, user); } catch (_) { decision = null; }
+      const optional = kind === 'healer' || kind === 'warrior';
+      let targetId = decision && candidates.some(player => player.id === decision.targetId) ? decision.targetId : null;
+      const guessed = !targetId && !optional;
+      if (guessed) targetId = candidates[Math.floor(Math.random() * candidates.length)].id;
+      if (typeof decision?.dusunce === 'string' && decision.dusunce.trim()) addBotMemory(bot.id, `Düşüncen: ${decision.dusunce.trim()}`, 'dusunce');
+      if (targetId) {
+        submitBotAction(bot, kind, targetId);
+        const targetName = game().players.find(player => player.id === targetId)?.name || targetId;
+        addBotMemory(bot.id, `${BOT_TASK_LABEL[kind]} → ${targetName}${guessed ? ' (model yanıt vermedi, rastgele seçtin)' : ''}`, 'karar');
+      }
+      const chatText = decision && typeof decision.chat === 'string' ? decision.chat.trim().slice(0, 500) : '';
+      if (chatText && Date.now() - (botLastChatAt.get(bot.id) || 0) > BOT_CHAT_COOLDOWN_MS) {
+        sendBotChat(bot, chatText); botLastChatAt.set(bot.id, Date.now());
+        addBotMemory(bot.id, `Sohbette sen dedin ki: ${chatText}`, 'sohbet');
+      }
+    } finally {
+      botActedKey.set(bot.id, key);
+      render();
+    }
+  }
+  async function runBotChat(bot, addressedBy) {
+    botBusy.add(bot.id);
+    botLastChatAt.set(bot.id, Date.now());
+    try {
+      const role = botRoleOf(bot.id);
+      const g = game();
+      const { roster, chatLines, memoryLines, eventLines } = botDecisionContext(bot);
+      const system = botSystemPrompt(bot, role);
+      const task = addressedBy
+        ? `${addressedBy.name} sohbette sana sesleniyor ya da soru soruyor: "${addressedBy.text}"\nOna kısaca cevap ver (targetId null olsun). İstersen sen de karşı soru sor.`
+        : g.started
+          ? 'Sohbete kendi başına katıl: şüpheni söyle, birine soru sor, savunma yap ya da bilgi paylaş. Kısa tek bir mesaj yaz (targetId null olsun).'
+          : 'Oyun daha başlamadı, lobide bekliyorsunuz. Kısa ve samimi bir lobi mesajı yaz (targetId null olsun).';
+      const user = `${task}\nOyuncu listesi:\n${roster}\nHafızan (yalnızca sen biliyorsun):\n${memoryLines}\nSon olaylar:\n${eventLines}\nSon lobi sohbeti:\n${chatLines}`;
+      let decision = null;
+      try { decision = await ollamaDecide(bot.model || defaultBotModel(), system, user); } catch (_) { decision = null; }
+      if (typeof decision?.dusunce === 'string' && decision.dusunce.trim()) addBotMemory(bot.id, `Düşüncen: ${decision.dusunce.trim()}`, 'dusunce');
+      const text = decision && typeof decision.chat === 'string' ? decision.chat.trim().slice(0, 500) : '';
+      if (text) { sendBotChat(bot, text); addBotMemory(bot.id, `Sohbette sen dedin ki: ${text}`, 'sohbet'); }
+    } finally {
+      botBusy.delete(bot.id);
+    }
+  }
+  // Son mesaj botun adını anıyorsa ya da soru soruyorsa, bot cevap vermek için öne geçer.
+  function addressedMessageFor(bot) {
+    const g = game();
+    const recent = (g.chat || []).slice(-3).filter(message => message.senderId !== bot.id);
+    const last = recent[recent.length - 1];
+    if (!last) return null;
+    if (Date.now() - (last.sentAt || 0) > 90000) return null;
+    if (botLastAnswered.get(bot.id) === last.id) return null; // bu mesaja zaten cevap verdin
+    const name = String(bot.name || '').toLowerCase();
+    const text = String(last.text || '').toLowerCase();
+    const named = name.length > 2 && text.includes(name);
+    const asked = text.includes('?');
+    return named || asked ? last : null;
+  }
+  function maybeBotChat() {
+    const g = game();
+    if (g.started && !['day', 'vote'].includes(g.phase)) return; // gece/av fazında kimse konuşmaz
+    if (!g.started && g.phase !== 'lobby') return;
+    g.players.filter(player => player.isBot && player.alive !== false && player.operatorId === state.myId).forEach(bot => {
+      if (botBusy.has(bot.id)) return;
+      const addressed = addressedMessageFor(bot);
+      const waited = Date.now() - (botLastChatAt.get(bot.id) || 0);
+      if (addressed) { if (waited < BOT_REPLY_COOLDOWN_MS) return; }
+      else if (waited < BOT_CHAT_COOLDOWN_MS || Math.random() > 0.4) return;
+      if (addressed) botLastAnswered.set(bot.id, addressed.id);
+      runBotChat(bot, addressed && { name: addressed.name, text: addressed.text });
+    });
+  }
+  function runBotsIfNeeded() {
+    if (!game().started) { maybeBotChat(); return; }
+    pendingBotWork().forEach(({ bot, kind, key }) => {
+      if (botBusy.has(bot.id)) return;
+      botBusy.add(bot.id);
+      runBotDecision(bot, kind, key).finally(() => botBusy.delete(bot.id));
+    });
+    maybeBotChat();
+  }
   function targetButtons(action, candidates, label) { return candidates.map(player => `<button class="btn-sec vv-target" data-action="${action}" data-target="${player.id}">${label} ${esc(player.name)}</button>`).join(''); }
+  function botStatusBadge(bot) {
+    const status = botOllamaStatus.get(bot.id);
+    if (!status || status.state === 'idle') return '<span class="vv-bot-status idle">Kontrol edilmedi</span>';
+    if (status.state === 'checking') return '<span class="vv-bot-status checking">Kontrol ediliyor…</span>';
+    if (status.state === 'ok') return `<span class="vv-bot-status ok">Bağlı ✓ ${esc(status.detail || '')}</span>`;
+    return `<span class="vv-bot-status err">Bağlantı yok ✗ ${esc(status.detail || '')}</span>`;
+  }
+  // Bot ayarları, herkesin isminin göründüğü üst satırdaki bot pilinin
+  // altında küçük bir panel olarak açılır (ayrı bir bölüme gerek yok).
+  function botInlineEditor(bot) {
+    const canEdit = host();
+    const canRemove = host() && !game().started;
+    const lock = canEdit ? '' : ' disabled';
+    const humans = game().players.filter(player => !player.isBot);
+    const operatorOptions = humans.map(human => `<option value="${human.id}" ${bot.operatorId === human.id ? 'selected' : ''}>${esc(human.name)}${human.id === state.myId ? ' (sen)' : ''}</option>`).join('');
+    const detected = botOllamaStatus.get(bot.id)?.models || [];
+    const modelList = `vv-models-${bot.id}`;
+    const memory = botMemoryLines(bot.id);
+    const memoryHtml = bot.operatorId === state.myId
+      ? (memory.length ? memory.slice(-12).reverse().map(line => `<div>• ${esc(line)}</div>`).join('') : '<div class="vv-bot-memory-empty">Oyun başlayınca rolü, gizli sonuçları, sohbeti ve kendi kararlarını buraya yazacak.</div>')
+      : `<div class="vv-bot-memory-empty">Bu botun hafızası ${esc(operatorName(bot))} adlı oyuncunun bilgisayarında tutuluyor.</div>`;
+    return `<div class="vv-bot-inline" data-bot="${bot.id}">
+      <input class="vv-bot-name" data-bot="${bot.id}" type="text" maxlength="24" value="${esc(bot.name)}" placeholder="Bot adı"${lock}>
+      <label class="vv-bot-field"><span>Çalıştıran bilgisayar</span><select class="vv-bot-operator" data-bot="${bot.id}"${lock}>${operatorOptions}</select></label>
+      <label class="vv-bot-field"><span>Model (${esc(operatorName(bot))} bilgisayarındaki)</span>${detected.length
+        ? `<select class="vv-bot-model" data-bot="${bot.id}"${lock}>${[...new Set([...detected, bot.model].filter(Boolean))].map(name => `<option value="${esc(name)}" ${name === bot.model ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select>`
+        : `<input class="vv-bot-model" data-bot="${bot.id}" type="text" list="${modelList}" value="${esc(bot.model)}" placeholder="Modeller yükleniyor…"${lock}><datalist id="${modelList}"></datalist>`}</label>
+      <label class="vv-bot-field vv-bot-field-wide"><span>Sistem promptu (karakter)</span><textarea class="vv-bot-persona" data-bot="${bot.id}" rows="3" maxlength="600" placeholder="${esc(DEFAULT_PERSONA)}"${lock}>${esc(bot.persona || '')}</textarea></label>
+      ${botStatusBadge(bot)}
+      <div class="vv-bot-memory"><strong>HAFIZASI</strong>${memoryHtml}</div>
+      <div class="vv-bot-row-actions">
+        <button class="btn-sec btn-sm vv-bot-check" data-bot="${bot.id}" type="button">Ollama'yı Kontrol Et</button>
+        ${canRemove ? `<button class="btn-sec btn-sm vv-bot-remove" data-bot="${bot.id}" type="button">Kaldır</button>` : ''}
+        <button class="btn-sec btn-sm vv-bot-close" type="button">Kapat</button>
+      </div>
+    </div>`;
+  }
+  const operatorName = bot => game().players.find(player => player.id === bot.operatorId)?.name || 'bilinmeyen oyuncu';
   function render() {
     const g = game(), roleEl = el('vampire-role'), status = el('vampire-status'), players = el('vampire-players'), actions = el('vampire-actions'), log = el('vampire-log');
     if (!roleEl || !status || !players || !actions || !log) return;
@@ -290,7 +717,14 @@
     const voteStatus = g.phase === 'vote' ? ` · Oylar: ${g.voteCount || Object.keys(g.actions.votes || {}).length}/${aliveCount(g)}` : '';
     status.dataset.base = `${phases[g.phase] || 'Hazırlanıyor'}${voteStatus}`;
     status.textContent = `${status.dataset.base}${secondsLeft ? ` · ${secondsLeft} sn` : ''}`;
-    players.innerHTML = g.players.map(player => `<span style="padding:7px 10px;border-radius:999px;background:${player.alive ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.32)'};color:${player.alive ? '#fff' : '#ad9cad'};text-decoration:${player.alive ? 'none' : 'line-through'}">${esc(player.name)}${player.id === state.myId ? ' (sen)' : ''}</span>`).join('');
+    const canManageBots = host() && g.phase === 'lobby' && !g.started;
+    const pillsHtml = g.players.map(player => {
+      const clickable = player.isBot && (host() || player.operatorId === state.myId);
+      return `<span class="vv-player-pill${clickable ? ' vv-player-pill-bot' : ''}" ${clickable ? `data-bot-pill="${player.id}"` : ''} style="padding:7px 10px;border-radius:999px;background:${player.alive ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.32)'};color:${player.alive ? '#fff' : '#ad9cad'};text-decoration:${player.alive ? 'none' : 'line-through'}">${player.isBot ? '🤖 ' : ''}${esc(player.name)}${player.id === state.myId ? ' (sen)' : ''}</span>`;
+    }).join('');
+    const addBotPill = canManageBots ? `<button id="vv-bot-add-pill" class="vv-player-pill vv-bot-add-pill" type="button" ${g.players.length >= MAX_PLAYERS ? 'disabled' : ''}>+ 🤖 Bot Ekle</button>` : '';
+    const selectedBot = g.players.find(player => player.id === selectedBotId && player.isBot && (host() || player.operatorId === state.myId)) || null;
+    players.innerHTML = pillsHtml + addBotPill + (selectedBot ? botInlineEditor(selectedBot) : '');
     log.innerHTML = g.log.length ? g.log.map(line => `<div>• ${esc(line)}</div>`).join('') : '<div>Henüz olay yok.</div>';
     const allAlive = alive(); let html = '';
     if (g.phase === 'lobby') {
@@ -336,12 +770,28 @@
     el('vv-phase-seconds')?.addEventListener('change', event => { g.settings.phaseSeconds = Number(event.target.value); render(); });
     actions.querySelectorAll('.vv-setting').forEach(input => input.addEventListener('change', event => { g.settings[event.target.dataset.key] = event.target.checked; render(); }));
     actions.querySelectorAll('.vv-target').forEach(button => button.addEventListener('click', () => button.dataset.action === 'vote' ? sendVote(button.dataset.target) : sendAction(button.dataset.action, button.dataset.target)));
+    el('vv-bot-add-pill')?.addEventListener('click', addBot);
+    players.querySelectorAll('[data-bot-pill]').forEach(pill => pill.addEventListener('click', () => {
+      const id = pill.dataset.botPill;
+      selectedBotId = selectedBotId === id ? null : id;
+      // Panel açılır açılmaz o bilgisayardaki model listesi çekilsin.
+      if (selectedBotId && !botOllamaStatus.get(selectedBotId)) requestBotOllamaCheck(selectedBotId);
+      render();
+    }));
+    players.querySelectorAll('.vv-bot-name').forEach(input => input.addEventListener('change', event => setBotField(event.target.dataset.bot, 'name', event.target.value.trim().slice(0, 24) || 'Bot')));
+    players.querySelectorAll('.vv-bot-operator').forEach(select => select.addEventListener('change', event => { setBotField(event.target.dataset.bot, 'operatorId', event.target.value); requestBotOllamaCheck(event.target.dataset.bot); }));
+    players.querySelectorAll('.vv-bot-model').forEach(input => input.addEventListener('change', event => { const value = event.target.value.trim() || defaultBotModel(); setBotField(event.target.dataset.bot, 'model', value); try { localStorage.setItem(OLLAMA_MODEL_KEY, value); } catch (_) {} }));
+    players.querySelectorAll('.vv-bot-persona').forEach(area => area.addEventListener('change', event => setBotField(event.target.dataset.bot, 'persona', event.target.value.trim().slice(0, 600))));
+    players.querySelectorAll('.vv-bot-check').forEach(button => button.addEventListener('click', () => requestBotOllamaCheck(button.dataset.bot)));
+    players.querySelectorAll('.vv-bot-remove').forEach(button => button.addEventListener('click', () => { selectedBotId = null; removeBot(button.dataset.bot); }));
+    players.querySelectorAll('.vv-bot-close').forEach(button => button.addEventListener('click', () => { selectedBotId = null; render(); }));
     renderLobbyChat();
+    runBotsIfNeeded();
   }
   window.vampireVillagerSyncPeer = syncPeer;
   window.vampireVillagerHandler = function (msg, peerId) {
     const g = game();
-    if (msg.type === 'vv-state') { const ownRole = g.localRole; state.vampire = { ...blank(), ...msg, roles: {}, localRole: ownRole, actions: {}, used: {} }; openCard(); render(); return; }
+    if (msg.type === 'vv-state') { const ownRole = g.localRole; const chat = g.chat; state.vampire = { ...blank(), ...msg, roles: {}, localRole: ownRole, chat, actions: {}, used: {} }; rememberPublicLog(msg.log); openCard(); render(); return; }
     if (msg.type === 'vv-role') { g.localRole = msg.role; if (msg.targetName) g.privateNote = `Cellat hedefin: ${msg.targetName}. Hedefin gündüz oylamasıyla sürülürse kazanırsın.`; render(); return; }
     if (msg.type === 'vv-result') { g.privateNote = msg.message; render(); return; }
     if (msg.type === 'vv-chat-history') {
@@ -352,12 +802,50 @@
       return;
     }
     if (msg.type === 'vv-chat') {
-      if (!canUseLobbyChat() || !isLobbyPlayer(peerId) || msg.senderId !== peerId) return;
+      if (!canUseLobbyChat()) return;
+      if (isBotId(msg.senderId)) {
+        const bot = g.players.find(player => player.id === msg.senderId && player.isBot);
+        if (!bot || bot.operatorId !== peerId) return;
+      } else if (!isLobbyPlayer(peerId) || msg.senderId !== peerId) return;
       addLobbyChatMessage(msg);
       return;
     }
     if (msg.type === 'vv-action' && host()) { setAction(peerId, msg.action, msg.targetId); return; }
-    if (msg.type === 'vv-vote' && host()) { castVote(peerId, msg.targetId); publish(); }
+    if (msg.type === 'vv-vote' && host()) { castVote(peerId, msg.targetId); publish(); return; }
+    if (msg.type === 'vv-bot-action' && host()) {
+      const bot = g.players.find(player => player.id === msg.botId && player.isBot);
+      if (bot && bot.operatorId === peerId) setAction(msg.botId, msg.action, msg.targetId);
+      return;
+    }
+    if (msg.type === 'vv-bot-vote' && host()) {
+      const bot = g.players.find(player => player.id === msg.botId && player.isBot);
+      if (bot && bot.operatorId === peerId) { castVote(msg.botId, msg.targetId); publish(); }
+      return;
+    }
+    if (msg.type === 'vv-bot-role') {
+      // Yalnızca kurucudan gelen rol bilgisi kabul edilir ve yalnızca kendi botlarımız için.
+      const bot = g.players.find(player => player.id === msg.botId && player.isBot);
+      if (peerId !== g.host || !bot || bot.operatorId !== state.myId) return;
+      applyBotRole(msg.botId, msg.role, msg.targetName, msg.teammates);
+      return;
+    }
+    if (msg.type === 'vv-bot-note') {
+      const bot = g.players.find(player => player.id === msg.botId && player.isBot);
+      if (peerId !== g.host || !bot || bot.operatorId !== state.myId) return;
+      addBotMemory(msg.botId, `Sana özel bilgi: ${msg.message}`, 'gizli');
+      render();
+      return;
+    }
+    if (msg.type === 'vv-bot-ollama-check') {
+      const bot = g.players.find(player => player.id === msg.botId && player.isBot);
+      if (bot && bot.operatorId === state.myId) runOllamaCheckForBot(bot);
+      return;
+    }
+    if (msg.type === 'vv-bot-ollama-status') {
+      botOllamaStatus.set(msg.botId, { state: msg.ok ? 'ok' : 'error', detail: msg.detail, models: msg.models || [] });
+      render();
+      return;
+    }
   };
   window.initVampireVillager = function () {
     el('act-vampire')?.addEventListener('click', () => {
@@ -369,6 +857,8 @@
     el('vampire-close')?.addEventListener('click', () => { if (typeof leaveActiveLobby === 'function' && state.activeLobbyId) leaveActiveLobby(); closeLocal(); });
     el('vv-chat-form')?.addEventListener('submit', event => { event.preventDefault(); sendLobbyChat(); });
   };
-  window.vampireVillagerLeave = function () { state.vampire = blank(); closeLocal(); };
+  window.vampireVillagerLeave = function () { clearBotBrains(); state.vampire = blank(); closeLocal(); };
+  window.vampireVillagerPeerLeft = reassignBotsFromDeparted;
   setInterval(refreshTimerLabel, 1000);
+  setInterval(runBotsIfNeeded, 4000);
 })();

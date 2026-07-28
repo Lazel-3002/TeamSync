@@ -2775,7 +2775,7 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 }
 #vampire-card .vv-card-header h3 { margin: 4px 0 0; font-size: 23px; letter-spacing: -.02em; }
 .vv-card-kicker { color: #f9a8d4; font-size: 10px; font-weight: 800; letter-spacing: .16em; }
-.vv-card-body { width: min(800px, 100%); margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
+.vv-card-body { width: min(800px, 100%); margin: 0 auto; padding: 24px; padding-bottom: 90px; display: grid; gap: 16px; }
 .vv-role-banner {
   padding: 15px 17px; border: 1px solid rgba(255,255,255,.13); border-radius: 14px;
   background: linear-gradient(110deg, rgba(255,255,255,.09), rgba(0,0,0,.18)); color: #fff; font-weight: 700;
@@ -2860,6 +2860,29 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .vv-start-button { width: 100%; min-height: 46px; justify-content: center; border-radius: 12px; font-size: 14px; font-weight: 800; }
 .vv-start-button span { margin-left: 7px; padding-left: 8px; border-left: 1px solid rgba(255,255,255,.32); font-size: 12px; opacity: .9; }
 .vv-target { border-radius: 10px; border: 1px solid rgba(244,114,182,.24); }
+.vv-player-pill { border: none; font: inherit; cursor: default; }
+.vv-player-pill-bot { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.vv-player-pill-bot:hover { transform: translateY(-1px); box-shadow: 0 0 0 2px rgba(244,114,182,.35); }
+.vv-bot-add-pill { padding: 7px 12px; border-radius: 999px; background: rgba(244,114,182,.14); border: 1px dashed rgba(244,114,182,.5); color: #fce7f3; font-size: 13px; font-weight: 700; cursor: pointer; }
+.vv-bot-add-pill:hover { background: rgba(244,114,182,.22); }
+.vv-bot-add-pill:disabled { opacity: .4; cursor: not-allowed; }
+.vv-bot-inline { width: 100%; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 8px; padding: 12px; margin-top: 10px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(244,114,182,.24); }
+.vv-bot-name { min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.22); color: #fff; font-size: 13px; font-weight: 700; align-self: end; }
+.vv-bot-field { display: grid; gap: 5px; min-width: 0; color: #e8dcea; font-size: 11px; font-weight: 700; }
+.vv-bot-field span { color: #c8afcf; font-size: 10px; letter-spacing: .02em; }
+.vv-bot-field select, .vv-bot-field input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.22); color: #fff; font-size: 12px; }
+.vv-bot-field select:hover, .vv-bot-field select:focus, .vv-bot-field input:hover, .vv-bot-field input:focus { border-color: rgba(244,114,182,.72); box-shadow: 0 0 0 3px rgba(244,114,182,.12); }
+.vv-bot-field-wide { grid-column: 1 / -1; }
+.vv-bot-field textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.22); color: #fff; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.45; resize: vertical; }
+.vv-bot-field textarea:hover, .vv-bot-field textarea:focus { border-color: rgba(244,114,182,.72); box-shadow: 0 0 0 3px rgba(244,114,182,.12); outline: none; }
+.vv-bot-memory { grid-column: 1 / -1; max-height: 150px; overflow-y: auto; display: grid; gap: 4px; padding: 9px 11px; border-radius: 10px; background: rgba(0,0,0,.24); border: 1px solid rgba(255,255,255,.08); color: #e4d6e9; font-size: 11.5px; line-height: 1.45; }
+.vv-bot-memory > strong { position: sticky; top: -9px; padding: 2px 0; background: inherit; color: #f9a8d4; font-size: 10px; letter-spacing: .14em; }
+.vv-bot-memory-empty { color: #bda8c4; font-style: italic; }
+.vv-bot-status { grid-column: 1 / -1; justify-self: start; font-size: 11px; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.08); color: #d8c5dd; }
+.vv-bot-status.ok { background: rgba(16,185,129,.16); color: #6ee7b7; }
+.vv-bot-status.err { background: rgba(244,63,94,.16); color: #fda4af; }
+.vv-bot-status.checking { background: rgba(244,114,182,.14); color: #f9a8d4; }
+.vv-bot-row-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 680px) {
   #vampire-card .vv-card-header { align-items: flex-start; padding: 16px; }
   #vampire-card .vv-card-header h3 { font-size: 20px; }
@@ -2868,6 +2891,7 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   .vv-role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vv-lobby-settings { padding: 16px; border-radius: 14px; }
   .vv-chat-form { align-items: stretch; }
+  .vv-bot-inline { grid-template-columns: 1fr; }
 }
 
 

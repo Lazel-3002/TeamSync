@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "js/vampire-villager.js": {
-    "mtime": 1785267258.218033,
-    "ast_hash": "3ad19cf5db1a2c3e3998a672b8b7b9c9",
+    "mtime": 1785266629.7649016,
+    "ast_hash": "6cfeeaec760d3e1894202286b0c20fa3",
     "semantic_hash": ""
   },
   "test/e2e/media-library.test.js": {
@@ -550,8 +550,8 @@
     "semantic_hash": ""
   },
   "test/e2e/vampire-villager-bots.test.js": {
-    "mtime": 1785267269.7578113,
-    "ast_hash": "095986a5cbaf34b6ed0ae4e3485d8eb0",
+    "mtime": 1785266568.261462,
+    "ast_hash": "9dbe647e65f7018b009ae9a5f952dbab",
     "semantic_hash": ""
   }
 }
