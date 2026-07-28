@@ -2860,6 +2860,24 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .vv-start-button { width: 100%; min-height: 46px; justify-content: center; border-radius: 12px; font-size: 14px; font-weight: 800; }
 .vv-start-button span { margin-left: 7px; padding-left: 8px; border-left: 1px solid rgba(255,255,255,.32); font-size: 12px; opacity: .9; }
 .vv-target { border-radius: 10px; border: 1px solid rgba(244,114,182,.24); }
+.vv-bot-section { display: grid; gap: 10px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,.09); margin-top: 4px; padding-top: 14px; }
+.vv-bot-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.vv-bot-section-title strong { font-size: 14px; }
+.vv-bot-section-title span { color: #bda8c4; font-size: 11px; }
+.vv-bot-list { display: grid; gap: 8px; }
+.vv-bot-empty { color: #bda8c4; font-size: 12px; font-style: italic; padding: 10px 0; }
+.vv-bot-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+.vv-bot-name { min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.22); color: #fff; font-size: 13px; font-weight: 700; align-self: end; }
+.vv-bot-field { display: grid; gap: 5px; min-width: 0; color: #e8dcea; font-size: 11px; font-weight: 700; }
+.vv-bot-field span { color: #c8afcf; font-size: 10px; letter-spacing: .02em; }
+.vv-bot-field select, .vv-bot-field input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.22); color: #fff; font-size: 12px; }
+.vv-bot-field select:hover, .vv-bot-field select:focus, .vv-bot-field input:hover, .vv-bot-field input:focus { border-color: rgba(244,114,182,.72); box-shadow: 0 0 0 3px rgba(244,114,182,.12); }
+.vv-bot-status { grid-column: 1 / -1; justify-self: start; font-size: 11px; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.08); color: #d8c5dd; }
+.vv-bot-status.ok { background: rgba(16,185,129,.16); color: #6ee7b7; }
+.vv-bot-status.err { background: rgba(244,63,94,.16); color: #fda4af; }
+.vv-bot-status.checking { background: rgba(244,114,182,.14); color: #f9a8d4; }
+.vv-bot-row-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.vv-bot-add { width: 100%; justify-content: center; }
 @media (max-width: 680px) {
   #vampire-card .vv-card-header { align-items: flex-start; padding: 16px; }
   #vampire-card .vv-card-header h3 { font-size: 20px; }
@@ -2868,6 +2886,7 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   .vv-role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vv-lobby-settings { padding: 16px; border-radius: 14px; }
   .vv-chat-form { align-items: stretch; }
+  .vv-bot-row { grid-template-columns: 1fr; }
 }
 
 
