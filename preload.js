@@ -51,6 +51,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateCheck: () => ipcRenderer.invoke('update-check'),
   updateGetStatus: () => ipcRenderer.invoke('update-get-status'),
   updateInstall: () => ipcRenderer.send('update-install'),
-  onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, status) => cb(status))
+  onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, status) => cb(status)),
+  // Kişisel tema seçildiğinde pencerenin native arka planını da günceller
+  // (frame:false olduğu için yeniden boyutlandırmada bu renk görünür).
+  setWindowTheme: (theme, persist, customBg) => ipcRenderer.send('set-window-theme', theme, persist, customBg)
 });
 

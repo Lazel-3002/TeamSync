@@ -876,7 +876,7 @@ function renderFriends() {
           </div>
         </div>
         <div class="friend-actions">
-          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border-color: rgba(139, 92, 246, 0.3);" onclick="openDM('${fId}')" title="Mesaj Gönder">
+          <button class="icon-btn sm friend-action-chat" style="display: flex; align-items: center; justify-content: center;" onclick="openDM('${fId}')" title="Mesaj Gönder">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           </button>
           ${inRoom ? `<button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom('${fId}')" title="Sunucusuna Katıl">
@@ -5748,8 +5748,6 @@ const I18N = {
     'toolbar.activity': 'Etkinlik',
     'toolbar.record': 'Kayıt',
     'toolbar.volume': 'Düzey',
-    'toolbar.manual': 'Manuel',
-    'toolbar.network': 'Uzak Ağ',
     'toolbar.founder': 'Kurucu',
     'toolbar.voiceTitle': 'Mikrofon (M)',
     'toolbar.deafenTitle': 'Sağırlaştır (D)',
@@ -5758,8 +5756,6 @@ const I18N = {
     'toolbar.activityTitle': 'Etkinlikler (E)',
     'toolbar.recordTitle': 'Kayıt (R)',
     'toolbar.volumeTitle': 'Ses Seviyesi',
-    'toolbar.manualTitle': 'Manuel IP Ekle',
-    'toolbar.networkTitle': 'Çapraz Ağ (SDP)',
     'toolbar.founderTitle': 'Kurucu Ayarları',
     'settings.personal': 'Kişisel Ayarlar',
     'settings.userSettings': 'KULLANICI AYARLARI',
@@ -5778,6 +5774,14 @@ const I18N = {
     'settings.themeNavyDesc': 'Sakin ve odaklı',
     'settings.themeWhite': 'Temiz Beyaz',
     'settings.themeWhiteDesc': 'Aydınlık ve ferah',
+    'settings.themeViolet': 'Mor & Beyaz',
+    'settings.themeVioletDesc': 'Açık zemin, canlı mor',
+    'settings.themeCustom': 'Kendi Teman',
+    'settings.themeCustomDesc': 'Renkleri sen seç',
+    'settings.themeCustomBg': 'Arka plan rengi',
+    'settings.themeCustomAccent': 'Vurgu rengi',
+    'settings.themeCustomButton': 'Buton rengi',
+    'settings.themeCustomPresets': 'Hazır presetler:',
     'settings.themeHint': 'Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.',
     'settings.voice': 'Ses ve Görüntü',
     'settings.voiceLead': 'Mikrofon ve hoparlör cihazlarını, ses seviyelerini ve konuşma biçimini ayarla.',
@@ -5926,8 +5930,6 @@ const I18N = {
     'toolbar.activity': 'Activity',
     'toolbar.record': 'Record',
     'toolbar.volume': 'Volume',
-    'toolbar.manual': 'Manual',
-    'toolbar.network': 'Remote',
     'toolbar.founder': 'Owner',
     'toolbar.voiceTitle': 'Microphone (M)',
     'toolbar.deafenTitle': 'Deafen (D)',
@@ -5936,8 +5938,6 @@ const I18N = {
     'toolbar.activityTitle': 'Activities (E)',
     'toolbar.recordTitle': 'Record (R)',
     'toolbar.volumeTitle': 'Volume Level',
-    'toolbar.manualTitle': 'Add Manual IP',
-    'toolbar.networkTitle': 'Cross-Network (SDP)',
     'toolbar.founderTitle': 'Owner Settings',
     'settings.personal': 'Personal Settings',
     'settings.userSettings': 'USER SETTINGS',
@@ -5956,6 +5956,14 @@ const I18N = {
     'settings.themeNavyDesc': 'Calm and focused',
     'settings.themeWhite': 'Clean White',
     'settings.themeWhiteDesc': 'Bright and airy',
+    'settings.themeViolet': 'Violet & White',
+    'settings.themeVioletDesc': 'Light background, vivid violet',
+    'settings.themeCustom': 'Custom Theme',
+    'settings.themeCustomDesc': 'Pick your own colors',
+    'settings.themeCustomBg': 'Background color',
+    'settings.themeCustomAccent': 'Accent color',
+    'settings.themeCustomButton': 'Button color',
+    'settings.themeCustomPresets': 'Ready-made presets:',
     'settings.themeHint': 'Preview your choice, then select Save to keep it.',
     'settings.voice': 'Voice & Video',
     'settings.voiceLead': 'Choose microphone and speaker devices, volume levels, and voice behavior.',
@@ -6145,7 +6153,26 @@ function translateLegacyStaticUI(language, root = document.body) {
   });
 }
 
-const APP_THEMES = new Set(['aurora', 'black', 'navy', 'white']);
+const APP_THEMES = new Set(['aurora', 'black', 'navy', 'white', 'violet', 'custom']);
+const CUSTOM_BG_KEY = 'teamsync_custom_bg';
+const CUSTOM_ACCENT_KEY = 'teamsync_custom_accent';
+const CUSTOM_BUTTON_KEY = 'teamsync_custom_button';
+const CUSTOM_THEME_DEFAULTS = { bg: '#1a1130', accent: '#a855f7', button: '#8b5cf6' };
+// Kendi tema paletini oluştururken hazır seçim sunmak için: her preset bir
+// arka plan + o arka planla kontrast oluşturan bir vurgu rengi + buton rengi
+// üçlüsü. Presetlerde vurgu ve buton rengi aynı tonda başlar; kullanıcı
+// istediğinde butonu vurgudan bağımsız olarak ayrıca değiştirebilir.
+const CUSTOM_THEME_PRESETS = [
+  { name: 'Mor Gece', bg: '#1b1130', accent: '#a855f7', button: '#a855f7' },
+  { name: 'Kızıl Ateş', bg: '#2b1012', accent: '#f43f5e', button: '#f43f5e' },
+  { name: 'Orman Yeşili', bg: '#0e1f18', accent: '#34d399', button: '#34d399' },
+  { name: 'Gün Batımı', bg: '#2b1608', accent: '#fb923c', button: '#fb923c' },
+  { name: 'Okyanus Mavisi', bg: '#071f2c', accent: '#22d3ee', button: '#22d3ee' },
+  { name: 'Pembe Rüya', bg: '#260f21', accent: '#f472b6', button: '#f472b6' },
+  { name: 'Altın Çöl', bg: '#241c08', accent: '#fbbf24', button: '#fbbf24' },
+  { name: 'Buz Beyazı', bg: '#eef2f7', accent: '#2563eb', button: '#2563eb' },
+  { name: 'Mor & Beyaz', bg: '#f6f4fc', accent: '#8b5cf6', button: '#8b5cf6' }
+];
 
 function getUserTheme() {
   const saved = localStorage.getItem(USER_THEME_KEY);
@@ -6156,13 +6183,146 @@ function syncThemeSelection(theme = getUserTheme()) {
   const selected = APP_THEMES.has(theme) ? theme : 'aurora';
   const input = document.querySelector(`input[name="settings-theme"][value="${selected}"]`);
   if (input) input.checked = true;
+  document.getElementById('settings-theme-custom-editor')?.classList.toggle('hidden', selected !== 'custom');
+}
+
+function hexLuminance(hex) {
+  const c = (hex || '').replace('#', '');
+  if (c.length !== 6) return 0;
+  const chan = v => { const x = parseInt(v, 16) / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+  return 0.2126 * chan(c.slice(0, 2)) + 0.7152 * chan(c.slice(2, 4)) + 0.0722 * chan(c.slice(4, 6));
+}
+
+function getCustomThemeColors() {
+  const bg = localStorage.getItem(CUSTOM_BG_KEY) || CUSTOM_THEME_DEFAULTS.bg;
+  const accent = localStorage.getItem(CUSTOM_ACCENT_KEY) || CUSTOM_THEME_DEFAULTS.accent;
+  const button = localStorage.getItem(CUSTOM_BUTTON_KEY) || CUSTOM_THEME_DEFAULTS.button;
+  return { bg, accent, button };
+}
+
+// Renkleri :root'a canlı olarak uygular (önizleme dahil); persist=true iken
+// localStorage'a yazar. Metin rengi arka planın luminansına göre otomatik
+// seçilir, böylece açık bir arka plan seçilse bile yazılar okunaklı kalır.
+// Buton rengi vurgu renginden bağımsız: butonlar üzerinden CSS var(--acc-btn)
+// üzerinden okunur, diğer vurgular var(--acc) kullanmaya devam eder.
+function applyCustomThemeColors({ bg, accent, button }, persist = false) {
+  const root = document.documentElement.style;
+  root.setProperty('--custom-bg', bg);
+  root.setProperty('--custom-accent', accent);
+  if (button) root.setProperty('--custom-button', button);
+  const isLight = hexLuminance(bg) > 0.5;
+  root.setProperty('--custom-text-main', isLight ? '#172033' : '#f5f5f5');
+  root.setProperty('--custom-text-mut', isLight ? '#5b6472' : '#b7b2c4');
+  if (persist) {
+    localStorage.setItem(CUSTOM_BG_KEY, bg);
+    localStorage.setItem(CUSTOM_ACCENT_KEY, accent);
+    if (button) localStorage.setItem(CUSTOM_BUTTON_KEY, button);
+  }
+}
+
+function markActiveCustomPreset(bg) {
+  const target = (bg || '').toLowerCase();
+  document.querySelectorAll('.settings-theme-preset-swatch').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.presetBg === target);
+  });
+}
+
+function renderCustomThemePresets() {
+  const wrap = document.getElementById('settings-theme-presets');
+  if (!wrap || wrap.dataset.rendered) return;
+  wrap.dataset.rendered = '1';
+  CUSTOM_THEME_PRESETS.forEach(preset => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'settings-theme-preset-swatch';
+    btn.title = preset.name;
+    btn.dataset.presetBg = preset.bg.toLowerCase();
+    const dot = document.createElement('span');
+    dot.className = 'settings-theme-preset-dot';
+    dot.style.background = `linear-gradient(135deg, ${preset.bg} 45%, ${preset.accent})`;
+    const name = document.createElement('span');
+    name.className = 'settings-theme-preset-name';
+    name.textContent = preset.name;
+    btn.append(dot, name);
+    btn.addEventListener('click', () => {
+      const bgInput = document.getElementById('settings-custom-bg');
+      const accentInput = document.getElementById('settings-custom-accent');
+      const buttonInput = document.getElementById('settings-custom-button');
+      const bgHex = document.getElementById('settings-custom-bg-hex');
+      const accentHex = document.getElementById('settings-custom-accent-hex');
+      const buttonHex = document.getElementById('settings-custom-button-hex');
+      if (bgInput) bgInput.value = preset.bg;
+      if (accentInput) accentInput.value = preset.accent;
+      if (buttonInput) buttonInput.value = preset.button;
+      if (bgHex) bgHex.value = preset.bg.toUpperCase();
+      if (accentHex) accentHex.value = preset.accent.toUpperCase();
+      if (buttonHex) buttonHex.value = preset.button.toUpperCase();
+      applyCustomThemeColors({ bg: preset.bg, accent: preset.accent, button: preset.button });
+      markActiveCustomPreset(preset.bg);
+      applyUserTheme('custom');
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+function initCustomThemeEditor() {
+  renderCustomThemePresets();
+  const { bg, accent, button } = getCustomThemeColors();
+  const bgInput = document.getElementById('settings-custom-bg');
+  const accentInput = document.getElementById('settings-custom-accent');
+  const buttonInput = document.getElementById('settings-custom-button');
+  const bgHex = document.getElementById('settings-custom-bg-hex');
+  const accentHex = document.getElementById('settings-custom-accent-hex');
+  const buttonHex = document.getElementById('settings-custom-button-hex');
+  if (bgInput) bgInput.value = bg;
+  if (accentInput) accentInput.value = accent;
+  if (buttonInput) buttonInput.value = button;
+  if (bgHex) bgHex.value = bg.toUpperCase();
+  if (accentHex) accentHex.value = accent.toUpperCase();
+  if (buttonHex) buttonHex.value = button.toUpperCase();
+  applyCustomThemeColors({ bg, accent, button });
+  markActiveCustomPreset(bg);
+
+  const HEX_RE = /^#[0-9a-f]{6}$/i;
+  const sync = () => {
+    const colors = { bg: bgInput?.value || bg, accent: accentInput?.value || accent, button: buttonInput?.value || button };
+    applyCustomThemeColors(colors);
+    markActiveCustomPreset(colors.bg);
+    if (getUserTheme() === 'custom' || document.documentElement.dataset.theme === 'custom') applyUserTheme('custom');
+  };
+  bgInput?.addEventListener('input', () => { if (bgHex) bgHex.value = bgInput.value.toUpperCase(); sync(); });
+  accentInput?.addEventListener('input', () => { if (accentHex) accentHex.value = accentInput.value.toUpperCase(); sync(); });
+  buttonInput?.addEventListener('input', () => { if (buttonHex) buttonHex.value = buttonInput.value.toUpperCase(); sync(); });
+  bgHex?.addEventListener('input', () => {
+    const v = bgHex.value.trim();
+    if (HEX_RE.test(v)) { if (bgInput) bgInput.value = v; sync(); }
+  });
+  accentHex?.addEventListener('input', () => {
+    const v = accentHex.value.trim();
+    if (HEX_RE.test(v)) { if (accentInput) accentInput.value = v; sync(); }
+  });
+  buttonHex?.addEventListener('input', () => {
+    const v = buttonHex.value.trim();
+    if (HEX_RE.test(v)) { if (buttonInput) buttonInput.value = v; sync(); }
+  });
 }
 
 function applyUserTheme(theme, persist = false) {
   const selected = APP_THEMES.has(theme) ? theme : 'aurora';
   document.documentElement.dataset.theme = selected;
-  if (persist) localStorage.setItem(USER_THEME_KEY, selected);
+  if (persist) {
+    localStorage.setItem(USER_THEME_KEY, selected);
+    if (selected === 'custom') {
+      const bgInput = document.getElementById('settings-custom-bg');
+      const accentInput = document.getElementById('settings-custom-accent');
+      const buttonInput = document.getElementById('settings-custom-button');
+      const current = getCustomThemeColors();
+      applyCustomThemeColors({ bg: bgInput?.value || current.bg, accent: accentInput?.value || current.accent, button: buttonInput?.value || current.button }, true);
+    }
+  }
   syncThemeSelection(selected);
+  const customBg = selected === 'custom' ? getCustomThemeColors().bg : null;
+  window.electronAPI?.setWindowTheme?.(selected, persist, customBg);
   return selected;
 }
 
@@ -6458,6 +6618,7 @@ function initUserSettings() {
   // altında tanımlı; #app ana menüde gizli olduğundan body'ye portal edilmelidir.
   const settingsModal = document.getElementById('settings-modal');
   if (settingsModal && settingsModal.parentElement !== document.body) document.body.appendChild(settingsModal);
+  initCustomThemeEditor();
   applyUserTheme(getUserTheme());
   applyUserLanguage(getUserLanguage(), false);
   const quality = localStorage.getItem(USER_QUALITY_KEY);
@@ -6574,7 +6735,6 @@ function bindUI() {
   const volpop = document.getElementById('volpop');
   const volslider = document.getElementById('volslider');
   const volval = document.getElementById('volval');
-  const addip = document.getElementById('addip');
   const leave = document.getElementById('leave');
 
   const micThresh = document.getElementById('mic-thresh');
@@ -6683,112 +6843,6 @@ function bindUI() {
       document.getElementById('share-modal').classList.add('hidden');
     });
   }
-
-  addip.addEventListener('click', () => {
-    document.getElementById('ip-modal').classList.remove('hidden');
-  });
-  document.getElementById('ip-cancel').addEventListener('click', () => {
-    document.getElementById('ip-modal').classList.add('hidden');
-  });
-  document.getElementById('ip-ok').addEventListener('click', () => {
-    const ip = document.getElementById('ip-input').value.trim();
-    if (ip) {
-      window.electronAPI.directConnect(ip);
-      showToast(ip + ' adresine ping gönderildi.', 'info');
-    }
-    document.getElementById('ip-modal').classList.remove('hidden');
-    document.getElementById('ip-input').value = '';
-  });
-
-  const addsdp = document.getElementById('addsdp');
-  if (addsdp) {
-    addsdp.addEventListener('click', async () => {
-      document.getElementById('sdp-modal').classList.remove('hidden');
-      document.getElementById('my-offer').value = 'Hazırlanıyor... Lütfen bekleyin.';
-      
-      let targetPeer = null;
-      let targetId = null;
-
-      if (state.peers.size === 0) {
-        targetId = crypto.randomUUID();
-        addUser({ id: targetId, name: 'Bilinmeyen (SDP)', mic: true, deaf: false, sharing: false });
-        await createPeerConnection(targetId, 'Bilinmeyen (SDP)', true, null);
-        targetPeer = state.peers.get(targetId);
-      } else {
-        for (const [id, peer] of state.peers) {
-          targetId = id;
-          targetPeer = peer;
-          break;
-        }
-      }
-
-      if (targetPeer.pc.iceGatheringState === 'complete') {
-        document.getElementById('my-offer').value = btoa(JSON.stringify(targetPeer.pc.localDescription));
-        document.getElementById('my-offer').dataset.targetId = targetId;
-      } else {
-        targetPeer.pc.addEventListener('icegatheringstatechange', () => {
-          if (targetPeer.pc.iceGatheringState === 'complete') {
-            document.getElementById('my-offer').value = btoa(JSON.stringify(targetPeer.pc.localDescription));
-            document.getElementById('my-offer').dataset.targetId = targetId;
-          }
-        });
-      }
-    });
-  }
-
-  document.getElementById('sdp-cancel').addEventListener('click', () => {
-    document.getElementById('sdp-modal').classList.add('hidden');
-  });
-
-  document.getElementById('copy-offer').addEventListener('click', () => {
-    const offerText = document.getElementById('my-offer').value;
-    navigator.clipboard.writeText(offerText);
-    showToast('Teklif kopyalandı!', 'ok');
-  });
-
-  document.getElementById('sdp-apply').addEventListener('click', async () => {
-    const friendSdpB64 = document.getElementById('friend-answer').value.trim();
-    if (!friendSdpB64) return;
-    try {
-      const friendSdp = JSON.parse(atob(friendSdpB64));
-      
-      if (friendSdp.type === 'offer') {
-        const newId = crypto.randomUUID();
-        addUser({ id: newId, name: 'Bilinmeyen (SDP)', mic: true, deaf: false, sharing: false });
-        await createPeerConnection(newId, 'Bilinmeyen (SDP)', false, null);
-        const peer = state.peers.get(newId);
-        await peer.pc.setRemoteDescription(new RTCSessionDescription(friendSdp));
-        const answer = await peer.pc.createAnswer();
-        answer.sdp = setMediaBitrates(answer.sdp);
-        await peer.pc.setLocalDescription(answer);
-        
-        document.getElementById('my-offer').value = 'Cevap hazırlanıyor (ICE)...';
-        if (peer.pc.iceGatheringState === 'complete') {
-          document.getElementById('my-offer').value = btoa(JSON.stringify(peer.pc.localDescription));
-          showToast('Cevap oluşturuldu, lütfen arkadaşına gönder.', 'info');
-        } else {
-          peer.pc.addEventListener('icegatheringstatechange', () => {
-            if (peer.pc.iceGatheringState === 'complete') {
-              document.getElementById('my-offer').value = btoa(JSON.stringify(peer.pc.localDescription));
-              showToast('Cevap oluşturuldu, lütfen arkadaşına gönder.', 'info');
-            }
-          });
-        }
-      } else {
-        const targetId = document.getElementById('my-offer').dataset.targetId;
-        if (targetId && state.peers.has(targetId)) {
-          const peer = state.peers.get(targetId);
-          await peer.pc.setRemoteDescription(new RTCSessionDescription(friendSdp));
-          showToast('Bağlantı kuruluyor...', 'info');
-        }
-      }
-      
-      document.getElementById('sdp-modal').classList.add('hidden');
-      document.getElementById('friend-answer').value = '';
-    } catch (e) {
-      showToast('Geçersiz SDP metni.', 'danger');
-    }
-  });
 
   document.getElementById('settings').addEventListener('click', () => {
     document.getElementById('settings-modal').classList.remove('hidden');

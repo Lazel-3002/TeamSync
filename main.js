@@ -476,7 +476,11 @@ function createWindow() {
       // ses kapısı ve sinyalleşme aksar; sesli sohbet uygulaması için kapalı olmalı.
       backgroundThrottling: false
     },
-    backgroundColor: '#1e1f22',
+    backgroundColor: (() => {
+      const s = readSettings();
+      if (s.theme === 'custom' && /^#[0-9a-f]{6}$/i.test(s.customBg || '')) return s.customBg;
+      return THEME_BG_COLORS[s.theme] || '#1e1f22';
+    })(),
     title: 'TeamSync - P2P',
     icon: path.join(__dirname, 'assets', 'icon.png'),
     autoHideMenuBar: true,
@@ -656,6 +660,30 @@ ipcMain.handle('set-hardware-acceleration', (event, enabled) => {
   const s = readSettings();
   s.hardwareAcceleration = !!enabled;
   return writeSettings(s);
+});
+
+// Kişisel arka plan temaları — style.css'teki --bg-dark değerleriyle eşleşir.
+// Pencere çerçevesiz (frame:false) olduğundan yeniden boyutlandırma/maksimize
+// sırasında Chromium'un native arka planı görünür; tema değişiminde bunu da
+// güncellemezsek pencere kenarları eski (koyu) renkte kalır.
+const THEME_BG_COLORS = {
+  aurora: '#0f172a',
+  black: '#0a0a0c',
+  navy: '#081426',
+  white: '#f3f6fb',
+  violet: '#f6f4fc'
+};
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+ipcMain.on('set-window-theme', (event, theme, persist, customBg) => {
+  const isCustom = theme === 'custom' && HEX_COLOR_RE.test(customBg || '');
+  const color = isCustom ? customBg : (THEME_BG_COLORS[theme] || THEME_BG_COLORS.aurora);
+  if (persist) {
+    const s = readSettings();
+    s.theme = isCustom ? 'custom' : (THEME_BG_COLORS[theme] ? theme : 'aurora');
+    if (isCustom) s.customBg = customBg;
+    writeSettings(s);
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setBackgroundColor(color);
 });
 
 ipcMain.handle('is-second-instance', () => {
