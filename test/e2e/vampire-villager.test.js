@@ -57,7 +57,7 @@ module.exports = async function run() {
     assert.deepStrictEqual(activityCover, {
       hasCard: true,
       hasCover: true,
-      source: 'assets/vampire-villager-cover-v2.png',
+      source: 'assets/vampire-villager-cover-v3.png',
       hasCustomIcon: true
     }, JSON.stringify(activityCover));
 
@@ -69,7 +69,7 @@ module.exports = async function run() {
       selected: document.querySelector('input[name="settings-theme"]:checked')?.value,
       visible: !document.getElementById('settings-modal').classList.contains('hidden')
     }))()`);
-    assert.strictEqual(themeLayout.optionCount, 4, JSON.stringify(themeLayout));
+    assert.strictEqual(themeLayout.optionCount, 6, JSON.stringify(themeLayout));
     assert.strictEqual(themeLayout.selected, 'aurora', JSON.stringify(themeLayout));
     assert.strictEqual(themeLayout.visible, true, JSON.stringify(themeLayout));
     const savedTheme = await evalJS(peer.client, `(() => {
