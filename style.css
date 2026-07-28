@@ -2775,7 +2775,7 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 }
 #vampire-card .vv-card-header h3 { margin: 4px 0 0; font-size: 23px; letter-spacing: -.02em; }
 .vv-card-kicker { color: #f9a8d4; font-size: 10px; font-weight: 800; letter-spacing: .16em; }
-.vv-card-body { width: min(800px, 100%); margin: 0 auto; padding: 24px; display: grid; gap: 16px; }
+.vv-card-body { width: min(800px, 100%); margin: 0 auto; padding: 24px; padding-bottom: 90px; display: grid; gap: 16px; }
 .vv-role-banner {
   padding: 15px 17px; border: 1px solid rgba(255,255,255,.13); border-radius: 14px;
   background: linear-gradient(110deg, rgba(255,255,255,.09), rgba(0,0,0,.18)); color: #fff; font-weight: 700;
