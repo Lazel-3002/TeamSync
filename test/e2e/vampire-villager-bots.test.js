@@ -86,26 +86,33 @@ module.exports = async function run() {
     const host = await evalJS(peer.client, 'window.state.myId');
     await installMockOllama(peer);
 
-    // --- Bot yönetim arayüzü: ekleme, isim/model/operator değiştirme, kaldırma ---
+    // --- Bot yönetim arayüzü: isim pili satırından ekleme, tıklayınca satır-içi
+    // düzenleyici açılması, isim/model/operator değiştirme, kaldırma ---
     await setLobbyPhaseState(peer, host);
-    await evalJS(peer.client, `document.getElementById('vv-bot-add').click(); document.getElementById('vv-bot-add').click(); 1`);
+    await evalJS(peer.client, `document.getElementById('vv-bot-add-pill').click(); document.getElementById('vv-bot-add-pill').click(); 1`);
     let layout = await evalJS(peer.client, `(() => ({
-      rows: document.querySelectorAll('.vv-bot-row').length,
-      names: Array.from(document.querySelectorAll('.vv-bot-name')).map(i => i.value),
-      startDisabled: document.getElementById('vampire-start').disabled,
-      startLabel: document.getElementById('vampire-start').textContent.trim()
-    }))()`);
-    assert.strictEqual(layout.rows, 2, JSON.stringify(layout));
-    assert.deepStrictEqual(layout.names, ['Bot 1', 'Bot 2'], JSON.stringify(layout));
-    assert.strictEqual(layout.startDisabled, true, 'Botlarla birlikte 3 oyuncu varken başlat düğmesi hâlâ kapalı olmalı: ' + JSON.stringify(layout));
-
-    await evalJS(peer.client, `document.getElementById('vv-bot-add').click(); 1`);
-    layout = await evalJS(peer.client, `(() => ({
-      rows: document.querySelectorAll('.vv-bot-row').length,
+      pills: document.querySelectorAll('[data-bot-pill]').length,
+      names: Array.from(document.querySelectorAll('[data-bot-pill]')).map(p => p.textContent.trim()),
       startDisabled: document.getElementById('vampire-start').disabled
     }))()`);
-    assert.strictEqual(layout.rows, 3, JSON.stringify(layout));
+    assert.strictEqual(layout.pills, 2, JSON.stringify(layout));
+    assert.deepStrictEqual(layout.names, ['🤖 Bot 1', '🤖 Bot 2'], JSON.stringify(layout));
+    assert.strictEqual(layout.startDisabled, true, 'Botlarla birlikte 3 oyuncu varken başlat düğmesi hâlâ kapalı olmalı: ' + JSON.stringify(layout));
+
+    await evalJS(peer.client, `document.getElementById('vv-bot-add-pill').click(); 1`);
+    layout = await evalJS(peer.client, `(() => ({
+      pills: document.querySelectorAll('[data-bot-pill]').length,
+      startDisabled: document.getElementById('vampire-start').disabled
+    }))()`);
+    assert.strictEqual(layout.pills, 3, JSON.stringify(layout));
     assert.strictEqual(layout.startDisabled, false, 'Kurucu + 3 bot (4 oyuncu) ile oyun başlatılabilmeli: ' + JSON.stringify(layout));
+
+    // Bot pili henüz düzenleyici açmadan önce inline editör görünmemeli
+    assert.strictEqual(await evalJS(peer.client, `!!document.querySelector('.vv-bot-inline')`), false, 'Tıklanmadan bot editörü açık olmamalı');
+
+    // Pile tıklayınca satır-içi editör açılmalı
+    await evalJS(peer.client, `document.querySelector('[data-bot-pill]').click(); 1`);
+    assert.strictEqual(await evalJS(peer.client, `!!document.querySelector('.vv-bot-inline')`), true, 'Bot pili tıklanınca editör açılmadı');
 
     // İsim değişikliği
     await evalJS(peer.client, `(() => {
@@ -135,11 +142,18 @@ module.exports = async function run() {
     await evalJS(peer.client, `document.querySelector('.vv-bot-check').click(); 1`);
     await waitFor(peer.client, `document.querySelector('.vv-bot-status.ok') ? 'yes' : null`, 5000, 'ollama check ok badge');
 
-    // Bot kaldırma
-    const removedCountBefore = await evalJS(peer.client, `document.querySelectorAll('.vv-bot-row').length`);
+    // Kapat düğmesi editörü gizlemeli ama botu silmemeli
+    await evalJS(peer.client, `document.querySelector('.vv-bot-close').click(); 1`);
+    assert.strictEqual(await evalJS(peer.client, `!!document.querySelector('.vv-bot-inline')`), false, 'Kapat düğmesi editörü kapatmadı');
+    assert.strictEqual(await evalJS(peer.client, `document.querySelectorAll('[data-bot-pill]').length`), 3, 'Kapat düğmesi yanlışlıkla bot sildi');
+
+    // Bot kaldırma (pile tekrar tıkla, editörü aç, kaldır'a bas)
+    await evalJS(peer.client, `document.querySelector('[data-bot-pill]').click(); 1`);
+    const removedCountBefore = await evalJS(peer.client, `document.querySelectorAll('[data-bot-pill]').length`);
     await evalJS(peer.client, `document.querySelector('.vv-bot-remove').click(); 1`);
-    const removedCountAfter = await evalJS(peer.client, `document.querySelectorAll('.vv-bot-row').length`);
+    const removedCountAfter = await evalJS(peer.client, `document.querySelectorAll('[data-bot-pill]').length`);
     assert.strictEqual(removedCountAfter, removedCountBefore - 1, 'Bot kaldırılmadı');
+    assert.strictEqual(await evalJS(peer.client, `!!document.querySelector('.vv-bot-inline')`), false, 'Bot kaldırılınca editör hâlâ açık kaldı');
 
     // --- Bot otonom gece kararı: mock Ollama geçerli bir hedef döndürünce uygulanmalı ---
     await evalJS(peer.client, `window.__mockChatResponse = { targetId: ${JSON.stringify(host)}, chat: 'Sizden şüpheleniyorum.' }; 1`);

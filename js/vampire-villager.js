@@ -36,6 +36,7 @@
   const botActedKey = new Map();
   const botLastChatAt = new Map();
   const botOllamaStatus = new Map();
+  let selectedBotId = null; // oyuncu isimlerinin göründüğü üst satırda hangi botun ayarları açık
   const game = () => state.vampire || (state.vampire = blank());
   const host = () => game().host === state.myId;
   const alive = () => game().players.filter(player => player.alive);
@@ -551,10 +552,12 @@
     if (status.state === 'ok') return `<span class="vv-bot-status ok">Bağlı ✓ ${esc(status.detail || '')}</span>`;
     return `<span class="vv-bot-status err">Bağlantı yok ✗ ${esc(status.detail || '')}</span>`;
   }
-  function botRow(bot) {
+  // Bot ayarları, herkesin isminin göründüğü üst satırdaki bot pilinin
+  // altında küçük bir panel olarak açılır (ayrı bir bölüme gerek yok).
+  function botInlineEditor(bot) {
     const humans = game().players.filter(player => !player.isBot);
     const operatorOptions = humans.map(human => `<option value="${human.id}" ${bot.operatorId === human.id ? 'selected' : ''}>${esc(human.name)}${human.id === state.myId ? ' (sen)' : ''}</option>`).join('');
-    return `<div class="vv-bot-row" data-bot="${bot.id}">
+    return `<div class="vv-bot-inline" data-bot="${bot.id}">
       <input class="vv-bot-name" data-bot="${bot.id}" type="text" maxlength="24" value="${esc(bot.name)}" placeholder="Bot adı">
       <label class="vv-bot-field"><span>Çalıştıran bilgisayar</span><select class="vv-bot-operator" data-bot="${bot.id}">${operatorOptions}</select></label>
       <label class="vv-bot-field"><span>Ollama modeli</span><input class="vv-bot-model" data-bot="${bot.id}" type="text" value="${esc(bot.model)}" placeholder="örn. gemma3:e2b"></label>
@@ -562,16 +565,8 @@
       <div class="vv-bot-row-actions">
         <button class="btn-sec btn-sm vv-bot-check" data-bot="${bot.id}" type="button">Ollama'yı Kontrol Et</button>
         <button class="btn-sec btn-sm vv-bot-remove" data-bot="${bot.id}" type="button">Kaldır</button>
+        <button class="btn-sec btn-sm vv-bot-close" type="button">Kapat</button>
       </div>
-    </div>`;
-  }
-  function botSectionHtml() {
-    const g = game();
-    const bots = g.players.filter(player => player.isBot);
-    return `<div class="vv-bot-section">
-      <div class="vv-bot-section-title"><strong>🤖 Botlar (Ollama)</strong><span>Boş koltukları yapay zeka botlarıyla doldur</span></div>
-      <div class="vv-bot-list">${bots.map(botRow).join('') || '<div class="vv-bot-empty">Henüz bot eklenmedi.</div>'}</div>
-      <button id="vv-bot-add" class="btn-sec vv-bot-add" type="button" ${g.players.length >= MAX_PLAYERS ? 'disabled' : ''}>+ Bot Ekle</button>
     </div>`;
   }
   function render() {
@@ -584,7 +579,14 @@
     const voteStatus = g.phase === 'vote' ? ` · Oylar: ${g.voteCount || Object.keys(g.actions.votes || {}).length}/${aliveCount(g)}` : '';
     status.dataset.base = `${phases[g.phase] || 'Hazırlanıyor'}${voteStatus}`;
     status.textContent = `${status.dataset.base}${secondsLeft ? ` · ${secondsLeft} sn` : ''}`;
-    players.innerHTML = g.players.map(player => `<span style="padding:7px 10px;border-radius:999px;background:${player.alive ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.32)'};color:${player.alive ? '#fff' : '#ad9cad'};text-decoration:${player.alive ? 'none' : 'line-through'}">${player.isBot ? '🤖 ' : ''}${esc(player.name)}${player.id === state.myId ? ' (sen)' : ''}</span>`).join('');
+    const canManageBots = host() && g.phase === 'lobby' && !g.started;
+    const pillsHtml = g.players.map(player => {
+      const clickable = canManageBots && player.isBot;
+      return `<span class="vv-player-pill${clickable ? ' vv-player-pill-bot' : ''}" ${clickable ? `data-bot-pill="${player.id}"` : ''} style="padding:7px 10px;border-radius:999px;background:${player.alive ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.32)'};color:${player.alive ? '#fff' : '#ad9cad'};text-decoration:${player.alive ? 'none' : 'line-through'}">${player.isBot ? '🤖 ' : ''}${esc(player.name)}${player.id === state.myId ? ' (sen)' : ''}</span>`;
+    }).join('');
+    const addBotPill = canManageBots ? `<button id="vv-bot-add-pill" class="vv-player-pill vv-bot-add-pill" type="button" ${g.players.length >= MAX_PLAYERS ? 'disabled' : ''}>+ 🤖 Bot Ekle</button>` : '';
+    const selectedBot = canManageBots ? g.players.find(player => player.id === selectedBotId && player.isBot) : null;
+    players.innerHTML = pillsHtml + addBotPill + (selectedBot ? botInlineEditor(selectedBot) : '');
     log.innerHTML = g.log.length ? g.log.map(line => `<div>• ${esc(line)}</div>`).join('') : '<div>Henüz olay yok.</div>';
     const allAlive = alive(); let html = '';
     if (g.phase === 'lobby') {
@@ -598,7 +600,6 @@
             <label class="vv-field"><span>Gece / oylama süresi</span><select id="vv-phase-seconds"><option value="0" ${Number(g.settings.phaseSeconds) === 0 ? 'selected' : ''}>Kurucu bitirir</option><option value="60" ${Number(g.settings.phaseSeconds) === 60 ? 'selected' : ''}>60 saniye</option><option value="90" ${Number(g.settings.phaseSeconds) === 90 ? 'selected' : ''}>90 saniye</option><option value="120" ${Number(g.settings.phaseSeconds) === 120 ? 'selected' : ''}>120 saniye</option></select></label>
             <label class="vv-field"><span>Vampir sayısı</span><select id="vv-vampire-count"><option value="auto" ${g.settings.vampireCount === 'auto' ? 'selected' : ''}>Otomatik · ${recommendedVampires(g.players.length)}</option><option value="1" ${g.settings.vampireCount === '1' ? 'selected' : ''}>1 vampir</option><option value="2" ${g.settings.vampireCount === '2' ? 'selected' : ''}>2 vampir</option><option value="3" ${g.settings.vampireCount === '3' ? 'selected' : ''}>3 vampir</option></select></label>
           </div>
-          ${botSectionHtml()}
           <div class="vv-role-section"><div class="vv-role-section-title"><strong>Özel roller</strong><span>İstediğin rolleri aç</span></div><div class="vv-role-grid">${checks}</div></div>
           <div class="vv-role-summary"><span>DAĞILIM</span><p>${setup.vampires} Vampir · ${setup.special.map(key => ROLE_INFO[key].name).join(', ') || 'Özel rol yok'} · Köylüler${setup.ignored.length ? `<em>Yer olmadığı için kapalı: ${setup.ignored.map(key => ROLE_INFO[key].name).join(', ')}</em>` : ''}</p></div>
           <button id="vampire-start" class="btn-pri vv-start-button" ${g.players.length < 4 ? 'disabled' : ''}>Oyunu Başlat <span>${g.players.length}/4+</span></button>
@@ -631,12 +632,14 @@
     el('vv-phase-seconds')?.addEventListener('change', event => { g.settings.phaseSeconds = Number(event.target.value); render(); });
     actions.querySelectorAll('.vv-setting').forEach(input => input.addEventListener('change', event => { g.settings[event.target.dataset.key] = event.target.checked; render(); }));
     actions.querySelectorAll('.vv-target').forEach(button => button.addEventListener('click', () => button.dataset.action === 'vote' ? sendVote(button.dataset.target) : sendAction(button.dataset.action, button.dataset.target)));
-    el('vv-bot-add')?.addEventListener('click', addBot);
-    actions.querySelectorAll('.vv-bot-name').forEach(input => input.addEventListener('change', event => setBotField(event.target.dataset.bot, 'name', event.target.value.trim().slice(0, 24) || 'Bot')));
-    actions.querySelectorAll('.vv-bot-operator').forEach(select => select.addEventListener('change', event => { setBotField(event.target.dataset.bot, 'operatorId', event.target.value); requestBotOllamaCheck(event.target.dataset.bot); }));
-    actions.querySelectorAll('.vv-bot-model').forEach(input => input.addEventListener('change', event => { const value = event.target.value.trim() || defaultBotModel(); setBotField(event.target.dataset.bot, 'model', value); try { localStorage.setItem(OLLAMA_MODEL_KEY, value); } catch (_) {} }));
-    actions.querySelectorAll('.vv-bot-check').forEach(button => button.addEventListener('click', () => requestBotOllamaCheck(button.dataset.bot)));
-    actions.querySelectorAll('.vv-bot-remove').forEach(button => button.addEventListener('click', () => removeBot(button.dataset.bot)));
+    el('vv-bot-add-pill')?.addEventListener('click', addBot);
+    players.querySelectorAll('[data-bot-pill]').forEach(pill => pill.addEventListener('click', () => { selectedBotId = selectedBotId === pill.dataset.botPill ? null : pill.dataset.botPill; render(); }));
+    players.querySelectorAll('.vv-bot-name').forEach(input => input.addEventListener('change', event => setBotField(event.target.dataset.bot, 'name', event.target.value.trim().slice(0, 24) || 'Bot')));
+    players.querySelectorAll('.vv-bot-operator').forEach(select => select.addEventListener('change', event => { setBotField(event.target.dataset.bot, 'operatorId', event.target.value); requestBotOllamaCheck(event.target.dataset.bot); }));
+    players.querySelectorAll('.vv-bot-model').forEach(input => input.addEventListener('change', event => { const value = event.target.value.trim() || defaultBotModel(); setBotField(event.target.dataset.bot, 'model', value); try { localStorage.setItem(OLLAMA_MODEL_KEY, value); } catch (_) {} }));
+    players.querySelectorAll('.vv-bot-check').forEach(button => button.addEventListener('click', () => requestBotOllamaCheck(button.dataset.bot)));
+    players.querySelectorAll('.vv-bot-remove').forEach(button => button.addEventListener('click', () => { selectedBotId = null; removeBot(button.dataset.bot); }));
+    players.querySelectorAll('.vv-bot-close').forEach(button => button.addEventListener('click', () => { selectedBotId = null; render(); }));
     renderLobbyChat();
     runBotsIfNeeded();
   }
