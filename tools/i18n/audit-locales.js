@@ -65,6 +65,9 @@ if (process.argv.includes('--sync-source')) {
     if (!fs.existsSync(file)) continue;
     const catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
     Object.assign(catalog.structured, i18n[locale]);
+    Object.assign(catalog.legacy, locale === 'tr'
+      ? Object.fromEntries(requiredLegacy.map(key => [key, key]))
+      : legacy);
     fs.writeFileSync(file, JSON.stringify(catalog, null, 2) + '\n', 'utf8');
   }
   for (const locale of EXPECTED_LOCALES.filter(code => !['tr', 'en'].includes(code))) {
@@ -72,6 +75,7 @@ if (process.argv.includes('--sync-source')) {
     if (!fs.existsSync(file)) continue;
     const catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
     for (const key of requiredStructured) if (!(key in catalog.structured)) catalog.structured[key] = '';
+    for (const key of requiredLegacy) if (!(key in catalog.legacy)) catalog.legacy[key] = '';
     fs.writeFileSync(file, JSON.stringify(catalog, null, 2) + '\n', 'utf8');
   }
 }

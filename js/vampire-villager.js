@@ -89,7 +89,12 @@
   }
   function closeLocal() {
     const card = el('vampire-card');
-    if (card && !card.classList.contains('hidden')) card.classList.add('hidden');
+    if (!card || card.classList.contains('hidden')) return;
+    // The activity can be closed while it owns focus mode.  Hiding it first
+    // leaves .main.focus-mode and the focus spacer active, producing the blank
+    // or broken layout reported after leaving Vampire Villager.
+    if (card.classList.contains('focused') && typeof exitFocus === 'function') exitFocus();
+    card.classList.add('hidden');
   }
   function refreshTimerLabel() {
     const g = game(), status = el('vampire-status');

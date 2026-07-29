@@ -947,7 +947,11 @@
 
         <div id="lvs-card" class="vcard hidden" style="background: #000; display: flex; flex-direction: column;">
           <div class="card-actions lvs-tools">
-            <input type="file" id="lvs-file" accept="video/mp4,video/mkv,video/webm" style="color: #fff; max-width: 200px;" />
+            <!-- Native file inputs inherit the operating-system language.  Keep the
+                 real control hidden and expose our own localizable trigger/name. -->
+            <input type="file" id="lvs-file" accept="video/mp4,video/mkv,video/webm" style="display: none;" />
+            <label id="lvs-file-label" for="lvs-file" class="btn-sec btn-sm" style="cursor: pointer;">Dosya Seç</label>
+            <span id="lvs-file-name" class="muted" style="font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Dosya seçilmedi</span>
             <button id="lvs-load" class="btn-pri btn-sm">Seçili Videoyu Aç</button>
             <div style="flex: 1;"></div>
             <span class="muted" style="font-size: 11px; margin-right: 10px;">(Sadece play/pause/süre senkronize olur)</span>

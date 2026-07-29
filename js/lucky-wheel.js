@@ -475,6 +475,8 @@ function initLuckyWheel() {
   
   document.getElementById('lvs-file')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
+    const fileName = document.getElementById('lvs-file-name');
+    if (fileName) fileName.textContent = file ? file.name : 'Dosya seçilmedi';
     if(file) {
       const url = URL.createObjectURL(file);
       lvsPlayer.src = url;

@@ -6325,6 +6325,128 @@ Object.assign(LEGACY_TEXT_EN, {
   'Emin misiniz?': 'Are you sure?',
   'metered.ca\'dan ücretsiz hesap açıp buraya TURN bilgilerinizi girin. Kolay yol: Metered panelindeki "credentials API" adresini (https://...metered.live/api/v1/turn/credentials?apiKey=...) URL alanına yapıştırın, kullanıcı adı/şifre boş kalabilir. Odada TEK kişinin girmesi yeterli — diğerlerine otomatik paylaşılır.': 'Create a free account at metered.ca and enter your TURN details here. The easiest way is to paste the credentials API URL from the Metered panel (https://...metered.live/api/v1/turn/credentials?apiKey=...) into the URL field; username and password may be left blank. Only one person in the room needs to enter it — it is shared automatically with everyone else.'
 });
+// Labels rendered after the initial page load by activities and owner controls.
+// Keep these in the same source dictionary so every locale catalog is audited
+// against them and dynamic cards cannot silently remain in Turkish.
+Object.assign(LEGACY_TEXT_EN, {
+  'SUNUCU ID:': 'SERVER ID:',
+  '32 kbps (Düşük)': '32 kbps (Low)',
+  '64 kbps': '64 kbps',
+  '96 kbps': '96 kbps',
+  '128 kbps (Önerilen)': '128 kbps (Recommended)',
+  '192 kbps': '192 kbps',
+  '256 kbps (Yüksek)': '256 kbps (High)',
+  'Arkadaşlarını Davet Et': 'Invite Your Friends',
+  'Çevrimiçi arkadaşlarını bu sunucuya davet et.': 'Invite your online friends to this server.',
+  'Yeni': 'New',
+  'UNO Lobileri': 'UNO Lobbies',
+  '(sen)': '(you)',
+  'koltuk dolu': 'seats filled',
+  'Herkes hazır olduğunda "Başlat"a bas.': 'Press "Start" when everyone is ready.',
+  'Kurucunun oyunu başlatması bekleniyor…': 'Waiting for the host to start the game…',
+  'Sıra sende!': 'Your turn!',
+  'Sıra sende! +': 'Your turn! +',
+  'Sıra:': 'Turn:',
+  'Çektiğin kart oynanabilir — at ya da beklet!': 'The card you drew can be played — play it or keep it!',
+  'Renk seç': 'Choose a color',
+  'Kırmızı': 'Red',
+  'Sarı': 'Yellow',
+  'Yeşil': 'Green',
+  'Mavi': 'Blue',
+  'Kart çek': 'Draw card',
+  'Çektiğin kart oynanabilir!': 'The card you drew can be played!',
+  'Oyna': 'Play',
+  'Beklet': 'Keep',
+  'Tekrar Oyna': 'Play Again',
+  'Oyun Kuralları': 'Game Rules',
+  'Kombo (Yığma)': 'Stacking',
+  '+2/+4 yediğinde çekmek yerine elindeki +2 veya +4\'ü üstüne atabilirsin; ceza katlanarak sıradakine geçer. İstersen desteye tıklayıp cezayı normal çekersin.': 'When you receive a +2 or +4, you may play a +2 or +4 instead of drawing; the penalty stacks for the next player. You can still click the deck to draw the penalty normally.',
+  'Bloklama': 'Blocking',
+  '+2/+4 yiyeceğin sırada elinde Engel (⊘) varsa onu atıp cezayı bloklarsın; kart çekmezsin ve sıra düzgünce bir sonrakine geçer — Engel, cezayı savmak için kullanılmış olur.': 'If you hold a Block (⊘) when receiving a +2 or +4, play it to block the penalty. You do not draw and play continues to the next player.',
+  'Başlangıç Kartı': 'Starting Cards',
+  'Her oyuncunun oyuna kaç kartla başlayacağını belirler.': 'Sets how many cards each player starts with.',
+  'Açık': 'On',
+  'Kapalı': 'Off',
+  'kart': 'cards',
+  'Kurucu olarak kuralları buradan değiştirebilirsin.': 'As host, you can change the rules here.',
+  'Kurallar oyun sırasında değiştirilemez.': 'Rules cannot be changed during a game.',
+  'Kuralları yalnızca kurucu değiştirebilir.': 'Only the host can change the rules.',
+  'Yetkilendir': 'Authorize',
+  'Yetkilendirme': 'Authorization',
+  'Ekranı Büyült': 'Enlarge Screen',
+  'Yenile': 'Refresh',
+  'Git': 'Go',
+  'Odada başka kimse yok': 'There is nobody else in the room.',
+  'Yetki Ver': 'Grant Access',
+  'Yetkili': 'Authorized',
+  'Geçerli bir YouTube linki girin': 'Enter a valid YouTube link.',
+  'Mysal için Bu gece name oynayalım?': 'For example, what should we play tonight?',
+  '1. zorunlu seçenek': '1st required option',
+  '2. zorunlu seçenek': '2nd required option',
+  '3. seçenek (isteğe bağlı)': '3rd option (optional)',
+  '4. seçenek (isteğe bağlı)': '4th option (optional)',
+  'Örn. Film izleyelim': 'For example, watch a movie',
+  'Film izleyelim': 'Watch a movie',
+  'Oyun oynayalım': 'Play a game',
+  'Sohbet edelim': 'Chat',
+  'Müzik dinleyelim': 'Listen to music',
+  'Lobi hazıralanıyor…': 'Preparing lobby…',
+  'Lobi hazırlanıyor…': 'Preparing lobby…',
+  'VAMPİR KÖYLÜ': 'VAMPIRE VILLAGER',
+  'SOSYAL ÇIKARIM OYUNU': 'SOCIAL DEDUCTION GAME',
+  'Lobi kurucususun. Rolleri ve vampir sayısını aşağıdan ayarla.': 'You are the lobby host. Set the roles and vampire count below.',
+  'Lobi kurucusunun kuralları ayarlamasını bekliyorsun.': 'Waiting for the lobby host to configure the rules.',
+  'Gizli rolün:': 'Your secret role:',
+  'İzleyici modundasın; gizli rolün yok.': 'You are spectating; you have no secret role.',
+  'Lobi kuralları': 'Lobby rules',
+  'Önce oyun tarzını seç, ardından özel rolleri istediğin gibi düzenle.': 'Choose a game style first, then tailor the special roles as you like.',
+  'Hazır kural paketi': 'Rule preset',
+  'Klasik': 'Classic',
+  'Dengeli': 'Balanced',
+  'Kaos': 'Chaos',
+  'Yeni Lobi Kur': 'Create New Lobby',
+  'Bu aşamada bekleyin.': 'Please wait during this phase.',
+  'NORMAL': 'NORMAL', 'ATEŞ': 'FIRE', 'SU': 'WATER', 'ELEKTRİK': 'ELECTRIC', 'ÇİMEN': 'GRASS', 'BUZ': 'ICE',
+  'DÖVÜŞ': 'FIGHTING', 'ZEHİR': 'POISON', 'TOPRAK': 'GROUND', 'UÇAN': 'FLYING', 'PSİŞİK': 'PSYCHIC', 'BÖCEK': 'BUG',
+  'KAYA': 'ROCK', 'HAYALET': 'GHOST', 'EJDERHA': 'DRAGON', 'KARANLIK': 'DARK', 'ÇELİK': 'STEEL', 'PERİ': 'FAIRY',
+  'OYUNCU 1...': 'PLAYER 1...', 'OYUNCU 2...': 'PLAYER 2...', 'HAZIRLANIYOR...': 'PREPARING...',
+  'Tür çarpanları çift türlerde birleşir: Örneğin Ateş saldırısı Çimen/Böcek rakibe 4×, Su/Ejderha rakibe 0.25× etki eder.': 'Type multipliers combine for dual types: for example, a Fire attack deals 4× damage to a Grass/Bug opponent and 0.25× damage to a Water/Dragon opponent.',
+  'Hasar Verir (2x)': 'Deals Damage (2x)',
+  'Zayıf Vurur (0.5x)': 'Deals Reduced Damage (0.5x)',
+  'Etki Etmez (0x)': 'No Effect (0x)',
+  'Kişiye': 'None',
+  'Tüm katılımcıların mikrofonunda RNNoise\'u açar veya kapatır. Değişiklik bağlantıyı kesmeden anında uygulanır.': 'Turns RNNoise on or off for every participant\'s microphone. The change applies instantly without disconnecting.',
+  'Tüm katılımcıların ses bit hızını belirler. Yüksek değer daha net ses, daha fazla internet kullanımı demektir. Değişiklik anında herkese uygulanır.': 'Sets the audio bitrate for all participants. Higher values provide clearer audio but use more bandwidth. The change applies to everyone instantly.',
+  'Aktif olduğunda, yalnızca şu an sunucuda bulunan herhangi bir kişinin arkadaş listesinde olanlar katılabilir. Yabancıların bağlantısı anında reddedilir.': 'When enabled, only people who are friends with someone currently in this server can join. Unknown connections are rejected immediately.',
+  'Tüm katılımcıların sohbet mesajları ve profil fotoğrafları AI ile denetlenir.': 'All participants’ chat messages and profile photos are checked by AI.',
+  'RAM/CPU kullanımını minimize eder (Ekran paylaşımlarını 15 FPS’e kilitler ve AI taramasını yavaşlatır).': 'Minimizes RAM/CPU usage (locks screen sharing to 15 FPS and slows AI scanning).',
+  'Lobi: 0 • Oyuncu: 0': 'Lobby: 0 • Players: 0',
+  'Lobi:': 'Lobby:',
+  'Oyuncu:': 'Player:', 'Oyuncu': 'Player', 'oyuncu': 'player',
+  'En az 2 oyuncu gerekli. Arkadaşların katılmasını bekle…': 'At least 2 players are required. Waiting for friends to join…',
+  'ceza iptal': 'penalty blocked',
+  'Odak kilidi açıldı': 'Focus lock unlocked',
+  'Odak kilitlendi — tıklamalar odağı değiştirmez': 'Focus locked — clicks will not change focus',
+  'Sıra sende değil.': 'It is not your turn.',
+  'Kazandın!': 'You won!',
+  'RAM/CPU kullanımını minimize eder (Ekran paylaşımlarını 15 FPS\'e kilitler ve AI taramasını yavaşlatır).': 'Minimizes RAM/CPU usage (locks screen sharing to 15 FPS and slows AI scanning).',
+  'POPÜLER': 'POPULAR', 'KLASİK': 'CLASSIC', 'YENİ': 'NEW', 'SENKRON': 'SYNCED', 'ARENA': 'ARENA', 'PARTİ': 'PARTY', 'SOSYAL': 'SOCIAL',
+  'YouTube Linki': 'YouTube URL',
+  'Aç': 'Open',
+  'Başlamak için 2 seçenek daha ekle.': 'Add 2 more options to begin.',
+  'Başlamak için 1 seçenek daha ekle.': 'Add 1 more option to begin.',
+  'Çark dönüyor': 'Wheel is spinning',
+  'Sonuç:': 'Result:',
+  'Odadan Ayrıl': 'Leave Room',
+  'Takımı Bırakmam!': 'Keep My Team!',
+  'Evet, Ayrıl': 'Yes, Leave',
+  'Dosya Seç': 'Choose File',
+  'Dosya seçilmedi': 'No file selected',
+  'Seçili Videoyu Aç': 'Open Selected Video',
+  '(Sadece play/pause/süre senkronize olur)': '(Only play/pause/time is synchronized)',
+  'Lütfen bilgisayarınızdan aynı filmi seçin.': 'Please choose the same video file from your computer.',
+  'Mor Gece': 'Purple Night', 'Kızıl Ateş': 'Crimson Fire', 'Orman Yeşili': 'Forest Green', 'Gün Batımı': 'Sunset', 'Okyanus Mavisi': 'Ocean Blue', 'Pembe Rüya': 'Pink Dream', 'Altın Çöl': 'Golden Desert', 'Buz Beyazı': 'Ice White', 'Mor & Beyaz': 'Purple & White'
+});
 
 const LEGACY_TEXT_TR = Object.fromEntries(Object.entries(LEGACY_TEXT_EN).map(([tr, en]) => [en, tr]));
 // A locale must provide its own complete legacy dictionary before it can be
@@ -6346,18 +6468,31 @@ Object.entries(window.TeamSyncLocaleCatalogs || {}).forEach(([locale, catalog]) 
 
 function translateLegacyValue(value, dictionary) {
   if (dictionary[value]) return dictionary[value];
-  // Runtime status strings often append a number to a translated label
-  // ("Güç: 40", "0 oy"). Preserve the dynamic portion while translating
-  // the stable UI fragment in either direction.
-  for (const [source, target] of Object.entries(dictionary)) {
-    if (source.length > 1 && (source.endsWith(':') || source.endsWith('(')) && value.startsWith(source)) {
-      return `${target}${value.slice(source.length)}`;
-    }
-    if (source.length > 1 && source.startsWith(' ') && value.endsWith(source)) {
-      return `${value.slice(0, -source.length)}${target}`;
-    }
-  }
-  return null;
+  // Activity UIs commonly decorate labels with icons, counters or a user's
+  // name (for example "🌐 Senin IP: 192…" and "1 / 4 koltuk dolu").  Exact
+  // matching leaves those rows in Turkish after switching languages.  Replace
+  // the longest known fragment once, while chat/user content remains excluded
+  // by translateLegacyStaticUI.
+  let embeddedValue = value;
+  let embeddedChanged = false;
+  Object.entries(dictionary)
+    .filter(([source, target]) => source.length > 1 && source !== target)
+    .sort(([a], [b]) => b.length - a.length)
+    .forEach(([source, target]) => {
+      if (!embeddedValue.includes(source)) return;
+      // Do not turn a short standalone word such as "oy" (vote) into the
+      // middle of a longer Turkish word such as "oyuncu" (player).
+      if (/^[\p{L}\p{N}]+$/u.test(source)) {
+        const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const wholeWord = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'gu');
+        if (!wholeWord.test(embeddedValue)) return;
+        embeddedValue = embeddedValue.replace(wholeWord, target);
+      } else {
+        embeddedValue = embeddedValue.split(source).join(target);
+      }
+      embeddedChanged = true;
+    });
+  return embeddedChanged ? embeddedValue : null;
 }
 
 function translateLegacyStaticUI(language, root = document.body) {
@@ -7000,10 +7135,19 @@ function initUserSettings() {
     state.legacyI18nObserver = new MutationObserver(mutations => {
       const language = getUserLanguage();
       mutations.forEach(mutation => {
+        if (mutation.type === 'attributes') {
+          translateLegacyStaticUI(language, mutation.target);
+          return;
+        }
         mutation.addedNodes.forEach(node => translateLegacyStaticUI(language, node));
       });
     });
-    state.legacyI18nObserver.observe(document.body, { childList: true, subtree: true });
+    state.legacyI18nObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['title', 'placeholder']
+    });
   }
   document.addEventListener('keydown', e => {
     if (e.code === 'Escape' && !document.getElementById('settings-modal')?.classList.contains('hidden')) {

@@ -34,7 +34,16 @@ def run(locale, section):
             if len(translated) != len(batch):
                 raise ValueError('translation separator was changed')
         except Exception:
-            translated = [GoogleTranslator(source=source, target=target).translate(item[2]) for item in batch]
+            translated = []
+            for _, key, value in batch:
+                try:
+                    translated.append(GoogleTranslator(source=source, target=target).translate(value))
+                except Exception:
+                    # A provider occasionally rejects an isolated short label
+                    # (for example Turkish "Git").  Do not leave Turkish in a
+                    # selectable locale: retain the reviewed English fallback
+                    # and flag the catalogue as a machine draft for review.
+                    translated.append(english[group].get(key, value))
         for (_, key, _), translation in zip(batch, translated):
             catalog[group][key] = translation
         completed = min(offset + len(batch), len(work))

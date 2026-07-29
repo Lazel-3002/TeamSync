@@ -42,6 +42,16 @@ module.exports = async function run() {
   try {
     await createRoom(peer);
     const host = await evalJS(peer.client, 'window.state.myId');
+    const closeRestoresLayout = await evalJS(peer.client, `(() => {
+      openCardFocused('vampire-card');
+      document.getElementById('vampire-close').click();
+      return {
+        hidden: document.getElementById('vampire-card').classList.contains('hidden'),
+        focusMode: document.querySelector('.main').classList.contains('focus-mode'),
+        focusAreaHidden: document.getElementById('focus-area').classList.contains('hidden')
+      };
+    })()`);
+    assert.deepStrictEqual(closeRestoresLayout, { hidden: true, focusMode: false, focusAreaHidden: true }, JSON.stringify(closeRestoresLayout));
 
     // Etkinlik kartı: emoji yerine oyun afişi ve özgün ikon kullanılmalı.
     const activityCover = await evalJS(peer.client, `(() => {

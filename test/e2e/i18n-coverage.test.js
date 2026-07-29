@@ -31,7 +31,28 @@ module.exports = async function run() {
         lobbyText: visibleText('#act-lobby-card'),
         pollText: visibleText('#poll-card'),
         wheelText: visibleText('#wheel-card'),
+        localVideoText: visibleText('#lvs-card'),
         pokeText: visibleText('#poke-card'),
+        inviteText: visibleText('#server-invites-modal'),
+        dynamicText: (() => {
+          const sample = document.createElement('div');
+          sample.textContent = '🌐 Senin IP: 192.0.2.1 · 1 / 4 koltuk dolu';
+          document.body.append(sample);
+          translateLegacyStaticUI('en', sample);
+          const text = sample.textContent;
+          sample.remove();
+          return text;
+        })(),
+        wordBoundaryText: translateLegacyValue('1 oyuncu · 0 oy', LEGACY_TEXT_EN),
+        activityBadge: translateLegacyValue('POPÜLER', LEGACY_TEXT_EN),
+        wheelStatus: translateLegacyValue('Sonuç: Deniz', LEGACY_TEXT_EN),
+        leaveTitle: translateLegacyValue('Odadan Ayrıl', LEGACY_TEXT_EN),
+        dynamicPlaceholder: (() => {
+          const input = document.createElement('input');
+          input.placeholder = '1. zorunlu seçenek';
+          translateLegacyStaticUI('en', input);
+          return input.placeholder;
+        })(),
       };
     })()`);
 
@@ -44,6 +65,19 @@ module.exports = async function run() {
 
     const availableCatalogs = await evalJS(peer.client, `SUPPORTED_LANGUAGES.map(language => ({ language, complete: hasCompleteLocaleCatalog(language) }))`);
     assert.ok(availableCatalogs.length === 13 && availableCatalogs.every(catalog => catalog.complete), JSON.stringify(availableCatalogs, null, 2));
+
+    assert.match(result.inviteText, /Invite Your Friends/, JSON.stringify(result, null, 2));
+    assert.strictEqual(result.dynamicText, '🌐 Your IP: 192.0.2.1 · 1 / 4 seats filled', JSON.stringify(result, null, 2));
+    assert.strictEqual(result.wordBoundaryText, '1 player · 0 votes', JSON.stringify(result, null, 2));
+    assert.strictEqual(result.activityBadge, 'POPULAR', JSON.stringify(result, null, 2));
+    assert.strictEqual(result.wheelStatus, 'Result: Deniz', JSON.stringify(result, null, 2));
+    assert.strictEqual(result.leaveTitle, 'Leave Room', JSON.stringify(result, null, 2));
+    assert.strictEqual(result.dynamicPlaceholder, '1st required option', JSON.stringify(result, null, 2));
+    assert.match(result.localVideoText, /Choose File/, JSON.stringify(result, null, 2));
+    assert.match(result.localVideoText, /No file selected/, JSON.stringify(result, null, 2));
+    assert.match(result.localVideoText, /Open Selected Video/, JSON.stringify(result, null, 2));
+    assert.match(result.localVideoText, /Only play\/pause\/time is synchronized/, JSON.stringify(result, null, 2));
+    assert.match(result.localVideoText, /Please choose the same video file/, JSON.stringify(result, null, 2));
 
     const keySurfaces = [result.activityText, result.lobbyText, result.pollText, result.wheelText, result.pokeText].join('\n');
     assert.ok(!/[çğıöşüÇĞİÖŞÜ]/.test(keySurfaces), `Turkish text leaked into English activity UI:\n${keySurfaces}`);
