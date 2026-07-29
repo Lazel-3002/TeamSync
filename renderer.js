@@ -8318,10 +8318,10 @@ window.renderServerDMFriends = () => {
     const f = state.friends[fId];
     const isActive = state.activeDM === fId;
     const li = document.createElement('li');
-    li.style.cssText = `padding: 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s; color: #fff; background: ${isActive ? 'rgba(255,255,255,0.1)' : 'transparent'}; display: flex; align-items: center; gap: 8px;`;
+    li.className = `server-dm-friend${isActive ? ' active' : ''}`;
     li.innerHTML = `<div class="friend-status online"></div> <b>${escapeHtml(f.name)}</b>`;
-    li.onmouseover = () => { if (!isActive) li.style.background = 'rgba(255,255,255,0.05)'; };
-    li.onmouseout = () => { if (!isActive) li.style.background = 'transparent'; };
+    li.onmouseover = () => { if (!isActive) li.classList.add('hover'); };
+    li.onmouseout = () => { if (!isActive) li.classList.remove('hover'); };
     li.onclick = () => { openDM(fId); renderServerDMFriends(); };
     list.appendChild(li);
   });

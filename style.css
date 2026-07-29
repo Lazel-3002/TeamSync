@@ -14,6 +14,9 @@
   
   --txt-main: #f8fafc;
   --txt-mut: #94a3b8;
+  /* Yardımcı metinler için ayrı ton: açık temada beyaz saydam metinlerin
+     kaybolmasını önlemek üzere tema ile birlikte değişir. */
+  --txt-subtle: rgba(248, 250, 252, 0.62);
   
   --danger: #ef4444;
   --danger-hover: #dc2626;
@@ -813,6 +816,75 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 }
 .dm-input-area button:hover {
   background: var(--acc-btn-hover, var(--acc-light));
+}
+
+/* Sunucu içi DM penceresi tema değişkenlerini kullanır. Böylece pencere
+   açıldığında sabit lacivert katman, kullanıcının seçtiği paleti ezmez. */
+.modal.server-dm-modal {
+  z-index: 10000;
+  background: color-mix(in srgb, var(--bg-dark) 68%, transparent);
+}
+.server-dm-card {
+  width: 700px;
+  height: 500px;
+  display: flex;
+  flex-direction: row;
+  padding: 0;
+  overflow: hidden;
+  color: var(--txt-main);
+  background: var(--bg-card);
+  border: var(--border);
+}
+.server-dm-sidebar {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--bg-dark) 84%, black 8%);
+  border-right: 1px solid color-mix(in srgb, var(--txt-main) 10%, transparent);
+}
+.server-dm-sidebar-title {
+  padding: 16px;
+  color: var(--txt-main);
+  font-weight: 700;
+  border-bottom: 1px solid color-mix(in srgb, var(--txt-main) 10%, transparent);
+}
+.server-dm-friend-list {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.server-dm-friend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--txt-main);
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--txt-main) 8%, transparent);
+  transition: background .2s;
+}
+.server-dm-friend.hover { background: color-mix(in srgb, var(--txt-main) 5%, transparent); }
+.server-dm-friend.active { background: color-mix(in srgb, var(--acc) 20%, transparent); }
+.server-dm-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+.server-dm-card .dm-header {
+  background: color-mix(in srgb, var(--txt-main) 5%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--txt-main) 9%, transparent);
+}
+.server-dm-card .dm-input-area {
+  background: color-mix(in srgb, var(--txt-main) 4%, transparent);
+  border-top-color: color-mix(in srgb, var(--txt-main) 9%, transparent);
+}
+.server-dm-card .dm-input-area input {
+  background: color-mix(in srgb, var(--txt-main) 5%, transparent);
+  border-color: color-mix(in srgb, var(--txt-main) 14%, transparent);
 }
 
 .menu-id-value {
@@ -1625,7 +1697,9 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   inset: 0;
   /* backdrop-filter blur kaldırıldı: donanım hızlandırma kapalıyken tam ekran
      blur her karede CPU'da yeniden hesaplanıyor ve modal açılışını kastırıyordu */
-  background: rgba(15, 23, 42, 0.85);
+  /* Modal açıkken arka plan kararır, ancak sabit lacivert kullanılmaz:
+     seçili temanın rengi karartılmış olarak korunur. */
+  background: color-mix(in srgb, var(--bg-dark) 68%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7955,6 +8029,7 @@ input:checked + .slider:before {
   --acc-light: #3b82f6;
   --txt-main: #172033;
   --txt-mut: #657188;
+  --txt-subtle: #5c6475;
   --border: 1px solid rgba(31,41,55,.12);
   --shadow: 0 12px 32px rgba(31,41,55,.12);
   --shadow-sm: 0 4px 12px rgba(31,41,55,.08);
@@ -7971,6 +8046,7 @@ input:checked + .slider:before {
   --acc-light: #a78bfa;
   --txt-main: #211c33;
   --txt-mut: #6b6280;
+  --txt-subtle: #625a76;
   --border: 1px solid rgba(139,92,246,.18);
   --shadow: 0 12px 32px rgba(139,92,246,.16);
   --shadow-sm: 0 4px 12px rgba(139,92,246,.1);
@@ -8067,6 +8143,22 @@ input:checked + .slider:before {
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-profile span, :root:is([data-theme="white"],[data-theme="violet"]) .settings-nav-label, :root:is([data-theme="white"],[data-theme="violet"]) .settings-lead, :root:is([data-theme="white"],[data-theme="violet"]) .settings-row p, :root:is([data-theme="white"],[data-theme="violet"]) .settings-help, :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-heading p, :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-copy small, :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-hint { color: #667085; }
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-nav-item { color: #586275; }:root:is([data-theme="white"],[data-theme="violet"]) .settings-nav-item:hover { color: #172033; background: #eef2f8; }:root:is([data-theme="white"],[data-theme="violet"]) .settings-nav-item.active { color: #312e81; background: #e8e9ff; }:root:is([data-theme="white"],[data-theme="violet"]) .settings-nav-icon { color: #657188; }
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-card, :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-section { background: #f8faff; border-color: rgba(31,41,55,.1); }
+:root:is([data-theme="white"],[data-theme="violet"]) .language-option,
+:root:is([data-theme="white"],[data-theme="violet"]) .time-options label {
+  color: #172033;
+  background: #fff;
+  border-color: #d9dfeb;
+}
+:root:is([data-theme="white"],[data-theme="violet"]) .language-option small,
+:root:is([data-theme="white"],[data-theme="violet"]) .settings-time-preview { color: #667085; }
+:root:is([data-theme="white"],[data-theme="violet"]) .language-option:hover { background: #f4f6fb; border-color: #9aa6bb; }
+:root:is([data-theme="white"],[data-theme="violet"]) .language-option:has(input:checked),
+:root:is([data-theme="white"],[data-theme="violet"]) .time-options label:has(input:checked) {
+  background: color-mix(in srgb, var(--acc) 10%, #fff);
+  border-color: var(--acc);
+}
+:root:is([data-theme="white"],[data-theme="violet"]) .settings-time-preview strong,
+:root:is([data-theme="white"],[data-theme="violet"]) .settings-section-title { color: #172033; }
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-option { color: #172033; background: #fff; border-color: rgba(31,41,55,.12); }:root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-option:hover { background: color-mix(in srgb, var(--acc) 6%, #fff); border-color: color-mix(in srgb, var(--acc) 55%, transparent); }:root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-option:has(input:checked) { background: color-mix(in srgb, var(--acc) 10%, #fff); border-color: var(--acc); }:root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-device { color: #5c6475; border-color: rgba(31,41,55,.12); }
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-select, :root:is([data-theme="white"],[data-theme="violet"]) .settings-input { color: #172033; background: #fff; border-color: #d9dfeb; }
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-actions { background: #f8faff; border-top-color: rgba(31,41,55,.1); }:root:is([data-theme="white"],[data-theme="violet"]) .settings-actions > span { color: #667085; }
@@ -8126,3 +8218,187 @@ input:checked + .slider:before {
 :root:is([data-theme="white"],[data-theme="violet"]) #vampire-card { background: #f5f7fb !important; }
 :root:is([data-theme="white"],[data-theme="violet"]) #vampire-card .vv-card-header { background: #ffffff; }
 :root:is([data-theme="white"],[data-theme="violet"]) #vampire-card .vv-lobby-settings { background: #ffffff; }
+
+/* Etkinlikler, uygulamanın seçili paletini izler. Oyunların marka görselleri
+   ve UNO kart renkleri korunur; çevreleyen zemin, panel ve kontroller temadan
+   türetilir. */
+#activities-modal {
+  background: color-mix(in srgb, var(--bg-dark) 72%, transparent);
+}
+#activities-modal .activity-picker,
+#activities-modal .activity-search-row {
+  color: var(--txt-main);
+  background: var(--bg-card);
+  border-color: color-mix(in srgb, var(--txt-main) 14%, transparent);
+}
+#activities-modal .activity-search-box {
+  color: var(--txt-mut);
+  background: color-mix(in srgb, var(--txt-main) 5%, var(--bg-dark));
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--acc) 20%, transparent);
+}
+#activities-modal .activity-search-box:focus-within {
+  border-color: var(--acc-light);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 28%, transparent);
+}
+#activities-modal .activity-search-box input,
+#activities-modal .activity-quick-section h4,
+#activities-modal .activity-section-label,
+#activities-modal .card-act-btn { color: var(--txt-main); }
+#activities-modal .activity-search-box input::placeholder,
+#activities-modal .activity-close-btn,
+#activities-modal .activity-section-hint { color: var(--txt-mut); }
+#activities-modal .activity-close-btn:hover { color: var(--txt-main); background: color-mix(in srgb, var(--txt-main) 8%, transparent); }
+#activities-modal .activity-picker-scroll { scrollbar-color: color-mix(in srgb, var(--txt-main) 22%, transparent) color-mix(in srgb, var(--txt-main) 5%, var(--bg-dark)); }
+#activities-modal .activity-picker-scroll::-webkit-scrollbar-track { background: color-mix(in srgb, var(--txt-main) 5%, var(--bg-dark)); }
+#activities-modal .activity-picker-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--txt-main) 24%, transparent); border-color: color-mix(in srgb, var(--txt-main) 5%, var(--bg-dark)); }
+#activities-modal .card-act-btn {
+  background: color-mix(in srgb, var(--txt-main) 6%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--txt-main) 12%, transparent);
+}
+#activities-modal .card-act-btn:hover,
+#activities-modal .card-act-btn:focus-visible {
+  background: color-mix(in srgb, var(--txt-main) 11%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--acc) 52%, transparent);
+}
+
+#uno-card,
+#poke-card {
+  color: var(--txt-main) !important;
+  background: radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--acc) 20%, transparent), transparent 42%), var(--bg-dark) !important;
+  border-color: color-mix(in srgb, var(--acc) 32%, transparent) !important;
+}
+#uno-card .card-actions,
+#poke-card > .card-actions {
+  background: color-mix(in srgb, var(--bg-dark) 84%, transparent) !important;
+}
+#uno-card .u-lobby-box,
+#uno-card .u-host-settings,
+#uno-card .u-turn,
+#uno-card .u-settings-box {
+  color: var(--txt-main);
+  background: color-mix(in srgb, var(--txt-main) 7%, var(--bg-dark));
+  border-color: color-mix(in srgb, var(--txt-main) 16%, transparent);
+}
+#uno-card .u-hint,
+#uno-card .u-check,
+#uno-card .u-rule-state { color: var(--txt-mut); }
+#uno-card .u-select { color: var(--txt-main); background: color-mix(in srgb, var(--txt-main) 6%, var(--bg-dark)); border-color: color-mix(in srgb, var(--txt-main) 18%, transparent); }
+#uno-card .u-select option { color: var(--txt-main); background: var(--bg-dark); }
+#poke-card .poke-battle-arena {
+  background:
+    radial-gradient(ellipse at 50% -8%, color-mix(in srgb, var(--acc) 28%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--acc) 34%, var(--bg-dark)), var(--bg-dark)) !important;
+  border-color: color-mix(in srgb, var(--acc) 36%, transparent);
+}
+#poke-card .poke-battle-brand,
+#poke-card .poke-battle-profile,
+#poke-card #poke-selection-panel {
+  background-color: color-mix(in srgb, var(--txt-main) 6%, var(--bg-dark)) !important;
+  border-color: color-mix(in srgb, var(--txt-main) 14%, transparent) !important;
+}
+
+/* Hızlı Anket'in mor tasarımı yalnızca vurgu olarak kalır; çalışma alanının
+   tamamı seçili tema zeminini ve metin kontrastını kullanır. */
+.poll-card {
+  color: var(--txt-main);
+  background: radial-gradient(circle at 18% 0, color-mix(in srgb, var(--acc) 16%, transparent), transparent 30%), var(--bg-dark) !important;
+  border-color: color-mix(in srgb, var(--acc) 28%, transparent) !important;
+}
+.poll-header {
+  background: color-mix(in srgb, var(--bg-dark) 86%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--txt-main) 10%, transparent);
+}
+.poll-title-icon {
+  color: var(--acc-light);
+  border-color: color-mix(in srgb, var(--acc) 38%, transparent);
+  background: color-mix(in srgb, var(--acc) 18%, transparent);
+}
+.poll-eyebrow,
+.poll-step-label,
+.poll-section-heading p,
+.poll-preview-top > div span,
+.poll-preview-card > span,
+.poll-preview-note,
+.poll-results-heading > div span,
+#poll-vote-hint,
+#poll-change-note { color: var(--txt-mut); }
+.poll-section-heading h4,
+.poll-voting-panel > h2,
+.poll-preview-card h5,
+.poll-results-heading > div strong,
+.poll-leader-card strong { color: var(--txt-main); }
+.poll-builder-panel,
+.poll-preview-panel,
+.poll-voting-panel,
+.poll-results-panel {
+  color: var(--txt-main);
+  background: color-mix(in srgb, var(--txt-main) 5%, var(--bg-dark));
+  border-color: color-mix(in srgb, var(--txt-main) 13%, transparent);
+}
+.poll-preview-card,
+.poll-option-editor,
+.poll-preview-options > div,
+.poll-opt,
+.poll-leader-card {
+  color: var(--txt-main);
+  background: color-mix(in srgb, var(--txt-main) 6%, var(--bg-dark));
+  border-color: color-mix(in srgb, var(--txt-main) 12%, transparent);
+}
+.poll-question-field > div,
+.poll-question-field input,
+.poll-option-editor input { color: var(--txt-main); }
+.poll-question-field > div { background: color-mix(in srgb, var(--txt-main) 5%, var(--bg-dark)); border-color: color-mix(in srgb, var(--txt-main) 14%, transparent); }
+.poll-template { color: var(--txt-main); background: color-mix(in srgb, var(--txt-main) 6%, transparent); border-color: color-mix(in srgb, var(--txt-main) 15%, transparent); }
+.poll-template:hover { background: color-mix(in srgb, var(--acc) 15%, var(--bg-dark)); border-color: var(--acc); }
+.poll-primary-button { color: #fff; background: var(--acc-btn, var(--acc)); box-shadow: 0 9px 26px color-mix(in srgb, var(--acc) 28%, transparent); }
+.poll-switch input:checked + span { background: var(--acc); }
+
+/* Şans Çarkı'nın koyu mor iskeletini de ortak tema yüzeylerine bağla. */
+.wheel-card {
+  --wheel-gold: var(--acc);
+  --wheel-gold-strong: var(--acc-light);
+  --wheel-violet: var(--acc);
+  --wheel-panel: color-mix(in srgb, var(--txt-main) 6%, var(--bg-dark));
+  color: var(--txt-main);
+  background: radial-gradient(circle at 18% 0, color-mix(in srgb, var(--acc) 16%, transparent), transparent 30%), var(--bg-dark) !important;
+  border-color: color-mix(in srgb, var(--acc) 28%, transparent) !important;
+}
+.wheel-header { background: color-mix(in srgb, var(--bg-dark) 86%, transparent); border-bottom-color: color-mix(in srgb, var(--txt-main) 10%, transparent); }
+.wheel-title-icon { color: var(--acc-light); background: color-mix(in srgb, var(--acc) 18%, transparent); border-color: color-mix(in srgb, var(--acc) 38%, transparent); }
+.wheel-eyebrow, .wheel-step-label, .wheel-section-heading p, .wheel-preview-top > div span, .wheel-preview-note { color: var(--txt-mut); }
+.wheel-section-heading h4, .wheel-game-heading h4, .wheel-preview-top > div strong { color: var(--txt-main); }
+.wheel-editor-panel, .wheel-preview-panel, .wheel-side-card { border-color: color-mix(in srgb, var(--txt-main) 13%, transparent); }
+.wheel-preset { color: var(--txt-main); border-color: color-mix(in srgb, var(--txt-main) 14%, transparent); background: color-mix(in srgb, var(--txt-main) 5%, transparent); }
+.wheel-preset:hover { color: var(--txt-main); border-color: var(--acc); background: color-mix(in srgb, var(--acc) 15%, var(--bg-dark)); }
+.wheel-input-wrap input { color: var(--txt-main); background: color-mix(in srgb, var(--txt-main) 5%, var(--bg-dark)); border-color: color-mix(in srgb, var(--txt-main) 14%, transparent); }
+
+/* Pokémon seçim katmanları dinamik olarak inline stillerle oluşur; burada
+   !important kullanımı bu seçim ekranlarının da temayı izlemesini sağlar. */
+#poke-base-selection-modal,
+#poke-evolution-selection-modal,
+#poke-move-selection-modal {
+  color: var(--txt-main);
+  background: color-mix(in srgb, var(--bg-dark) 94%, transparent) !important;
+}
+#poke-base-selection-modal h2,
+#poke-evolution-selection-modal h2,
+#poke-move-selection-modal h2 { color: var(--txt-main) !important; }
+#poke-base-selection-modal p,
+#poke-evolution-selection-modal p,
+#poke-move-selection-modal p { color: var(--txt-mut) !important; }
+#poke-move-selection-pokename { color: var(--acc-light) !important; text-shadow: 0 0 10px color-mix(in srgb, var(--acc) 55%, transparent) !important; }
+#poke-evo-back-btn { background: color-mix(in srgb, var(--txt-main) 10%, var(--bg-dark)) !important; border-color: color-mix(in srgb, var(--txt-main) 18%, transparent) !important; }
+#poke-base-selection-grid > div,
+#poke-evolution-selection-flex > div,
+#poke-move-selection-list .manual-move-card {
+  color: var(--txt-main) !important;
+  background: color-mix(in srgb, var(--txt-main) 7%, var(--bg-dark)) !important;
+  border-color: color-mix(in srgb, var(--txt-main) 18%, transparent) !important;
+}
+#poke-base-selection-grid > div:hover,
+#poke-evolution-selection-flex > div:hover,
+#poke-move-selection-list .manual-move-card:hover {
+  border-color: var(--acc) !important;
+  background: color-mix(in srgb, var(--acc) 15%, var(--bg-dark)) !important;
+}
