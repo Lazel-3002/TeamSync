@@ -832,7 +832,7 @@ function renderFriends() {
   // Render Invites
   invitesList.innerHTML = '';
   if (state.friendRequests.length === 0) {
-    invitesList.innerHTML = '<li class="muted" style="text-align: center; padding: 12px;">Bekleyen davet yok.</li>';
+    invitesList.innerHTML = `<li class="muted" style="text-align: center; padding: 12px;">${t('invites.empty')}</li>`;
   } else {
     state.friendRequests.forEach((req, idx) => {
       const li = document.createElement('li');
@@ -2006,7 +2006,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const ips = await window.electronAPI.getLocalIPs();
     if (ips.length) {
       document.getElementById('my-ip').innerHTML =
-        `🌐 Senin IP: <code>${ips[0].address}</code> (aynı ağdaki arkadaşın otomatik bulur)`;
+        `🌐 ${t('network.yourIp')}: <code>${ips[0].address}</code> (${t('network.discoveryHint')})`;
     }
   } catch (e) {}
 
@@ -2403,9 +2403,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-add-friend').addEventListener('click', () => {
     const targetId = document.getElementById('friend-id-input').value.trim().toUpperCase();
-    if (!targetId || targetId === state.friendId) return alert("Geçerli bir ID girin.");
+    if (!targetId || targetId === state.friendId) return alert(t('alert.validId'));
     
-    if (state.friends[targetId]) return alert("Bu kişi zaten arkadaşın!");
+    if (state.friends[targetId]) return alert(t('alert.alreadyFriend'));
     
     if (state.globalMqtt && state.globalMqtt.connected) {
       state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
@@ -2627,7 +2627,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       setConnStatus(true);
     } catch (err) {
-      alert('Hata: ' + err.message);
+      alert(`${t('alert.error')}: ${err.message}`);
       console.error(err);
     }
   };
@@ -2635,7 +2635,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   btnJoin.addEventListener('click', () => {
     document.getElementById('error-modal').classList.add('hidden');
     const roomId = joinId.value.trim().toLowerCase();
-    if (!roomId) return alert("Lütfen bir Sunucu ID girin!");
+    if (!roomId) return alert(t('alert.serverIdRequired'));
     
     const originalText = btnJoin.textContent;
     btnJoin.textContent = "Aranıyor...";
@@ -5599,7 +5599,19 @@ const USER_SPEAKER_VOLUME_KEY = 'teamsync_speaker_volume';
 const USER_STREAM_PREVIEWS_KEY = 'teamsync_stream_previews';
 const USER_STREAM_FPS_KEY = 'teamsync_stream_fps';
 const USER_SHARE_SYSTEM_AUDIO_KEY = 'teamsync_share_system_audio';
-const SUPPORTED_LANGUAGES = ['tr', 'en'];
+// Keep the language list in one place so settings, persistence, and runtime
+// translation always agree.  English is the non-Turkish fallback, never
+// Turkish: choosing another locale must not leave Turkish UI behind.
+const SUPPORTED_LANGUAGES = ['tr', 'en', 'de', 'es', 'fr', 'pt', 'ru'];
+const LANGUAGE_META = {
+  tr: { flag: '🇹🇷', name: 'Türkçe', native: 'Turkish', locale: 'tr-TR' },
+  en: { flag: '🇬🇧', name: 'English', native: 'İngilizce', locale: 'en-GB' },
+  de: { flag: '🇩🇪', name: 'Deutsch', native: 'German', locale: 'de-DE' },
+  es: { flag: '🇪🇸', name: 'Español', native: 'Spanish', locale: 'es-ES' },
+  fr: { flag: '🇫🇷', name: 'Français', native: 'French', locale: 'fr-FR' },
+  pt: { flag: '🇧🇷', name: 'Português', native: 'Portuguese', locale: 'pt-BR' },
+  ru: { flag: '🇷🇺', name: 'Русский', native: 'Russian', locale: 'ru-RU' }
+};
 
 const I18N = {
   tr: {
@@ -5971,6 +5983,73 @@ const I18N = {
 // Eski ekranların tamamını tek seferde yeniden yazmadan dil değişimine dahil
 // etmek için yalnızca sabit arayüz metinlerinde çalışan uyumluluk sözlüğü.
 // Sohbet, arkadaş listesi ve kullanıcı adları özellikle kapsam dışıdır.
+Object.assign(I18N.tr, {
+  'app.subtitle': "P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur, internetten bağlanılabilir",
+  'network.connected': 'İnternet üzerinden bağlantı aktif',
+  'network.yourIp': 'Senin IP',
+  'network.discoveryHint': 'aynı ağdaki arkadaşın otomatik bulur',
+  'invites.title': 'Gelen Arkadaşlık Davetleri',
+  'invites.lead': 'Sana gelen arkadaşlık istekleri burada görünür.',
+  'invites.empty': 'Bekleyen davet yok.',
+  'alert.validId': 'Geçerli bir ID girin.',
+  'alert.alreadyFriend': 'Bu kişi zaten arkadaşın!',
+  'alert.error': 'Hata',
+  'alert.serverIdRequired': 'Lütfen bir Sunucu ID girin!'
+});
+Object.assign(I18N.en, {
+  'app.subtitle': 'P2P • Serverless • Finds people automatically on the same Wi-Fi and can connect over the internet',
+  'network.connected': 'Internet connection is active',
+  'network.yourIp': 'Your IP',
+  'network.discoveryHint': 'friends on the same network find you automatically',
+  'invites.title': 'Incoming Friend Requests',
+  'invites.lead': 'Friend requests you receive appear here.',
+  'invites.empty': 'No pending invitations.',
+  'alert.validId': 'Enter a valid ID.',
+  'alert.alreadyFriend': 'This person is already your friend!',
+  'alert.error': 'Error',
+  'alert.serverIdRequired': 'Enter a Server ID!'
+});
+
+// Locales deliberately inherit English rather than Turkish.  That guarantees
+// a complete readable interface while a translated locale is being expanded;
+// an untranslated key can never silently fall back to Turkish.
+const makeLocale = overrides => ({ ...I18N.en, ...overrides });
+I18N.de = makeLocale({
+  'common.settings': 'Einstellungen', 'common.settingsShort': 'Einstellungen', 'common.close': 'Schließen', 'common.save': 'Änderungen speichern', 'common.back': 'Zurück', 'common.cancel': 'Abbrechen', 'common.send': 'Senden', 'common.join': 'Beitreten', 'common.create': 'Erstellen',
+  'menu.join': 'Server beitreten', 'menu.joinDesc': 'Einem bestehenden Raum beitreten', 'menu.create': 'Server erstellen', 'menu.createDesc': 'Eigenen Raum starten', 'menu.friends': 'Freunde', 'menu.addFriend': 'Freund hinzufügen', 'menu.sendFriendRequest': 'Freundschaftsanfrage senden', 'menu.serverId': 'Server-ID',
+  'room.users': 'BENUTZER', 'room.voiceTest': 'SPRACHTEST', 'room.chat': 'CHAT', 'toolbar.voice': 'Sprache', 'toolbar.deafen': 'Stummschalten', 'toolbar.screen': 'Bildschirm', 'toolbar.activity': 'Aktivität', 'toolbar.record': 'Aufnehmen', 'toolbar.volume': 'Lautstärke',
+  'settings.languageTime': 'Sprache & Zeit', 'settings.languageLead': 'Wähle die Sprache der Oberfläche und die Zeitanzeige.', 'settings.chooseLanguage': 'Sprache auswählen', 'settings.timeFormat': 'Zeitformat', 'settings.timeAuto': 'Automatisch', 'settings.preview': 'Vorschau',
+  'settings.general': 'Allgemein', 'settings.voice': 'Sprache & Video', 'settings.broadcast': 'Übertragung', 'settings.connections': 'Verbindungen', 'settings.mediaLibrary': 'GIFs & Medien'
+});
+I18N.es = makeLocale({
+  'common.settings': 'Ajustes', 'common.settingsShort': 'Ajustes', 'common.close': 'Cerrar', 'common.save': 'Guardar cambios', 'common.back': 'Volver', 'common.cancel': 'Cancelar', 'common.send': 'Enviar', 'common.join': 'Unirse', 'common.create': 'Crear',
+  'menu.join': 'Unirse a un servidor', 'menu.joinDesc': 'Entrar a una sala existente', 'menu.create': 'Crear un servidor', 'menu.createDesc': 'Iniciar tu propia sala', 'menu.friends': 'Amigos', 'menu.addFriend': 'Añadir amigo', 'menu.sendFriendRequest': 'Enviar solicitud de amistad', 'menu.serverId': 'ID del servidor',
+  'room.users': 'USUARIOS', 'room.voiceTest': 'PRUEBA DE VOZ', 'room.chat': 'CHAT', 'toolbar.voice': 'Voz', 'toolbar.deafen': 'Ensordecer', 'toolbar.screen': 'Pantalla', 'toolbar.activity': 'Actividad', 'toolbar.record': 'Grabar', 'toolbar.volume': 'Volumen',
+  'settings.languageTime': 'Idioma y hora', 'settings.languageLead': 'Elige el idioma de la interfaz y el formato de hora.', 'settings.chooseLanguage': 'Elige un idioma', 'settings.timeFormat': 'Formato de hora', 'settings.timeAuto': 'Automático', 'settings.preview': 'Vista previa',
+  'settings.general': 'General', 'settings.voice': 'Voz y vídeo', 'settings.broadcast': 'Transmisión', 'settings.connections': 'Conexiones', 'settings.mediaLibrary': 'GIF y medios'
+});
+I18N.fr = makeLocale({
+  'common.settings': 'Paramètres', 'common.settingsShort': 'Paramètres', 'common.close': 'Fermer', 'common.save': 'Enregistrer les modifications', 'common.back': 'Retour', 'common.cancel': 'Annuler', 'common.send': 'Envoyer', 'common.join': 'Rejoindre', 'common.create': 'Créer',
+  'menu.join': 'Rejoindre un serveur', 'menu.joinDesc': 'Entrer dans une salle existante', 'menu.create': 'Créer un serveur', 'menu.createDesc': 'Créer votre propre salle', 'menu.friends': 'Amis', 'menu.addFriend': 'Ajouter un ami', 'menu.sendFriendRequest': 'Envoyer une demande d’ami', 'menu.serverId': 'ID du serveur',
+  'room.users': 'UTILISATEURS', 'room.voiceTest': 'TEST VOCAL', 'room.chat': 'CHAT', 'toolbar.voice': 'Voix', 'toolbar.deafen': 'Assourdir', 'toolbar.screen': 'Écran', 'toolbar.activity': 'Activité', 'toolbar.record': 'Enregistrer', 'toolbar.volume': 'Volume',
+  'settings.languageTime': 'Langue et heure', 'settings.languageLead': 'Choisissez la langue de l’interface et le format de l’heure.', 'settings.chooseLanguage': 'Choisir une langue', 'settings.timeFormat': 'Format de l’heure', 'settings.timeAuto': 'Automatique', 'settings.preview': 'Aperçu',
+  'settings.general': 'Général', 'settings.voice': 'Voix et vidéo', 'settings.broadcast': 'Diffusion', 'settings.connections': 'Connexions', 'settings.mediaLibrary': 'GIF et médias'
+});
+I18N.pt = makeLocale({
+  'common.settings': 'Configurações', 'common.settingsShort': 'Configurações', 'common.close': 'Fechar', 'common.save': 'Salvar alterações', 'common.back': 'Voltar', 'common.cancel': 'Cancelar', 'common.send': 'Enviar', 'common.join': 'Entrar', 'common.create': 'Criar',
+  'menu.join': 'Entrar em um servidor', 'menu.joinDesc': 'Entrar em uma sala existente', 'menu.create': 'Criar um servidor', 'menu.createDesc': 'Iniciar sua própria sala', 'menu.friends': 'Amigos', 'menu.addFriend': 'Adicionar amigo', 'menu.sendFriendRequest': 'Enviar pedido de amizade', 'menu.serverId': 'ID do servidor',
+  'room.users': 'USUÁRIOS', 'room.voiceTest': 'TESTE DE VOZ', 'room.chat': 'CHAT', 'toolbar.voice': 'Voz', 'toolbar.deafen': 'Silenciar', 'toolbar.screen': 'Tela', 'toolbar.activity': 'Atividade', 'toolbar.record': 'Gravar', 'toolbar.volume': 'Volume',
+  'settings.languageTime': 'Idioma e hora', 'settings.languageLead': 'Escolha o idioma da interface e o formato da hora.', 'settings.chooseLanguage': 'Escolha um idioma', 'settings.timeFormat': 'Formato da hora', 'settings.timeAuto': 'Automático', 'settings.preview': 'Prévia',
+  'settings.general': 'Geral', 'settings.voice': 'Voz e vídeo', 'settings.broadcast': 'Transmissão', 'settings.connections': 'Conexões', 'settings.mediaLibrary': 'GIFs e mídia'
+});
+I18N.ru = makeLocale({
+  'common.settings': 'Настройки', 'common.settingsShort': 'Настройки', 'common.close': 'Закрыть', 'common.save': 'Сохранить изменения', 'common.back': 'Назад', 'common.cancel': 'Отмена', 'common.send': 'Отправить', 'common.join': 'Войти', 'common.create': 'Создать',
+  'menu.join': 'Войти на сервер', 'menu.joinDesc': 'Войти в существующую комнату', 'menu.create': 'Создать сервер', 'menu.createDesc': 'Создать свою комнату', 'menu.friends': 'Друзья', 'menu.addFriend': 'Добавить друга', 'menu.sendFriendRequest': 'Отправить запрос в друзья', 'menu.serverId': 'ID сервера',
+  'room.users': 'ПОЛЬЗОВАТЕЛИ', 'room.voiceTest': 'ПРОВЕРКА ГОЛОСА', 'room.chat': 'ЧАТ', 'toolbar.voice': 'Голос', 'toolbar.deafen': 'Отключить звук', 'toolbar.screen': 'Экран', 'toolbar.activity': 'Активность', 'toolbar.record': 'Запись', 'toolbar.volume': 'Громкость',
+  'settings.languageTime': 'Язык и время', 'settings.languageLead': 'Выберите язык интерфейса и формат времени.', 'settings.chooseLanguage': 'Выберите язык', 'settings.timeFormat': 'Формат времени', 'settings.timeAuto': 'Автоматически', 'settings.preview': 'Предпросмотр',
+  'settings.general': 'Общие', 'settings.voice': 'Голос и видео', 'settings.broadcast': 'Трансляция', 'settings.connections': 'Подключения', 'settings.mediaLibrary': 'GIF и медиа'
+});
+
 const LEGACY_TEXT_EN = {
   'İptal': 'Cancel',
   'Kapat': 'Close',
@@ -6031,17 +6110,243 @@ const LEGACY_TEXT_EN = {
   'Tam Ekran (F)': 'Fullscreen (F)',
   'Küçült': 'Minimize'
 };
+Object.assign(LEGACY_TEXT_EN, {
+  'P2P • Sunucusuz • Aynı Wi-Fi’da otomatik bulur, internetten bağlanılabilir': 'P2P • Serverless • Finds people automatically on the same Wi-Fi and can connect over the internet',
+  "P2P • Sunucusuz • Aynı Wi-Fi'da otomatik bulur, internetten bağlanılabilir": 'P2P • Serverless • Finds people automatically on the same Wi-Fi and can connect over the internet',
+  'İnternet üzerinden bağlantı aktif': 'Internet connection is active',
+  'Senin IP:': 'Your IP:',
+  '(aynı ağdaki arkadaşın otomatik bulur)': '(friends on the same network find you automatically)',
+  'Sana gelen arkadaşlık istekleri burada görünür.': 'Friend requests you receive appear here.',
+  'Bekleyen davet yok.': 'No pending invitations.',
+  'Gelen Arkadaşlık Davetleri': 'Incoming Friend Requests',
+  'Mesajlar': 'Messages',
+  'Mesajlaşmaya başlamak için bir arkadaş seç.': 'Select a friend to start messaging.',
+  'Şu an çevrimiçi arkadaşın yok.': 'You do not have any friends online right now.',
+  'Sadece çevrimiçi arkadaşların mesajlaşabilir.': 'Only online friends can be messaged.',
+  'Arkadaşlar / Davet Et': 'Friends / Invite',
+  'Sunucu ID:': 'SERVER ID:',
+  'Çıkış': 'Output',
+  '0 (Hep Açık)': '0 (Always Open)',
+  'Ses Eşiği': 'Voice Threshold',
+  'Yankı Kalkanı': 'Echo Shield',
+  '(hoparlörden dinliyorsan)': '(when listening through speakers)',
+  'Tüm ekran': 'Entire screen',
+  'Ortak Tarayıcı': 'Shared Browser',
+  'Birlikte web’de gezin': 'Browse the web together',
+  "Birlikte web'de gezin": 'Browse the web together',
+  'Video Oynatıcı': 'Video Player',
+  'Senkron izleme odası': 'Synchronized watch room',
+  'Hızlı Anket': 'Quick Poll',
+  'Birlikte karar verin': 'Make a decision together',
+  'Şans Çarkı': 'Lucky Wheel',
+  'Rastgele kazanan seçin': 'Pick a random winner',
+  'Vampir Köylü': 'Vampire Villager',
+  'Gece hayatta kal, gündüz oylayın': 'Survive the night, vote by day',
+  'Klasik kart oyunu': 'Classic card game',
+  'Element arenası': 'Element arena',
+  'PokeSavaş': 'PokeBattle',
+  '⚔️ PokeSavaş ⚔️': '⚔️ PokeBattle ⚔️',
+  'SAVAŞLARI': 'BATTLES',
+  'Geri': 'Back',
+  'Lobilere Göz At': 'Browse Lobbies',
+  'Katılmak için bir lobi seçin veya yeni bir tane oluşturun.': 'Choose a lobby to join or create a new one.',
+  'Aktif Lobi: 0 • Toplam Oyuncu: 0': 'Active Lobbies: 0 • Total Players: 0',
+  'Yeni Lobi Oluştur': 'Create New Lobby',
+  'Henüz aktif lobi yok. İlk lobiyi siz oluşturun!': 'There are no active lobbies yet. Create the first one!',
+  'Oyuncu': 'Player',
+  'Oyuncu:': 'Player:',
+  'Toplam Oyuncu': 'Total Players',
+  'Lobi:': 'Lobby:',
+  'Lobi': 'Lobby',
+  'Lobiler': 'Lobbies',
+  'Lobileri': 'Lobbies',
+  'Lobi kuralları': 'Lobby rules',
+  'Yeni Lobi Kur': 'Create New Lobby',
+  'Lobi hazırlanıyor…': 'Preparing lobby…',
+  'Oyuncular bekleniyor': 'Waiting for players',
+  'Lobi sohbeti hazır. İlk mesajı sen yaz.': 'Lobby chat is ready. Write the first message.',
+  'Lobi mesajı': 'Lobby message',
+  'Lobine mesaj yaz…': 'Write a message to your lobby…',
+  'Oyunu Başlat': 'Start Game',
+  'Başlat': 'Start',
+  'Odadan Çık': 'Leave Room',
+  'Kurallar': 'Rules',
+  'UNO — Bekleme Salonu': 'UNO — Waiting Room',
+  'Kaç kişilik?': 'How many players?',
+  '+ Bot Ekle': '+ Add Bot',
+  'Başlatınca boşlukları botla doldur': 'Fill empty seats with bots when starting',
+  'En az 2 oyuncu gerekli. Arkadaşlarının katılmasını bekle…': 'At least 2 players are required. Waiting for friends to join…',
+  'HIZLI ANKET': 'QUICK POLL',
+  'TEAMSYNC KARAR ALANI': 'TEAMSYNC DECISION SPACE',
+  'CANLI ÖNİZLEME': 'LIVE PREVIEW',
+  'HAZIRLANIYOR': 'PREPARING',
+  'Oylar oda içinde canlı ve eş zamanlı güncellenir.': 'Votes update live and simultaneously in the room.',
+  'Oylama tamamlandı': 'Voting is complete',
+  'Sonuçlar artık değiştirilemez.': 'Results can no longer be changed.',
+  'CANLI SONUÇLAR': 'LIVE RESULTS',
+  'ŞU AN ÖNDE': 'CURRENTLY LEADING',
+  'Oylamayı bitir': 'End poll',
+  'Yeni anket': 'New poll',
+  '01 · SORUNU HAZIRLA': '01 · PREPARE THE QUESTION',
+  'Soruyu yaz, seçenekleri belirle ve odadaki herkesin fikrini saniyeler içinde gör.': 'Write the question, set the options, and see everyone’s opinion in seconds.',
+  'Hazır anketler': 'Ready-made polls',
+  'Akşam planı': 'Evening plans',
+  'Buluşma zamanı': 'Meeting time',
+  'Hızlı karar': 'Quick decision',
+  'Anket sorusu': 'Poll question',
+  'Örn. Bu akşam ne oynayalım?': 'For example, what should we play tonight?',
+  'Seçenekler': 'Options',
+  'Seçenek ekle': 'Add option',
+  'Oy değiştirilebilir': 'Votes can be changed',
+  'Katılımcılar kararını güncelleyebilir.': 'Participants can update their decision.',
+  'Anketi başlat': 'Start poll',
+  'Canlı önizleme': 'Live preview',
+  'Sorunu yazmaya başla': 'Start writing your question',
+  'Sence en iyi seçenek hangisi?': 'Which option do you think is best?',
+  'İlk seçenek': 'First option',
+  'İkinci seçenek': 'Second option',
+  'Anket sorusunu yazmalısın.': 'Enter a poll question.',
+  'En az iki dolu seçenek gerekli.': 'At least two options are required.',
+  'Seçeneklerin birbirinden farklı olmalı.': 'Options must be different from one another.',
+  'Henüz oy yok': 'No votes yet',
+  'oy': 'vote',
+  ' oy': ' votes',
+  'katılımcı': 'participant',
+  'OYLAMA BİTTİ': 'VOTING ENDED',
+  'OYLAMA AÇIK': 'VOTING OPEN',
+  'Kesin sonuçlar': 'Final results',
+  'Bir seçeneğe dokunarak oy ver': 'Choose an option to vote',
+  'Oyunu değiştirebilirsin': 'You can change your vote',
+  'Oyun kaydedildi': 'Vote recorded',
+  'Bu anketin kesin sonuçları gösteriliyor.': 'The final results of this poll are shown.',
+  'Oyunu sonuçlanana kadar değiştirebilirsin.': 'You can change your vote until the poll ends.',
+  'Her katılımcının tek oy hakkı var.': 'Each participant has one vote.',
+  'Sonuç bekleniyor': 'Waiting for results',
+  'İlk sonuç burada görünecek.': 'The first result will appear here.',
+  'TEAMSYNC OYUNU': 'TEAMSYNC GAME',
+  '01 · ÇARKI HAZIRLA': '01 · PREPARE THE WHEEL',
+  'Kararı çarka bırak. En az 2, en fazla 15 seçenek kullanabilirsin.': 'Leave the decision to the wheel. You can use at least 2 and at most 15 options.',
+  'Takımlar': 'Teams',
+  'Başlamak için en az 2 seçenek ekle.': 'Add at least 2 options to begin.',
+  'Odadaki herkes aynı dönüşü ve aynı sonucu görür.': 'Everyone in the room sees the same spin and result.',
+  '02 · ŞANSINI DENE': '02 · TRY YOUR LUCK',
+  'Hazır olduğunda çevir': 'Spin when you are ready',
+  'Çark hazır': 'Wheel ready',
+  'ÇARKI ÇEVİR': 'SPIN THE WHEEL',
+  'SEÇENEKLER': 'OPTIONS',
+  'SONUÇ GEÇMİŞİ': 'RESULT HISTORY',
+  'Seçenekleri düzenle': 'Edit options',
+  'ÇARKIN SEÇİMİ': 'THE WHEEL’S PICK',
+  'Şans bugün bu seçenekten yana.': 'Luck favors this option today.',
+  'Sonucu kapat': 'Close result',
+  'Tekrar çevir': 'Spin again',
+  'Çarkın henüz boş': 'The wheel is still empty',
+  'Yukarıdan bir seçenek ekle veya hazır bir liste seç.': 'Add an option above or choose a ready-made list.',
+  'Seçeneklerini ekle': 'Add your options',
+  'Yeni seçenek': 'New option',
+  'Ekle': 'Add',
+  'Çarkı hazırla': 'Prepare wheel',
+  'Çarkı döndür': 'Spin the wheel',
+  'Kazanan': 'Winner',
+  'Seçenek bekleniyor': 'Waiting for options',
+  'Pokemonunu Seç': 'Choose Your Pokémon',
+  'Savaşmak istediğin türü ve ana Pokemonunu belirle.': 'Choose the type and main Pokémon you want to battle with.',
+  'Savaştan Çekil': 'Withdraw from Battle',
+  'Arena Bekleme Salonu': 'Arena Waiting Room',
+  'Buraya Katıl': 'Join this slot',
+  'Bot Ekle': 'Add Bot',
+  'Rastgele Yetenekler (AÇIK)': 'Random Abilities (ON)',
+  'Savaşı Başlat': 'Start Battle',
+  'Savaşı Baslat': 'Start Battle',
+  'POKE SAVAŞLARI': 'POKÉ BATTLES',
+  'SEÇ • GELİŞTİR • SAVAŞ': 'CHOOSE • EVOLVE • BATTLE',
+  'OYUNCU 1...': 'PLAYER 1...',
+  'OYUNCU 2...': 'PLAYER 2...',
+  'TÜR': 'TYPE',
+  'CAN': 'HP',
+  'SALDIRI': 'ATTACK',
+  'SAVUNMA': 'DEFENSE',
+  'HIZ': 'SPEED',
+  'ÖZEL GÜÇ': 'SPECIAL POWER',
+  'Savaş başlıyor...': 'The battle is starting...',
+  'TÜR REHBERİ': 'TYPE GUIDE',
+  'Saldırı Seç': 'Choose an attack',
+  'Saldırı 1': 'Attack 1',
+  'Saldırı 2': 'Attack 2',
+  'Saldırı 3': 'Attack 3',
+  'Saldırı 4': 'Attack 4',
+  'Savaşı Bitirmek İstiyorum (Pes Et)': 'I Want to End the Battle (Surrender)',
+  'Rakip pes etmek istiyor:': 'Your opponent wants to surrender:',
+  'Affet': 'Accept surrender',
+  'TEKRAR OYNA': 'PLAY AGAIN',
+  'Sıradaki tur bekleniyor...': 'Waiting for the next round...',
+  'Rakip Seçimini Yapıyor...': 'Opponent is choosing...',
+  'Geri Dön': 'Go back',
+  'Hangi Formla Savaşacaksın?': 'Which form will you battle with?',
+  'Seçtiğin formun gerçek türleri, özellikleri ve öğrenebildiği saldırılar savaşa uygulanır.': 'The selected form’s real types, abilities, and learnable attacks are used in battle.',
+  'Rakip Evrimini Seçiyor...': 'Opponent is choosing an evolution...',
+  'Saldırılarını Seç': 'Choose your attacks',
+  'Pokemonun için en fazla 4 gerçek saldırı seç. (0/4)': 'Choose up to 4 real attacks for your Pokémon. (0/4)',
+  'Pokemonun için en fazla 4 gerçek saldırı seç. (': 'Choose up to 4 real attacks for your Pokémon. (',
+  'Onayla': 'Confirm',
+  'Rakip Bekleniyor...': 'Waiting for opponent...',
+  'Pokémon Tür Kılavuzu': 'Pokémon Type Guide',
+  'Pokemonun için en fazla 4 gerçek saldırı seç. (0/4)': 'Choose up to 4 real attacks for your Pokémon. (0/4)',
+  'Güç:': 'Power:',
+  'Hız:': 'Speed:',
+  'Oyuncu 1 Bekleniyor...': 'Waiting for Player 1...',
+  'Oyuncu 2 Bekleniyor...': 'Waiting for Player 2...',
+  'Savaş alanı kuruluyor...': 'Preparing the battlefield...',
+  'Senin sıran! Bir saldırı seç!': 'Your turn! Choose an attack!',
+  'Saldırılar gerçekleşiyor...': 'Attacks are being resolved...',
+  'Güç:': 'Power:',
+  'Hız:': 'Speed:',
+  'Öncelik:': 'Priority:',
+  'Durum': 'Status',
+  'ETKİSİZ': 'NO EFFECT',
+  'AŞIRI ETKİLİ': 'EXTREMELY EFFECTIVE',
+  'SÜPER ETKİLİ': 'SUPER EFFECTIVE',
+  'ÇOK AZ ETKİLİ': 'BARELY EFFECTIVE',
+  'ETKİSİ AZ': 'NOT VERY EFFECTIVE',
+  'NORMAL ETKİ': 'NORMAL EFFECT',
+  'Geçerli bir ID girin.': 'Enter a valid ID.',
+  'Bu kişi zaten arkadaşın!': 'This person is already your friend!',
+  'Lütfen bir Sunucu ID girin!': 'Enter a Server ID!',
+  'TeamSync\'ten ayrılmak istermisiniz?': 'Do you want to leave TeamSync?',
+  'Emin misiniz?': 'Are you sure?',
+  'metered.ca\'dan ücretsiz hesap açıp buraya TURN bilgilerinizi girin. Kolay yol: Metered panelindeki "credentials API" adresini (https://...metered.live/api/v1/turn/credentials?apiKey=...) URL alanına yapıştırın, kullanıcı adı/şifre boş kalabilir. Odada TEK kişinin girmesi yeterli — diğerlerine otomatik paylaşılır.': 'Create a free account at metered.ca and enter your TURN details here. The easiest way is to paste the credentials API URL from the Metered panel (https://...metered.live/api/v1/turn/credentials?apiKey=...) into the URL field; username and password may be left blank. Only one person in the room needs to enter it — it is shared automatically with everyone else.'
+});
+
 const LEGACY_TEXT_TR = Object.fromEntries(Object.entries(LEGACY_TEXT_EN).map(([tr, en]) => [en, tr]));
+
+function translateLegacyValue(value, dictionary) {
+  if (dictionary[value]) return dictionary[value];
+  // Runtime status strings often append a number to a translated label
+  // ("Güç: 40", "0 oy"). Preserve the dynamic portion while translating
+  // the stable UI fragment in either direction.
+  for (const [source, target] of Object.entries(dictionary)) {
+    if (source.length > 1 && (source.endsWith(':') || source.endsWith('(')) && value.startsWith(source)) {
+      return `${target}${value.slice(source.length)}`;
+    }
+    if (source.length > 1 && source.startsWith(' ') && value.endsWith(source)) {
+      return `${value.slice(0, -source.length)}${target}`;
+    }
+  }
+  return null;
+}
 
 function translateLegacyStaticUI(language, root = document.body) {
   if (!root) return;
-  const dictionary = language === 'en' ? LEGACY_TEXT_EN : LEGACY_TEXT_TR;
+  // Dynamic cards are authored in Turkish.  Any non-Turkish locale first
+  // receives the complete English safety net so a language switch cannot
+  // produce a mixed Turkish interface.
+  const dictionary = language === 'tr' ? LEGACY_TEXT_TR : LEGACY_TEXT_EN;
   const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, .chat-msg, .dm-message, .uname-text, .vtitle';
   const visitText = node => {
     const parent = node.parentElement;
     if (!parent || parent.closest(excludedSelector)) return;
     const trimmed = node.nodeValue.trim();
-    const translated = dictionary[trimmed];
+    const translated = translateLegacyValue(trimmed, dictionary);
     if (!translated) return;
     node.nodeValue = node.nodeValue.replace(trimmed, translated);
   };
@@ -6244,7 +6549,38 @@ function getUserLanguage() {
 
 function t(key) {
   const lang = getUserLanguage();
-  return (I18N[lang] && I18N[lang][key]) || I18N.tr[key] || key;
+  return (I18N[lang] && I18N[lang][key]) || I18N.en[key] || I18N.tr[key] || key;
+}
+
+function renderLanguageOptions() {
+  const container = document.querySelector('.language-options');
+  if (!container) return;
+  const activeLanguage = getUserLanguage();
+  const fragment = document.createDocumentFragment();
+  SUPPORTED_LANGUAGES.forEach(language => {
+    const meta = LANGUAGE_META[language];
+    const label = document.createElement('label');
+    label.className = 'language-option';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'settings-language';
+    input.value = language;
+    input.checked = language === activeLanguage;
+    const flag = document.createElement('span');
+    flag.className = 'language-flag';
+    flag.textContent = meta.flag;
+    const copy = document.createElement('span');
+    const name = document.createElement('strong');
+    name.textContent = meta.name;
+    const native = document.createElement('small');
+    native.textContent = meta.native;
+    copy.append(name, native);
+    const mark = document.createElement('i');
+    mark.textContent = '✓';
+    label.append(input, flag, copy, mark);
+    fragment.append(label);
+  });
+  container.replaceChildren(fragment);
 }
 
 function applyUserLanguage(language, persist = true) {
@@ -6252,15 +6588,15 @@ function applyUserLanguage(language, persist = true) {
   if (persist) localStorage.setItem(USER_LANGUAGE_KEY, lang);
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-i18n]').forEach(el => {
-    const value = (I18N[lang] && I18N[lang][el.dataset.i18n]) || I18N.tr[el.dataset.i18n];
+    const value = (I18N[lang] && I18N[lang][el.dataset.i18n]) || I18N.en[el.dataset.i18n] || I18N.tr[el.dataset.i18n];
     if (value) el.textContent = value;
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const value = (I18N[lang] && I18N[lang][el.dataset.i18nPlaceholder]) || I18N.tr[el.dataset.i18nPlaceholder];
+    const value = (I18N[lang] && I18N[lang][el.dataset.i18nPlaceholder]) || I18N.en[el.dataset.i18nPlaceholder] || I18N.tr[el.dataset.i18nPlaceholder];
     if (value) el.placeholder = value;
   });
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
-    const value = (I18N[lang] && I18N[lang][el.dataset.i18nTitle]) || I18N.tr[el.dataset.i18nTitle];
+    const value = (I18N[lang] && I18N[lang][el.dataset.i18nTitle]) || I18N.en[el.dataset.i18nTitle] || I18N.tr[el.dataset.i18nTitle];
     if (value) {
       el.title = value;
       el.setAttribute('aria-label', value);
@@ -6270,8 +6606,8 @@ function applyUserLanguage(language, persist = true) {
   const selectedLanguage = document.querySelector(`input[name="settings-language"][value="${lang}"]`);
   if (selectedLanguage) selectedLanguage.checked = true;
   const createName = document.getElementById('create-name');
-  if (createName && [I18N.tr['menu.gameRoom'], I18N.en['menu.gameRoom']].includes(createName.value)) {
-    createName.value = I18N[lang]['menu.gameRoom'];
+  if (createName && Object.values(I18N).map(locale => locale['menu.gameRoom']).includes(createName.value)) {
+    createName.value = t('menu.gameRoom');
   }
   const selfName = document.querySelector('[data-uid="self"] .uname-text');
   if (selfName && state.myName) selfName.textContent = `${state.myName} (${t('common.you')})`;
@@ -6288,7 +6624,7 @@ function formatUserTime(value) {
   const options = { hour: '2-digit', minute: '2-digit' };
   if (format === '12') options.hour12 = true;
   if (format === '24') options.hour12 = false;
-  const locale = format === 'auto' ? undefined : (lang === 'en' ? 'en-GB' : 'tr-TR');
+  const locale = format === 'auto' ? undefined : (LANGUAGE_META[lang]?.locale || LANGUAGE_META.en.locale);
   return date.toLocaleTimeString(locale, options);
 }
 
@@ -6529,6 +6865,7 @@ function initUserSettings() {
   // altında tanımlı; #app ana menüde gizli olduğundan body'ye portal edilmelidir.
   const settingsModal = document.getElementById('settings-modal');
   if (settingsModal && settingsModal.parentElement !== document.body) document.body.appendChild(settingsModal);
+  renderLanguageOptions();
   initCustomThemeEditor();
   applyUserTheme(getUserTheme());
   applyUserLanguage(getUserLanguage(), false);

@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1785315209.0109751,
-    "ast_hash": "34a6918532f429e9a347b161b28dd9c3",
+    "mtime": 1785322551.6786206,
+    "ast_hash": "15a6e596ab440b0749c53fd04cee76ae",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1785315209.007176,
-    "ast_hash": "e8a21a9dcb28d3610064b87c7120880e",
+    "mtime": 1785321726.6126635,
+    "ast_hash": "dbd75aecd358206468a74e47f6e9a049",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -547,6 +547,11 @@
   "test/e2e/vampire-villager-bots.test.js": {
     "mtime": 1785268355.0908616,
     "ast_hash": "095986a5cbaf34b6ed0ae4e3485d8eb0",
+    "semantic_hash": ""
+  },
+  "test/e2e/i18n-coverage.test.js": {
+    "mtime": 1785322088.8760781,
+    "ast_hash": "ca3ebca321471e663fe9695fd682df67",
     "semantic_hash": ""
   }
 }
