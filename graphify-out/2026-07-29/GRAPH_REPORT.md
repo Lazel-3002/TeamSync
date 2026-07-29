@@ -1,7 +1,7 @@
-# Graph Report - TeamSync  (2026-07-29)
+# Graph Report - kanka-voice  (2026-07-28)
 
 ## Corpus Check
-- 86 files · ~524,242 words
+- 87 files · ~524,748 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1b98c7c8`
+- Built from commit: `a4dae613`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -170,24 +170,24 @@ Nodes (27): applyAudioBitrateToPeers(), applyIceEscalationPolicy(), applySharedT
 
 ### Community 10 - "E2E Test: MQTT/First Run"
 Cohesion: 0.18
-Nodes (14): { spawnPeer, cleanupPeer, waitFor }, { spawnPeer, cleanupPeer, waitFor, evalJS, createRoom }, cleanupPeer(), createRoom(), waitFor(), assert, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
-  waitFor,
+Nodes (14): { spawnPeer, cleanupPeer, waitFor }, { spawnPeer, cleanupPeer, waitFor, evalJS, createRoom }, cleanupPeer(), createRoom(), waitFor(), assert, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
 }, fs (+6 more)
 
 ### Community 11 - "E2E Test Harness"
 Cohesion: 0.15
-Nodes (16): assert, audioState(), setFounderToggle(), {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  joinRoom,
-  waitForPeerConnected,
-  evalJS,
-  waitFor,
+Nodes (16): assert, audioState(), setFounderToggle(), {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  joinRoom,
+  waitForPeerConnected,
+  evalJS,
+  waitFor,
 }, clickWhenReady(), joinRoom(), setValueWhenReady(), spawnPeer() (+8 more)
 
 ### Community 12 - "E2E Test: Scroll/Download"
@@ -252,21 +252,21 @@ Nodes (7): author, description, license, main, name, releaseName, version
 
 ### Community 28 - "E2E Test: Lucky Wheel"
 Cohesion: 0.29
-Nodes (5): assert, fs, inspectWheel(), path, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
-  waitFor,
+Nodes (5): assert, fs, inspectWheel(), path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
 }
 
 ### Community 29 - "E2E Test: Quick Poll"
 Cohesion: 0.29
-Nodes (5): assert, fs, inspectPoll(), path, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
+Nodes (5): assert, fs, inspectPoll(), path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
 }
 
 ### Community 30 - "E2E Test: Focus Minimize"
@@ -280,11 +280,11 @@ Nodes (9): assert, fs, inspectControls(), path, {
 
 ### Community 31 - "E2E Test: Friend List"
 Cohesion: 0.33
-Nodes (5): assert, fs, inspectAtWidth(), path, {
-  spawnPeer,
-  cleanupPeer,
-  evalJS,
-  waitFor,
+Nodes (5): assert, fs, inspectAtWidth(), path, {
+  spawnPeer,
+  cleanupPeer,
+  evalJS,
+  waitFor,
 }
 
 ### Community 32 - "Pokemon Moves Fetch Tool"
@@ -309,12 +309,12 @@ Nodes (5): Build & Portable Distribution, P2P Serverless Architecture, Project S
 
 ### Community 37 - "E2E Test: Pokemon Moves"
 Cohesion: 0.40
-Nodes (4): assert, fs, path, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
-  waitFor,
+Nodes (4): assert, fs, path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
 }
 
 ### Community 38 - "HTML Patch Tool v1"
@@ -387,12 +387,12 @@ Nodes (6): nsis, artifactName, deleteAppDataOnUninstall, oneClick, perMachine, r
 
 ### Community 81 - "settings-language.test.js"
 Cohesion: 0.40
-Nodes (4): assert, fs, path, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
-  waitFor,
+Nodes (4): assert, fs, path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
 }
 
 ## Ambiguous Edges - Review These
