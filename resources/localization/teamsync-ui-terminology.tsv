@@ -1,0 +1,26 @@
+key\ttr\ten\tde\tes\tfr\tpt-BR\tru\tar\tkk\ttk\tmn\tzh-CN\tja
+settings\tAyarlar\tSettings\tEinstellungen\tAjustes\tParamètres\tConfigurações\tНастройки\tالإعدادات\tБаптаулар\tSazlamalar\tТохиргоо\t设置\t設定
+language\tDil\tLanguage\tSprache\tIdioma\tLangue\tIdioma\tЯзык\tاللغة\tТіл\tDil\tХэл\t语言\t言語
+save\tKaydet\tSave\tSpeichern\tGuardar\tEnregistrer\tSalvar\tСохранить\tحفظ\tСақтау\tÝatda sakla\tХадгалах\t保存\t保存
+cancel\tİptal\tCancel\tAbbrechen\tCancelar\tAnnuler\tCancelar\tОтмена\tإلغاء\tБас тарту\tÝatyr\tЦуцлах\t取消\tキャンセル
+close\tKapat\tClose\tSchließen\tCerrar\tFermer\tFechar\tЗакрыть\tإغلاق\tЖабу\tÝap\tХаах\t关闭\t閉じる
+back\tGeri\tBack\tZurück\tVolver\tRetour\tVoltar\tНазад\tرجوع\tАртқа\tYza\tБуцах\t返回\t戻る
+send\tGönder\tSend\tSenden\tEnviar\tEnvoyer\tEnviar\tОтправить\tإرسال\tЖіберу\tUgrat\tИлгээх\t发送\t送信
+join\tKatıl\tJoin\tBeitreten\tUnirse\tRejoindre\tEntrar\tПрисоединиться\tانضم\tҚосылу\tGoşul\tНэгдэх\t加入\t参加
+create\tOluştur\tCreate\tErstellen\tCrear\tCréer\tCriar\tСоздать\tإنشاء\tҚұру\tDöret\tҮүсгэх\t创建\t作成
+friends\tArkadaşlar\tFriends\tFreunde\tAmigos\tAmis\tAmigos\tДрузья\tالأصدقاء\tДостар\tDostlar\tНайзууд\t好友\tフレンド
+friend_request\tArkadaşlık isteği\tFriend request\tFreundschaftsanfrage\tSolicitud de amistad\tDemande d’ami\tSolicitação de amizade\tЗапрос в друзья\tطلب صداقة\tДостық сұрауы\tDostluk haýyşy\tНайзын хүсэлт\t好友请求\tフレンド申請
+add_friend\tArkadaş ekle\tAdd friend\tFreund hinzufügen\tAñadir amigo\tAjouter un ami\tAdicionar amigo\tДобавить друга\tإضافة صديق\tДос қосу\tDost goş\tНайз нэмэх\t添加好友\tフレンドを追加
+chat\tSohbet\tChat\tChat\tChat\tDiscussion\tChat\tЧат\tالدردشة\tЧат\tSöhbet\tЧат\t聊天\tチャット
+message\tMesaj\tMessage\tNachricht\tMensaje\tMessage\tMensagem\tСообщение\tرسالة\tХабар\tHabar\tЗурвас\t消息\tメッセージ
+screen_share\tEkran paylaşımı\tScreen sharing\tBildschirmübertragung\tCompartir pantalla\tPartage d’écran\tCompartilhamento de tela\tДемонстрация экрана\tمشاركة الشاشة\tЭкранды бөлісу\tEkrany paýlaşmak\tДэлгэц хуваалцах\t屏幕共享\t画面共有
+voice\tSes\tVoice\tSprache\tVoz\tVoix\tVoz\tГолос\tالصوت\tДауыс\tSes\tДуу\t语音\t音声
+microphone\tMikrofon\tMicrophone\tMikrofon\tMicrófono\tMicrophone\tMicrofone\tМикрофон\tالميكروفون\tМикрофон\tMikrofon\tМикрофон\t麦克风\tマイク
+speaker\tHoparlör\tSpeaker\tLautsprecher\tAltavoz\tHaut-parleur\tAlto-falante\tДинамик\tمكبر الصوت\tДинамик\tSes çykaryjy\tЧанга яригч\t扬声器\tスピーカー
+server\tSunucu\tServer\tServer\tServidor\tServeur\tServidor\tСервер\tالخادم\tСервер\tSerwer\tСервер\t服务器\tサーバー
+room\tOda\tRoom\tRaum\tSala\tSalle\tSala\tКомната\tغرفة\tБөлме\tOtag\tӨрөө\t房间\tルーム
+connection\tBağlantı\tConnection\tVerbindung\tConexión\tConnexion\tConexão\tПодключение\tاتصال\tБайланыс\tBaglanyşyk\tХолболт\t连接\t接続
+online\tÇevrimiçi\tOnline\tOnline\tEn línea\tEn ligne\tOnline\tВ сети\tمتصل\tЖеліде\tOnlaýn\tОнлайн\t在线\tオンライン
+offline\tÇevrimdışı\tOffline\tOffline\tSin conexión\tHors ligne\tOffline\tНе в сети\tغير متصل\tЖеліден тыс\tOflayn\tОфлайн\t离线\tオフライン
+error\tHata\tError\tFehler\tError\tErreur\tErro\tОшибка\tخطأ\tҚате\tÝalňyşlyk\tАлдаа\t错误\tエラー
+loading\tYükleniyor\tLoading\tWird geladen\tCargando\tChargement\tCarregando\tЗагрузка\tجارٍ التحميل\tЖүктелуде\tÝüklenýär\tАчаалж байна\t正在加载\t読み込み中

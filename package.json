@@ -12,7 +12,9 @@
     "build": "electron-builder --win nsis --x64",
     "build-full": "electron-builder --win --x64",
     "release": "electron-builder --win nsis --x64 --publish always",
-    "test:e2e": "node test/e2e/run-all.js"
+    "test:e2e": "node test/e2e/run-all.js",
+    "i18n:audit": "node tools/i18n/audit-locales.js",
+    "i18n:build-runtime": "node tools/i18n/build-runtime-catalogs.js"
   },
   "author": "TeamSync",
   "license": "MIT",

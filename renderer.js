@@ -5029,7 +5029,9 @@ function updateFocusLockBtn() {
   btn.innerHTML = state.focusLocked
     ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>'
     : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>';
-  btn.title = state.focusLocked ? 'Odak Kilidini Aç' : 'Odak Kilidi (yanlışlıkla çıkmayı engeller)';
+  const sourceTitle = state.focusLocked ? 'Odak Kilidini Aç' : 'Odak Kilidi (yanlışlıkla çıkmayı engeller)';
+  const dictionary = typeof LEGACY_TEXT_BY_LOCALE !== 'undefined' ? LEGACY_TEXT_BY_LOCALE[getUserLanguage()] : null;
+  btn.title = dictionary ? (translateLegacyValue(sourceTitle, dictionary) || sourceTitle) : sourceTitle;
   ensureFocusControlsVisible();
   updateFocusFullscreenBtn();
   updateFocusExitBtn();
@@ -5599,18 +5601,25 @@ const USER_SPEAKER_VOLUME_KEY = 'teamsync_speaker_volume';
 const USER_STREAM_PREVIEWS_KEY = 'teamsync_stream_previews';
 const USER_STREAM_FPS_KEY = 'teamsync_stream_fps';
 const USER_SHARE_SYSTEM_AUDIO_KEY = 'teamsync_share_system_audio';
-// Keep the language list in one place so settings, persistence, and runtime
-// translation always agree.  English is the non-Turkish fallback, never
-// Turkish: choosing another locale must not leave Turkish UI behind.
-const SUPPORTED_LANGUAGES = ['tr', 'en', 'de', 'es', 'fr', 'pt', 'ru'];
+// A locale is selectable only when its complete, reviewed catalogue is
+// available. Do not expose a partly translated locale and silently replace
+// the rest of its interface with English: that produces a mixed-language UI
+// and misrepresents the level of support.
+const SUPPORTED_LANGUAGES = ['tr', 'en', 'de', 'es', 'fr', 'pt-BR', 'ru', 'ar', 'kk', 'tk', 'mn', 'zh-CN', 'ja'];
 const LANGUAGE_META = {
   tr: { flag: '🇹🇷', name: 'Türkçe', native: 'Turkish', locale: 'tr-TR' },
   en: { flag: '🇬🇧', name: 'English', native: 'İngilizce', locale: 'en-GB' },
   de: { flag: '🇩🇪', name: 'Deutsch', native: 'German', locale: 'de-DE' },
   es: { flag: '🇪🇸', name: 'Español', native: 'Spanish', locale: 'es-ES' },
   fr: { flag: '🇫🇷', name: 'Français', native: 'French', locale: 'fr-FR' },
-  pt: { flag: '🇧🇷', name: 'Português', native: 'Portuguese', locale: 'pt-BR' },
-  ru: { flag: '🇷🇺', name: 'Русский', native: 'Russian', locale: 'ru-RU' }
+  'pt-BR': { flag: '🇧🇷', name: 'Português (Brasil)', native: 'Brazilian Portuguese', locale: 'pt-BR' },
+  ru: { flag: '🇷🇺', name: 'Русский', native: 'Russian', locale: 'ru-RU' },
+  ar: { flag: '🇸🇦', name: 'العربية', native: 'Arabic', locale: 'ar' },
+  kk: { flag: '🇰🇿', name: 'Қазақша', native: 'Kazakh', locale: 'kk-KZ' },
+  tk: { flag: '🇹🇲', name: 'Türkmençe', native: 'Turkmen', locale: 'tk-TM' },
+  mn: { flag: '🇲🇳', name: 'Монгол', native: 'Mongolian', locale: 'mn-MN' },
+  'zh-CN': { flag: '🇨🇳', name: '简体中文', native: 'Simplified Chinese', locale: 'zh-CN' },
+  ja: { flag: '🇯🇵', name: '日本語', native: 'Japanese', locale: 'ja-JP' }
 };
 
 const I18N = {
@@ -6318,6 +6327,22 @@ Object.assign(LEGACY_TEXT_EN, {
 });
 
 const LEGACY_TEXT_TR = Object.fromEntries(Object.entries(LEGACY_TEXT_EN).map(([tr, en]) => [en, tr]));
+// A locale must provide its own complete legacy dictionary before it can be
+// exposed in settings.  Keeping the dictionaries explicit makes a fallback
+// visible during review instead of silently turning a UI into another language.
+const LEGACY_TEXT_BY_LOCALE = {
+  tr: { ...Object.fromEntries(Object.keys(LEGACY_TEXT_EN).map(key => [key, key])), ...LEGACY_TEXT_TR },
+  en: LEGACY_TEXT_EN
+};
+
+// Complete build-time catalogs are loaded before this renderer. They are kept
+// separate from the application code so native reviewers can work in JSON and
+// every supported language has an explicit structured + legacy dictionary.
+Object.entries(window.TeamSyncLocaleCatalogs || {}).forEach(([locale, catalog]) => {
+  if (!SUPPORTED_LANGUAGES.includes(locale)) return;
+  I18N[locale] = { ...I18N.en, ...catalog.structured };
+  LEGACY_TEXT_BY_LOCALE[locale] = catalog.legacy;
+});
 
 function translateLegacyValue(value, dictionary) {
   if (dictionary[value]) return dictionary[value];
@@ -6340,13 +6365,16 @@ function translateLegacyStaticUI(language, root = document.body) {
   // Dynamic cards are authored in Turkish.  Any non-Turkish locale first
   // receives the complete English safety net so a language switch cannot
   // produce a mixed Turkish interface.
-  const dictionary = language === 'tr' ? LEGACY_TEXT_TR : LEGACY_TEXT_EN;
+  const dictionary = LEGACY_TEXT_BY_LOCALE[language] || LEGACY_TEXT_EN;
   const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, .chat-msg, .dm-message, .uname-text, .vtitle';
   const visitText = node => {
     const parent = node.parentElement;
     if (!parent || parent.closest(excludedSelector)) return;
     const trimmed = node.nodeValue.trim();
-    const translated = translateLegacyValue(trimmed, dictionary);
+    if (!state.legacyI18nText) state.legacyI18nText = new WeakMap();
+    const sourceText = state.legacyI18nText.get(node) || trimmed;
+    state.legacyI18nText.set(node, sourceText);
+    const translated = translateLegacyValue(sourceText, dictionary);
     if (!translated) return;
     node.nodeValue = node.nodeValue.replace(trimmed, translated);
   };
@@ -6544,7 +6572,20 @@ function applyUserTheme(theme, persist = false) {
 
 function getUserLanguage() {
   const saved = localStorage.getItem(USER_LANGUAGE_KEY);
-  return SUPPORTED_LANGUAGES.includes(saved) ? saved : 'tr';
+  return SUPPORTED_LANGUAGES.includes(saved) ? saved : 'en';
+}
+
+function hasCompleteLocaleCatalog(language) {
+  const structured = I18N[language];
+  const legacy = LEGACY_TEXT_BY_LOCALE[language];
+  if (!structured || !legacy) return false;
+  const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+  const structuredComplete = Object.keys(I18N.en).every(key => hasOwn(structured, key));
+  // Turkish is restored from the English display value after a language switch;
+  // all other locales translate the original Turkish display value.
+  const legacySource = Object.keys(LEGACY_TEXT_EN);
+  const legacyComplete = legacySource.every(key => hasOwn(legacy, key));
+  return structuredComplete && legacyComplete;
 }
 
 function t(key) {
@@ -6584,7 +6625,7 @@ function renderLanguageOptions() {
 }
 
 function applyUserLanguage(language, persist = true) {
-  const lang = SUPPORTED_LANGUAGES.includes(language) ? language : 'tr';
+  const lang = SUPPORTED_LANGUAGES.includes(language) ? language : 'en';
   if (persist) localStorage.setItem(USER_LANGUAGE_KEY, lang);
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -6603,6 +6644,11 @@ function applyUserLanguage(language, persist = true) {
     }
   });
   translateLegacyStaticUI(lang);
+  // Focus controls are moved in and out of the DOM, so refresh their titles
+  // after every locale change instead of leaving the previous locale behind.
+  if (typeof updateFocusLockBtn === 'function') updateFocusLockBtn();
+  if (typeof updateFocusFullscreenBtn === 'function') updateFocusFullscreenBtn();
+  if (typeof updateFocusExitBtn === 'function') updateFocusExitBtn();
   const selectedLanguage = document.querySelector(`input[name="settings-language"][value="${lang}"]`);
   if (selectedLanguage) selectedLanguage.checked = true;
   const createName = document.getElementById('create-name');
