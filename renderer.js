@@ -6471,27 +6471,32 @@ function translateLegacyValue(value, dictionary) {
   // Activity UIs commonly decorate labels with icons, counters or a user's
   // name (for example "🌐 Senin IP: 192…" and "1 / 4 koltuk dolu").  Exact
   // matching leaves those rows in Turkish after switching languages.  Replace
-  // the longest known fragment once, while chat/user content remains excluded
+  // one substantial known fragment only, while chat/user content remains excluded
   // by translateLegacyStaticUI.
   let embeddedValue = value;
   let embeddedChanged = false;
-  Object.entries(dictionary)
+  const candidates = Object.entries(dictionary)
     .filter(([source, target]) => source.length > 1 && source !== target)
-    .sort(([a], [b]) => b.length - a.length)
-    .forEach(([source, target]) => {
-      if (!embeddedValue.includes(source)) return;
+    .sort(([a], [b]) => b.length - a.length);
+  for (const [source, target] of candidates) {
+      if (!embeddedValue.includes(source)) continue;
+      // A short label embedded in a whole sentence is usually dynamic game or
+      // user content. Translating just that label produced mixed strings such
+      // as "Your secret role: Büyücü". Keep the original coherent instead.
+      if (source.length / Math.max(embeddedValue.length, 1) < 0.45) continue;
       // Do not turn a short standalone word such as "oy" (vote) into the
       // middle of a longer Turkish word such as "oyuncu" (player).
       if (/^[\p{L}\p{N}]+$/u.test(source)) {
         const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const wholeWord = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'gu');
-        if (!wholeWord.test(embeddedValue)) return;
+        if (!wholeWord.test(embeddedValue)) continue;
         embeddedValue = embeddedValue.replace(wholeWord, target);
       } else {
         embeddedValue = embeddedValue.split(source).join(target);
       }
       embeddedChanged = true;
-    });
+      break;
+  }
   return embeddedChanged ? embeddedValue : null;
 }
 
@@ -6527,7 +6532,12 @@ function translateLegacyStaticUI(language, root = document.body) {
     if (element.closest(excludedSelector)) return;
     ['title', 'placeholder'].forEach(attribute => {
       const value = element.getAttribute(attribute);
-      if (value && dictionary[value]) element.setAttribute(attribute, dictionary[value]);
+      const translated = value && dictionary[value];
+      // setAttribute emits an attribute mutation even when the value is unchanged.
+      // The observer below processes title/placeholder mutations, so writing the
+      // same Turkish value here used to schedule itself indefinitely on a locale
+      // switch and freeze the renderer.
+      if (translated && translated !== value) element.setAttribute(attribute, translated);
     });
   });
 }

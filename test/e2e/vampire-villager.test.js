@@ -195,6 +195,31 @@ module.exports = async function run() {
     game = await state(peer);
     assert.strictEqual(game.winnerId, host, 'Cellat doğru hedef sürülünce tek başına kazanmadı');
     assert.strictEqual(game.phase, 'over', 'Cellat kazanınca oyun bitmedi');
+    // A normal participant must not be able to forge authoritative state, a
+    // secret role, or preload a night action while the game is in daytime.
+    const messageGuards = await evalJS(peer.client, `(() => {
+      window.state.vampire = {
+        host: window.state.myId, started: true, phase: 'day', round: 2,
+        players: [
+          { id: window.state.myId, name: 'Kurucu', alive: true },
+          { id: 'attacker', name: 'SaldÄ±rgan', alive: true }
+        ],
+        roles: { [window.state.myId]: 'vampire', attacker: 'villager' },
+        localRole: 'vampire', settings: {}, actions: {}, used: {},
+        pendingHunterId: null, privateNote: '', log: [], chat: []
+      };
+      window.vampireVillagerHandler({ type: 'vv-state', host: 'attacker', phase: 'over', players: [] }, 'attacker');
+      const forgedStateIgnored = window.state.vampire.host === window.state.myId && window.state.vampire.phase === 'day';
+      window.vampireVillagerHandler({ type: 'vv-role', role: 'villager' }, 'attacker');
+      const forgedRoleIgnored = window.state.vampire.localRole === 'vampire';
+      window.vampireVillagerHandler({ type: 'vv-action', action: 'vampire', targetId: 'attacker' }, window.state.myId);
+      return { forgedStateIgnored, forgedRoleIgnored, actionPreloadBlocked: !window.state.vampire.actions.vampire };
+    })()`);
+    assert.deepStrictEqual(messageGuards, {
+      forgedStateIgnored: true,
+      forgedRoleIgnored: true,
+      actionPreloadBlocked: true
+    }, JSON.stringify(messageGuards));
     if (require.main === module) console.log(lobbyScreenshot);
   } finally {
     cleanupPeer(peer);

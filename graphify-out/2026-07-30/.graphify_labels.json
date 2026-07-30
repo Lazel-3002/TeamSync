@@ -82,5 +82,6 @@
   "80": "seed_machine_draft.py",
   "81": "settings-language.test.js",
   "82": "TeamSync localization terminology",
-  "83": "catalogs.bundle.js"
+  "83": "catalogs.bundle.js",
+  "84": "escapeHtml"
 }

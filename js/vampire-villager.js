@@ -56,7 +56,10 @@
     botMemory.set(botId, [...list, entry].slice(-MEMORY_LIMIT));
   }
   const botMemoryLines = botId => (botMemory.get(botId) || []).map(item => `[${item.round}. tur/${item.phase}] ${item.text}`);
-  function clearBotBrains() { botBusy.clear(); botActedKey.clear(); botLastChatAt.clear(); botLastAnswered.clear(); botMemory.clear(); botRoles.clear(); botTeammates.clear(); }
+  function clearBotBrains() {
+    botBusy.clear(); botActedKey.clear(); botLastChatAt.clear(); botLastAnswered.clear();
+    botOllamaStatus.clear(); botMemory.clear(); botRoles.clear(); botTeammates.clear();
+  }
   // Kurucuda roller g.roles'te durur; uzaktaki operatörde yalnızca kendi botunun rolü bilinir.
   const botRoleOf = botId => game().roles[botId] || botRoles.get(botId) || null;
   function botKnownVampires(botId) {
@@ -250,7 +253,8 @@
     g.players = g.players.filter(player => player.id !== id);
     const lobby = state.lobbies.find(item => item.id === state.activeLobbyId);
     if (lobby) { lobby.players = lobby.players.filter(player => player.id !== id); if (typeof syncLobbiesList === 'function') syncLobbiesList(); }
-    botBusy.delete(id); botActedKey.delete(id); botLastChatAt.delete(id); botOllamaStatus.delete(id);
+    botBusy.delete(id); botActedKey.delete(id); botLastChatAt.delete(id); botLastAnswered.delete(id);
+    botOllamaStatus.delete(id); botMemory.delete(id); botRoles.delete(id); botTeammates.delete(id);
     publish();
   }
   function setBotField(id, field, value) {
@@ -334,13 +338,27 @@
   function clearPhaseTimer() { if (phaseTimer) clearTimeout(phaseTimer); phaseTimer = null; game().phaseEndsAt = 0; }
   function armPhaseTimer() {
     const g = game(); clearPhaseTimer();
-    const seconds = Number(g.settings.phaseSeconds) || 0;
+    const configuredSeconds = Number(g.settings.phaseSeconds);
+    const seconds = Number.isFinite(configuredSeconds) ? Math.min(120, Math.max(0, configuredSeconds)) : 0;
     if (!host() || !seconds || !['night', 'vote'].includes(g.phase)) return;
-    g.phaseEndsAt = Date.now() + seconds * 1000;
-    phaseTimer = setTimeout(() => { if (game().phase === 'night') resolveNight(); else if (game().phase === 'vote') resolveVote(); }, seconds * 1000);
+    const phase = g.phase;
+    const round = g.round;
+    const phaseEndsAt = Date.now() + seconds * 1000;
+    g.phaseEndsAt = phaseEndsAt;
+    phaseTimer = setTimeout(() => {
+      const current = game();
+      // clearTimeout cannot stop a callback that is already queued.  Do not let
+      // such a stale callback resolve a newer round or a manually changed phase.
+      if (current.phase !== phase || current.round !== round || current.phaseEndsAt !== phaseEndsAt) return;
+      if (phase === 'night') resolveNight(); else resolveVote();
+    }, seconds * 1000);
   }
   function selectedRoles(count, settings) {
-    const vampires = settings.vampireCount === 'auto' ? recommendedVampires(count) : Math.max(1, Math.min(Number(settings.vampireCount), count - 1));
+    const maxVampires = Math.max(1, count - 1);
+    const requested = Number(settings.vampireCount);
+    const vampires = settings.vampireCount === 'auto' || !Number.isFinite(requested)
+      ? recommendedVampires(count)
+      : Math.max(1, Math.min(requested, maxVampires));
     const capacity = Math.max(0, count - vampires - 1); // en az bir normal köylü kalsın
     const special = SPECIALS.filter(role => settings[role]).slice(0, capacity);
     return { vampires, special, ignored: SPECIALS.filter(role => settings[role]).slice(capacity) };
@@ -376,6 +394,9 @@
     const target = g.players.find(player => player.id === targetId);
     const role = roleOf(actorId);
     if (!actor || !target || !host()) return;
+    // Actions are host-authoritative and valid only in their own phase.  Without
+    // this gate, a forged data-channel message could preload a night action.
+    if (action === 'hunter' ? g.phase !== 'hunter-shot' : g.phase !== 'night') return;
     const aliveTarget = target.alive;
     if (action === 'vampire' && role === 'vampire' && actor.alive && aliveTarget && roleOf(targetId) !== 'vampire') (g.actions.vampire ||= {})[actorId] = targetId;
     if (action === 'doctor' && role === 'doctor' && actor.alive && aliveTarget) g.actions.doctor = { actorId, targetId };
@@ -448,7 +469,7 @@
   function castVote(actorId, targetId) {
     const g = game(); if (!host() || g.phase !== 'vote') return;
     g.actions.votes ||= {};
-    if (g.players.some(player => player.id === actorId && player.alive) && g.players.some(player => player.id === targetId && player.alive)) g.actions.votes[actorId] = targetId;
+    if (actorId !== targetId && g.players.some(player => player.id === actorId && player.alive) && g.players.some(player => player.id === targetId && player.alive)) g.actions.votes[actorId] = targetId;
     render();
   }
   function resolveVote() {
@@ -796,9 +817,18 @@
   window.vampireVillagerSyncPeer = syncPeer;
   window.vampireVillagerHandler = function (msg, peerId) {
     const g = game();
-    if (msg.type === 'vv-state') { const ownRole = g.localRole; const chat = g.chat; state.vampire = { ...blank(), ...msg, roles: {}, localRole: ownRole, chat, actions: {}, used: {} }; rememberPublicLog(msg.log); openCard(); render(); return; }
-    if (msg.type === 'vv-role') { g.localRole = msg.role; if (msg.targetName) g.privateNote = `Cellat hedefin: ${msg.targetName}. Hedefin gündüz oylamasıyla sürülürse kazanırsın.`; render(); return; }
-    if (msg.type === 'vv-result') { g.privateNote = msg.message; render(); return; }
+    if (!msg || typeof msg !== 'object') return;
+    // State, roles and private results must come from the elected host only.
+    // A participant could otherwise overwrite the local game with a forged
+    // snapshot or grant itself a role through the peer data channel.
+    if (msg.type === 'vv-state') {
+      if (typeof msg.host !== 'string' || peerId !== msg.host || (g.host && peerId !== g.host)) return;
+      const ownRole = g.localRole; const chat = g.chat;
+      state.vampire = { ...blank(), ...msg, roles: {}, localRole: ownRole, chat, actions: {}, used: {} };
+      rememberPublicLog(msg.log); openCard(); render(); return;
+    }
+    if (msg.type === 'vv-role') { if (peerId !== g.host) return; g.localRole = msg.role; if (msg.targetName) g.privateNote = `Cellat hedefin: ${msg.targetName}. Hedefin gündüz oylamasıyla sürülürse kazanırsın.`; render(); return; }
+    if (msg.type === 'vv-result') { if (peerId !== g.host) return; g.privateNote = msg.message; render(); return; }
     if (msg.type === 'vv-chat-history') {
       const lobby = activeVampireLobby();
       if (!canUseLobbyChat() || peerId !== lobby?.hostId || !Array.isArray(msg.messages)) return;
@@ -843,10 +873,12 @@
     }
     if (msg.type === 'vv-bot-ollama-check') {
       const bot = g.players.find(player => player.id === msg.botId && player.isBot);
-      if (bot && bot.operatorId === state.myId) runOllamaCheckForBot(bot);
+      if (peerId === g.host && bot && bot.operatorId === state.myId) runOllamaCheckForBot(bot);
       return;
     }
     if (msg.type === 'vv-bot-ollama-status') {
+      const bot = g.players.find(player => player.id === msg.botId && player.isBot);
+      if (!bot || bot.operatorId !== peerId) return;
       botOllamaStatus.set(msg.botId, { state: msg.ok ? 'ok' : 'error', detail: msg.detail, models: msg.models || [] });
       render();
       return;
@@ -862,7 +894,7 @@
     el('vampire-close')?.addEventListener('click', () => { if (typeof leaveActiveLobby === 'function' && state.activeLobbyId) leaveActiveLobby(); closeLocal(); });
     el('vv-chat-form')?.addEventListener('submit', event => { event.preventDefault(); sendLobbyChat(); });
   };
-  window.vampireVillagerLeave = function () { clearBotBrains(); state.vampire = blank(); closeLocal(); };
+  window.vampireVillagerLeave = function () { clearPhaseTimer(); clearBotBrains(); state.vampire = blank(); closeLocal(); };
   window.vampireVillagerPeerLeft = reassignBotsFromDeparted;
   setInterval(refreshTimerLabel, 1000);
   setInterval(runBotsIfNeeded, 4000);

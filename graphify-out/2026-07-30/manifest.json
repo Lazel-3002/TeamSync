@@ -1,7 +1,7 @@
 {
   "js/lucky-wheel.js": {
-    "mtime": 1784829582.689923,
-    "ast_hash": "6472c016e24cb7e66ee5a350ba4c5100",
+    "mtime": 1785362046.028911,
+    "ast_hash": "dd0eeecf62c40cd85a4445baa4e0ed3c",
     "semantic_hash": ""
   },
   "js/movesData.js": {
@@ -25,8 +25,8 @@
     "semantic_hash": "ab487a8d65e91b79dfe985d0a9ae8620"
   },
   "js/state.js": {
-    "mtime": 1785095629.2014682,
-    "ast_hash": "6f783e12dbec15af369d7d431aef4e43",
+    "mtime": 1785406069.777609,
+    "ast_hash": "551632349dbaf38153216bbbe74d9084",
     "semantic_hash": ""
   },
   "js/watch-together.js": {
@@ -40,8 +40,8 @@
     "semantic_hash": ""
   },
   "main.js": {
-    "mtime": 1785262590.1239102,
-    "ast_hash": "66f1567cf811c6c52127363a16ded839",
+    "mtime": 1785417397.397321,
+    "ast_hash": "3fbe3d89b6b3387e017c204fa325ebad",
     "semantic_hash": ""
   },
   "package.json": {
@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1785361530.98892,
-    "ast_hash": "7c452e09086c74fae878e3b934e0d340",
+    "mtime": 1785417562.0191295,
+    "ast_hash": "0cb919f0beb83823668b677630ba00d9",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1785333039.9700909,
-    "ast_hash": "a1769026bf65d0ff3c8e452725c757f2",
+    "mtime": 1785406069.776608,
+    "ast_hash": "b20303eccd163a5bd4a0f42e3d226fa6",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -165,7 +165,7 @@
     "semantic_hash": ""
   },
   "test/e2e/lib/harness.js": {
-    "mtime": 1784216741.4992676,
+    "mtime": 1785405027.6886582,
     "ast_hash": "6ab7a44f3054416484347ed021a723b4",
     "semantic_hash": ""
   },
@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "js/vampire-villager.js": {
-    "mtime": 1785360206.5479143,
-    "ast_hash": "c11c184b286540ac73e6fac0d11d71b4",
+    "mtime": 1785417308.5137682,
+    "ast_hash": "33f307f11a1236a49d8f3da9663d1fbb",
     "semantic_hash": ""
   },
   "test/e2e/media-library.test.js": {
@@ -525,8 +525,8 @@
     "semantic_hash": ""
   },
   "test/e2e/vampire-villager.test.js": {
-    "mtime": 1785360270.0476813,
-    "ast_hash": "a542d53e985d126590eac918d104ef88",
+    "mtime": 1785417606.0094,
+    "ast_hash": "59fdccdfd7c95342c86b123ba1c47c03",
     "semantic_hash": ""
   },
   "assets/vampire-villager-cover-v2.png": {
@@ -550,78 +550,78 @@
     "semantic_hash": ""
   },
   "test/e2e/i18n-coverage.test.js": {
-    "mtime": 1785361546.8764844,
-    "ast_hash": "a4f66dcb37d23c012934e3cc36f38841",
+    "mtime": 1785404411.4313424,
+    "ast_hash": "928d3094728c6c030d2c9189f368c9db",
     "semantic_hash": ""
   },
   "resources/localization/catalogs.bundle.js": {
-    "mtime": 1785361618.2001688,
-    "ast_hash": "57e1e4ed347608b5aeae7cb0278d5c2f",
+    "mtime": 1785362093.7662618,
+    "ast_hash": "1aac56e5078f587353ec698a2c1f984b",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ar.json": {
-    "mtime": 1785361571.4386127,
-    "ast_hash": "69a57ad5bef1a9002c8f6d95307d5444",
+    "mtime": 1785362076.741125,
+    "ast_hash": "33f95aa3b650bc3a8d872599cf60bb3a",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/de.json": {
-    "mtime": 1785361576.5425684,
-    "ast_hash": "e490ee17ff45c50fcc5e22c6b96ccb5e",
+    "mtime": 1785362077.8610892,
+    "ast_hash": "de64c69f06d6d2168e910bc06c08d557",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/en.json": {
-    "mtime": 1785361558.0342493,
-    "ast_hash": "bd9aa51857fc5fa7abf7c721d88c436e",
+    "mtime": 1785362074.3537877,
+    "ast_hash": "e5b0f16504f104d382b648775fdd1a10",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/es.json": {
-    "mtime": 1785361580.2216702,
-    "ast_hash": "37f62e7607e35814d9530866a90fcd60",
+    "mtime": 1785362079.2548196,
+    "ast_hash": "2d4b36567b8347c888f22c81caf73c87",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/fr.json": {
-    "mtime": 1785361584.119537,
-    "ast_hash": "660ecc18f0293d4f32e2d3cbc971919e",
+    "mtime": 1785362080.6723127,
+    "ast_hash": "07d79c91f6d53cf282b71668c74a05a8",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ja.json": {
-    "mtime": 1785361590.0450413,
-    "ast_hash": "c1cff125875b04746df865d4040e064d",
+    "mtime": 1785362083.4634387,
+    "ast_hash": "eaec7ab695547962ae4febf028579480",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/kk.json": {
-    "mtime": 1785361594.644291,
-    "ast_hash": "65bf1dcf544576491972b75e17811a36",
+    "mtime": 1785362085.656495,
+    "ast_hash": "9faab108ce038f4aeea1f716dda35466",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/mn.json": {
-    "mtime": 1785361599.5467508,
-    "ast_hash": "b218a44554f8e5852c26b8bc4acca178",
+    "mtime": 1785362086.9706304,
+    "ast_hash": "a2b744ed3e088c34cdcdc2ffdc470918",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/pt-BR.json": {
-    "mtime": 1785361603.7820323,
-    "ast_hash": "af31ebcc932081e8e39859867402be93",
+    "mtime": 1785362088.8337204,
+    "ast_hash": "82e35ee6d5fbf43b849ac8f05f2a2fda",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ru.json": {
-    "mtime": 1785361607.6651757,
-    "ast_hash": "f7b2403e3bfa57ffc4f3859084d82115",
+    "mtime": 1785362090.0480719,
+    "ast_hash": "e5e220d0d624c93e480edf5ba3833b05",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tk.json": {
-    "mtime": 1785361613.4312499,
-    "ast_hash": "8c0b1ce235f1945a6c23ae114dbede10",
+    "mtime": 1785362091.543548,
+    "ast_hash": "942dde91652e98c86544d9639f2e37f8",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tr.json": {
-    "mtime": 1785361558.0322213,
-    "ast_hash": "4ec7e591cb62a056a5d8d1384affaf39",
+    "mtime": 1785362074.3522573,
+    "ast_hash": "909a96b8646b5cd9eefe24192f24107c",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/zh-CN.json": {
-    "mtime": 1785361617.5674996,
-    "ast_hash": "73711da427c27d75b262b31ecf8bcafd",
+    "mtime": 1785362093.2126627,
+    "ast_hash": "76cc43f82ec7cb4c7b58920b8c046cb7",
     "semantic_hash": ""
   },
   "tools/i18n/audit-locales.js": {

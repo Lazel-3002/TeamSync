@@ -489,8 +489,17 @@ function createWindow() {
   });
   
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    // Do not hand file:, javascript: or custom protocols to the OS just because
+    // a page (or an embedded page) asked to open a new window.
+    if (/^(https?:|mailto:)/i.test(url)) shell.openExternal(url).catch(() => {});
     return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = process.env.REACT_DEV === 'true'
+      ? /^http:\/\/localhost:5173(?:\/|$)/.test(url)
+      : url === mainWindow.webContents.getURL();
+    if (!allowed) event.preventDefault();
   });
 
   // Defense-in-depth: renderer tarafında <webview> etiketine yazılan güvenlik
@@ -584,6 +593,10 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+function isMainWindowSender(event) {
+  return Boolean(mainWindow && !mainWindow.isDestroyed() && event && event.sender === mainWindow.webContents);
 }
 
 ipcMain.handle('get-local-ips', () => getLocalIPs());
@@ -855,7 +868,8 @@ ipcMain.on('update-install', () => {
   autoUpdater.quitAndInstall(true, true); // sessiz kur + otomatik yeniden başlat
 });
 
-ipcMain.handle('get-sources', async () => {
+ipcMain.handle('get-sources', async (event) => {
+  if (!isMainWindowSender(event)) return [];
   try {
     const sources = await desktopCapturer.getSources({
       types: ['window', 'screen'],
@@ -980,11 +994,13 @@ function syncControlKillSwitch() {
 }
 
 ipcMain.on('set-remote-control', (event, active) => {
+  if (!isMainWindowSender(event)) return;
   setRemoteControlEnabled(active);
   console.log('Uzaktan kontrol:', remoteControlActive ? 'AKTİF' : 'KAPALI');
 });
 
 ipcMain.on('update-control-pointer', (event, data) => {
+  if (!isMainWindowSender(event)) return;
   if (!remoteControlActive) return;
   const point = validNormalizedPoint(data);
   if (!point) return;
@@ -997,6 +1013,7 @@ ipcMain.on('update-control-pointer', (event, data) => {
 });
 
 ipcMain.handle('set-control-owner', (event, requestedOwner) => {
+  if (!isMainWindowSender(event)) return { owner: 'host', hostPoint: normalizePrimaryPoint() };
   if (!remoteControlActive) return { owner: 'host', hostPoint: normalizePrimaryPoint() };
   if (requestedOwner === 'remote') {
     hostPassivePoint = normalizePrimaryPoint();
@@ -1009,6 +1026,7 @@ ipcMain.handle('set-control-owner', (event, requestedOwner) => {
 });
 
 ipcMain.on('remote-input', (event, data) => {
+  if (!isMainWindowSender(event) || !data || typeof data !== 'object') return;
   if (!remoteControlActive || remoteControlOwner !== 'remote') return;
 
   if (!robot) {
@@ -1151,46 +1169,28 @@ app.whenReady().then(() => {
     console.warn('Adblocker modülü yüklenemedi, atlanıyor:', e.message);
   }
 
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    let responseHeaders = { ...details.responseHeaders };
-    
-    // Ortak Tarayıcı (webview) için gömülmeyi engelleyen başlıkları kaldır
-    const headersToRemove = [
-      'x-frame-options',
-      'X-Frame-Options',
-      'content-security-policy',
-      'Content-Security-Policy',
-      'cross-origin-opener-policy',
-      'Cross-Origin-Opener-Policy',
-      'cross-origin-embedder-policy',
-      'Cross-Origin-Embedder-Policy'
-    ];
-    
-    headersToRemove.forEach(header => {
-      if (responseHeaders[header]) {
-        delete responseHeaders[header];
-      }
-    });
-    
-    callback({
-      cancel: false,
-      responseHeaders: responseHeaders
-    });
-  });
-
   // --- WEBRTC MEDYA VE EKRAN PAYLAŞIMI İZİNLERİ ---
-  session.defaultSession.setPermissionCheckHandler(() => true);
+  // Webview content uses a separate, sandboxed session and must never inherit
+  // microphone, camera or display permissions from the application shell.
+  const trustedMainContents = webContents => Boolean(mainWindow && !mainWindow.isDestroyed() && webContents === mainWindow.webContents);
+  const trustedMainFrame = frame => Boolean(mainWindow && !mainWindow.isDestroyed() && frame === mainWindow.webContents.mainFrame);
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) =>
+    trustedMainContents(webContents) && ['media', 'display-capture'].includes(permission)
+  );
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(true); // Mikrofon ve Kamera izinlerini otomatik onayla
+    callback(trustedMainContents(webContents) && ['media', 'display-capture'].includes(permission));
   });
 
   ipcMain.on('set-screen-share-source', (event, id) => {
+    if (!isMainWindowSender(event) || typeof id !== 'string' || id.length > 512) return;
     currentScreenShareSourceId = id;
   });
 
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     desktopCapturer.getSources({ types: ['window', 'screen'] }).then((sources) => {
-      const selectedSource = sources.find(s => s.id === currentScreenShareSourceId) || sources[0];
+      const selectedSource = trustedMainFrame(request.frame)
+        ? sources.find(s => s.id === currentScreenShareSourceId)
+        : null;
       if (selectedSource) {
         if (selectedSource.id.startsWith('screen:')) {
           const selectedDisplay = screen.getAllDisplays().find(display => String(display.id) === String(selectedSource.display_id));
