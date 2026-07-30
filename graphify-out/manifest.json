@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1785429421.6660354,
-    "ast_hash": "aadc8f8e7a6f72be04e231f1c1270a23",
+    "mtime": 1785430414.8959095,
+    "ast_hash": "7a373a53abc9d2aeeadf95666f36b3aa",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1785406069.776608,
-    "ast_hash": "b20303eccd163a5bd4a0f42e3d226fa6",
+    "mtime": 1785433237.1206102,
+    "ast_hash": "cc7569a735d4b644e6ab73d1ae5d512b",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "js/vampire-villager.js": {
-    "mtime": 1785417308.5137682,
-    "ast_hash": "33f307f11a1236a49d8f3da9663d1fbb",
+    "mtime": 1785441991.6668117,
+    "ast_hash": "d5251e2c053af988cdbae05fe75790ad",
     "semantic_hash": ""
   },
   "test/e2e/media-library.test.js": {
@@ -525,8 +525,8 @@
     "semantic_hash": ""
   },
   "test/e2e/vampire-villager.test.js": {
-    "mtime": 1785417606.0094,
-    "ast_hash": "59fdccdfd7c95342c86b123ba1c47c03",
+    "mtime": 1785438069.0465262,
+    "ast_hash": "ec28e4df7e145ce0319fe82d233ed765",
     "semantic_hash": ""
   },
   "assets/vampire-villager-cover-v2.png": {
@@ -545,8 +545,8 @@
     "semantic_hash": ""
   },
   "test/e2e/vampire-villager-bots.test.js": {
-    "mtime": 1785268355.0908616,
-    "ast_hash": "095986a5cbaf34b6ed0ae4e3485d8eb0",
+    "mtime": 1785441731.109224,
+    "ast_hash": "1f1bddacf942ce6e4624c82ce6fc1f22",
     "semantic_hash": ""
   },
   "test/e2e/i18n-coverage.test.js": {

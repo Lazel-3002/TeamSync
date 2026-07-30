@@ -741,17 +741,39 @@
         </div>
 
         <!-- Vampir Köylü -->
-        <div id="vampire-card" class="vcard hidden" style="background:radial-gradient(circle at 50% 0,#5f1f4c,#170d27 62%);color:#fff;overflow:auto;">
+        <div id="vampire-card" class="vcard vv-app hidden">
+          <div class="vv-ambient vv-ambient-moon" aria-hidden="true"></div>
+          <div class="vv-ambient vv-ambient-fog" aria-hidden="true"></div>
+          <div id="vv-role-reveal" class="vv-role-reveal hidden" role="dialog" aria-modal="true" aria-live="assertive">
+            <div class="vv-reveal-noise" aria-hidden="true"></div>
+            <div class="vv-reveal-content">
+              <span id="vv-reveal-eyebrow" class="vv-reveal-eyebrow">GİZLİ ROLÜN</span>
+              <div id="vv-reveal-sigil" class="vv-reveal-sigil" aria-hidden="true">◆</div>
+              <h2 id="vv-reveal-title">Hazırlan</h2>
+              <p id="vv-reveal-description"></p>
+              <div id="vv-reveal-team" class="vv-reveal-team hidden"></div>
+              <button id="vv-reveal-close" class="btn-sec btn-sm" type="button">Hazırım</button>
+            </div>
+            <div class="vv-reveal-progress" aria-hidden="true"><i></i></div>
+          </div>
           <div class="vv-card-header">
             <div><span class="vv-card-kicker">SOSYAL ÇIKARIM OYUNU</span><h3>🧛 Vampir Köylü</h3></div>
             <button id="vampire-close" class="btn-sec btn-sm">Odadan Çık</button>
           </div>
+          <div class="vv-phase-track" aria-label="Oyun akışı">
+            <div data-vv-step="night"><span>01</span><strong>Gece</strong></div>
+            <i></i><div data-vv-step="day"><span>02</span><strong>Tartışma</strong></div>
+            <i></i><div data-vv-step="vote"><span>03</span><strong>Oylama</strong></div>
+          </div>
           <div class="vv-card-body">
+            <main class="vv-game-stage">
             <div id="vampire-role" class="vv-role-banner">Lobi hazırlanıyor…</div>
             <div id="vampire-status" class="vv-status">Oyuncular bekleniyor</div>
             <div id="vampire-players" class="vv-player-list"></div>
             <div id="vampire-actions"></div>
-            <details id="vampire-guide" class="vv-guide" open>
+            </main>
+            <aside class="vv-side-rail">
+            <details id="vampire-guide" class="vv-guide">
               <summary>Oyuna başlamadan önce: hızlı rehber ve roller</summary>
               <div class="vv-guide-content">
                 <div><strong>Akış:</strong> Gece vampirler hedef seçer; bilgi ve koruma rolleri yeteneklerini kullanır. Gündüz herkes konuşur, sonra yaşayan oyuncular bir kişiyi oylayarak köyden sürer. Tüm vampirler elenirse köy, vampirler yaşayan köylülere eşitlenirse vampirler kazanır.</div>
@@ -778,6 +800,12 @@
                 <button class="btn-pri" type="submit">Gönder</button>
               </form>
             </section>
+            </aside>
+            <section id="vv-council" class="vv-council hidden" aria-labelledby="vv-council-title">
+              <div id="vv-council-content" class="vv-council-content"></div>
+              <div id="vv-council-chat-slot" class="vv-council-chat-slot"></div>
+            </section>
+            <section id="vv-endgame" class="vv-endgame hidden" aria-labelledby="vv-endgame-title"></section>
           </div>
         </div>
 

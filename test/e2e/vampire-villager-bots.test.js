@@ -225,10 +225,10 @@ module.exports = async function run() {
     })()`);
     assert.deepStrictEqual(prompt, { model: 'gemma3:e2b', hasPersona: true, hasMemorySection: true, hasChatSection: true }, JSON.stringify(prompt));
 
-    // Sohbette konuşulanlar botun hafızasına gitmeli
-    await evalJS(peer.client, `window.vampireVillagerHandler({ type: 'vv-chat', id: 'm1', senderId: 'koylu1', text: 'Ben doktorum, dün gece kurucuyu korudum.', sentAt: Date.now() }, 'koylu1'); 1`);
     // Gece çözülünce büyücü sonucu yalnızca bota özel olarak hafızasına yazılmalı
     await evalJS(peer.client, `document.getElementById('vv-night-end').click(); 1`);
+    // Oyun sohbeti yalnız gündüz meclisinde açıktır; konuşulanlar bot hafızasına gitmeli.
+    await evalJS(peer.client, `window.vampireVillagerHandler({ type: 'vv-chat', id: 'm1', senderId: 'koylu1', text: 'Ben doktorum, dün gece kurucuyu korudum.', sentAt: Date.now() }, 'koylu1'); 1`);
     await evalJS(peer.client, `(() => { const pill = Array.from(document.querySelectorAll('[data-bot-pill]'))[0]; pill && pill.click(); return 1; })()`);
     const memoryPanel = await evalJS(peer.client, `document.querySelector('.vv-bot-memory')?.textContent || ''`);
     assert.match(memoryPanel, /Gizli rolün: Büyücü/, 'Bot rolünü hafızasına yazmadı: ' + memoryPanel);
@@ -273,11 +273,16 @@ module.exports = async function run() {
         hasRoleList: system.includes('Büyücü (seer)') && system.includes('Doktor (doctor)'),
         hasSituation: system.includes('ŞU ANKİ DURUM'),
         hasChatRule: system.includes('Sana bir soru sorulduysa'),
+        hasAveragePlayerRule: system.includes('Kusursuz veya her şeyi bilen biri değilsin'),
+        hasEvidenceDiscipline: system.includes('İddia ile doğrulanmış bilgiyi ayır'),
+        hasRoleStrategy: system.includes('ROL STRATEJİN'),
+        hasSuspicionSchema: system.includes('"supheler"'),
         hasJsonExample: system.includes('Örnek doğru yanıt')
       };
     })()`);
     assert.deepStrictEqual(rulesPrompt, {
-      hasRules: true, hasPhases: true, hasWinCondition: true, hasRoleList: true, hasSituation: true, hasChatRule: true, hasJsonExample: true
+      hasRules: true, hasPhases: true, hasWinCondition: true, hasRoleList: true, hasSituation: true, hasChatRule: true,
+      hasAveragePlayerRule: true, hasEvidenceDiscipline: true, hasRoleStrategy: true, hasSuspicionSchema: true, hasJsonExample: true
     }, JSON.stringify(rulesPrompt));
 
     // --- Model seçimi: panel açılınca o bilgisayardaki modeller listeden seçilebilmeli ---
@@ -299,8 +304,123 @@ module.exports = async function run() {
     game = await state(peer);
     assert.strictEqual(game.players.find(p => p.isBot).model, 'llama3:8b', 'Listeden seçilen model bota işlenmedi');
 
+    // --- Konuşma dili: yalnızca uygulamanın desteklediği 13 dil sunulmalı,
+    // seçim bot durumuna ve Ollama sistem promptuna taşınmalı. ---
+    const languagePicker = await evalJS(peer.client, `(() => {
+      const select = document.querySelector('.vv-bot-language');
+      return { options: Array.from(select.options).map(o => o.value), value: select.value };
+    })()`);
+    assert.deepStrictEqual(languagePicker.options, ['tr', 'en', 'de', 'es', 'fr', 'pt-BR', 'ru', 'ar', 'kk', 'tk', 'mn', 'zh-CN', 'ja'], JSON.stringify(languagePicker));
+    await evalJS(peer.client, `(() => {
+      const select = document.querySelector('.vv-bot-language');
+      select.value = 'de';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return 1;
+    })()`);
+    game = await state(peer);
+    assert.strictEqual(game.players.find(p => p.isBot).language, 'de', 'Bot konuşma dili güncellenmedi');
+    await evalJS(peer.client, `window.__mockChatFail = false; window.__mockChatResponse = (body) => { window.__lastBody = body; return { dusunce: 'Prüfe einen Spieler.', targetId: ${JSON.stringify(host)}, chat: null, supheler: [] }; }; 1`);
+    await installNightScenario(peer, host, { [host]: 'villager', vampir: 'vampire', botlang: 'seer' }, {
+      botlang: { isBot: true, operatorId: host, model: 'gemma3:e2b', language: 'de' }
+    });
+    await waitFor(peer.client, `window.state.vampire.actions?.seer?.actorId === 'botlang' ? 'yes' : null`, 8000, 'dil seçilmiş bot karar vermeli');
+    const languagePrompt = await evalJS(peer.client, `(() => {
+      const system = (window.__lastBody.messages || []).find(m => m.role === 'system')?.content || '';
+      const user = (window.__lastBody.messages || []).find(m => m.role === 'user')?.content || '';
+      return { germanOnly: system.includes('Yalnızca Deutsch (de) konuş'), hasBeliefTable: user.includes('Şüphe tablon') };
+    })()`);
+    assert.deepStrictEqual(languagePrompt, { germanOnly: true, hasBeliefTable: true }, JSON.stringify(languagePrompt));
+
+    // --- Kanıt tabanlı yedek karar: Büyücü tarafından doğrulanmış vampir,
+    // Ollama çöktüğünde rastgele biri yerine oylama hedefi olmalı. ---
+    await evalJS(peer.client, `window.__mockChatResponse = { dusunce: 'Vampiri kontrol ediyorum.', targetId: 'vampir', chat: null, supheler: [] }; 1`);
+    await installNightScenario(peer, host, { [host]: 'villager', vampir: 'vampire', botintel: 'seer', koylu1: 'villager' }, {
+      botintel: { isBot: true, operatorId: host, model: 'gemma3:e2b', language: 'tr' }
+    });
+    await waitFor(peer.client, `window.state.vampire.actions?.seer?.actorId === 'botintel' ? 'yes' : null`, 8000, 'kanıt botu gece incelemesi');
+    await evalJS(peer.client, `document.getElementById('vv-night-end').click(); 1`);
+    await evalJS(peer.client, `(() => {
+      window.__mockChatFail = true;
+      window.state.vampire.phase = 'vote';
+      window.state.vampire.actions = { votes: {} };
+      window.vampireVillagerHandler({ type: 'vv-role', role: 'villager' }, ${JSON.stringify(host)});
+      return 1;
+    })()`);
+    await waitFor(peer.client, `window.state.vampire.actions?.votes?.botintel ? 'yes' : null`, 8000, 'kanıta dayalı yedek oy');
+    game = await state(peer);
+    assert.strictEqual(game.actions.votes.botintel, 'vampir', 'Bot doğrulanmış vampir yerine rastgele hedef seçti: ' + JSON.stringify(game.actions));
+
+    // --- Sohbet iknası: model kapalıyken bile insanın gerekçeli suçlaması botun
+    // şüphe tablosuna girmeli ve bot kendi oyunu bu kanaate göre kullanmalı. ---
+    await setupLobbyRecord(peer, host, [
+      { id: host, name: 'Kurucu' },
+      { id: 'vvbot-ikna', name: 'Sorgucu', isBot: true },
+      { id: 'iknaci', name: 'İknacı' },
+      { id: 'supheli', name: 'Ali' }
+    ]);
+    await evalJS(peer.client, `(() => {
+      window.__mockChatFail = true;
+      window.state.vampire = {
+        host: ${JSON.stringify(host)}, started: true, phase: 'day', round: 3,
+        players: [
+          { id: ${JSON.stringify(host)}, name: 'Kurucu', alive: true },
+          { id: 'vvbot-ikna', name: 'Sorgucu', alive: true, isBot: true, operatorId: ${JSON.stringify(host)}, model: 'gemma3:e2b', language: 'tr' },
+          { id: 'iknaci', name: 'İknacı', alive: true },
+          { id: 'supheli', name: 'Ali', alive: true }
+        ],
+        roles: { ${JSON.stringify(host)}: 'villager', 'vvbot-ikna': 'villager', iknaci: 'villager', supheli: 'vampire' },
+        localRole: 'villager', settings: {}, actions: {}, used: {}, doctorHistory: {},
+        pendingHunterId: null, privateNote: '', log: [], chat: []
+      };
+      window.vampireVillagerHandler({ type: 'vv-chat', id: 'ikna-1', senderId: 'iknaci', text: 'Ali çok şüpheli, sözleri çelişti; bence Ali vampir, ona oy verelim.', sentAt: Date.now() }, 'iknaci');
+      window.state.vampire.phase = 'vote';
+      window.state.vampire.actions = { votes: {} };
+      window.vampireVillagerHandler({ type: 'vv-role', role: 'villager' }, window.state.myId);
+      return 1;
+    })()`);
+    await waitFor(peer.client, `window.state.vampire.actions?.votes?.['vvbot-ikna'] ? 'yes' : null`, 8000, 'ikna edilen bot kendi oyunu kullanmalı');
+    game = await state(peer);
+    assert.strictEqual(game.actions.votes['vvbot-ikna'], 'supheli', 'Bot sohbet iddiasını değerlendirip kendi oyuna yansıtmadı: ' + JSON.stringify(game.actions));
+
+    // --- Kanıtsız suçlama: "bence Bot1 vampir" gibi boş bir iddia hedefi
+    // otomatik suçlu yapmamalı; diğer botlar kanıt istemeli ve suçlayana şüphe duymalı. ---
+    await setupLobbyRecord(peer, host, [
+      { id: host, name: 'Kurucu' },
+      { id: 'suclayan', name: 'Suclayan' },
+      { id: 'vvbot-hedef', name: 'Bot 2', isBot: true },
+      { id: 'vvbot-gozlem', name: 'Bot 3', isBot: true }
+    ]);
+    await evalJS(peer.client, `(() => {
+      window.__mockChatFail = true;
+      window.state.vampire = {
+        host: ${JSON.stringify(host)}, started: true, phase: 'day', round: 4,
+        players: [
+          { id: ${JSON.stringify(host)}, name: 'Kurucu', alive: true },
+          { id: 'suclayan', name: 'Suclayan', alive: true },
+          { id: 'vvbot-hedef', name: 'Bot 2', alive: true, isBot: true, operatorId: ${JSON.stringify(host)}, model: 'gemma3:e2b', language: 'tr' },
+          { id: 'vvbot-gozlem', name: 'Bot 3', alive: true, isBot: true, operatorId: ${JSON.stringify(host)}, model: 'gemma3:e2b', language: 'tr' }
+        ],
+        roles: { ${JSON.stringify(host)}: 'vampire', suclayan: 'villager', 'vvbot-hedef': 'villager', 'vvbot-gozlem': 'villager' },
+        localRole: 'vampire', settings: {}, actions: {}, used: {}, doctorHistory: {},
+        pendingHunterId: null, privateNote: '', log: [], chat: []
+      };
+      window.vampireVillagerHandler({ type: 'vv-chat', id: 'bos-suclama-1', senderId: 'suclayan', text: 'bence katil bot2', sentAt: Date.now() }, 'suclayan');
+      return 1;
+    })()`);
+    await waitFor(peer.client, `(window.state.vampire.chat || []).some(m => m.senderId === 'vvbot-hedef' && /Somut kanıtın ne/i.test(m.text)) && (window.state.vampire.chat || []).some(m => m.senderId === 'vvbot-gozlem' && /somut|kanıt değil/i.test(m.text)) ? 'yes' : null`, 10000, 'bot2 ve diğer bot kanıtsız suçlamaya cevap vermeli');
+    await evalJS(peer.client, `(() => {
+      window.state.vampire.phase = 'vote';
+      window.state.vampire.actions = { votes: {} };
+      window.vampireVillagerHandler({ type: 'vv-role', role: 'vampire' }, window.state.myId);
+      return 1;
+    })()`);
+    await waitFor(peer.client, `window.state.vampire.actions?.votes?.['vvbot-hedef'] && window.state.vampire.actions?.votes?.['vvbot-gozlem'] ? 'yes' : null`, 9000, 'botlar kanıtsız suçlama sonrası kendi oylarını kullanmalı');
+    game = await state(peer);
+    assert.strictEqual(game.actions.votes['vvbot-hedef'], 'suclayan', 'Suçlanan bot kanıtsız suçlayana şüphe yöneltmedi: ' + JSON.stringify(game.actions));
+    assert.strictEqual(game.actions.votes['vvbot-gozlem'], 'suclayan', 'Diğer bot kanıtsız suçlayana şüphe yöneltmedi: ' + JSON.stringify(game.actions));
+
     // --- Sohbet: adı geçince/soru sorulunca bot cevap vermeli ---
-    await evalJS(peer.client, `window.__mockChatResponse = (body) => { window.__lastBody = body; return { dusunce: 'Bana soruyorlar.', targetId: null, chat: 'Ben dün gece evimdeydim, kimseye dokunmadım.' }; }; 1`);
+    await evalJS(peer.client, `window.__mockChatFail = false; window.__mockChatResponse = (body) => { window.__lastBody = body; return { dusunce: 'Bana soruyorlar.', targetId: null, chat: 'Ben dün gece evimdeydim, kimseye dokunmadım.' }; }; 1`);
     await setupLobbyRecord(peer, host, [
       { id: host, name: 'Kurucu' },
       { id: 'vvbot-cevap', name: 'Cevapci', isBot: true },
@@ -328,6 +448,17 @@ module.exports = async function run() {
       return { quotesQuestion: user.includes('Cevapci sen dün gece neredeydin?'), tellsToAnswer: user.includes('Ona kısaca cevap ver') };
     })()`);
     assert.deepStrictEqual(replyPrompt, { quotesQuestion: true, tellsToAnswer: true }, JSON.stringify(replyPrompt));
+
+    // Ollama kapalı olsa bile bot tamamen susmamalı; seçili dilde yerleşik,
+    // kısa bir oyuncu cevabı üretmeli.
+    await evalJS(peer.client, `(() => {
+      window.__mockChatFail = true;
+      window.vampireVillagerHandler({ type: 'vv-chat', id: 'soru2', senderId: 'koylu1', text: 'Bence Cevapci vampir, ondan şüpheleniyorum.', sentAt: Date.now() }, 'koylu1');
+      return 1;
+    })()`);
+    await waitFor(peer.client, `(window.state.vampire.chat || []).filter(m => m.senderId === 'vvbot-cevap').length >= 2 ? 'yes' : null`, 9000, 'ollama yokken bot yedek sohbeti');
+    const fallbackReply = await evalJS(peer.client, `(window.state.vampire.chat || []).filter(m => m.senderId === 'vvbot-cevap').at(-1)?.text || ''`);
+    assert.match(fallbackReply, /Somut kanıtın ne/, 'Bot suçlanınca kendini savunup kanıt istemedi: ' + fallbackReply);
 
     if (require.main === module) console.log('bot scenarios verified');
   } finally {

@@ -1,16 +1,16 @@
 # Graph Report - TeamSync  (2026-07-30)
 
 ## Corpus Check
-- 105 files · ~606,628 words
+- 105 files · ~612,623 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 999 nodes · 2007 edges · 85 communities (61 shown, 24 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 61 edges (avg confidence: 0.6)
+- 1021 nodes · 2076 edges · 85 communities (63 shown, 22 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 63 edges (avg confidence: 0.6)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1b5679af`
+- Built from commit: `34627792`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -101,10 +101,10 @@
 1. `evalJS()` - 48 edges
 2. `handleDataMessage()` - 38 edges
 3. `bindUI()` - 37 edges
-4. `spawnPeer()` - 30 edges
-5. `showToast()` - 28 edges
-6. `waitFor()` - 27 edges
-7. `render()` - 26 edges
+4. `render()` - 35 edges
+5. `spawnPeer()` - 30 edges
+6. `showToast()` - 28 edges
+7. `waitFor()` - 27 edges
 8. `cleanupPeer()` - 24 edges
 9. `initUserSettings()` - 23 edges
 10. `createRoom()` - 20 edges
@@ -130,7 +130,7 @@
 - **Create-Room premium options (RNNoise, SFW AI, Game Mode, Relay, Bitrate) configured together at room creation** — index_step_create_form, index_rnnoise_toggle_option, index_sfw_toggle_option, index_game_mode_toggle_option, index_relay_toggle_option, index_bitrate_select [EXTRACTED 0.90]
 - **TeamSync release pipeline: version bump in index/docs marketing pages triggers GitHub Actions build published to GitHub Releases** — github_workflows_release_release_workflow, docs_index_github_releases_link, index_teamsync_login_flow [INFERRED 0.65]
 
-## Communities (85 total, 24 thin omitted)
+## Communities (85 total, 22 thin omitted)
 
 ### Community 0 - "UNO Card Game"
 Cohesion: 0.12
@@ -161,8 +161,8 @@ Cohesion: 0.15
 Nodes (10): catalogDir, EXPECTED_LOCALES, fs, path, renderer, report, requiredLegacy, requiredStructured (+2 more)
 
 ### Community 7 - "Electron Builder Config"
-Cohesion: 0.09
-Nodes (22): build, appId, directories, files, nsis, productName, publish, win (+14 more)
+Cohesion: 0.22
+Nodes (9): build, appId, directories, productName, publish, win, output, icon (+1 more)
 
 ### Community 8 - "Sidebar UI Components"
 Cohesion: 0.10
@@ -199,8 +199,8 @@ Cohesion: 0.15
 Nodes (16): fs, { launch, getPageTarget, cdp, evalJS, waitFor }, os, path, assert, fs, inspectButton(), { launch, getPageTarget, cdp, evalJS, waitFor } (+8 more)
 
 ### Community 13 - "Native Dependencies"
-Cohesion: 0.11
-Nodes (19): acorn, cross-fetch, crypto-js, electron-updater, dependencies, acorn, cross-fetch, crypto-js (+11 more)
+Cohesion: 0.09
+Nodes (23): acorn, cross-fetch, crypto-js, electron-updater, @ghostery/adblocker-electron, @jitsi/robotjs, dependencies, acorn (+15 more)
 
 ### Community 14 - "Shared Browser Feature"
 Cohesion: 0.32
@@ -387,12 +387,20 @@ Cohesion: 0.33
 Nodes (10): APP_THEMES, applyCustomThemeColors(), applyUserTheme(), CUSTOM_THEME_PRESETS, getCustomThemeColors(), hexLuminance(), initCustomThemeEditor(), markActiveCustomPreset() (+2 more)
 
 ### Community 68 - "Lucky Wheel Feature"
-Cohesion: 0.08
-Nodes (62): initLuckyWheel(), addBot(), addBotMemory(), addLobbyChatMessage(), addressedMessageFor(), afterNight(), applyBotRole(), armPhaseTimer() (+54 more)
+Cohesion: 0.06
+Nodes (84): initLuckyWheel(), addBot(), addBotMemory(), addLobbyChatMessage(), addressedMessageFor(), afterNight(), analyzeChatClaim(), applyBotRole() (+76 more)
 
 ### Community 69 - "Poke Feature Init"
 Cohesion: 0.14
 Nodes (17): initPoke(), evalJS(), assert, installMockOllama(), installNightScenario(), setLobbyPhaseState(), setupLobbyRecord(), { spawnPeer, cleanupPeer, createRoom, evalJS, waitFor } (+9 more)
+
+### Community 70 - "Supabase Client Dependency"
+Cohesion: 0.29
+Nodes (7): files, **/*, !dist, !.env, !problemler.md, !tools/dev/yapaydenetleyici.js, !yapaydenetliyici.md
+
+### Community 79 - "nsis"
+Cohesion: 0.33
+Nodes (6): nsis, artifactName, deleteAppDataOnUninstall, oneClick, perMachine, runAfterFinish
 
 ### Community 80 - "seed_machine_draft.py"
 Cohesion: 0.60
@@ -413,7 +421,7 @@ Nodes (28): acceptServerInvite(), appendChat(), checkSession(), cleanText(), clo
 ## Knowledge Gaps
 - **325 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+320 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **24 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -421,14 +429,14 @@ _Questions this graph is uniquely positioned to answer:_
 - **What is the exact relationship between `window.handlePokeImgError() sprite fallback chain` and `PokeAPI (pokeapi.co)`?**
   _Edge tagged AMBIGUOUS (relation: calls) - confidence is low._
 - **Why does `t()` connect `Cross-Fetch Dependency` to `Chat & Renderer Utilities`, `Audio Bitrate & Mic Controls`, `Poke Feature Init`, `Focus Mode UI`, `escapeHtml`?**
-  _High betweenness centrality (0.081) - this node is a cross-community bridge._
+  _High betweenness centrality (0.073) - this node is a cross-community bridge._
 - **Why does `initPoke()` connect `Poke Feature Init` to `Cross-Fetch Dependency`?**
-  _High betweenness centrality (0.081) - this node is a cross-community bridge._
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
+- **Are the 7 inferred relationships involving `render()` (e.g. with `addBot()` and `continueAfterVoteResult()`) actually correct?**
+  _`render()` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
   _325 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `UNO Card Game` be split into smaller, more focused modules?**
   _Cohesion score 0.11779448621553884 - nodes in this community are weakly interconnected._
 - **Should `App Shell & Pokedex Data` be split into smaller, more focused modules?**
   _Cohesion score 0.07205387205387205 - nodes in this community are weakly interconnected._
-- **Should `Chat & Renderer Utilities` be split into smaller, more focused modules?**
-  _Cohesion score 0.039186507936507936 - nodes in this community are weakly interconnected._

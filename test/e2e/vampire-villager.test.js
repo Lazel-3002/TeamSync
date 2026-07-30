@@ -71,6 +71,21 @@ module.exports = async function run() {
       hasCustomIcon: true
     }, JSON.stringify(activityCover));
 
+    // Yeni Gece Meclisi kabuğu: faz akışı, bağımsız oyun masası ve bilgi rayı
+    // erişilebilir DOM yapısında hazır olmalı.
+    const gameShell = await evalJS(peer.client, `(() => ({
+      hasAmbient: document.querySelectorAll('#vampire-card .vv-ambient').length === 2,
+      phaseSteps: document.querySelectorAll('#vampire-card [data-vv-step]').length,
+      hasStage: !!document.querySelector('#vampire-card .vv-game-stage'),
+      hasSideRail: !!document.querySelector('#vampire-card .vv-side-rail')
+    }))()`);
+    assert.deepStrictEqual(gameShell, {
+      hasAmbient: true,
+      phaseSteps: 3,
+      hasStage: true,
+      hasSideRail: true
+    }, JSON.stringify(gameShell));
+
     // Kişisel arka plan teması: dört seçenek görünmeli, önizleme anlık çalışmalı
     // ve Kaydet ile cihazdaki tercih olarak kalmalı.
     await evalJS(peer.client, `openUserSettings('general'); 1`);
@@ -107,12 +122,63 @@ module.exports = async function run() {
       const panel = document.querySelector('.vv-lobby-settings');
       const grid = document.querySelector('.vv-role-grid');
       const rect = panel.getBoundingClientRect();
-      return { roleCount: document.querySelectorAll('.vv-role-toggle').length, columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length, width: rect.width, right: rect.right, viewport: document.documentElement.clientWidth };
+      return { roleCount: document.querySelectorAll('.vv-role-toggle').length, columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length, width: rect.width, right: rect.right, viewport: document.documentElement.clientWidth, hasRoleSigil: !!document.querySelector('#vampire-role .vv-role-sigil'), phase: document.getElementById('vampire-card').dataset.phase };
     })()`);
     assert.strictEqual(lobbyLayout.roleCount, 9, JSON.stringify(lobbyLayout));
     assert.strictEqual(lobbyLayout.columns, 3, JSON.stringify(lobbyLayout));
     assert.ok(lobbyLayout.width >= 600 && lobbyLayout.right <= lobbyLayout.viewport, JSON.stringify(lobbyLayout));
+    assert.strictEqual(lobbyLayout.hasRoleSigil, true, JSON.stringify(lobbyLayout));
+    assert.strictEqual(lobbyLayout.phase, 'lobby', JSON.stringify(lobbyLayout));
     const lobbyScreenshot = await screenshot(peer);
+
+    await peer.client.send('Emulation.setDeviceMetricsOverride', { width: 600, height: 820, deviceScaleFactor: 1, mobile: false });
+    const mobileLayout = await evalJS(peer.client, `(() => ({
+      columns: getComputedStyle(document.querySelector('#vampire-card .vv-card-body')).gridTemplateColumns.split(' ').length,
+      playerColumns: getComputedStyle(document.getElementById('vampire-players')).gridTemplateColumns.split(' ').length,
+      overflow: document.getElementById('vampire-card').scrollWidth <= document.getElementById('vampire-card').clientWidth + 1
+    }))()`);
+    assert.deepStrictEqual(mobileLayout, { columns: 1, playerColumns: 2, overflow: true }, JSON.stringify(mobileLayout));
+
+    // Kullanıcının raporladığı orta genişlik: sağ ray ekran dışına taşmamalı ve
+    // özel tema rengi oyun yüzeyinin ortasından sızmamalı.
+    await peer.client.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 720, deviceScaleFactor: 1, mobile: false });
+    const mediumCustomTheme = await evalJS(peer.client, `(() => {
+      document.documentElement.dataset.theme = 'custom';
+      document.documentElement.style.setProperty('--bg-dark', '#0b332f');
+      document.documentElement.style.setProperty('--bg-panel', '#0d3d37');
+      const card = document.getElementById('vampire-card');
+      const body = card.querySelector('.vv-card-body');
+      return {
+        columns: getComputedStyle(body).gridTemplateColumns.split(' ').length,
+        cardBackground: getComputedStyle(card).backgroundColor,
+        overflow: card.scrollWidth <= card.clientWidth + 1
+      };
+    })()`);
+    assert.deepStrictEqual(mediumCustomTheme, { columns: 1, cardBackground: 'rgb(11, 51, 47)', overflow: true }, JSON.stringify(mediumCustomTheme));
+    await evalJS(peer.client, `document.documentElement.dataset.theme = 'aurora'; 1`);
+    await peer.client.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
+
+    // Oyun başlangıcı rol perdesi ve hedef geri bildirimi: vampir av seçmeden
+    // geceyi bitirememeli; seçilen kart açıkça işaretlenmeli.
+    await installScenario(peer, { [host]: 'vampire', koylu1: 'villager', koylu2: 'villager', koylu3: 'villager' });
+    const revealState = await evalJS(peer.client, `(() => ({
+      visible: !document.getElementById('vv-role-reveal').classList.contains('hidden'),
+      title: document.getElementById('vv-reveal-title').textContent,
+      endDisabled: document.getElementById('vv-night-end').disabled
+    }))()`);
+    assert.deepStrictEqual(revealState, { visible: true, title: 'Vampir', endDisabled: true }, JSON.stringify(revealState));
+    const targetSelection = await evalJS(peer.client, `(() => {
+      document.getElementById('vv-reveal-close').click();
+      const target = document.querySelector('.vv-target[data-action="vampire"]');
+      target.click();
+      return {
+        selected: target.classList.contains('is-selected') || !!document.querySelector('.vv-target.is-selected'),
+        pressed: document.querySelector('.vv-target.is-selected')?.getAttribute('aria-pressed'),
+        label: document.querySelector('.vv-target.is-selected small')?.textContent,
+        endDisabled: document.getElementById('vv-night-end').disabled
+      };
+    })()`);
+    assert.deepStrictEqual(targetSelection, { selected: true, pressed: 'true', label: 'Seçildi', endDisabled: false }, JSON.stringify(targetSelection));
 
     // Doktor koruması: vampir saldırısı hedefi elememeli.
     await installScenario(peer, { [host]: 'doctor', vampir: 'vampire', koylu1: 'villager', koylu2: 'villager' });
@@ -122,6 +188,17 @@ module.exports = async function run() {
     let game = await state(peer);
     assert.strictEqual(game.players.find(p => p.id === host).alive, true, 'Doktor koruması saldırıyı engellemedi');
     assert.strictEqual(game.phase, 'day', 'Korunan geceden sonra gündüz başlamadı');
+    assert.strictEqual(game.doctorHistory[host], host, 'Doktorun önceki koruma hedefi kaydedilmedi');
+    const consecutiveProtection = await evalJS(peer.client, `(() => {
+      window.state.vampire.phase = 'night';
+      window.state.vampire.round = 2;
+      window.state.vampire.actions = {};
+      window.vampireVillagerHandler({ type: 'vv-action', action: 'doctor', targetId: window.state.myId }, window.state.myId);
+      const repeatedAccepted = !!window.state.vampire.actions.doctor;
+      window.vampireVillagerHandler({ type: 'vv-action', action: 'doctor', targetId: 'koylu1' }, window.state.myId);
+      return { repeatedAccepted, nextTarget: window.state.vampire.actions.doctor?.targetId || null };
+    })()`);
+    assert.deepStrictEqual(consecutiveProtection, { repeatedAccepted: false, nextTarget: 'koylu1' }, 'Doktor aynı kişiyi iki gece üst üste koruyabildi: ' + JSON.stringify(consecutiveProtection));
 
     // Büyücü ve Casus gizli sonucu yalnızca rol sahibine almalı.
     await installScenario(peer, { [host]: 'seer', vampir: 'vampire', koylu1: 'villager', koylu2: 'villager' });
@@ -129,6 +206,8 @@ module.exports = async function run() {
     await evalJS(peer.client, `document.getElementById('vv-night-end').click(); 1`);
     game = await state(peer);
     assert.match(game.privateNote, /Vampir/, 'Büyücü vampir rolünü öğrenemedi');
+    const seerIntelUi = await evalJS(peer.client, `document.querySelector('#vv-council .vv-private-intel')?.textContent || ''`);
+    assert.match(seerIntelUi, /Büyücü sonucu: vampir rolü Vampir/, 'Büyücü sonucu gündüzde gizli bilgi panelinde görünmedi: ' + seerIntelUi);
 
     await installScenario(peer, { [host]: 'oracle', vampir: 'vampire', koylu1: 'villager', koylu2: 'villager' });
     await botAction(peer, host, 'oracle', 'vampir');
@@ -177,6 +256,8 @@ module.exports = async function run() {
 
     // Bot oyları çoğunlukla vampiri sürmeli.
     await installScenario(peer, { [host]: 'villager', vampir: 'vampire', koylu1: 'villager', koylu2: 'villager' }, 'vote');
+    const councilUi = await evalJS(peer.client, `(() => ({ visible: !document.getElementById('vv-council').classList.contains('hidden'), mainHidden: getComputedStyle(document.querySelector('#vampire-card .vv-game-stage')).display === 'none', chatInCouncil: document.querySelector('#vv-council-chat-slot .vv-lobby-chat') !== null, voteCards: document.querySelectorAll('#vv-council .vv-vote-card').length }))()`);
+    assert.deepStrictEqual(councilUi, { visible: true, mainHidden: true, chatInCouncil: true, voteCards: 3 }, 'Gündüz oylaması ayrı meclis ekranına taşınmadı: ' + JSON.stringify(councilUi));
     await botVote(peer, host, 'vampir');
     await botVote(peer, 'koylu1', 'vampir');
     await botVote(peer, 'koylu2', 'vampir');
@@ -184,6 +265,11 @@ module.exports = async function run() {
     game = await state(peer);
     assert.strictEqual(game.players.find(p => p.id === 'vampir').alive, false, 'Bot çoğunluk oyu vampiri sürmedi');
     assert.strictEqual(game.phase, 'over', 'Oy sonrası kazanma koşulu çalışmadı');
+    assert.strictEqual(game.winnerTeam, 'village', 'Kazanan köy tarafı kaydedilmedi');
+    const endgameUi = await evalJS(peer.client, `(() => ({ visible: !document.getElementById('vv-endgame').classList.contains('hidden'), roles: document.querySelectorAll('#vv-endgame .vv-reveal-roster article').length, title: document.getElementById('vv-endgame-title')?.textContent || '' }))()`);
+    assert.strictEqual(endgameUi.visible, true, 'Oyun sonu ekranı açılmadı');
+    assert.strictEqual(endgameUi.roles, 4, 'Finalde bütün oyuncuların rolleri açıklanmadı');
+    assert.match(endgameUi.title, /Köylüler/, 'Kazanan taraf final ekranında yazılmadı');
 
     // Cellat, gizli hedefi gündüz oylamasıyla sürülünce tek başına kazanmalı.
     await installScenario(peer, { [host]: 'executioner', vampir: 'vampire', koylu1: 'villager', koylu2: 'villager' }, 'vote');
