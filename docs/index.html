@@ -386,167 +386,26 @@
       color: var(--ink);
     }
 
-    .settings-window {
-      border: 1px solid var(--ink);
-      background: var(--surface);
+    .settings-shot {
+      border: 1px solid #0f1320;
+      background: var(--night);
+      padding: 10px;
     }
 
-    .settings-titlebar {
+    .settings-shot img {
+      width: 100%;
+      border: 1px solid #394157;
+    }
+
+    .settings-shot figcaption {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 13px 16px;
-      border-bottom: 1px solid var(--ink);
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .settings-titlebar span:last-child {
-      color: var(--muted);
+      gap: 16px;
+      padding: 12px 2px 2px;
+      color: #b8bfd0;
       font-family: Consolas, "Courier New", monospace;
       font-size: 11px;
-      font-weight: 500;
     }
-
-    .settings-layout {
-      display: grid;
-      grid-template-columns: 184px 1fr;
-      min-height: 480px;
-    }
-
-    .settings-sidebar {
-      padding: 14px;
-      border-right: 1px solid var(--line);
-      background: #ebe9e1;
-    }
-
-    .settings-sidebar span {
-      display: block;
-      padding: 10px 12px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .settings-sidebar .active {
-      background: var(--ink);
-      color: var(--white);
-    }
-
-    .settings-main {
-      padding: 30px;
-    }
-
-    .settings-main > p {
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .settings-choice {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      margin-top: 26px;
-      padding: 18px;
-      border: 1px solid var(--line);
-      background: var(--white);
-    }
-
-    .settings-choice strong,
-    .theme-label {
-      display: block;
-      font-size: 13px;
-    }
-
-    .settings-choice small {
-      display: block;
-      max-width: 360px;
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.45;
-    }
-
-    .toggle {
-      width: 40px;
-      height: 22px;
-      flex: 0 0 auto;
-      position: relative;
-      border: 1px solid var(--accent-dark);
-      border-radius: 20px;
-      background: var(--accent);
-    }
-
-    .toggle::after {
-      width: 16px;
-      height: 16px;
-      position: absolute;
-      top: 2px;
-      right: 2px;
-      border-radius: 50%;
-      background: var(--white);
-      content: "";
-    }
-
-    .theme-block {
-      margin-top: 26px;
-    }
-
-    .theme-swatches {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .theme-swatch {
-      min-height: 72px;
-      display: flex;
-      align-items: flex-end;
-      padding: 9px;
-      border: 1px solid var(--line);
-      color: var(--white);
-      font-size: 10px;
-      font-weight: 700;
-    }
-
-    .theme-swatch.purple { background: #5d55d6; }
-    .theme-swatch.black { background: #171719; }
-    .theme-swatch.navy { background: #1d2b43; }
-    .theme-swatch.white {
-      background: #f6f6f3;
-      color: var(--ink);
-    }
-    .theme-swatch.violet {
-      background: #8c63dd;
-    }
-    .theme-swatch.custom {
-      background: #276f6d;
-    }
-
-    .custom-colors {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-top: 22px;
-      padding-top: 18px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .color-chip {
-      width: 24px;
-      height: 24px;
-      display: inline-block;
-      border: 1px solid var(--ink);
-    }
-
-    .color-chip.bg { background: #1d2435; }
-    .color-chip.accent { background: #8c63dd; }
-    .color-chip.button { background: #5d55d6; }
 
     .how-grid {
       display: grid;
@@ -791,30 +650,6 @@
         gap: 16px;
       }
 
-      .settings-layout {
-        grid-template-columns: 1fr;
-      }
-
-      .settings-sidebar {
-        display: flex;
-        gap: 4px;
-        overflow-x: auto;
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .settings-sidebar span {
-        flex: 0 0 auto;
-      }
-
-      .settings-main {
-        padding: 20px;
-      }
-
-      .theme-swatches {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
       .how-grid {
         grid-template-columns: 1fr;
       }
@@ -964,58 +799,17 @@
             <li><b>6 tema seçeneği:</b> Mor, siyah, lacivert, beyaz, mor-beyaz veya kendi teman</li>
             <li><b>Sade görünüm:</b> Gradyanları ve parlama efektlerini tek dokunuşla kaldırır</li>
             <li><b>Kendi renklerin:</b> Arka plan, vurgu ve buton renkleri ayrı ayrı seçilebilir</li>
-            <li><b>Diğer ayarlar:</b> Profil, ses ve görüntü, bildirimler, gizlilik, dil ve saat</li>
+            <li><b>Diğer ayarlar:</b> Ses ve görüntü, yayın, bağlantılar, GIF ve medya, dil ve zaman</li>
           </ul>
         </div>
 
-        <div class="settings-window" aria-label="TeamSync ayarlar ekranı örneği">
-          <div class="settings-titlebar">
-            <span>Ayarlar</span>
-            <span>GÖRÜNÜM ÖNİZLEMESİ</span>
-          </div>
-          <div class="settings-layout">
-            <div class="settings-sidebar" aria-hidden="true">
-              <span class="active">Genel</span>
-              <span>Profil</span>
-              <span>Ses ve Görüntü</span>
-              <span>Bildirimler</span>
-              <span>Gizlilik</span>
-              <span>Dil ve Zaman</span>
-            </div>
-            <div class="settings-main">
-              <h3>Genel Ayarlar</h3>
-              <p>Uygulamanın görünümünü ve temel davranışını seç.</p>
-
-              <div class="settings-choice">
-                <div>
-                  <strong>Sade görünüm</strong>
-                  <small>Renk karışımlarını ve parlama efektlerini kaldırır. İlk kurulumda açıktır.</small>
-                </div>
-                <span class="toggle" aria-label="Sade görünüm açık"></span>
-              </div>
-
-              <div class="theme-block">
-                <span class="theme-label">Arka plan teması</span>
-                <div class="theme-swatches" aria-label="Tema seçenekleri">
-                  <div class="theme-swatch purple">Mevcut Mor</div>
-                  <div class="theme-swatch black">Gece Siyahı</div>
-                  <div class="theme-swatch navy">Derin Lacivert</div>
-                  <div class="theme-swatch white">Temiz Beyaz</div>
-                  <div class="theme-swatch violet">Mor &amp; Beyaz</div>
-                  <div class="theme-swatch custom">Kendi Teman</div>
-                </div>
-              </div>
-
-              <div class="custom-colors">
-                <span>Kendi teman:</span>
-                <span class="color-chip bg" title="Arka plan rengi"></span>
-                <span class="color-chip accent" title="Vurgu rengi"></span>
-                <span class="color-chip button" title="Buton rengi"></span>
-                <span>Arka plan · Vurgu · Buton</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <figure class="settings-shot">
+          <img src="assets/screenshot-settings.png" alt="TeamSync uygulamasının gerçek Genel Ayarlar ekranı; sade görünüm anahtarı ve altı tema seçeneği açıkça görünüyor" loading="lazy">
+          <figcaption>
+            <span>GERÇEK UYGULAMA EKRANI / GENEL AYARLAR</span>
+            <span>SADE GÖRÜNÜM AÇIK</span>
+          </figcaption>
+        </figure>
       </div>
     </section>
 
