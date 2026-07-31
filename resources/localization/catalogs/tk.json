@@ -94,6 +94,8 @@
     "settings.frameRate": "Broadaýlym çarçuwasynyň derejesi",
     "settings.general": "General",
     "settings.generalLead": "TeamSync-iň daşky görnüşini we öndürijiligini dolandyryň.",
+    "settings.simpleUi": "Ýönekeý görnüş",
+    "settings.simpleUiDesc": "Gradiýentleri, reňk garyndylaryny we şöhle effektlerini aýryp, diňe saýlanan reňk palitrasyny ulanýar.",
     "settings.hwSaved": "Enjamlaryň tizlenmegi ileri tutulýar. Täzeden başlandan soň ulanylar.",
     "settings.hwaccel": "Enjamlaryň tizlenmegi",
     "settings.hwaccelDesc": "Has ýumşak wizual we effektler üçin GPU-ny ulanýar. Programmany täzeden açanyňyzdan soň ulanylýar.",

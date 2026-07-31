@@ -94,6 +94,8 @@
     "settings.frameRate": "Broadcast-Bildrate",
     "settings.general": "Allgemein",
     "settings.generalLead": "Verwalten Sie das Erscheinungsbild und die Leistung von TeamSync.",
+    "settings.simpleUi": "Schlichte Ansicht",
+    "settings.simpleUiDesc": "Verwendet nur die ausgewählte Farbpalette und entfernt Farbverläufe, Farbmischungen und Leuchteffekte.",
     "settings.hwSaved": "Präferenz für Hardwarebeschleunigung gespeichert. Es gilt nach dem Neustart.",
     "settings.hwaccel": "Hardwarebeschleunigung",
     "settings.hwaccelDesc": "Nutzt die GPU für flüssigere Grafiken und Effekte. Wird nach dem Neustart der App angewendet.",

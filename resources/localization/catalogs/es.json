@@ -94,6 +94,8 @@
     "settings.frameRate": "Velocidad de fotogramas de transmisión",
     "settings.general": "General",
     "settings.generalLead": "Administre la apariencia y el rendimiento de TeamSync.",
+    "settings.simpleUi": "Apariencia sencilla",
+    "settings.simpleUiDesc": "Usa solo la paleta seleccionada y elimina degradados, mezclas de colores y efectos de brillo.",
     "settings.hwSaved": "Preferencia de aceleración de hardware guardada. Se aplicará después del reinicio.",
     "settings.hwaccel": "Aceleración de hardware",
     "settings.hwaccelDesc": "Utiliza la GPU para obtener imágenes y efectos más fluidos. Aplicado después de reiniciar la aplicación.",

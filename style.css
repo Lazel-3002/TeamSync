@@ -8829,3 +8829,127 @@ input:checked + .slider:before {
   border-color: var(--acc) !important;
   background: color-mix(in srgb, var(--acc) 15%, var(--bg-dark)) !important;
 }
+
+/* ===== Sade görünüm =====
+   Varsayılan açık olan bu mod paleti değiştirmez; yalnızca aynı yüzeyde birden
+   fazla rengi karıştıran gradyanları, neon parlamaları ve dekoratif gölgeleri
+   kaldırır. Fotoğraf, video ve kapak görsellerine dokunulmaz. */
+:root[data-simple-ui="1"] {
+  --body-glow-one: transparent;
+  --body-glow-two: transparent;
+  --blur: none;
+  --shadow: none;
+  --shadow-sm: none;
+}
+
+:root[data-simple-ui="1"] *,
+:root[data-simple-ui="1"] *::before,
+:root[data-simple-ui="1"] *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+:root[data-simple-ui="1"] body {
+  background-color: var(--bg-dark);
+  background-image: none !important;
+}
+
+:root[data-simple-ui="1"] .login-wrap {
+  background-color: var(--bg-dark) !important;
+  background-image: none !important;
+}
+
+:root[data-simple-ui="1"] .login-wrap::before {
+  display: none;
+}
+
+:root[data-simple-ui="1"] .login-card,
+:root[data-simple-ui="1"] .menu-profile-card,
+:root[data-simple-ui="1"] .mcard,
+:root[data-simple-ui="1"] .vcard,
+:root[data-simple-ui="1"] .settings-shell,
+:root[data-simple-ui="1"] .settings-content,
+:root[data-simple-ui="1"] .settings-card,
+:root[data-simple-ui="1"] .settings-theme-section {
+  background-color: var(--bg-card) !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-simple-ui="1"] .settings-sidebar,
+:root[data-simple-ui="1"] .settings-actions,
+:root[data-simple-ui="1"] .toolbar,
+:root[data-simple-ui="1"] .custom-titlebar {
+  background-color: var(--bg-panel) !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-simple-ui="1"] .login-card h1 {
+  background: none !important;
+  color: var(--txt-main) !important;
+  -webkit-text-fill-color: var(--txt-main) !important;
+}
+
+:root[data-simple-ui="1"] .action-card,
+:root[data-simple-ui="1"] .action-card.pri,
+:root[data-simple-ui="1"] .action-card.sec {
+  background-color: var(--bg-card) !important;
+  background-image: none !important;
+  border-color: color-mix(in srgb, var(--txt-main) 16%, transparent) !important;
+}
+
+:root[data-simple-ui="1"] .action-card.pri {
+  border-color: var(--acc) !important;
+}
+
+:root[data-simple-ui="1"] .action-card:hover,
+:root[data-simple-ui="1"] .action-card.pri:hover {
+  background-color: var(--bg-hover) !important;
+  background-image: none !important;
+  border-color: var(--acc) !important;
+  transform: none;
+}
+
+:root[data-simple-ui="1"] .btn-pri,
+:root[data-simple-ui="1"] .login-card button:not(.btn-sec):not(.action-card) {
+  background-color: var(--acc-btn, var(--acc)) !important;
+  background-image: none !important;
+  filter: none !important;
+}
+
+:root[data-simple-ui="1"] .btn-sec {
+  background-color: var(--bg-hover) !important;
+  background-image: none !important;
+  filter: none !important;
+}
+
+:root[data-simple-ui="1"] .btn-back {
+  background-color: transparent !important;
+  border-color: color-mix(in srgb, var(--txt-main) 18%, transparent) !important;
+}
+
+:root[data-simple-ui="1"] :where(
+  .settings-theme-option,
+  .settings-theme-custom-mini-preview,
+  .settings-theme-preset-swatch,
+  .settings-input,
+  .settings-select,
+  .activity-picker,
+  .activity-card-footer,
+  .poll-builder-panel,
+  .poll-preview-panel,
+  .poll-voting-panel,
+  .poll-results-panel,
+  .wheel-card,
+  .vv-card-header,
+  .vv-role-banner
+) {
+  background-image: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-simple-ui="1"] .settings-simple-row {
+  border-color: color-mix(in srgb, var(--acc) 35%, transparent);
+}

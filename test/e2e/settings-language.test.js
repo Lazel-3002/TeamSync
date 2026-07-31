@@ -46,6 +46,53 @@ module.exports = async function run() {
     assert.ok(opened.rect.right <= opened.viewport.width, JSON.stringify(opened, null, 2));
     assert.ok(opened.rect.bottom <= opened.viewport.height, JSON.stringify(opened, null, 2));
 
+    // Sade görünüm ilk kurulumda açık olmalı. Gradyan ve parlama önizlemesi
+    // anında değişmeli; Kaydetmeden kapatılırsa varsayılan tercihe geri dönmeli.
+    const simpleDefault = await evalJS(
+      peer.client,
+      `(() => {
+        const action = document.getElementById('btn-show-create');
+        const style = getComputedStyle(action);
+        return {
+          stored: localStorage.getItem('teamsync_simple_ui'),
+          dataset: document.documentElement.dataset.simpleUi,
+          checked: document.getElementById('user-settings-simple-ui').checked,
+          actionBackgroundImage: style.backgroundImage,
+          actionShadow: style.boxShadow,
+          bodyBackgroundImage: getComputedStyle(document.body).backgroundImage,
+        };
+      })()`
+    );
+    assert.deepStrictEqual(simpleDefault, {
+      stored: null,
+      dataset: '1',
+      checked: true,
+      actionBackgroundImage: 'none',
+      actionShadow: 'none',
+      bodyBackgroundImage: 'none',
+    }, JSON.stringify(simpleDefault, null, 2));
+
+    const richPreview = await evalJS(
+      peer.client,
+      `(() => {
+        const toggle = document.getElementById('user-settings-simple-ui');
+        toggle.checked = false;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+        return {
+          dataset: document.documentElement.dataset.simpleUi,
+          backgroundImage: getComputedStyle(document.getElementById('btn-show-create')).backgroundImage,
+        };
+      })()`
+    );
+    assert.strictEqual(richPreview.dataset, '0', JSON.stringify(richPreview));
+    assert.match(richPreview.backgroundImage, /gradient/i, JSON.stringify(richPreview));
+    await evalJS(peer.client, `document.getElementById('settings-v2-close').click(); document.getElementById('menu-settings').click(); 1`);
+    const revertedSimple = await evalJS(peer.client, `({
+      dataset: document.documentElement.dataset.simpleUi,
+      checked: document.getElementById('user-settings-simple-ui').checked
+    })`);
+    assert.deepStrictEqual(revertedSimple, { dataset: '1', checked: true }, JSON.stringify(revertedSimple));
+
     await evalJS(
       peer.client,
       `document.querySelector('[data-settings-panel="language"]').click();
@@ -193,6 +240,7 @@ module.exports = async function run() {
         fps: localStorage.getItem('teamsync_stream_fps'),
         previews: localStorage.getItem('teamsync_stream_previews'),
         shareAudio: localStorage.getItem('teamsync_share_system_audio'),
+        simpleUi: localStorage.getItem('teamsync_simple_ui'),
         micVolume: localStorage.getItem('teamsync_mic_volume'),
         speakerVolume: localStorage.getItem('teamsync_speaker_volume'),
         legacyQuality: document.getElementById('quality-select').value,
@@ -209,6 +257,7 @@ module.exports = async function run() {
       fps: '60',
       previews: '0',
       shareAudio: '0',
+      simpleUi: '1',
       micVolume: '42',
       speakerVolume: '73',
       legacyQuality: 'high',

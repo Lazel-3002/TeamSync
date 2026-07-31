@@ -94,6 +94,8 @@
     "settings.frameRate": "广播帧率",
     "settings.general": "一般",
     "settings.generalLead": "管理 TeamSync 的外观和性能。",
+    "settings.simpleUi": "简洁外观",
+    "settings.simpleUiDesc": "移除渐变、混合颜色和发光效果，仅使用所选配色方案。",
     "settings.hwSaved": "已保存硬件加速首选项。重启后即可应用。",
     "settings.hwaccel": "硬件加速",
     "settings.hwaccelDesc": "使用 GPU 实现更流畅的视觉效果。重新启动应用程序后应用。",

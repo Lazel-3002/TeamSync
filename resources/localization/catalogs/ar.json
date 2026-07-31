@@ -94,6 +94,8 @@
     "settings.frameRate": "معدل إطار البث",
     "settings.general": "عام",
     "settings.generalLead": "إدارة مظهر وأداء TeamSync.",
+    "settings.simpleUi": "مظهر بسيط",
+    "settings.simpleUiDesc": "يستخدم لوحة الألوان المحددة فقط مع إزالة التدرجات ومزج الألوان وتأثيرات التوهج.",
     "settings.hwSaved": "تم حفظ تفضيل تسريع الأجهزة. سيتم تطبيقه بعد إعادة التشغيل.",
     "settings.hwaccel": "تسريع الأجهزة",
     "settings.hwaccelDesc": "يستخدم وحدة معالجة الرسومات (GPU) للحصول على صور وتأثيرات أكثر سلاسة. يتم تطبيقه بعد إعادة تشغيل التطبيق.",

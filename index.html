@@ -6,9 +6,14 @@
   <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.youtube.com https://s.ytimg.com; connect-src 'self' wss://broker.emqx.io:8084 https://s3.amazonaws.com https://unpkg.com https://cdn.jsdelivr.net https://pokeapi.co https://1.1.1.1 https://8.8.8.8 https://*.metered.live https://zperyrjpfumtblossyod.supabase.co wss://zperyrjpfumtblossyod.supabase.co http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob: https://*; frame-src 'self' https://www.youtube.com; worker-src 'self' blob:; object-src 'none';">
   <meta name="referrer" content="no-referrer" />
   <title>TeamSync</title>
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
   <script>
-    try { document.documentElement.dataset.theme = localStorage.getItem('teamsync_theme') || 'aurora'; } catch (_) {}
+    try {
+      document.documentElement.dataset.theme = localStorage.getItem('teamsync_theme') || 'aurora';
+      document.documentElement.dataset.simpleUi = localStorage.getItem('teamsync_simple_ui') === '0' ? '0' : '1';
+    } catch (_) {
+      document.documentElement.dataset.simpleUi = '1';
+    }
   </script>
   <style>
     /* Pokemon Selection Styles */
@@ -1664,6 +1669,13 @@
             <div class="settings-panel active" data-settings-content="general">
               <h2 id="settings-view-title" data-i18n="settings.general">Genel</h2>
               <p class="settings-lead" data-i18n="settings.generalLead">TeamSync'in görünümünü ve performansını yönet.</p>
+              <div class="settings-card settings-row settings-simple-row">
+                <div>
+                  <strong data-i18n="settings.simpleUi">Sade görünüm</strong>
+                  <p data-i18n="settings.simpleUiDesc">Gradyanları, renk karışımlarını ve parlama efektlerini kaldırarak yalnızca seçili renk paletini kullanır.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="user-settings-simple-ui" checked><span class="slider round"></span></label>
+              </div>
               <section class="settings-theme-section" aria-labelledby="settings-theme-title">
                 <div class="settings-theme-heading">
                   <div>

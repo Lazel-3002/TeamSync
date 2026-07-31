@@ -72,6 +72,8 @@
     "settings.appSettings": "UYGULAMA AYARLARI",
     "settings.general": "Genel",
     "settings.generalLead": "TeamSync'in görünümünü ve performansını yönet.",
+    "settings.simpleUi": "Sade görünüm",
+    "settings.simpleUiDesc": "Gradyanları, renk karışımlarını ve parlama efektlerini kaldırarak yalnızca seçili renk paletini kullanır.",
     "settings.appearance": "GÖRÜNÜM",
     "settings.backgroundTheme": "Arka plan teması",
     "settings.backgroundThemeDesc": "Kendine en rahat gelen görünümü seç. Tercihin yalnızca bu cihazda saklanır.",

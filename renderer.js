@@ -5594,6 +5594,7 @@ function escapeHtml(s) {
 const USER_LANGUAGE_KEY = 'teamsync_language';
 const USER_TIME_FORMAT_KEY = 'teamsync_time_format';
 const USER_THEME_KEY = 'teamsync_theme';
+const USER_SIMPLE_UI_KEY = 'teamsync_simple_ui';
 const USER_QUALITY_KEY = 'teamsync_media_quality';
 const USER_MIC_DEVICE_KEY = 'teamsync_mic_device_id';
 const USER_MIC_VOLUME_KEY = 'teamsync_mic_volume';
@@ -5694,6 +5695,8 @@ const I18N = {
     'settings.appSettings': 'UYGULAMA AYARLARI',
     'settings.general': 'Genel',
     'settings.generalLead': "TeamSync'in görünümünü ve performansını yönet.",
+    'settings.simpleUi': 'Sade görünüm',
+    'settings.simpleUiDesc': 'Gradyanları, renk karışımlarını ve parlama efektlerini kaldırarak yalnızca seçili renk paletini kullanır.',
     'settings.appearance': 'GÖRÜNÜM',
     'settings.backgroundTheme': 'Arka plan teması',
     'settings.backgroundThemeDesc': 'Kendine en rahat gelen görünümü seç. Tercihin yalnızca bu cihazda saklanır.',
@@ -5876,6 +5879,8 @@ const I18N = {
     'settings.appSettings': 'APP SETTINGS',
     'settings.general': 'General',
     'settings.generalLead': 'Manage the appearance and performance of TeamSync.',
+    'settings.simpleUi': 'Simple appearance',
+    'settings.simpleUiDesc': 'Uses only the selected color palette by removing gradients, mixed colors, and glow effects.',
     'settings.appearance': 'APPEARANCE',
     'settings.backgroundTheme': 'Background theme',
     'settings.backgroundThemeDesc': 'Choose the look that feels most comfortable. Your preference is stored only on this device.',
@@ -6568,6 +6573,19 @@ function getUserTheme() {
   return APP_THEMES.has(saved) ? saved : 'aurora';
 }
 
+function getSimpleUiEnabled() {
+  return localStorage.getItem(USER_SIMPLE_UI_KEY) !== '0';
+}
+
+function applySimpleUi(enabled, persist = false) {
+  const active = enabled !== false;
+  document.documentElement.dataset.simpleUi = active ? '1' : '0';
+  const input = document.getElementById('user-settings-simple-ui');
+  if (input) input.checked = active;
+  if (persist) localStorage.setItem(USER_SIMPLE_UI_KEY, active ? '1' : '0');
+  return active;
+}
+
 function syncThemeSelection(theme = getUserTheme()) {
   const selected = APP_THEMES.has(theme) ? theme : 'aurora';
   const input = document.querySelector(`input[name="settings-theme"][value="${selected}"]`);
@@ -7000,6 +7018,7 @@ function openUserSettings(panel = 'general') {
   const timeFormat = localStorage.getItem(USER_TIME_FORMAT_KEY) || 'auto';
   const timeRadio = document.querySelector(`input[name="settings-time-format"][value="${timeFormat}"]`);
   if (timeRadio) timeRadio.checked = true;
+  applySimpleUi(getSimpleUiEnabled());
   syncThemeSelection();
   updateSettingsTimePreview();
 
@@ -7019,6 +7038,7 @@ function saveUserSettings() {
   const showStreamPreviews = document.getElementById('user-stream-previews').checked;
   const shareSystemAudio = document.getElementById('user-share-system-audio').checked;
   const theme = document.querySelector('input[name="settings-theme"]:checked')?.value || getUserTheme();
+  const simpleUi = document.getElementById('user-settings-simple-ui')?.checked !== false;
 
   localStorage.setItem('teamsync_turn_url', turnUrl);
   localStorage.setItem('teamsync_turn_user', turnUser);
@@ -7028,6 +7048,7 @@ function saveUserSettings() {
   localStorage.setItem(USER_STREAM_FPS_KEY, streamFps);
   localStorage.setItem(USER_STREAM_PREVIEWS_KEY, showStreamPreviews ? '1' : '0');
   localStorage.setItem(USER_SHARE_SYSTEM_AUDIO_KEY, shareSystemAudio ? '1' : '0');
+  applySimpleUi(simpleUi, true);
   applyUserTheme(theme, true);
   applyMicrophoneVolume(document.getElementById('user-mic-volume').value, true);
   applySpeakerVolume(document.getElementById('user-speaker-volume').value, true);
@@ -7058,6 +7079,7 @@ function initUserSettings() {
   if (settingsModal && settingsModal.parentElement !== document.body) document.body.appendChild(settingsModal);
   renderLanguageOptions();
   initCustomThemeEditor();
+  applySimpleUi(getSimpleUiEnabled());
   applyUserTheme(getUserTheme());
   applyUserLanguage(getUserLanguage(), false);
   const quality = localStorage.getItem(USER_QUALITY_KEY);
@@ -7073,6 +7095,7 @@ function initUserSettings() {
   document.getElementById('settings-v2-close')?.addEventListener('click', () => {
     stopSettingsMicTest();
     window.releaseMediaLibrarySettingsUrls?.();
+    applySimpleUi(getSimpleUiEnabled());
     applyUserTheme(getUserTheme());
     document.getElementById('settings-modal').classList.add('hidden');
   });
@@ -7128,6 +7151,9 @@ function initUserSettings() {
     radio.addEventListener('change', () => {
       if (radio.checked) applyUserTheme(radio.value);
     });
+  });
+  document.getElementById('user-settings-simple-ui')?.addEventListener('change', event => {
+    applySimpleUi(event.target.checked);
   });
 
   const hwEl = document.getElementById('user-settings-hwaccel');

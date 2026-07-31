@@ -94,6 +94,8 @@
     "settings.frameRate": "ブロードキャストフレームレート",
     "settings.general": "一般",
     "settings.generalLead": "TeamSync の外観とパフォーマンスを管理します。",
+    "settings.simpleUi": "シンプル表示",
+    "settings.simpleUiDesc": "グラデーション、色の混合、発光効果を取り除き、選択したカラーパレットだけを使用します。",
     "settings.hwSaved": "ハードウェア アクセラレーション設定が保存されました。再起動後に適用されます。",
     "settings.hwaccel": "ハードウェアアクセラレーション",
     "settings.hwaccelDesc": "GPU を使用して、よりスムーズなビジュアルとエフェクトを実現します。アプリ再起動後に適用されます。",

@@ -72,6 +72,8 @@
     "settings.appSettings": "APP SETTINGS",
     "settings.general": "General",
     "settings.generalLead": "Manage the appearance and performance of TeamSync.",
+    "settings.simpleUi": "Simple appearance",
+    "settings.simpleUiDesc": "Uses only the selected color palette by removing gradients, mixed colors, and glow effects.",
     "settings.appearance": "APPEARANCE",
     "settings.backgroundTheme": "Background theme",
     "settings.backgroundThemeDesc": "Choose the look that feels most comfortable. Your preference is stored only on this device.",
