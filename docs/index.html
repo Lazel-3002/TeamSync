@@ -397,6 +397,15 @@
       border: 1px solid #394157;
     }
 
+    .settings-shot a {
+      display: block;
+    }
+
+    .settings-shot a:hover img,
+    .settings-shot a:focus-visible img {
+      opacity: 0.9;
+    }
+
     .settings-shot figcaption {
       display: flex;
       justify-content: space-between;
@@ -405,6 +414,17 @@
       color: #b8bfd0;
       font-family: Consolas, "Courier New", monospace;
       font-size: 11px;
+    }
+
+    .settings-gallery {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      margin-top: 22px;
+    }
+
+    .settings-gallery .settings-shot {
+      min-width: 0;
     }
 
     .how-grid {
@@ -650,6 +670,10 @@
         gap: 16px;
       }
 
+      .settings-gallery {
+        grid-template-columns: 1fr;
+      }
+
       .how-grid {
         grid-template-columns: 1fr;
       }
@@ -793,21 +817,77 @@
       <div class="wrap customize-grid">
         <div class="customize-copy">
           <span class="section-label">Ayarlar ve görünüm</span>
-          <h2>Uygulama sana uysun.</h2>
-          <p>TeamSync’in görünümünü ve kullanım biçimini ayarlar ekranından değiştirebilirsin. Seçimlerini kaydetmeden önce doğrudan önizleyebilirsin.</p>
+          <h2>Ayarların tamamı, uygulamanın içinden.</h2>
+          <p>Aşağıdaki görüntülerin tamamı çalışan TeamSync uygulamasından alındı. Her görüntüye tıklayarak gerçek ayar ekranını tam boy inceleyebilirsin.</p>
           <ul class="customize-points">
             <li><b>6 tema seçeneği:</b> Mor, siyah, lacivert, beyaz, mor-beyaz veya kendi teman</li>
             <li><b>Sade görünüm:</b> Gradyanları ve parlama efektlerini tek dokunuşla kaldırır</li>
-            <li><b>Kendi renklerin:</b> Arka plan, vurgu ve buton renkleri ayrı ayrı seçilebilir</li>
-            <li><b>Diğer ayarlar:</b> Ses ve görüntü, yayın, bağlantılar, GIF ve medya, dil ve zaman</li>
+            <li><b>Ses ve yayın:</b> Mikrofon, hoparlör, Bas-Konuş ve ekran paylaşımı tercihleri</li>
+            <li><b>Bağlantılar:</b> Kısıtlı ağlar için isteğe bağlı TURN sunucusu bilgileri</li>
+            <li><b>GIF ve Medya:</b> GIF, fotoğraf ve kısa videolar için cihaz içi kütüphane</li>
+            <li><b>Dil ve Zaman:</b> 13 arayüz dili ve mesaj saati gösterimi</li>
           </ul>
         </div>
 
         <figure class="settings-shot">
-          <img src="assets/screenshot-settings.png" alt="TeamSync uygulamasının gerçek Genel Ayarlar ekranı; sade görünüm anahtarı ve altı tema seçeneği açıkça görünüyor" loading="lazy">
+          <a href="assets/screenshot-settings.png" target="_blank" rel="noopener">
+            <img src="assets/screenshot-settings.png" alt="TeamSync uygulamasının gerçek Genel Ayarlar ekranı; sade görünüm anahtarı ve altı tema seçeneği açıkça görünüyor" loading="lazy">
+          </a>
           <figcaption>
-            <span>GERÇEK UYGULAMA EKRANI / GENEL AYARLAR</span>
-            <span>SADE GÖRÜNÜM AÇIK</span>
+            <span>01 / GENEL</span>
+            <span>TEMA VE SADE GÖRÜNÜM</span>
+          </figcaption>
+        </figure>
+      </div>
+
+      <div class="wrap settings-gallery">
+        <figure class="settings-shot">
+          <a href="assets/screenshot-settings-voice.png" target="_blank" rel="noopener">
+            <img src="assets/screenshot-settings-voice.png" alt="TeamSync uygulamasının gerçek Ses ve Görüntü ayarları; mikrofon, hoparlör, ses seviyeleri, mikrofon testi ve Bas-Konuş seçenekleri" loading="lazy">
+          </a>
+          <figcaption>
+            <span>02 / SES VE GÖRÜNTÜ</span>
+            <span>CİHAZLAR VE BAS-KONUŞ</span>
+          </figcaption>
+        </figure>
+
+        <figure class="settings-shot">
+          <a href="assets/screenshot-settings-broadcast.png" target="_blank" rel="noopener">
+            <img src="assets/screenshot-settings-broadcast.png" alt="TeamSync uygulamasının gerçek Yayın ayarları; ekran paylaşımı önizlemesi ve gelişmiş yayın seçenekleri" loading="lazy">
+          </a>
+          <figcaption>
+            <span>03 / YAYIN</span>
+            <span>EKRAN PAYLAŞIMI</span>
+          </figcaption>
+        </figure>
+
+        <figure class="settings-shot">
+          <a href="assets/screenshot-settings-connections.png" target="_blank" rel="noopener">
+            <img src="assets/screenshot-settings-connections.png" alt="TeamSync uygulamasının gerçek Bağlantılar ayarları; TURN sunucusu, kullanıcı adı ve şifre alanları" loading="lazy">
+          </a>
+          <figcaption>
+            <span>04 / BAĞLANTILAR</span>
+            <span>TURN SUNUCUSU</span>
+          </figcaption>
+        </figure>
+
+        <figure class="settings-shot">
+          <a href="assets/screenshot-settings-media.png" target="_blank" rel="noopener">
+            <img src="assets/screenshot-settings-media.png" alt="TeamSync uygulamasının gerçek GIF ve Medya ayarları; GIF, fotoğraf ve video ekleme alanı ile cihaz içi medya kütüphanesi" loading="lazy">
+          </a>
+          <figcaption>
+            <span>05 / GIF VE MEDYA</span>
+            <span>YEREL KÜTÜPHANE</span>
+          </figcaption>
+        </figure>
+
+        <figure class="settings-shot">
+          <a href="assets/screenshot-settings-language.png" target="_blank" rel="noopener">
+            <img src="assets/screenshot-settings-language.png" alt="TeamSync uygulamasının gerçek Dil ve Zaman ayarları; Türkçe, İngilizce, Almanca, İspanyolca ve diğer arayüz dilleri" loading="lazy">
+          </a>
+          <figcaption>
+            <span>06 / DİL VE ZAMAN</span>
+            <span>13 ARAYÜZ DİLİ</span>
           </figcaption>
         </figure>
       </div>
