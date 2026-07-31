@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#f2f0e9">
   <title>TeamSync — Hesapsız P2P sesli ve görüntülü sohbet</title>
-  <meta name="description" content="TeamSync ile hesap açmadan P2P sesli ve görüntülü konuşun, ekran paylaşın ve arkadaşlarınızla etkinliklere katılın. Windows için ücretsiz.">
+  <meta name="description" content="TeamSync ile hesap açmadan P2P sesli ve görüntülü konuşun, ekran paylaşın ve görünümü kendi zevkinize göre özelleştirin. Windows için ücretsiz.">
   <link rel="icon" href="assets/icon.png" type="image/png">
   <style>
     :root {
@@ -345,6 +345,209 @@
       font-size: 15px;
     }
 
+    .customize-grid {
+      display: grid;
+      grid-template-columns: 0.72fr 1.28fr;
+      align-items: start;
+      gap: 64px;
+    }
+
+    .customize-copy {
+      position: sticky;
+      top: 104px;
+    }
+
+    .customize-copy .section-label {
+      display: block;
+      margin-bottom: 18px;
+    }
+
+    .customize-copy p {
+      max-width: 440px;
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .customize-points {
+      margin-top: 32px;
+      border-top: 1px solid var(--ink);
+      list-style: none;
+    }
+
+    .customize-points li {
+      padding: 15px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .customize-points b {
+      color: var(--ink);
+    }
+
+    .settings-window {
+      border: 1px solid var(--ink);
+      background: var(--surface);
+    }
+
+    .settings-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .settings-titlebar span:last-child {
+      color: var(--muted);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .settings-layout {
+      display: grid;
+      grid-template-columns: 184px 1fr;
+      min-height: 480px;
+    }
+
+    .settings-sidebar {
+      padding: 14px;
+      border-right: 1px solid var(--line);
+      background: #ebe9e1;
+    }
+
+    .settings-sidebar span {
+      display: block;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .settings-sidebar .active {
+      background: var(--ink);
+      color: var(--white);
+    }
+
+    .settings-main {
+      padding: 30px;
+    }
+
+    .settings-main > p {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .settings-choice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 26px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .settings-choice strong,
+    .theme-label {
+      display: block;
+      font-size: 13px;
+    }
+
+    .settings-choice small {
+      display: block;
+      max-width: 360px;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .toggle {
+      width: 40px;
+      height: 22px;
+      flex: 0 0 auto;
+      position: relative;
+      border: 1px solid var(--accent-dark);
+      border-radius: 20px;
+      background: var(--accent);
+    }
+
+    .toggle::after {
+      width: 16px;
+      height: 16px;
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      border-radius: 50%;
+      background: var(--white);
+      content: "";
+    }
+
+    .theme-block {
+      margin-top: 26px;
+    }
+
+    .theme-swatches {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .theme-swatch {
+      min-height: 72px;
+      display: flex;
+      align-items: flex-end;
+      padding: 9px;
+      border: 1px solid var(--line);
+      color: var(--white);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .theme-swatch.purple { background: #5d55d6; }
+    .theme-swatch.black { background: #171719; }
+    .theme-swatch.navy { background: #1d2b43; }
+    .theme-swatch.white {
+      background: #f6f6f3;
+      color: var(--ink);
+    }
+    .theme-swatch.violet {
+      background: #8c63dd;
+    }
+    .theme-swatch.custom {
+      background: #276f6d;
+    }
+
+    .custom-colors {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .color-chip {
+      width: 24px;
+      height: 24px;
+      display: inline-block;
+      border: 1px solid var(--ink);
+    }
+
+    .color-chip.bg { background: #1d2435; }
+    .color-chip.accent { background: #8c63dd; }
+    .color-chip.button { background: #5d55d6; }
+
     .how-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -509,8 +712,13 @@
       }
 
       .section-intro,
-      .download-grid {
+      .download-grid,
+      .customize-grid {
         grid-template-columns: 1fr;
+      }
+
+      .customize-copy {
+        position: static;
       }
 
       .feature-row {
@@ -583,6 +791,30 @@
         gap: 16px;
       }
 
+      .settings-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .settings-sidebar {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .settings-sidebar span {
+        flex: 0 0 auto;
+      }
+
+      .settings-main {
+        padding: 20px;
+      }
+
+      .theme-swatches {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
       .how-grid {
         grid-template-columns: 1fr;
       }
@@ -638,6 +870,7 @@
       </a>
       <nav class="nav-links" aria-label="Ana menü">
         <a href="#features">Özellikler</a>
+        <a href="#customize">Özelleştirme</a>
         <a href="#how">Nasıl çalışır?</a>
         <a href="#download">İndir</a>
         <a href="https://github.com/Lazel-3002/TeamSync" target="_blank" rel="noopener">GitHub</a>
@@ -652,7 +885,7 @@
         <div>
           <span class="kicker">P2P · Hesapsız · Ücretsiz</span>
           <h1>Arkadaşlarınla konuş. Araya sunucu koyma.</h1>
-          <p class="hero-copy">TeamSync; sesli ve görüntülü konuşmayı, ekran paylaşımını ve grup etkinliklerini tek bir Windows uygulamasında toplar. Hesap açmadan indir, odanı kur ve bağlantıyı paylaş.</p>
+          <p class="hero-copy">TeamSync; sesli ve görüntülü konuşmayı, ekran paylaşımını ve kişiselleştirilebilir bir arayüzü tek bir Windows uygulamasında toplar. Hesap açmadan indir, odanı kur ve bağlantıyı paylaş.</p>
           <div class="hero-actions">
             <a class="button button-accent button-download" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">Windows için indir</a>
             <a class="button button-light" href="#features">Neler yapabildiğine bak</a>
@@ -664,7 +897,7 @@
           <img src="assets/screenshot-main.png" alt="TeamSync uygulamasının ana ekranı">
           <figcaption>
             <span>TEAMSYNC / ANA EKRAN</span>
-            <span>WINDOWS</span>
+            <span>AYARLARDAN ÖZELLEŞTİRİLEBİLİR</span>
           </figcaption>
         </figure>
       </div>
@@ -704,8 +937,8 @@
           </article>
           <article class="feature-row">
             <span class="feature-number">04</span>
-            <h3>Grup etkinlikleri</h3>
-            <p>Vampir Köylü, Şans Çarkı, ortak tarayıcı, senkronize video ve beyaz tahta aynı odada hazırdır.</p>
+            <h3>Görünüm özelleştirme</h3>
+            <p>Hazır temalardan birini seç veya arka plan, vurgu ve buton renklerini ayrı ayrı belirleyerek kendi temanı oluştur.</p>
           </article>
           <article class="feature-row">
             <span class="feature-number">05</span>
@@ -717,6 +950,71 @@
             <h3>Aile dostu kullanım</h3>
             <p>İsteğe bağlı filtreler sohbeti ve paylaşılan içerikleri daha güvenli bir grup ortamına uygun tutmaya yardımcı olur.</p>
           </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="customize" class="section">
+      <div class="wrap customize-grid">
+        <div class="customize-copy">
+          <span class="section-label">Ayarlar ve görünüm</span>
+          <h2>Uygulama sana uysun.</h2>
+          <p>TeamSync’in görünümünü ve kullanım biçimini ayarlar ekranından değiştirebilirsin. Seçimlerini kaydetmeden önce doğrudan önizleyebilirsin.</p>
+          <ul class="customize-points">
+            <li><b>6 tema seçeneği:</b> Mor, siyah, lacivert, beyaz, mor-beyaz veya kendi teman</li>
+            <li><b>Sade görünüm:</b> Gradyanları ve parlama efektlerini tek dokunuşla kaldırır</li>
+            <li><b>Kendi renklerin:</b> Arka plan, vurgu ve buton renkleri ayrı ayrı seçilebilir</li>
+            <li><b>Diğer ayarlar:</b> Profil, ses ve görüntü, bildirimler, gizlilik, dil ve saat</li>
+          </ul>
+        </div>
+
+        <div class="settings-window" aria-label="TeamSync ayarlar ekranı örneği">
+          <div class="settings-titlebar">
+            <span>Ayarlar</span>
+            <span>GÖRÜNÜM ÖNİZLEMESİ</span>
+          </div>
+          <div class="settings-layout">
+            <div class="settings-sidebar" aria-hidden="true">
+              <span class="active">Genel</span>
+              <span>Profil</span>
+              <span>Ses ve Görüntü</span>
+              <span>Bildirimler</span>
+              <span>Gizlilik</span>
+              <span>Dil ve Zaman</span>
+            </div>
+            <div class="settings-main">
+              <h3>Genel Ayarlar</h3>
+              <p>Uygulamanın görünümünü ve temel davranışını seç.</p>
+
+              <div class="settings-choice">
+                <div>
+                  <strong>Sade görünüm</strong>
+                  <small>Renk karışımlarını ve parlama efektlerini kaldırır. İlk kurulumda açıktır.</small>
+                </div>
+                <span class="toggle" aria-label="Sade görünüm açık"></span>
+              </div>
+
+              <div class="theme-block">
+                <span class="theme-label">Arka plan teması</span>
+                <div class="theme-swatches" aria-label="Tema seçenekleri">
+                  <div class="theme-swatch purple">Mevcut Mor</div>
+                  <div class="theme-swatch black">Gece Siyahı</div>
+                  <div class="theme-swatch navy">Derin Lacivert</div>
+                  <div class="theme-swatch white">Temiz Beyaz</div>
+                  <div class="theme-swatch violet">Mor &amp; Beyaz</div>
+                  <div class="theme-swatch custom">Kendi Teman</div>
+                </div>
+              </div>
+
+              <div class="custom-colors">
+                <span>Kendi teman:</span>
+                <span class="color-chip bg" title="Arka plan rengi"></span>
+                <span class="color-chip accent" title="Vurgu rengi"></span>
+                <span class="color-chip button" title="Buton rengi"></span>
+                <span>Arka plan · Vurgu · Buton</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -742,7 +1040,7 @@
           <article class="step">
             <b>03 / BAĞLAN</b>
             <h3>Konuşmaya başla</h3>
-            <p>Ses, görüntü, ekran paylaşımı ve etkinlikler doğrudan odanın içinde.</p>
+            <p>Ses, görüntü ve ekran paylaşımı doğrudan odanın içinde kullanıma hazırdır.</p>
           </article>
         </div>
       </div>
