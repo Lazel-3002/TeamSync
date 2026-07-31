@@ -1,435 +1,783 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TeamSync — Sunucusuz P2P Sesli & Görüntülü Sohbet</title>
-<meta name="description" content="TeamSync; sunucu, hesap veya e-posta doğrulaması olmadan çalışan P2P sesli/görüntülü sohbet, ekran paylaşımı ve uzaktan kontrol uygulaması. Windows için ücretsiz.">
-<link rel="icon" href="assets/icon.png" type="image/png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #05070f;
-    --bg-panel: rgba(255,255,255,0.03);
-    --bg-card: rgba(255,255,255,0.04);
-    --border: rgba(255,255,255,0.08);
-    --acc: #6366f1;
-    --acc-2: #a855f7;
-    --ok: #10b981;
-    --txt-main: #f8fafc;
-    --txt-mut: #94a3b8;
-    --radius-lg: 28px;
-    --radius-md: 16px;
-    --radius-sm: 10px;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    background: var(--bg);
-    color: var(--txt-main);
-    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    line-height: 1.5;
-    overflow-x: hidden;
-    position: relative;
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f2f0e9">
+  <title>TeamSync — Hesapsız P2P sesli ve görüntülü sohbet</title>
+  <meta name="description" content="TeamSync ile hesap açmadan P2P sesli ve görüntülü konuşun, ekran paylaşın ve arkadaşlarınızla etkinliklere katılın. Windows için ücretsiz.">
+  <link rel="icon" href="assets/icon.png" type="image/png">
+  <style>
+    :root {
+      --paper: #f2f0e9;
+      --surface: #faf9f5;
+      --ink: #181817;
+      --muted: #66645e;
+      --line: #d5d2c8;
+      --accent: #5d55d6;
+      --accent-dark: #453db1;
+      --night: #1d2435;
+      --white: #ffffff;
+      --page: 1180px;
+    }
 
-  /* Arka plan: hafif nokta deseni + üstte/altta yumuşak renkli parlama */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: -2;
-    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
-    background-size: 28px 28px;
-    mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 40%, transparent 100%);
-  }
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: -3;
-    background:
-      radial-gradient(ellipse 60% 40% at 15% -5%, rgba(99,102,241,0.25), transparent 60%),
-      radial-gradient(ellipse 55% 40% at 100% 10%, rgba(16,185,129,0.18), transparent 60%),
-      radial-gradient(ellipse 50% 35% at 50% 100%, rgba(168,85,247,0.15), transparent 60%);
-  }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  a { color: inherit; text-decoration: none; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-  img { display: block; max-width: 100%; }
+    html {
+      scroll-behavior: smooth;
+    }
 
-  /* ---------- Header ---------- */
-  header {
-    position: sticky; top: 0; z-index: 50;
-    backdrop-filter: blur(14px);
-    background: rgba(5,7,15,0.6);
-    border-bottom: 1px solid var(--border);
-  }
-  .nav {
-    display: flex; align-items: center; justify-content: space-between;
-    height: 72px;
-  }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
-  .brand img { width: 30px; height: 30px; border-radius: 8px; }
-  .nav-links { display: flex; align-items: center; gap: 32px; }
-  .nav-links a { font-size: 14px; font-weight: 500; color: var(--txt-mut); transition: color .15s; }
-  .nav-links a:hover { color: var(--txt-main); }
-  .nav-actions { display: flex; align-items: center; gap: 10px; }
-  .icon-link {
-    width: 38px; height: 38px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    border: 1px solid var(--border); color: var(--txt-mut);
-    transition: all .15s;
-  }
-  .icon-link:hover { color: var(--txt-main); border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.04); }
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
 
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 11px 22px; border-radius: 999px; font-weight: 600; font-size: 14px;
-    border: none; cursor: pointer; transition: all .15s; white-space: nowrap;
-  }
-  .btn-pri { background: var(--txt-main); color: #0b0d14; }
-  .btn-pri:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,255,255,0.15); }
-  .btn-ghost { background: transparent; color: var(--txt-main); border: 1px solid var(--border); }
-  .btn-ghost:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
-  .btn-sm { padding: 9px 18px; font-size: 13px; }
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
 
-  /* ---------- Hero ---------- */
-  .hero-section { padding: 56px 0 40px; }
-  .hero-card {
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 28px;
-  }
-  .hero-topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 12px 28px;
-  }
-  .hero-topbar .brand { font-size: 26px; }
-  .hero-topbar .brand img { width: 42px; height: 42px; border-radius: 11px; }
-  .hero-topbar-actions { display: flex; gap: 10px; }
+    img {
+      display: block;
+      max-width: 100%;
+    }
 
-  .hero-visual {
-    position: relative;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    padding: 64px 48px 56px;
-    min-height: 420px;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    background:
-      linear-gradient(135deg, rgba(255,255,255,.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.07) 75%),
-      linear-gradient(135deg, rgba(255,255,255,.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.07) 75%),
-      linear-gradient(120deg, #4338ca 0%, #7c3aed 42%, #d946ef 62%, #059669 100%);
-    background-size: 22px 22px, 22px 22px, cover;
-    background-position: 0 0, 11px 11px, 0 0;
-    background-blend-mode: overlay, overlay, normal;
-  }
-  .hero-visual::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(0deg, rgba(5,7,15,0.55) 0%, rgba(5,7,15,0.05) 55%, rgba(5,7,15,0.15) 100%);
-  }
-  .hero-tag, .hero-visual h1, .hero-visual p, .hero-visual .hero-cta {
-    position: relative; z-index: 1;
-  }
-  .hero-tag {
-    display: inline-flex; align-items: center; gap: 6px;
-    width: fit-content;
-    background: rgba(5,7,15,0.4); border: 1px solid rgba(255,255,255,0.25);
-    backdrop-filter: blur(6px);
-    padding: 6px 14px; border-radius: 999px;
-    font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em;
-    margin-bottom: 22px;
-  }
-  .hero-visual h1 {
-    font-size: 56px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05;
-    text-shadow: 0 4px 30px rgba(0,0,0,0.25);
-    margin-bottom: 18px;
-    max-width: 640px;
-  }
-  .hero-visual p {
-    font-size: 17px; color: rgba(255,255,255,0.92); max-width: 560px;
-    margin-bottom: 30px;
-    text-shadow: 0 2px 12px rgba(0,0,0,0.2);
-  }
-  .hero-cta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .btn-dark {
-    background: rgba(5,7,15,0.75); color: #fff; border: 1px solid rgba(255,255,255,0.15);
-    backdrop-filter: blur(6px);
-    padding: 13px 24px 13px 26px; font-size: 15px;
-  }
-  .btn-dark:hover { background: rgba(5,7,15,0.9); transform: translateY(-1px); }
-  .btn-dark svg { transition: transform .15s; }
-  .btn-dark:hover svg { transform: translateX(3px); }
-  .btn-outline-light {
-    background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4);
-    padding: 13px 22px; font-size: 15px;
-  }
-  .btn-outline-light:hover { background: rgba(255,255,255,0.1); }
+    .wrap {
+      width: min(calc(100% - 48px), var(--page));
+      margin-inline: auto;
+    }
 
-  .hero-stats {
-    display: flex; gap: 40px; flex-wrap: wrap;
-    padding: 26px 12px 6px;
-  }
-  .hero-stat b { display: block; font-size: 22px; font-weight: 800; }
-  .hero-stat span { font-size: 13px; color: var(--txt-mut); }
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -80px;
+      z-index: 100;
+      padding: 10px 14px;
+      background: var(--ink);
+      color: var(--white);
+    }
 
-  /* ---------- Section shared ---------- */
-  section { padding: 90px 0; }
-  .section-head { text-align: center; max-width: 620px; margin: 0 auto 56px; }
-  .eyebrow {
-    display: inline-block; font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
-    text-transform: uppercase; color: var(--acc-2);
-    margin-bottom: 14px;
-  }
-  .section-head h2 { font-size: 38px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; }
-  .section-head p { color: var(--txt-mut); font-size: 16px; }
+    .skip-link:focus {
+      top: 16px;
+    }
 
-  /* ---------- Features ---------- */
-  .features-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
-  }
-  .feature-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
-    padding: 26px; transition: border-color .15s, transform .15s;
-  }
-  .feature-card:hover { border-color: rgba(255,255,255,0.18); transform: translateY(-3px); }
-  .feature-icon {
-    width: 46px; height: 46px; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(16,185,129,0.2));
-    border: 1px solid rgba(255,255,255,0.1);
-    margin-bottom: 18px; color: #c7d2fe;
-  }
-  .feature-card h3 { font-size: 16.5px; font-weight: 700; margin-bottom: 8px; }
-  .feature-card p { font-size: 14px; color: var(--txt-mut); line-height: 1.6; }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(242, 240, 233, 0.96);
+      border-bottom: 1px solid var(--line);
+    }
 
-  /* ---------- Screenshot ---------- */
-  .shot-frame {
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    background: linear-gradient(160deg, rgba(99,102,241,0.12), rgba(16,185,129,0.06));
-    padding: 28px;
-    display: flex; justify-content: center;
-  }
-  .shot-frame img {
-    border-radius: var(--radius-md);
-    border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
-    width: 100%; max-width: 880px;
-  }
+    .nav {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+    }
 
-  /* ---------- CTA / Download ---------- */
-  .cta-card {
-    background: linear-gradient(120deg, rgba(99,102,241,0.18), rgba(217,70,239,0.12), rgba(16,185,129,0.14));
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 64px 40px;
-    text-align: center;
-  }
-  .cta-card h2 { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; }
-  .cta-card p { color: var(--txt-mut); font-size: 15.5px; margin-bottom: 30px; }
-  .cta-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
-  .cta-note { margin-top: 18px; font-size: 12.5px; color: var(--txt-mut); }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      font-size: 18px;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+    }
 
-  /* ---------- Footer ---------- */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 36px 0;
-  }
-  .footer-row {
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
-  }
-  .footer-brand { display: flex; align-items: center; gap: 10px; color: var(--txt-mut); font-size: 13.5px; }
-  .footer-brand img { width: 22px; height: 22px; border-radius: 6px; }
-  .footer-links { display: flex; gap: 22px; }
-  .footer-links a { font-size: 13.5px; color: var(--txt-mut); }
-  .footer-links a:hover { color: var(--txt-main); }
+    .brand img {
+      width: 30px;
+      height: 30px;
+      border-radius: 5px;
+    }
 
-  /* ---------- Responsive ---------- */
-  @media (max-width: 860px) {
-    .nav-links { display: none; }
-    .features-grid { grid-template-columns: repeat(2, 1fr); }
-    .hero-visual h1 { font-size: 40px; }
-    .hero-visual { padding: 44px 26px 40px; min-height: 380px; }
-  }
-  @media (max-width: 560px) {
-    .features-grid { grid-template-columns: 1fr; }
-    .hero-topbar .brand { font-size: 20px; }
-    .hero-topbar .brand img { width: 34px; height: 34px; }
-    .hero-visual h1 { font-size: 32px; }
-    .hero-card { padding: 16px; }
-    .hero-stats { gap: 24px; }
-    .cta-card { padding: 44px 22px; }
-    .section-head h2 { font-size: 28px; }
-  }
-</style>
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-left: auto;
+    }
+
+    .nav-links a,
+    .text-link {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .nav-links a:hover,
+    .nav-links a:focus-visible,
+    .text-link:hover,
+    .text-link:focus-visible {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    .button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 11px 18px;
+      border: 1px solid var(--ink);
+      border-radius: 5px;
+      background: var(--ink);
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .button:hover,
+    .button:focus-visible {
+      background: #343431;
+    }
+
+    .button-light {
+      background: transparent;
+      color: var(--ink);
+    }
+
+    .button-light:hover,
+    .button-light:focus-visible {
+      background: var(--white);
+    }
+
+    .button-accent {
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .button-accent:hover,
+    .button-accent:focus-visible {
+      background: var(--accent-dark);
+    }
+
+    .button-download::after {
+      content: "↓";
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    .hero {
+      padding: 82px 0 56px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.88fr) minmax(420px, 1.12fr);
+      align-items: center;
+      gap: 64px;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 24px;
+      color: var(--muted);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .kicker::before {
+      width: 22px;
+      height: 2px;
+      background: var(--accent);
+      content: "";
+    }
+
+    h1 {
+      max-width: 680px;
+      font-size: clamp(42px, 5.6vw, 74px);
+      font-weight: 760;
+      letter-spacing: -0.055em;
+      line-height: 0.99;
+    }
+
+    .hero-copy {
+      max-width: 600px;
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 34px;
+    }
+
+    .compatibility {
+      margin-top: 18px;
+      color: var(--muted);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+    }
+
+    .product-shot {
+      border: 1px solid #0f1320;
+      background: var(--night);
+      padding: 10px;
+    }
+
+    .product-shot img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      object-position: center top;
+      border: 1px solid #394157;
+    }
+
+    .product-shot figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 2px 2px;
+      color: #b8bfd0;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+    }
+
+    .facts {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .facts-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .fact {
+      min-height: 118px;
+      padding: 27px 24px;
+      border-left: 1px solid var(--line);
+    }
+
+    .fact:last-child {
+      border-right: 1px solid var(--line);
+    }
+
+    .fact strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 24px;
+      line-height: 1.1;
+    }
+
+    .fact span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .section {
+      padding: 104px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-intro {
+      display: grid;
+      grid-template-columns: 0.7fr 1.3fr;
+      gap: 48px;
+      margin-bottom: 58px;
+    }
+
+    .section-label {
+      color: var(--accent-dark);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      max-width: 750px;
+      font-size: clamp(32px, 4.2vw, 52px);
+      font-weight: 750;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+    }
+
+    .feature-list {
+      border-top: 1px solid var(--ink);
+    }
+
+    .feature-row {
+      display: grid;
+      grid-template-columns: 76px 0.7fr 1.3fr;
+      gap: 28px;
+      padding: 28px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .feature-number {
+      color: var(--accent-dark);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .feature-row h3 {
+      font-size: 19px;
+      letter-spacing: -0.015em;
+    }
+
+    .feature-row p {
+      max-width: 600px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid var(--ink);
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .step {
+      padding: 30px 30px 34px 0;
+    }
+
+    .step + .step {
+      padding-left: 30px;
+      border-left: 1px solid var(--line);
+    }
+
+    .step b {
+      display: block;
+      margin-bottom: 44px;
+      color: var(--accent-dark);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+
+    .step h3 {
+      margin-bottom: 10px;
+      font-size: 20px;
+    }
+
+    .step p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .download {
+      padding: 96px 0;
+      background: var(--ink);
+      color: var(--white);
+    }
+
+    .download-grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      align-items: end;
+      gap: 64px;
+    }
+
+    .download .section-label {
+      display: block;
+      margin-bottom: 20px;
+      color: #aaa4ff;
+    }
+
+    .download h2 {
+      max-width: 780px;
+    }
+
+    .download p {
+      max-width: 620px;
+      margin-top: 22px;
+      color: #aaa9a3;
+      font-size: 16px;
+    }
+
+    .download-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    .download-actions .button {
+      min-height: 52px;
+    }
+
+    .download .button-light {
+      border-color: #5b5a56;
+      color: var(--white);
+    }
+
+    .download .button-light:hover,
+    .download .button-light:focus-visible {
+      background: #2b2b29;
+    }
+
+    .download-note {
+      margin-top: 12px;
+      color: #8a8984;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    footer {
+      padding: 30px 0;
+      background: var(--ink);
+      color: #aaa9a3;
+      border-top: 1px solid #393936;
+    }
+
+    .footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .footer-brand img {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 22px;
+    }
+
+    .footer-links a {
+      font-size: 13px;
+    }
+
+    .footer-links a:hover,
+    .footer-links a:focus-visible {
+      color: var(--white);
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    :focus-visible {
+      outline: 3px solid #8b84ef;
+      outline-offset: 3px;
+    }
+
+    @media (max-width: 900px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .product-shot {
+        max-width: 720px;
+      }
+
+      .facts-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .fact:nth-child(2) {
+        border-right: 1px solid var(--line);
+      }
+
+      .fact:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-intro,
+      .download-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .feature-row {
+        grid-template-columns: 54px 1fr;
+      }
+
+      .feature-row p {
+        grid-column: 2;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .wrap {
+        width: min(calc(100% - 32px), var(--page));
+      }
+
+      .nav {
+        min-height: 62px;
+      }
+
+      .nav-links,
+      .nav > .button {
+        display: none;
+      }
+
+      .hero {
+        padding: 58px 0 40px;
+      }
+
+      .hero-grid {
+        gap: 44px;
+      }
+
+      .hero-copy {
+        font-size: 16px;
+      }
+
+      .hero-actions .button {
+        width: 100%;
+      }
+
+      .facts-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .fact,
+      .fact:nth-child(2),
+      .fact:last-child {
+        min-height: auto;
+        padding: 20px 0;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .fact:last-child {
+        border-bottom: 0;
+      }
+
+      .section {
+        padding: 74px 0;
+      }
+
+      .section-intro {
+        gap: 18px;
+        margin-bottom: 40px;
+      }
+
+      .feature-row {
+        grid-template-columns: 42px 1fr;
+        gap: 16px;
+      }
+
+      .how-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .step,
+      .step + .step {
+        padding: 26px 0;
+        border-left: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .step:last-child {
+        border-bottom: 0;
+      }
+
+      .step b {
+        margin-bottom: 20px;
+      }
+
+      .download {
+        padding: 72px 0;
+      }
+
+      .download-grid {
+        gap: 38px;
+      }
+
+      .footer-row {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      * {
+        transition: none !important;
+      }
+    }
+  </style>
 </head>
 <body>
+  <a class="skip-link" href="#content">İçeriğe geç</a>
 
   <header>
     <div class="wrap nav">
-      <div class="brand"><img src="assets/icon.png" alt="TeamSync"> TeamSync</div>
-      <nav class="nav-links">
+      <a class="brand" href="#" aria-label="TeamSync ana sayfa">
+        <img src="assets/icon.png" alt="">
+        <span>TeamSync</span>
+      </a>
+      <nav class="nav-links" aria-label="Ana menü">
         <a href="#features">Özellikler</a>
-        <a href="#screenshots">Ekran Görüntüleri</a>
+        <a href="#how">Nasıl çalışır?</a>
         <a href="#download">İndir</a>
+        <a href="https://github.com/Lazel-3002/TeamSync" target="_blank" rel="noopener">GitHub</a>
       </nav>
-      <div class="nav-actions">
-        <a class="icon-link" href="mailto:teamsyncsupport@gmail.com" title="Destek: teamsyncsupport@gmail.com">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-        </a>
-        <a class="icon-link" href="https://github.com/Lazel-3002/TeamSync" title="GitHub" target="_blank" rel="noopener">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.75 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.24 2.75.12 3.04.74.81 1.18 1.83 1.18 3.09 0 4.41-2.7 5.39-5.26 5.67.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"/></svg>
-        </a>
-        <a class="btn btn-pri btn-sm" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">İndir</a>
-      </div>
+      <a class="button button-download" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">Windows için indir</a>
     </div>
   </header>
 
-  <main>
-    <section class="hero-section wrap">
-      <div class="hero-card">
-        <div class="hero-topbar">
-          <div class="brand"><img src="assets/icon.png" alt="TeamSync"> TeamSync</div>
-          <div class="hero-topbar-actions">
-            <a class="icon-link" href="mailto:teamsyncsupport@gmail.com" title="Destek: teamsyncsupport@gmail.com">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            </a>
-            <a class="icon-link" href="https://github.com/Lazel-3002/TeamSync" title="GitHub'da görüntüle" target="_blank" rel="noopener">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.75 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.24 2.75.12 3.04.74.81 1.18 1.83 1.18 3.09 0 4.41-2.7 5.39-5.26 5.67.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55A10.52 10.52 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"/></svg>
-            </a>
-            <a class="icon-link" href="#download" title="İndir">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            </a>
+  <main id="content">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <span class="kicker">P2P · Hesapsız · Ücretsiz</span>
+          <h1>Arkadaşlarınla konuş. Araya sunucu koyma.</h1>
+          <p class="hero-copy">TeamSync; sesli ve görüntülü konuşmayı, ekran paylaşımını ve grup etkinliklerini tek bir Windows uygulamasında toplar. Hesap açmadan indir, odanı kur ve bağlantıyı paylaş.</p>
+          <div class="hero-actions">
+            <a class="button button-accent button-download" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">Windows için indir</a>
+            <a class="button button-light" href="#features">Neler yapabildiğine bak</a>
           </div>
+          <p class="compatibility">Sürüm 1.0.5 / Windows x64 / Ücretsiz</p>
         </div>
 
-        <div class="hero-visual">
-          <span class="hero-tag">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-            P2P • Sunucusuz • Ücretsiz
-          </span>
-          <h1>Sıfır Sunucu.<br>Sıfır Sınır.</h1>
-          <p>TeamSync, bilgisayarlar arasında doğrudan bağlantı kurar. Sunucu kirası, hesap oluşturma ya da e-posta doğrulama yok — sadece indir ve arkadaşlarınla konuşmaya başla.</p>
-          <div class="hero-cta">
-            <a class="btn btn-dark" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              Windows için İndir
-            </a>
-            <a class="btn btn-outline-light" href="#features">Özelliklere Göz At</a>
-          </div>
+        <figure class="product-shot">
+          <img src="assets/screenshot-main.png" alt="TeamSync uygulamasının ana ekranı">
+          <figcaption>
+            <span>TEAMSYNC / ANA EKRAN</span>
+            <span>WINDOWS</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="facts" aria-label="TeamSync hakkında kısa bilgiler">
+      <div class="wrap facts-grid">
+        <div class="fact"><strong>0₺</strong><span>Sunucu maliyeti</span></div>
+        <div class="fact"><strong>0</strong><span>Gerekli hesap veya e-posta</span></div>
+        <div class="fact"><strong>P2P</strong><span>Bilgisayarlar arasında bağlantı</span></div>
+        <div class="fact"><strong>Windows</strong><span>x64 masaüstü uygulaması</span></div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="wrap">
+        <div class="section-intro">
+          <span class="section-label">Özellikler</span>
+          <h2>Bir odada gerçekten kullanacağın araçlar.</h2>
         </div>
 
-        <div class="hero-stats">
-          <div class="hero-stat"><b>0₺</b><span>Sunucu maliyeti</span></div>
-          <div class="hero-stat"><b>0</b><span>Hesap / e-posta gerekmez</span></div>
-          <div class="hero-stat"><b>P2P</b><span>Doğrudan bağlantı</span></div>
-          <div class="hero-stat"><b>Windows</b><span>Tek dosya, kurulum yok</span></div>
+        <div class="feature-list">
+          <article class="feature-row">
+            <span class="feature-number">01</span>
+            <h3>Sesli ve görüntülü konuşma</h3>
+            <p>Arkadaşlarınla doğrudan bağlantı kur. Mikrofon, kamera ve Bas-Konuş seçeneklerini odanın içinden yönet.</p>
+          </article>
+          <article class="feature-row">
+            <span class="feature-number">02</span>
+            <h3>Ekran paylaşımı ve kontrol</h3>
+            <p>Ekranını paylaş; istersen fare ve klavye kontrolü için ayrıca izin ver. Kontrol her zaman sende kalır.</p>
+          </article>
+          <article class="feature-row">
+            <span class="feature-number">03</span>
+            <h3>Hesapsız cihaz kimliği</h3>
+            <p>E-posta ve parola yerine uygulamanın oluşturduğu cihaz kimliğini kullan. Her açılışta form doldurman gerekmez.</p>
+          </article>
+          <article class="feature-row">
+            <span class="feature-number">04</span>
+            <h3>Grup etkinlikleri</h3>
+            <p>Vampir Köylü, Şans Çarkı, ortak tarayıcı, senkronize video ve beyaz tahta aynı odada hazırdır.</p>
+          </article>
+          <article class="feature-row">
+            <span class="feature-number">05</span>
+            <h3>Gürültü engelleme</h3>
+            <p>RNNoise arka plan sesini azaltır. Klavye, fan ve ortam gürültüsü konuşmanın önüne geçmez.</p>
+          </article>
+          <article class="feature-row">
+            <span class="feature-number">06</span>
+            <h3>Aile dostu kullanım</h3>
+            <p>İsteğe bağlı filtreler sohbeti ve paylaşılan içerikleri daha güvenli bir grup ortamına uygun tutmaya yardımcı olur.</p>
+          </article>
         </div>
       </div>
     </section>
 
-    <section id="features" class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">Özellikler</span>
-        <h2>Arkadaş grubun için ihtiyacın olan her şey</h2>
-        <p>Discord'un ağırlığı olmadan, sunucusuz ve sadeleştirilmiş bir sesli/görüntülü sohbet deneyimi.</p>
-      </div>
-      <div class="features-grid">
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-          </div>
-          <h3>P2P Sesli &amp; Görüntülü</h3>
-          <p>Konuşmalar sunucudan geçmez, bilgisayarlar arasında doğrudan akar. Daha az gecikme, daha çok gizlilik.</p>
+    <section id="how" class="section">
+      <div class="wrap">
+        <div class="section-intro">
+          <span class="section-label">Nasıl çalışır?</span>
+          <h2>Üç adım. Üyelik ekranı yok.</h2>
         </div>
 
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-          </div>
-          <h3>Cihaz Kimliğiyle Giriş</h3>
-          <p>E-posta yok, şifre yok. Her cihaz kurulumda kendi güvenli kimliğini üretir ve otomatik giriş yapar.</p>
+        <div class="how-grid">
+          <article class="step">
+            <b>01 / İNDİR</b>
+            <h3>Uygulamayı aç</h3>
+            <p>Windows sürümünü GitHub üzerinden indir ve bilgisayarında çalıştır.</p>
+          </article>
+          <article class="step">
+            <b>02 / ODA</b>
+            <h3>Odanı oluştur</h3>
+            <p>Yeni bir oda aç veya arkadaşının paylaştığı oda bilgisiyle katıl.</p>
+          </article>
+          <article class="step">
+            <b>03 / BAĞLAN</b>
+            <h3>Konuşmaya başla</h3>
+            <p>Ses, görüntü, ekran paylaşımı ve etkinlikler doğrudan odanın içinde.</p>
+          </article>
         </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          </div>
-          <h3>Ekran Paylaşımı &amp; Uzaktan Kontrol</h3>
-          <p>Ekranını paylaş, izin verirsen arkadaşın fareni ve klavyeni bile kullanabilsin.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-          </div>
-          <h3>Aile Dostu Mod</h3>
-          <p>Yapay zeka, küfür ve +18 içerikleri sohbette ve paylaşılan sayfalarda otomatik filtreler.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line></svg>
-          </div>
-          <h3>Birlikte Etkinlikler</h3>
-          <p>Şans Çarkı, senkronize video izleme (Ortak Tarayıcı) ve beyaz tahta — hepsi odanın içinde.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-          </div>
-          <h3>RNNoise Gürültü Engelleme</h3>
-          <p>Ücretsiz ve açık kaynak RNNoise AI ile arka plan sesini ve hışırtıyı temizler; Push-to-Talk ile birlikte kullanılabilir.</p>
-        </div>
-
       </div>
     </section>
 
-    <section id="screenshots" class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">Arayüz</span>
-        <h2>Sade, hızlı, dikkat dağıtmayan</h2>
-        <p>Gereksiz menüler yok — odana katıl ya da yeni bir tane kur, hepsi bu kadar.</p>
-      </div>
-      <div class="shot-frame">
-        <img src="assets/screenshot-main.png" alt="TeamSync ana menü ekran görüntüsü" loading="lazy">
-      </div>
-    </section>
-
-    <section id="download" class="wrap">
-      <div class="cta-card">
-        <h2>Hemen indir, hemen konuş</h2>
-        <p>Kurulum gerekmez — tek dosya, çift tıkla ve aç. Sunucu kurmana da gerek yok.</p>
-        <div class="cta-actions">
-          <a class="btn btn-pri" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Windows için İndir
-          </a>
-          <a class="btn btn-ghost" href="https://github.com/Lazel-3002/TeamSync" target="_blank" rel="noopener">GitHub'da İncele</a>
+    <section id="download" class="download">
+      <div class="wrap download-grid">
+        <div>
+          <span class="section-label">İndirme</span>
+          <h2>Bir sonraki konuşma için oda hazır.</h2>
+          <p>TeamSync ücretsizdir. En güncel Windows sürümünü GitHub Releases sayfasından indirebilirsin.</p>
         </div>
-        <div class="cta-note">Şu an yalnızca Windows (x64) için mevcut · Sunucusuz P2P bağlantı</div>
+        <div>
+          <div class="download-actions">
+            <a class="button button-accent button-download" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">En son sürümü indir</a>
+            <a class="button button-light" href="https://github.com/Lazel-3002/TeamSync" target="_blank" rel="noopener">Kaynak kodunu incele</a>
+          </div>
+          <div class="download-note">WINDOWS X64 · SÜRÜM 1.0.5</div>
+        </div>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="wrap footer-row">
-      <div class="footer-brand"><img src="assets/icon.png" alt="TeamSync"> © 2026 TeamSync — P2P sesli/görüntülü sohbet</div>
+      <div class="footer-brand">
+        <img src="assets/icon.png" alt="">
+        <span>© 2026 TeamSync</span>
+      </div>
       <div class="footer-links">
         <a href="https://github.com/Lazel-3002/TeamSync" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">İndir</a>
-        <a href="https://github.com/Lazel-3002/TeamSync/issues" target="_blank" rel="noopener">Sorun Bildir</a>
-        <a href="mailto:teamsyncsupport@gmail.com">teamsyncsupport@gmail.com</a>
+        <a href="https://github.com/Lazel-3002/TeamSync/issues" target="_blank" rel="noopener">Sorun bildir</a>
+        <a href="mailto:teamsyncsupport@gmail.com">Destek</a>
       </div>
     </div>
   </footer>
-
 </body>
 </html>
