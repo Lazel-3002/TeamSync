@@ -1511,12 +1511,34 @@
       <div class="ctrl-note-timer"><div id="ctrl-timer-bar"></div></div>
     </div>
 
+    <!-- Ters yön: ekranı paylaşan kişi istek beklemeden denetim TEKLİF eder.
+         Otomatik ele geçirme yoktur; teklif açıkça kabul edilmelidir. -->
+    <div id="ctrl-offer-modal" class="ctrl-note ctrl-note-offer hidden">
+      <div class="ctrl-note-head">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        <span>Denetim Teklifi</span>
+      </div>
+      <p id="ctrl-offer-text">Bir kullanıcı size bilgisayarının denetimini vermek istiyor.</p>
+      <div class="ctrl-note-actions">
+        <button id="ctrl-offer-deny" class="btn-sec btn-sm">Reddet</button>
+        <button id="ctrl-offer-accept" class="btn-pri btn-sm">Denetimi Al</button>
+      </div>
+      <div class="ctrl-note-timer"><div id="ctrl-offer-timer-bar"></div></div>
+    </div>
+
     <!-- Kontrol edilen tarafta görünen kalıcı uyarı + durdurma düğmesi -->
     <div id="ctrl-active-pill" class="ctrl-pill hidden">
       <span class="ctrl-pill-dot"></span>
       <span id="ctrl-pill-text">Bilgisayarınız kontrol ediliyor</span>
       <span class="ctrl-pill-hint muted">Acil kapatma: Ctrl+X ×2</span>
       <button id="ctrl-pill-stop" class="btn-sec btn-sm">Durdur</button>
+    </div>
+
+    <!-- Denetim sürerken kısayolların bastırıldığını anlatan ince rozet.
+         Görünürlüğü renderer.js -> updateShortcutsPausedBadge() yönetir. -->
+    <div id="shortcuts-paused-badge" class="shortcuts-paused-badge hidden" aria-live="polite">
+      <span class="shortcuts-paused-dot" aria-hidden="true"></span>
+      <span data-i18n="settings.shortcutsPaused">Kısayollar duraklatıldı</span>
     </div>
 
     <div id="remote-modal" class="modal hidden">
@@ -1653,6 +1675,9 @@
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="network">
             <span class="settings-nav-icon">⧉</span><span data-i18n="settings.connections">Bağlantılar</span>
+          </button>
+          <button class="settings-nav-item" type="button" data-settings-panel="shortcuts">
+            <span class="settings-nav-icon">⌨</span><span data-i18n="settings.shortcuts">Kısayollar</span>
           </button>
           <div class="settings-nav-label" data-i18n="settings.appSettings">UYGULAMA AYARLARI</div>
           <button class="settings-nav-item" type="button" data-settings-panel="media">
@@ -1891,6 +1916,34 @@
                   </div>
                 </div>
                 <p class="settings-help" data-i18n="settings.turnHelp">Bir kişinin TURN bilgisi girmesi yeterlidir; odadaki diğer katılımcılarla otomatik paylaşılır.</p>
+              </div>
+            </div>
+
+            <!-- Kısayollar: ana anahtar + satır bazlı aç/kapat ve yeniden atama.
+                 Satırlar renderShortcutSettings() tarafından üretilir (renderer.js). -->
+            <div class="settings-panel" data-settings-content="shortcuts">
+              <h2 data-i18n="settings.shortcuts">Kısayollar</h2>
+              <p class="settings-lead" data-i18n="settings.shortcutsLead">Klavye kısayollarını aç, kapat veya yeniden ata.</p>
+              <div class="settings-card settings-row">
+                <div>
+                  <strong data-i18n="settings.shortcutsMaster">Kısayolları Etkinleştir</strong>
+                  <p data-i18n="settings.shortcutsMasterDesc">Kapatıldığında uygulamanın tüm klavye kısayolları devre dışı kalır.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="user-shortcuts-enabled" checked><span class="slider round"></span></label>
+              </div>
+              <div class="shortcuts-list-head">
+                <h3 class="settings-section-title" data-i18n="settings.shortcutsListTitle">Kısayol listesi</h3>
+                <button id="user-shortcuts-reset-all" class="settings-test-button" type="button" data-i18n="settings.shortcutsResetAll">Tümünü varsayılana döndür</button>
+              </div>
+              <div id="user-shortcuts-list" class="shortcuts-list"></div>
+              <p class="settings-help" data-i18n="settings.shortcutsPausedDesc">Denetim, etkinlik ve yazı yazarken kısayollar otomatik olarak duraklatılır.</p>
+              <div class="settings-card shortcuts-safety">
+                <strong data-i18n="settings.shortcutsSafetyTitle">Her zaman açık güvenlik kısayolları</strong>
+                <p data-i18n="settings.shortcutsSafetyDesc">Bu kısayollar kapatılamaz ve hiçbir durumda bastırılmaz.</p>
+                <ul>
+                  <li data-i18n="settings.shortcutsKillSwitch">Ctrl+X ×2 — uzaktan denetimi anında kes</li>
+                  <li data-i18n="settings.shortcutsEscape">Esc — denetimden ve odak modundan çık</li>
+                </ul>
               </div>
             </div>
 
@@ -2431,6 +2484,42 @@
   <div id="drop-overlay" class="drop-overlay hidden">
     <h2><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line></svg> Dosyayı Bırak</h2>
     <p>Arkadaşlarına göndermek için buraya bırak.</p>
+  </div>
+
+  <!-- Sohbet/DM görselleri için tam ekran önizleme (lightbox).
+       Titlebar 35px yüksekliğinde ve z-index: 999999 olduğu için katman
+       top: 35px'ten başlar; böylece pencere kontrolleri erişilebilir kalır. -->
+  <div id="img-lightbox" class="img-lightbox hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <div id="ilb-stage" class="ilb-stage">
+      <img id="ilb-img" class="ilb-img" alt="" draggable="false" />
+    </div>
+
+    <div class="ilb-bar ilb-bar-top">
+      <div class="ilb-info">
+        <span id="ilb-name" class="ilb-name"></span>
+        <span id="ilb-counter" class="ilb-counter"></span>
+      </div>
+      <div class="ilb-actions">
+        <a id="ilb-download" class="ilb-btn" download href="#" data-i18n-title="viewer.download" title="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
+        <button id="ilb-copy" class="ilb-btn" type="button" data-i18n-title="viewer.copy" title="Panoya Kopyala"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+        <button id="ilb-close" class="ilb-btn ilb-btn-close" type="button" data-i18n-title="common.close" title="Kapat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+      </div>
+    </div>
+
+    <button id="ilb-prev" class="ilb-nav ilb-nav-prev" type="button" data-i18n-title="viewer.prev" title="Önceki Görsel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+    <button id="ilb-next" class="ilb-nav ilb-nav-next" type="button" data-i18n-title="viewer.next" title="Sonraki Görsel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+
+    <div class="ilb-bar ilb-bar-bottom">
+      <button id="ilb-zoom-out" class="ilb-btn" type="button" data-i18n-title="viewer.zoomOut" title="Uzaklaştır"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+      <button id="ilb-zoom-label" class="ilb-zoom-label" type="button" data-i18n-title="viewer.toggleSize" title="Gerçek Boyut / Sığdır">
+        <span id="ilb-zoom-pct" class="ilb-zoom-pct">100%</span>
+        <span id="ilb-fit-state" class="ilb-fit-state">Sığdır</span>
+      </button>
+      <button id="ilb-zoom-in" class="ilb-btn" type="button" data-i18n-title="viewer.zoomIn" title="Yakınlaştır"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+      <span class="ilb-sep" aria-hidden="true"></span>
+      <button id="ilb-rotate-left" class="ilb-btn" type="button" data-i18n-title="viewer.rotateLeft" title="Sola Döndür"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg></button>
+      <button id="ilb-rotate-right" class="ilb-btn" type="button" data-i18n-title="viewer.rotateRight" title="Sağa Döndür"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
+    </div>
   </div>
 
   <div id="toast-container" class="toast-container"></div>

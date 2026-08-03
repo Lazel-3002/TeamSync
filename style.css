@@ -7655,6 +7655,21 @@ input:checked + .slider:before {
   background: #ffd166;
 }
 
+/* Denetim TEKLİFİ (paylaşan → izleyici). ctrl-note iskeletini paylaşır; mavi
+   vurgu ve sağ ALT köşe konumu sayesinde istek kartıyla asla üst üste binmez
+   (bir kullanıcı aynı anda hem paylaşıp hem izliyor olabilir). */
+.ctrl-note-offer {
+  top: auto;
+  bottom: 16px;
+  border-color: rgba(99, 102, 241, 0.45);
+}
+.ctrl-note-offer .ctrl-note-head { color: #a5b4fc; }
+#ctrl-offer-timer-bar {
+  height: 100%;
+  width: 100%;
+  background: #818cf8;
+}
+
 /* Sunucu katılma isteği bildirimi: ctrl-note iskeletini paylaşır, yeşil vurgu.
    İki kart aynı anda açılırsa üst üste binmesin diye biraz aşağıda durur. */
 #join-request-note { top: 150px; }
@@ -7926,6 +7941,116 @@ input:checked + .slider:before {
 }
 
 .ucm-vol-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+
+/* Ses satırı: sessize alma düğmesi + slider. Değer %100'ün üstündeyken sarı,
+   sessizken kırmızı okunur; kullanıcı durumu bakar bakmaz anlar. */
+.ucm-vol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ucm-vol-mute {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--txt-main);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ucm-vol-mute:hover { background: rgba(255, 255, 255, 0.14); }
+.ucm-vol.muted .ucm-vol-mute {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.16);
+}
+.ucm-vol.muted .ucm-vol-slider { opacity: 0.5; }
+.ucm-vol-val.is-muted { color: #fca5a5; }
+.ucm-vol-val.is-boosted { color: var(--warn, #f59e0b); }
+.ucm-vol-hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--txt-mut);
+  opacity: 0.75;
+}
+
+/* Video/ekran kartı üzerindeki ses kutusu ve tek tıkla denetim düğmesi.
+   (Kart aksiyonları .card-actions içinde, karta hover/odakta görünür.) */
+.vcard-vol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+.vcard-vol .vol-slider {
+  background: none;
+  border: none;
+  padding: 0;
+  backdrop-filter: none;
+  width: 76px;
+}
+.vcard-vol-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.vcard-vol-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.vcard-vol-val {
+  min-width: 34px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
+}
+.vcard-vol-val.is-muted { color: #fca5a5; }
+.vcard-vol-val.is-boosted { color: #fbbf24; }
+
+.vcard-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.vcard-ctrl-btn:hover:not(:disabled) {
+  background: var(--acc, #6366f1);
+  border-color: transparent;
+}
+.vcard-ctrl-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.vcard-ctrl-btn.is-active {
+  background: rgba(34, 197, 94, 0.85);
+  border-color: transparent;
+}
 
 /* PokeSavaş: hamleyi seçmeden önce rakibe karşı tür etkinliğini gösterir. */
 #poke-card .move-effectiveness {
@@ -8953,3 +9078,403 @@ input:checked + .slider:before {
 :root[data-simple-ui="1"] .settings-simple-row {
   border-color: color-mix(in srgb, var(--acc) 35%, transparent);
 }
+
+/* ===========================================================================
+   SOHBET GÖRSEL ÖNİZLEME (LIGHTBOX)
+   Oda sohbetindeki (.img-wrap > .chat-img) ve DM'lerdeki (.dm-msg img)
+   fotoğrafları tam ekran açar; yakınlaştırma, kaydırma, döndürme, gezinme,
+   indirme ve panoya kopyalama sağlar.
+
+   TUZAK NOTU: Bu projede kartlara satır içi `style="position:relative"` gibi
+   kurallar yazılıyor ve stylesheet'i eziyor. Bu katman body'nin doğrudan
+   çocuğu olduğu için o kartların içinde kalmaz; yine de konum/boyut/z-index
+   kuralları !important ile sabitlenmiştir.
+   =========================================================================== */
+
+.img-lightbox {
+  position: fixed !important;
+  /* Özel titlebar 35px ve z-index: 999999 — pencere kontrolleri erişilebilir
+     kalsın diye katman onun altından başlar ve altında kalır. */
+  top: 35px !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 99000 !important;
+  display: block !important;
+  /* Görsel izleyicisi bilinçli olarak koyu kalır: açık temada da her fotoğraf
+     aynı nötr zeminde ve kontrastta görünsün. */
+  background: rgba(6, 9, 17, 0.88);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  color: #fff;
+  overscroll-behavior: contain;
+  animation: ilb-fade 0.14s ease-out;
+}
+/* .hidden global kuralı da !important taşıdığı için burada daha yüksek
+   özgüllükle tekrar edilmelidir; yoksa katman hep açık kalır. */
+.img-lightbox.hidden { display: none !important; }
+body.no-hw-accel .img-lightbox {
+  background: rgba(6, 9, 17, 0.97);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+@keyframes ilb-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.ilb-stage {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  cursor: zoom-out;
+}
+.ilb-img {
+  display: block;
+  /* Sahne bir flex kapsayıcı: shrink açık kalırsa büyük görseller tarayıcı
+     tarafından küçültülür ve scale hesabı (doğal boyut varsayımı) bozulur. */
+  flex: 0 0 auto;
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+  border-radius: 6px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  cursor: zoom-in;
+}
+.ilb-img.ilb-pannable { cursor: grab; }
+.ilb-img.ilb-grabbing { cursor: grabbing; }
+.ilb-img.ilb-anim { transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.25, 1); }
+
+/* Üst/alt çubuklar — .dl-btn ile aynı saf buzlu cam dili (renk katmaz). */
+.ilb-bar {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  background: rgba(17, 24, 39, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+body.no-hw-accel .ilb-bar,
+body.no-hw-accel .ilb-nav {
+  background: rgba(20, 26, 40, 0.9);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.ilb-bar-top {
+  top: 14px; left: 14px; right: 14px;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ilb-bar-bottom {
+  bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+}
+.ilb-info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  padding-left: 6px;
+}
+.ilb-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 46vw;
+}
+.ilb-counter {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+}
+.ilb-counter:empty { display: none; }
+.ilb-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+
+.ilb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  padding: 0;
+  color: #fff;
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.ilb-btn svg { display: block; width: 17px; height: 17px; }
+.ilb-btn .dl-arrow { transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1); }
+.ilb-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.ilb-btn:hover .dl-arrow { transform: translateY(2px); }
+.ilb-btn:active { transform: scale(0.92); }
+.ilb-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.75);
+}
+.ilb-btn-close:hover {
+  background: color-mix(in srgb, var(--danger) 55%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+.ilb-btn[aria-disabled="true"] { opacity: 0.35; pointer-events: none; }
+
+/* "%X · Sığdır / Gerçek boyut" göstergesi; aynı zamanda geçiş düğmesidir. */
+.ilb-zoom-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  min-width: 118px;
+  padding: 0 12px;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.ilb-zoom-label:hover { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.3); }
+.ilb-zoom-label:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.75); }
+.ilb-zoom-pct { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ilb-fit-state {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+.ilb-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.18);
+  flex: none;
+}
+
+/* Sol/sağ gezinme okları */
+.ilb-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 64px;
+  padding: 0;
+  color: #fff;
+  background: rgba(17, 24, 39, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.ilb-nav svg { display: block; width: 22px; height: 22px; }
+.ilb-nav:hover { background: rgba(17, 24, 39, 0.5); border-color: rgba(255, 255, 255, 0.34); }
+.ilb-nav:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.75); }
+.ilb-nav-prev { left: 14px; }
+.ilb-nav-next { right: 14px; }
+
+/* Sohbetteki küçük görsellerin tıklanabilir olduğu imleçten anlaşılır. */
+.img-wrap .chat-img,
+.dm-msg img { cursor: zoom-in; }
+
+@media (max-width: 720px) {
+  .ilb-bar-top { top: 10px; left: 10px; right: 10px; }
+  .ilb-name { max-width: 38vw; }
+  .ilb-nav { width: 36px; height: 52px; }
+  .ilb-bar-bottom { bottom: 10px; }
+}
+
+/* ==========================================================================
+   AYARLAR → KISAYOLLAR paneli + "kısayollar duraklatıldı" rozeti
+   ========================================================================== */
+
+.shortcuts-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.shortcuts-list-head .settings-section-title { margin: 0; }
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  transition: opacity .15s ease;
+}
+/* Ana anahtar kapalıyken liste soluklaşır ama okunur kalır (satır tercihleri
+   korunduğu için tamamen gizlenmez). */
+.shortcuts-list.shortcuts-list-off { opacity: .45; }
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.shortcut-row.shortcut-row-off { opacity: .58; }
+
+.shortcut-info { flex: 1 1 auto; min-width: 0; }
+.shortcut-info strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.shortcut-info p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  opacity: .68;
+  line-height: 1.35;
+}
+
+.shortcut-key {
+  flex: 0 0 auto;
+  min-width: 96px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: background .15s ease, border-color .15s ease;
+}
+.shortcut-key:hover { background: rgba(255, 255, 255, 0.14); }
+.shortcut-key.listening {
+  border-color: var(--accent, #6f8cff);
+  background: rgba(111, 140, 255, 0.22);
+  animation: shortcutListening 1s ease-in-out infinite;
+}
+@keyframes shortcutListening {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+.shortcut-reset {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  line-height: 1;
+  font-size: 15px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: .7;
+}
+.shortcut-reset:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+
+.shortcut-note {
+  flex: 0 0 auto;
+  max-width: 150px;
+  font-size: 11px;
+  line-height: 1.3;
+  opacity: .6;
+  text-align: right;
+}
+
+.shortcuts-safety { margin-top: 16px; }
+.shortcuts-safety strong { display: block; font-size: 13.5px; }
+.shortcuts-safety p { margin: 2px 0 8px; font-size: 12px; opacity: .68; }
+.shortcuts-safety ul { margin: 0; padding-left: 18px; }
+.shortcuts-safety li { font-size: 12px; opacity: .8; line-height: 1.6; }
+
+/* Denetim sırasında görünen ince rozet. Denetim uyarı hapının hemen altında
+   durur; tıklanamaz olmalı ki altındaki arayüzü engellemesin. */
+.shortcuts-paused-badge {
+  position: fixed;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  letter-spacing: .2px;
+  color: #f4d9a6;
+  background: rgba(28, 20, 6, 0.88);
+  border: 1px solid rgba(244, 190, 90, 0.35);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.shortcuts-paused-badge.hidden { display: none; }
+.shortcuts-paused-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f4be5a;
+}
+
+@media (max-width: 720px) {
+  .shortcut-row { flex-wrap: wrap; }
+  .shortcut-info { flex-basis: 100%; }
+  .shortcut-note { max-width: none; text-align: left; }
+}
+
+/* ===== EKRAN (SİSTEM) SESİ DENETİMLERİ =====================================
+   Ekran paylaşımının sistem sesi mikrofondan bağımsız kısılır. Görsel olarak
+   da ayrışsın diye kart kutusu mor bir kenarlık ve küçük bir 🖥 rozeti alır;
+   böylece kullanıcı iki slider'ı karıştırmaz. */
+.vcard-vol-screen {
+  border-color: rgba(167, 139, 250, 0.55);
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.18) inset;
+}
+.vcard-vol-screen .vol-slider { accent-color: #a78bfa; }
+.vcard-vol-tag {
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.85;
+  padding-left: 2px;
+  pointer-events: none;
+}
+/* İki ses kutusu + "Denetle" düğmesi dar kartta taşmasın diye sarmalanır.
+   :has desteklenmeyen bir sürümde kural yok sayılır, düzen eskisi gibi kalır. */
+.card-actions:has(.vcard-vol-screen) {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: calc(100% - 24px);
+  row-gap: 6px;
+}
+
+/* Sağ tık menüsündeki ekran sesi bloğu */
+.ucm-vol-screen .ucm-vol-slider { accent-color: #a78bfa; }
+.ucm-vol-screen .ucm-vol-slider::-webkit-slider-thumb { background: #ddd6fe; }
+.ucm-vol-screen .ucm-vol-header { color: #c4b5fd; }

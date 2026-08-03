@@ -36,6 +36,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
   windowClose: () => ipcRenderer.send('window-close'),
   onWindowVisibility: (cb) => ipcRenderer.on('window-visibility', (e, visible) => cb(visible)),
+  // Pencere ön planda mı (odak/simge durumu). SADECE görsel işleri askıya almak
+  // için; ses işleme yolu bu sinyalle asla durdurulmaz. 'window-visibility'den
+  // ayrıdır: o kanal tray'e gizlenince webview sesini susturur.
+  onWindowUiActive: (cb) => ipcRenderer.on('window-ui-active', (e, active) => cb(active)),
+  // Sesli oturum başladı/bitti. Main süreç powerSaveBlocker'ı ve Windows
+  // süreç önceliğini buna göre ayarlar (alt+tab'da ses bozulmasını önler).
+  setVoiceSession: (active) => ipcRenderer.send('set-voice-session', active),
   appQuitForce: () => ipcRenderer.send('app-quit-force'),
   // Uygulama sürümü (package.json'dan). Başlangıç menüsünde gösterilir.
   getAppVersion: () => { try { return require('./package.json').version; } catch (e) { return null; } },

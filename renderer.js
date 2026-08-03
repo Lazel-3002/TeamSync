@@ -64,6 +64,31 @@ if (window.supabase && window.electronAPI) {
 
 const state = window.state;
 
+// ==================== ARKA PLAN / GÜÇ YÖNETİMİ KÖPRÜSÜ ====================
+// state.uiActive: pencere ön planda mı? SADECE görsel işleri (VU çubuğu,
+// izleyici kilidi taraması gibi) atlamak için kullanılır. Ses işleme yolundaki
+// hiçbir şey bu bayrakla durdurulmaz — aksi hâlde alt+tab'da ses bozulur.
+state.uiActive = true;
+if (window.electronAPI && typeof window.electronAPI.onWindowUiActive === 'function') {
+  window.electronAPI.onWindowUiActive((active) => { state.uiActive = active !== false; });
+} else {
+  // Preload'da kanal açılmamışsa (contextBridge tuzağı) her şey ön plandaymış
+  // gibi davranır: performans kazancı kaybolur ama işlevsellik bozulmaz.
+  console.warn('onWindowUiActive preload üzerinden gelmedi — arka plan optimizasyonu devre dışı');
+}
+
+// Sesli oturum bildirimi: main süreç powerSaveBlocker'ı başlatır ve Windows
+// süreç önceliğini yükseltir. Odaya girerken true, çıkarken false gönderilir.
+function setVoiceSessionActive(active) {
+  try {
+    if (window.electronAPI && typeof window.electronAPI.setVoiceSession === 'function') {
+      window.electronAPI.setVoiceSession(!!active);
+    } else {
+      console.warn('setVoiceSession preload üzerinden gelmedi — arka planda ses kısıtlaması önlenemez');
+    }
+  } catch (e) {}
+}
+
 const badWordsList = ['amk', 'amq', 'aq', 'oç', 'piç', 'yarak', 'yarrak', 'amcık', 'sik', 'sikerim', 'siktir', 'orospu', 'göt', 'pezevenk', 'fuck', 'shit', 'bitch', 'asshole', 'döl', 'dol', 'meme', 'yarak', 'yarrag', 'yaraq', 'yarraq', 'sg', 'siktir', 'sktir', 'am', 'kaltak', 'sürtük', 'pç'];
 const badWordsRegex = new RegExp('\\b(' + badWordsList.join('|') + ')\\b', 'gi');
 
@@ -469,10 +494,18 @@ async function processSignal(id, ip, signal) {
         await peer.pc.setLocalDescription({ type: 'rollback' });
       }
       await peer.pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      // Karşı taraf ekran sesi için fazladan bir ses m-line'ı gönderdiyse o
+      // transceiver burada oluşmuştur; sahipleniyoruz ve 'recvonly'den
+      // 'sendrecv'e çekiyoruz (kendi ekran sesimizi de yollayabilelim).
+      // Eski sürümden gelen offer'da fazladan m-line YOKTUR → null döner,
+      // her şey eskisi gibi çalışmaya devam eder.
+      adoptScreenAudioTransceiver(peer);
       const answer = await peer.pc.createAnswer();
-      answer.sdp = setMediaBitrates(answer.sdp);
+      answer.sdp = applyAudioSdpParams(answer.sdp);
       await peer.pc.setLocalDescription(answer);
       sendSignalToPeer(id, { type: 'answer', sdp: answer });
+      // Biz zaten ekran paylaşıyorsak sesi yeni kurulan kanala ilet.
+      pushScreenAudioIfSharing(peer);
       // Process queued candidates
       while (peer.iceQueue.length) {
         await peer.pc.addIceCandidate(peer.iceQueue.shift());
@@ -1143,6 +1176,11 @@ window.showProfileModal = ({ name, avatar, idLabel, badges = [], actions = [] })
 // adını değiştirse bile lakap ve ses ayarı korunur. Lakabı yalnızca koyan görür.
 const NICKNAMES_KEY = 'teamsync_nicknames';
 const USER_VOLUMES_KEY = 'teamsync_user_volumes';
+// Ekran paylaşımıyla gelen SİSTEM SESİ (müzik/oyun) mikrofondan BAĞIMSIZ
+// ayarlanır: oyunun sesini kısarken kişinin konuşmasını kısmak istemeyiz.
+// Bu yüzden ayrı bir localStorage haritası ve ayrı bir gain zinciri var —
+// ama aynı yardımcı fonksiyonlar kullanılır, yalnızca "kanal" değişir.
+const SCREEN_AUDIO_VOLUMES_KEY = 'teamsync_screen_audio_volumes';
 
 function loadLocalJsonMap(key) {
   try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; }
@@ -1150,6 +1188,26 @@ function loadLocalJsonMap(key) {
 }
 state.nicknames = loadLocalJsonMap(NICKNAMES_KEY);
 state.userVolumes = loadLocalJsonMap(USER_VOLUMES_KEY);
+state.screenAudioVolumes = loadLocalJsonMap(SCREEN_AUDIO_VOLUMES_KEY);
+
+// Ses kanalları. 'mic' kişinin mikrofonu, 'screen' ekran paylaşımının sistem
+// sesi. Aşağıdaki tüm ses yardımcıları (getUserVolume, ensurePeerBoostChain,
+// rampPeerGain, applyPeerLimiter, applyPeerVolume, syncPeerVolumeControls...)
+// bu tabloyu okuyarak çalışır; kanal başına kopyalanmış kod YOKTUR.
+const AUDIO_CHANNEL_FIELDS = {
+  mic: {
+    store: 'userVolumes', key: USER_VOLUMES_KEY, label: 'Ses',
+    el: 'audioEl', raw: 'rawAudioStream', src: 'gainSrc',
+    gain: 'gainNode', lim: 'limiterNode', dest: 'gainDest', pump: 'volPump'
+  },
+  screen: {
+    store: 'screenAudioVolumes', key: SCREEN_AUDIO_VOLUMES_KEY, label: 'Ekran sesi',
+    el: 'screenAudioEl', raw: 'screenRawAudioStream', src: 'screenGainSrc',
+    gain: 'screenGainNode', lim: 'screenLimiterNode', dest: 'screenGainDest', pump: 'screenVolPump'
+  }
+};
+const AUDIO_CHANNELS = ['mic', 'screen'];
+function channelFields(channel) { return AUDIO_CHANNEL_FIELDS[channel] || AUDIO_CHANNEL_FIELDS.mic; }
 
 function getNickname(id) {
   const n = state.nicknames[id];
@@ -1179,18 +1237,113 @@ function refreshUserRowName(id) {
 }
 
 // Kişi bazlı ses seviyesi: 0.0 – 2.0 (Discord'daki %0–%200 gibi).
-function getUserVolume(id) {
-  const v = parseFloat(state.userVolumes[id]);
+// SAKLANAN DEĞER HER ZAMAN GAIN'DİR (doğrusal genlik çarpanı). Kullanıcıya
+// gösterilen yüzde ise ALGISAL karşılığıdır: kulak logaritmik duyar, doğrusal
+// bir slider'da %50 "yarı yükseklikte" duyulmaz (yalnızca ~3 dB düşer).
+//   %0–100  : gain = (yüzde/100)^PERCEPTUAL_EXP  → %50 ≈ -10 dB (algısal yarı)
+//   %100–200: doğrusal güçlendirme 1.0 → 2.0 (limiter ile kırpılmaya karşı korunur)
+// Eğri her iki uçta sürekli ve monoton; %100 → gain 1.0 (birebir).
+const PERCEPTUAL_EXP = 1.66;
+
+function volumePercentToGain(pct) {
+  const p = Math.min(Math.max(Number(pct) || 0, 0), 200);
+  if (p <= 100) return Math.pow(p / 100, PERCEPTUAL_EXP);
+  return 1 + (p - 100) / 100;
+}
+
+function volumeGainToPercent(gain) {
+  const g = Math.min(Math.max(Number(gain) || 0, 0), 2);
+  if (g <= 1) return Math.round(Math.pow(g, 1 / PERCEPTUAL_EXP) * 100);
+  return Math.round(100 + (g - 1) * 100);
+}
+
+// channel: 'mic' (varsayılan) | 'screen'. Eski çağrılar parametresiz kaldığı
+// için varsayılan her zaman mikrofon kanalıdır.
+function getUserVolume(id, channel) {
+  const F = channelFields(channel);
+  const map = state[F.store] || {};
+  const v = parseFloat(map[id]);
   if (!Number.isFinite(v)) return 1.0;
   return Math.min(Math.max(v, 0), 2);
 }
 
-function setUserVolume(id, vol) {
+// Slider'ların konuştuğu birim: algısal yüzde (0–200).
+function getUserVolumePercent(id, channel) {
+  return volumeGainToPercent(getUserVolume(id, channel));
+}
+
+function setUserVolumePercent(id, pct, channel) {
+  setUserVolume(id, volumePercentToGain(pct), channel);
+}
+
+function setUserVolume(id, vol, channel) {
+  const F = channelFields(channel);
+  const map = state[F.store] || (state[F.store] = {});
   const v = Math.min(Math.max(vol, 0), 2);
-  if (v === 1.0) delete state.userVolumes[id]; // varsayılan değeri saklamaya gerek yok
-  else state.userVolumes[id] = v;
-  try { localStorage.setItem(USER_VOLUMES_KEY, JSON.stringify(state.userVolumes)); } catch (e) {}
-  applyPeerVolume(id);
+  if (v === 1.0) delete map[id]; // varsayılan değeri saklamaya gerek yok
+  else map[id] = v;
+  try { localStorage.setItem(F.key, JSON.stringify(map)); } catch (e) {}
+  const chan = AUDIO_CHANNEL_FIELDS[channel] ? channel : 'mic';
+  applyPeerVolume(id, chan);
+  syncPeerVolumeControls(id, chan);
+}
+
+// Aynı kişinin sesi iki yerden ayarlanabilir (sağ tık menüsü ve ekran/kamera
+// kartındaki slider). Biri değişince diğeri sessizce güncellenir; ikisi de tek
+// kaynağı (state.userVolumes) okur, paralel bir ses durumu tutulmaz.
+// Her denetim kendi kanalını `data-volchan` ile taşır (yoksa 'mic'). channel
+// verilmezse iki kanalın denetimleri de tazelenir.
+function syncPeerVolumeControls(id, channel) {
+  document.querySelectorAll(`[data-volfor="${id}"]`).forEach((el) => {
+    const chan = el.dataset.volchan || 'mic';
+    if (channel && chan !== channel) return;
+    const pct = getUserVolumePercent(id, chan);
+    const label = channelFields(chan).label;
+    const role = el.dataset.volrole || (el.tagName === 'INPUT' ? 'slider' : 'value');
+    if (role === 'slider') {
+      el.value = String(pct); // adım yuvarlaması slider'a da yansısın (snap)
+      el.title = pct === 0 ? 'Sessiz' : `${label}: %${pct}`;
+    } else if (role === 'icon') {
+      el.textContent = pct === 0 ? '🔇' : (pct > 100 ? '🔊' : '🔉');
+      el.title = pct === 0 ? 'Sesi aç' : 'Sessize al';
+    } else if (role === 'wrap') {
+      el.classList.toggle('muted', pct === 0);
+      return;
+    } else {
+      el.textContent = pct === 0 ? 'Sessiz' : `%${pct}`;
+    }
+    el.classList.toggle('is-muted', pct === 0);
+    el.classList.toggle('is-boosted', pct > 100);
+  });
+}
+
+// İnce ayar: Shift basılıyken slider %1'lik, normalde %5'lik adımlarla gider.
+// (Adım "input" anında hesaplanır, böylece sürüklerken Shift'e basmak da işler.)
+let volumeShiftHeld = false;
+window.addEventListener('keydown', (e) => { if (e.key === 'Shift') volumeShiftHeld = true; });
+window.addEventListener('keyup', (e) => { if (e.key === 'Shift') volumeShiftHeld = false; });
+window.addEventListener('blur', () => { volumeShiftHeld = false; });
+
+function quantizeVolumePercent(pct) {
+  const p = Math.min(Math.max(Number(pct) || 0, 0), 200);
+  return volumeShiftHeld ? Math.round(p) : Math.round(p / 5) * 5;
+}
+
+// Sessize alma: seviyeyi %0 yapar, önceki seviyeyi hatırlar (tekrar basınca
+// oraya döner). Ayrı bir "mute" durumu tutulmaz — tek kaynak yine ses seviyesi.
+const peerVolumeBeforeMute = new Map();
+function togglePeerMute(id, channel) {
+  const chan = AUDIO_CHANNEL_FIELDS[channel] ? channel : 'mic';
+  const memoKey = `${chan}:${id}`; // mikrofon ve ekran sesi birbirinin hafızasını ezmesin
+  const pct = getUserVolumePercent(id, chan);
+  if (pct === 0) {
+    const prev = peerVolumeBeforeMute.get(memoKey);
+    setUserVolumePercent(id, Number.isFinite(prev) && prev > 0 ? prev : 100, chan);
+  } else {
+    peerVolumeBeforeMute.set(memoKey, pct);
+    setUserVolumePercent(id, 0, chan);
+  }
+  return getUserVolumePercent(id, chan) === 0;
 }
 
 // %100 üzeri güçlendirme <audio>.volume ile mümkün değil; WebAudio gain zinciri
@@ -1199,54 +1352,115 @@ function setUserVolume(id, vol) {
 // ses yolu bekçisi (logVoicePathReport) aynen çalışmaya devam eder.
 // Chromium bilinen davranışı: uzak WebRTC akışı bir medya elemanına bağlı
 // değilse WebAudio'ya veri akmaz — bu yüzden sessiz bir "pompa" Audio tutulur.
-function ensurePeerBoostChain(peer) {
-  if (peer.gainNode || !peer.rawAudioStream) return;
+// channel: 'mic' | 'screen' — ikisi de aynı zinciri kurar, yalnızca peer
+// üzerindeki alan adları farklıdır (bkz. AUDIO_CHANNEL_FIELDS).
+function ensurePeerBoostChain(peer, channel) {
+  const F = channelFields(channel);
+  if (peer[F.gain] || !peer[F.raw] || !peer[F.el]) return;
   try {
     if (!state.remoteAudioCtx) state.remoteAudioCtx = new AudioContext();
     const ctx = state.remoteAudioCtx;
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    const src = ctx.createMediaStreamSource(peer.rawAudioStream);
+    const src = ctx.createMediaStreamSource(peer[F.raw]);
     const gain = ctx.createGain();
+    // Yumuşak limiter: %100 üzerinde güçlendirirken tepe noktaları 0 dBFS'i
+    // aşıp kırpılmasın (cızırtı/bozulma). ratio=1 & threshold=0 iken tamamen
+    // saydamdır; bu yüzden zincirde hep durur, yalnızca parametreleri değişir
+    // (düğüm bağlantısını değiştirmek tık sesi üretirdi). bkz. applyPeerLimiter
+    const limiter = ctx.createDynamicsCompressor();
     const dest = ctx.createMediaStreamDestination();
     src.connect(gain);
-    gain.connect(dest);
+    gain.connect(limiter);
+    limiter.connect(dest);
+    peer[F.lim] = limiter;
+    applyPeerLimiter(peer, 1.0, channel);
     const pump = new Audio();
-    pump.srcObject = peer.rawAudioStream;
+    pump.srcObject = peer[F.raw];
     pump.muted = true;
     pump.play().catch(() => {});
-    peer.volPump = pump;
-    peer.gainSrc = src;
-    peer.gainNode = gain;
-    peer.gainDest = dest;
-    peer.audioEl.srcObject = dest.stream;
-    peer.audioEl.play().catch(() => {});
+    peer[F.pump] = pump;
+    peer[F.src] = src;
+    peer[F.gain] = gain;
+    peer[F.dest] = dest;
+    peer[F.el].srcObject = dest.stream;
+    peer[F.el].play().catch(() => {});
   } catch (e) {
     console.warn('Ses güçlendirme zinciri kurulamadı, %100 ile sınırlanacak:', e);
-    peer.gainNode = null;
+    peer[F.gain] = null;
+    peer[F.lim] = null;
   }
+}
+
+// gain.value'yu doğrudan atamak örnek sınırında basamak (zipper/klik) sesi
+// üretir. ~20 ms'lik üstel yumuşatma ile hedefe gidilir; slider sürüklenirken
+// onlarca kez çağrılsa bile çatırtı olmaz.
+const PEER_GAIN_RAMP = 0.02;
+function rampPeerGain(peer, value, channel) {
+  const F = channelFields(channel);
+  const node = peer[F.gain];
+  const ctx = state.remoteAudioCtx;
+  if (!node) return;
+  if (!ctx) { node.gain.value = value; return; }
+  try {
+    const now = ctx.currentTime;
+    node.gain.cancelScheduledValues(now);
+    node.gain.setTargetAtTime(value, now, PEER_GAIN_RAMP);
+  } catch (e) {
+    node.gain.value = value;
+  }
+}
+
+// Limiter yalnızca güçlendirmede (userVol > 1.0) devreye girer; altında
+// ratio=1/threshold=0 ile tamamen saydamdır (sesi hiç renklendirmez).
+function applyPeerLimiter(peer, userVol, channel) {
+  const lim = peer[channelFields(channel).lim];
+  if (!lim) return;
+  const ctx = state.remoteAudioCtx;
+  const now = ctx ? ctx.currentTime : 0;
+  const boosting = userVol > 1.0;
+  const set = (param, v) => {
+    try { param.setValueAtTime(v, now); } catch (e) { try { param.value = v; } catch (e2) {} }
+  };
+  set(lim.threshold, boosting ? -3 : 0);
+  set(lim.knee, boosting ? 3 : 0);
+  set(lim.ratio, boosting ? 20 : 1);
+  set(lim.attack, 0.003);
+  set(lim.release, 0.25);
 }
 
 // Tek yetkili ses uygulayıcısı: kişi ayarı × ana ses × sağırlaştırma durumunu
 // peer'in oynatıcısına uygular. Sağırlaştırma, ana ses ve kişi slider'ı hep
 // bunu çağırır; böylece birbirlerinin ayarını ezmezler.
-function applyPeerVolume(peerId) {
-  const peer = state.peers.get(peerId);
-  if (!peer || !peer.audioEl) return;
-  const userVol = getUserVolume(peerId);
-  if (state.deafened) {
-    peer.audioEl.muted = true;
-    peer.audioEl.volume = 0.0;
-    if (peer.gainNode) peer.gainNode.gain.value = 0.0;
+// channel verilmezse HER İKİ kanal da uygulanır — böylece ana ses / sağırlaştırma
+// gibi eski (parametresiz) çağrılar ekran sesini de kapsar.
+function applyPeerVolume(peerId, channel) {
+  if (!AUDIO_CHANNEL_FIELDS[channel]) {
+    AUDIO_CHANNELS.forEach(c => applyPeerVolume(peerId, c));
     return;
   }
-  peer.audioEl.muted = false;
-  if (userVol > 1.0) ensurePeerBoostChain(peer);
+  const peer = state.peers.get(peerId);
+  const F = channelFields(channel);
+  const el = peer && peer[F.el];
+  if (!peer || !el) return; // ekran sesi hiç gelmemişse sessizce çık
+  const userVol = getUserVolume(peerId, channel);
+  if (state.deafened) {
+    el.muted = true;
+    el.volume = 0.0;
+    if (peer[F.gain]) rampPeerGain(peer, 0.0, channel);
+    return;
+  }
+  el.muted = false;
+  // Zincir yalnızca güçlendirme için değil, KISMA için de kurulur: <audio>.volume
+  // anlık atlar (çatırtı), gain düğümü yumuşak geçer. Kullanıcı sesi hiç
+  // ellemediyse (tam %100) fazladan düğüm kurulmaz — varsayılan yol aynen kalır.
+  if (userVol !== 1.0) ensurePeerBoostChain(peer, channel);
   const master = Math.min(Math.max(state.volume ?? 1.0, 0), 1);
-  if (peer.gainNode) {
-    peer.gainNode.gain.value = userVol;
-    peer.audioEl.volume = master;
+  if (peer[F.gain]) {
+    applyPeerLimiter(peer, userVol, channel);
+    rampPeerGain(peer, userVol, channel);
+    el.volume = master;
   } else {
-    peer.audioEl.volume = Math.min(master * Math.min(userVol, 1.0), 1.0);
+    el.volume = Math.min(master * Math.min(userVol, 1.0), 1.0);
   }
 }
 
@@ -2567,6 +2781,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     document.getElementById('login').classList.add('hidden');
     state.room = roomId;
+    // Sesli oturum başlıyor: Windows'un uygulamayı arka planda askıya
+    // almasını/CPU'sunu kısmasını engelle (alt+tab'da ses bozulması).
+    setVoiceSessionActive(true);
     state.password = pw;
     state.useAI = useAI;
     state.pttMode = pttMode;
@@ -3011,6 +3228,17 @@ function setupVUMeter() {
   let uiData;
   const vuBar = document.getElementById('vu');
   const vuText = document.getElementById('vu-text');
+  // Kirli-kontrol önbellekleri: aynı değeri tekrar yazmak Chromium'da stil
+  // yeniden hesabı + düzen + boyama tetikler. Ölçüm: bu döngü saniyede 20 kez
+  // koşuyor; her seferinde style.width + textContent yazmak, 23 backdrop-filter
+  // ve 215 box-shadow taşıyan bir arayüzde boşuna yeniden boyama demekti.
+  let lastBarPct = -1;
+  let lastMutedBar = null;
+  let lastDbText = '';
+  let lastGateTarget = -1;
+  let lastGateNode = null;
+  let lastMeterPct = -1;
+  let lastUiActive = true;
 
   function update() {
     if (!state.vuAnalyser) return;
@@ -3023,7 +3251,16 @@ function setupVUMeter() {
     const rms = Math.sqrt(sum / data.length);
     const db = 20 * Math.log10(rms / 255 || 0.0001);
     const pct = Math.min(100, Math.max(0, (db + 60) * 100 / 60));
-    updateSettingsMicMeter(pct);
+    // Ayarlar penceresindeki çubuklu ölçer yalnızca mikrofon testi açıkken
+    // anlamlı; kapalıyken her tikte ~20 elemanı dolaşmanın karşılığı yok.
+    // Test kapandığı anda bir kez sıfırlanır ki çubuklar dolu kalmasın.
+    if (state.settingsMicTestActive) {
+      const meterPct = Math.round(pct);
+      if (meterPct !== lastMeterPct) { lastMeterPct = meterPct; updateSettingsMicMeter(pct); }
+    } else if (lastMeterPct !== -1) {
+      lastMeterPct = -1;
+      updateSettingsMicMeter(0);
+    }
 
     const isSpeaking = pct > state.micThreshold;
 
@@ -3034,10 +3271,19 @@ function setupVUMeter() {
       pct < state.micThreshold + 15;
 
     if (state.gateGainNode && state.gateAudioCtx && state.gateAudioCtx.state !== 'closed') {
-      if (!isSpeaking) {
-        state.gateGainNode.gain.setTargetAtTime(0, state.gateAudioCtx.currentTime, 0.05);
-      } else {
-        state.gateGainNode.gain.setTargetAtTime(echoDuck ? 0.1 : 1, state.gateAudioCtx.currentTime, 0.05);
+      // Bağlam askıya alınmışsa (Windows arka plan/EcoQoS) currentTime ilerlemez
+      // ve kapı son değerinde donar — 0'da donarsa karşı taraf sizi hiç duymaz.
+      if (state.gateAudioCtx.state === 'suspended') state.gateAudioCtx.resume().catch(() => {});
+      const gateTarget = !isSpeaking ? 0 : (echoDuck ? 0.1 : 1);
+      // Ses zinciri yeniden kurulduysa (setupLocalAudio yeni bir gainNode
+      // üretir) önbellek geçersizdir; yeni düğüm varsayılan 1 kazançla gelir,
+      // kirli-kontrol yüzünden kapalı kalması gereken kapı açık kalabilirdi.
+      if (state.gateGainNode !== lastGateNode) { lastGateNode = state.gateGainNode; lastGateTarget = -1; }
+      // Hedef değişmediyse yeni bir otomasyon olayı planlamaya gerek yok:
+      // setTargetAtTime zaten üstel olarak hedefe yaklaşmayı sürdürür.
+      if (gateTarget !== lastGateTarget) {
+        lastGateTarget = gateTarget;
+        state.gateGainNode.gain.setTargetAtTime(gateTarget, state.gateAudioCtx.currentTime, 0.05);
       }
     }
 
@@ -3061,11 +3307,28 @@ function setupVUMeter() {
       if (state.isSpeakingLocally) { state.isSpeakingLocally = false; updateUserUI('self'); }
     }
 
-    if (vuBar) {
-      vuBar.style.width = pct + '%';
-      vuBar.classList.toggle('muted-bar', !isSpeaking);
+    // Görsel kısım: pencere ön planda değilken hiç çizme (ses yolu yukarıda
+    // zaten işlendi — burası yalnızca gösterge). Ön plandayken de değer
+    // değişmediyse DOM'a dokunma.
+    const uiActive = state.uiActive !== false;
+    if (uiActive) {
+      // Arka plandan dönüldüyse önbellekleri sıfırla ki gösterge bayat kalmasın.
+      if (!lastUiActive) { lastBarPct = -1; lastMutedBar = null; lastDbText = ''; }
+      if (vuBar) {
+        const barPct = Math.round(pct);
+        if (barPct !== lastBarPct) { lastBarPct = barPct; vuBar.style.width = barPct + '%'; }
+        const mutedBar = !isSpeaking;
+        if (mutedBar !== lastMutedBar) {
+          lastMutedBar = mutedBar;
+          vuBar.classList.toggle('muted-bar', mutedBar);
+        }
+      }
+      if (vuText) {
+        const txt = db.toFixed(0) + ' dB';
+        if (txt !== lastDbText) { lastDbText = txt; vuText.textContent = txt; }
+      }
     }
-    if (vuText) vuText.textContent = db.toFixed(0) + ' dB';
+    lastUiActive = uiActive;
   }
 
   // DİKKAT: Burada requestAnimationFrame KULLANILMAMALI. Pencere simge durumuna
@@ -3261,6 +3524,9 @@ function removePeer(peerId) {
   if (peer.pingInterval) clearInterval(peer.pingInterval);
   if (peer.pc) peer.pc.close();
   if (peer.dc) peer.dc.close();
+  // Merkezi konuşma algılama döngüsünden çıkar (bkz. runSpeakingDetection);
+  // son kişi de gidince döngü kendini durdurur.
+  if (typeof releaseSpeakingNode === 'function') releaseSpeakingNode(peerId);
   if (peer.mediaStreamSource) { try { peer.mediaStreamSource.disconnect(); } catch(e) {} }
   if (peer.analyser) { try { peer.analyser.disconnect(); } catch(e) {} }
   if (peer.silentGain) { try { peer.silentGain.disconnect(); } catch(e) {} }
@@ -3268,9 +3534,21 @@ function removePeer(peerId) {
   // Kişi bazlı ses güçlendirme zinciri temizliği (bkz: ensurePeerBoostChain)
   if (peer.gainSrc) { try { peer.gainSrc.disconnect(); } catch(e) {} }
   if (peer.gainNode) { try { peer.gainNode.disconnect(); } catch(e) {} }
+  if (peer.limiterNode) { try { peer.limiterNode.disconnect(); } catch(e) {} }
   if (peer.volPump) { try { peer.volPump.srcObject = null; peer.volPump.remove(); } catch(e) {} }
   if (peer.audioEl) { try { peer.audioEl.srcObject = null; peer.audioEl.remove(); } catch(e) {} }
   if (peer.videoEl) { try { peer.videoEl.srcObject = null; peer.videoEl.remove(); } catch(e) {} }
+  // Ekran sesi kanalı temizliği (mikrofonunkiyle birebir aynı desen).
+  if (peer.screenGainSrc) { try { peer.screenGainSrc.disconnect(); } catch(e) {} }
+  if (peer.screenGainNode) { try { peer.screenGainNode.disconnect(); } catch(e) {} }
+  if (peer.screenLimiterNode) { try { peer.screenLimiterNode.disconnect(); } catch(e) {} }
+  if (peer.screenVolPump) { try { peer.screenVolPump.srcObject = null; peer.screenVolPump.remove(); } catch(e) {} }
+  if (peer.screenAudioEl) { try { peer.screenAudioEl.srcObject = null; peer.screenAudioEl.remove(); } catch(e) {} }
+  peer.screenGainSrc = peer.screenGainNode = peer.screenLimiterNode = null;
+  peer.screenGainDest = peer.screenVolPump = peer.screenAudioEl = null;
+  peer.screenRawAudioStream = null;
+  peer.screenAudioTransceiver = null;
+  peer.micTransceiver = null;
   state.peers.delete(peerId);
   const userEl = document.querySelector(`[data-uid="${peerId}"]`);
   if (userEl) userEl.remove();
@@ -3282,6 +3560,9 @@ function removePeer(peerId) {
   }
   // Beni kontrol eden kişi koptuysa girişleri kapat, pill'i kaldır.
   if (state.controlledBy === peerId) stopBeingControlled(false);
+  // Bekleyen denetim teklifleri (her iki yön) peer gidince düşer.
+  if (state.pendingControlOffer && state.pendingControlOffer.peerId === peerId) clearControlOffer();
+  if (state.incomingControlOffer && state.incomingControlOffer.peerId === peerId) closeCtrlOfferNote();
   showToast(displayName(peerId, peer.name) + ' ayrıldı', 'warn');
   updateEmptyGrid();
 
@@ -3404,6 +3685,166 @@ function getVideoSender(pc) {
     if (transceiver) sender = transceiver.sender;
   }
   return sender;
+}
+
+// ===== EKRAN SESİ (sistem sesi) TAŞIMA KATMANI ==============================
+// Sorun: getDisplayMedia ile yakalanan sistem sesi hiç GÖNDERİLMİYORDU; yalnız
+// video track'i replaceTrack ile aktarılıyordu.
+//
+// Çözüm, video için zaten kullanılan desenin aynısı: bağlantı kurulurken
+// FAZLADAN bir ses m-line'ı (transceiver) açılır ve paylaşım başlayınca track
+// oraya replaceTrack ile takılır. Böylece yeniden müzakere (renegotiation)
+// GEREKMEZ — offer/answer bir kez yapılır, sonrasında ses aç/kapa anlıktır.
+//
+// m-line sırası her iki tarafta da deterministiktir:
+//   0: mikrofon sesi (addTrack)   1: video (addTrack)   2: EKRAN SESİ
+// Buna rağmen sıraya GÜVENMİYORUZ: transceiver referansı peer üzerinde
+// saklanır (peer.screenAudioTransceiver) ve gelen track'i ayırt etmek için
+// e.transceiver ile karşılaştırılır — en güvenilir yol budur.
+const SCREEN_AUDIO_BITRATE_BPS = 128000; // müzik/oyun sesi için (mikrofon ayrı)
+
+// Ekran sesi transceiver'ını bulur. Kural: birden fazla ses transceiver'ı
+// varsa SONUNCUSU ekran sesidir (fazladan m-line her zaman sona eklenir).
+// Tek ses transceiver'ı varsa karşı taraf ESKİ SÜRÜMDÜR (SDP'sinde fazladan
+// m-line yok) → null döner ve çağıranlar sessizce eski davranışa düşer.
+function findScreenAudioTransceiver(peer) {
+  const pc = peer && peer.pc;
+  if (!pc || typeof pc.getTransceivers !== 'function') return null;
+  let list;
+  try { list = pc.getTransceivers(); } catch (e) { return null; }
+  const audioTrs = list.filter(t => t && !t.stopped && (
+    (t.sender && t.sender.track && t.sender.track.kind === 'audio') ||
+    (t.receiver && t.receiver.track && t.receiver.track.kind === 'audio')
+  ));
+  if (audioTrs.length < 2) return null; // eski sürüm ya da henüz müzakere olmadı
+  const last = audioTrs[audioTrs.length - 1];
+  if (peer.micTransceiver && last === peer.micTransceiver) return null; // asla mikrofonu seçme
+  return last;
+}
+
+// Transceiver'ı peer'e bağlar (idempotent). Answerer tarafında transceiver
+// setRemoteDescription sırasında oluşur ve 'recvonly' başlar; kendi ekran
+// sesimizi de gönderebilmek için sendrecv'e çekilir (bu answer'a yansır,
+// ek müzakere gerektirmez).
+function adoptScreenAudioTransceiver(peer) {
+  if (!peer) return null;
+  if (peer.screenAudioTransceiver && !peer.screenAudioTransceiver.stopped) {
+    return peer.screenAudioTransceiver;
+  }
+  const tr = findScreenAudioTransceiver(peer);
+  if (!tr) return null;
+  peer.screenAudioTransceiver = tr;
+  try { if (tr.direction !== 'sendrecv') tr.direction = 'sendrecv'; } catch (e) {}
+  return tr;
+}
+
+// getVideoSender'ın ekran sesi karşılığı. Mikrofon sender'ıyla KARIŞMAZ:
+// mikrofon addTrack ile eklendiği için ayrı bir transceiver'dadır ve
+// findScreenAudioTransceiver onu açıkça eler.
+function getScreenAudioSender(peer) {
+  const tr = adoptScreenAudioTransceiver(peer);
+  return tr ? tr.sender : null;
+}
+
+// Ekran sesi müzik/oyun taşır: konuşma için ayarlanmış varsayılanlar yetmez.
+// Mikrofon gönderici parametrelerine DOKUNULMAZ.
+async function applyScreenAudioQuality(sender) {
+  if (!sender) return;
+  try {
+    const params = sender.getParameters();
+    if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+    params.encodings[0].maxBitrate = SCREEN_AUDIO_BITRATE_BPS;
+    try { params.encodings[0].networkPriority = 'high'; } catch (e) {}
+    await sender.setParameters(params);
+  } catch (e) {
+    console.warn('Ekran sesi bit hızı uygulanamadı:', e && e.message ? e.message : e);
+  }
+}
+
+// track null ise gönderim durur (paylaşım bitti). Karşı taraf eski sürümse
+// sender bulunamaz — sessizce false döner, HATA/ÇÖKME olmaz.
+function sendScreenAudioToPeer(peer, track) {
+  const sender = getScreenAudioSender(peer);
+  if (!sender) return false;
+  sender.replaceTrack(track || null)
+    .then(() => { if (track) applyScreenAudioQuality(sender); })
+    .catch(e => console.warn('Ekran sesi track değişimi başarısız:', e && e.message ? e.message : e));
+  return true;
+}
+
+// Halihazırda paylaşım yapıyorken bağlanan/yeniden müzakere eden peer'e
+// mevcut ekran sesini iter.
+function pushScreenAudioIfSharing(peer) {
+  if (!peer || !state.isSharing || !state.screenStream) return;
+  const track = state.screenStream.getAudioTracks()[0];
+  if (track) sendScreenAudioToPeer(peer, track);
+}
+
+// SDP'de İKİNCİ (ve sonraki) ses bölümü ekran sesidir; oraya müzik için
+// stereo + yüksek bit hızı yazılır. BİRİNCİ ses bölümü (mikrofon/konuşma)
+// hiç değiştirilmez — onun ayarları setMediaBitrates'e aittir.
+function setScreenAudioSdpParams(sdp) {
+  if (!sdp) return sdp;
+  let audioSectionSeen = 0;
+  return sdp.split(/(?=^m=)/m).map((sec) => {
+    if (!/^m=audio/.test(sec)) return sec;
+    audioSectionSeen++;
+    if (audioSectionSeen < 2) return sec; // mikrofon bölümü — dokunma
+    const m = sec.match(/a=rtpmap:(\d+)\s+opus/i);
+    if (!m) return sec;
+    const pt = m[1];
+    const opusParams =
+      `maxaveragebitrate=${SCREEN_AUDIO_BITRATE_BPS};maxplaybackrate=48000;` +
+      `sprop-maxcapturerate=48000;stereo=1;sprop-stereo=1;useinbandfec=1;usedtx=0`;
+    const fmtpRe = new RegExp(`a=fmtp:${pt} ([^\\r\\n]*)`);
+    if (fmtpRe.test(sec)) {
+      return sec.replace(fmtpRe, (full, existing) => {
+        const cleaned = existing.split(';')
+          .filter(p => p && !/^(maxaveragebitrate|maxplaybackrate|sprop-maxcapturerate|stereo|sprop-stereo|useinbandfec|usedtx|cbr)=/i.test(p.trim()))
+          .join(';');
+        return `a=fmtp:${pt} ${cleaned ? cleaned + ';' : ''}${opusParams}`;
+      });
+    }
+    return sec.replace(new RegExp(`(a=rtpmap:${pt}\\s+opus[^\\r\\n]*)`), `$1\r\na=fmtp:${pt} ${opusParams}`);
+  }).join('');
+}
+
+// Offer/answer SDP'sine hem mikrofon hem ekran sesi parametrelerini uygular.
+function applyAudioSdpParams(sdp) {
+  return setScreenAudioSdpParams(setMediaBitrates(sdp));
+}
+
+// Alıcı taraf: ekran sesi AYRI bir <audio> üzerinden çalar. peer.audioEl'e
+// KARIŞTIRILMAZ — yoksa tek slider iki sesi birden kısar ve mikrofon için
+// kurulmuş gain zinciri müziği de etkilerdi.
+// NOT: Paylaşım bitip yeniden başladığında ontrack TEKRAR TETİKLENMEZ
+// (replaceTrack aynı uzak track üzerinden çalışır). Bu yüzden burada kurulan
+// eleman/zincir paylaşım bitince YIKILMAZ, yalnızca sessizleşir.
+function attachPeerScreenAudio(peerId, peer, e) {
+  const stream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
+  if (!peer.screenAudioEl) {
+    const a = document.createElement('audio');
+    a.autoplay = true;
+    a.style.display = 'none';
+    applySpeakerTo(a); // hoparlör seçimi ekran sesi için de geçerli
+    document.body.appendChild(a);
+    peer.screenAudioEl = a;
+  }
+  peer.screenRawAudioStream = stream;
+  if (peer.screenGainNode && peer.screenGainSrc && state.remoteAudioCtx) {
+    // Yeniden müzakerede zincir korunur (mikrofon kanalındaki desenin aynısı).
+    try { peer.screenGainSrc.disconnect(); } catch (err) {}
+    peer.screenGainSrc = state.remoteAudioCtx.createMediaStreamSource(stream);
+    peer.screenGainSrc.connect(peer.screenGainNode);
+    if (peer.screenVolPump) peer.screenVolPump.srcObject = stream;
+  } else {
+    peer.screenAudioEl.srcObject = stream;
+  }
+  applyPeerVolume(peerId, 'screen');
+  peer.screenAudioEl.play().catch(err => console.warn('Ekran sesi oynatılamadı:', err));
+  // Ekran sesi KONUŞMA ALGILAMASINA sokulmaz: müzik/oyun sesi kişiyi
+  // "konuşuyor" gibi göstermemeli.
+  console.log(`🔊 Ekran sesi track'i alındı: ${peer.name}`);
 }
 
 function sendSignalToPeer(peerId, signal) {
@@ -3535,7 +3976,7 @@ async function attemptIceRestart(peerId) {
     }
     applyIceEscalationPolicy(peer);
     const offer = await peer.pc.createOffer({ iceRestart: true });
-    offer.sdp = setMediaBitrates(offer.sdp);
+    offer.sdp = applyAudioSdpParams(offer.sdp);
     peer.localCandidates = []; // ICE restart yeni ufrag üretir; eski adaylar geçersiz
     await peer.pc.setLocalDescription(offer);
     console.log(`🔄 ICE restart offer gönderiliyor → ${peer.name}`);
@@ -3556,10 +3997,44 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
     pc.addTrack(track, state.localStream);
   });
 
+  // Mikrofon transceiver'ını burada yakalıyoruz: ekran sesi transceiver'ını
+  // ararken onu KESİN olarak elemek için tek güvenilir referans budur.
+  let micTransceiver = null;
+  try {
+    micTransceiver = pc.getTransceivers().find(t => t.sender && t.sender.track && t.sender.track.kind === 'audio') || null;
+  } catch (e) {}
+
+  // Ekran sesi için FAZLADAN ses m-line'ı: yalnızca offer'ı üreten taraf açar.
+  // Answerer'da bu transceiver setRemoteDescription sırasında kendiliğinden
+  // oluşur ve adoptScreenAudioTransceiver ile sahiplenilir (bkz. processSignal).
+  // Böylece karşı taraf ESKİ SÜRÜMSE answerer hiç fazladan m-line üretmez.
+  let screenAudioTransceiver = null;
+  if (isInitiator) {
+    try {
+      screenAudioTransceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
+    } catch (e) {
+      console.warn('Ekran sesi kanalı açılamadı (eski davranışa dönülüyor):', e && e.message ? e.message : e);
+    }
+  }
+
   const sender = getVideoSender(pc);
   if (sender) {
     if (state.isSharing && state.screenStream) {
-      sender.replaceTrack(state.screenStream.getVideoTracks()[0]);
+      // Paylaşım sürerken katılan peer de aynı bit hızı sınırını almalı;
+      // aksi halde geç gelenler sınırsız gönderim alır.
+      sender.replaceTrack(state.screenStream.getVideoTracks()[0])
+        .then(() => limitVideoBitrate(sender))
+        .catch(console.error);
+    }
+  }
+  // Zaten paylaşım yapıyorsak, offer üretilmeden ÖNCE ekran sesini takıyoruz —
+  // böylece m-line en baştan track'li gider.
+  if (screenAudioTransceiver && state.isSharing && state.screenStream) {
+    const scrAudio = state.screenStream.getAudioTracks()[0];
+    if (scrAudio) {
+      screenAudioTransceiver.sender.replaceTrack(scrAudio)
+        .then(() => applyScreenAudioQuality(screenAudioTransceiver.sender))
+        .catch(e => console.warn('Ekran sesi takılamadı:', e && e.message ? e.message : e));
     }
   }
 
@@ -3618,6 +4093,15 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
     console.log(`🎵 Track received from ${peerName}:`, e.track.kind);
 
     if (e.track.kind === 'audio') {
+      // Mikrofon mu ekran sesi mi? İSİM/SIRA tahmini yapılmaz: gelen track'in
+      // transceiver referansı ekran sesi transceiver'ıyla karşılaştırılır.
+      // (adopt burada çağrılır çünkü answerer'da ontrack, setRemoteDescription
+      // sonrası sahiplenme adımından ÖNCE tetiklenebiliyor.)
+      adoptScreenAudioTransceiver(peer);
+      if (peer.screenAudioTransceiver && e.transceiver && peer.screenAudioTransceiver === e.transceiver) {
+        attachPeerScreenAudio(peerId, peer, e);
+        return;
+      }
       const audioStream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
       peer.rawAudioStream = audioStream;
       if (peer.gainNode && peer.gainSrc && state.remoteAudioCtx) {
@@ -3677,6 +4161,12 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
     mic: true,
     deaf: false,
     sharing: false,
+    // Ekran sesi kanalı: karşı taraf sistem sesi paylaşıyorsa true olur
+    // (bkz. 'sharing' mesajı). Slider yalnızca bu doğruyken gösterilir.
+    screenAudio: false,
+    // Sıra tahminine güvenmemek için transceiver referansları saklanır.
+    micTransceiver,
+    screenAudioTransceiver,
     ip: peerIp,
     isInitiator,
     lastSeen: Date.now()
@@ -3684,7 +4174,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
 
   if (isInitiator) {
     const offer = await pc.createOffer();
-    offer.sdp = setMediaBitrates(offer.sdp);
+    offer.sdp = applyAudioSdpParams(offer.sdp);
     await pc.setLocalDescription(offer);
     sendSignalToPeer(peerId, { type: 'offer', sdp: offer });
   }
@@ -3800,7 +4290,11 @@ function setupDataChannel(peerId, dc) {
             noiseSuppressionEnabled: !!state.useAI
           }));
         }
-        if (state.isSharing) dc.send(JSON.stringify({ type: 'sharing', sharing: true }));
+        if (state.isSharing) dc.send(JSON.stringify({
+          type: 'sharing',
+          sharing: true,
+          audio: !!(state.screenStream && state.screenStream.getAudioTracks().length)
+        }));
         if (state.lobbies && state.lobbies.length > 0) {
           dc.send(JSON.stringify({ type: 'lobby-list-sync', lobbies: state.lobbies }));
         }
@@ -4225,6 +4719,9 @@ async function handleDataMessage(peerId, msg) {
     updateUserUI(peerId);
   } else if (msg.type === 'sharing') {
     peer.sharing = msg.sharing;
+    // Eski sürümler 'audio' alanını göndermez → undefined → false: ekran sesi
+    // slider'ı gösterilmez, davranış eskisiyle birebir aynı kalır.
+    peer.screenAudio = !!(msg.sharing && msg.audio);
     if (msg.sharing) {
       addVideoCard(peerId, displayName(peerId, peer.name), peer.videoEl, true);
     } else {
@@ -4368,6 +4865,7 @@ async function handleDataMessage(peerId, msg) {
       if (peer.videoEl.srcObject) {
         document.getElementById('remote-vid').srcObject = peer.videoEl.srcObject;
       }
+      updateControlRequestButton(peerId); // karttaki düğme "Denetimde" olur
     } else {
       const reasonText = msg.reason === 'not-sharing'
         ? 'Ekran paylaşılmadığı için denetim isteği gönderilemedi.'
@@ -4416,6 +4914,42 @@ async function handleDataMessage(peerId, msg) {
       }
       pendingTakeoverPoint = null;
     }
+  } else if (msg.type === 'ctrl-offer') {
+    // GÖREV 3 — ters yön: EKRANI PAYLAŞAN kişi istek beklemeden denetim teklif
+    // etti. Otomatik ele geçirme YOK; izleyici açıkça kabul etmelidir.
+    if (!peer.sharing) {
+      broadcastTo(peerId, { type: 'ctrl-offer-res', accepted: false, reqId: msg.reqId, reason: 'not-sharing' });
+    } else if (state.activeControl || state.incomingControlOffer) {
+      broadcastTo(peerId, { type: 'ctrl-offer-res', accepted: false, reqId: msg.reqId, reason: 'busy' });
+    } else {
+      showControlOfferNote(peerId, displayName(peerId, peer.name), msg.reqId);
+    }
+  } else if (msg.type === 'ctrl-offer-cancel') {
+    if (state.incomingControlOffer && state.incomingControlOffer.peerId === peerId) {
+      closeCtrlOfferNote();
+      showToast('Denetim teklifi geri çekildi.', 'info');
+    }
+  } else if (msg.type === 'ctrl-offer-res') {
+    // Paylaşan taraf: teklif ettiğim kişi yanıtladı.
+    if (!state.pendingControlOffer || state.pendingControlOffer.peerId !== peerId) return;
+    clearControlOffer();
+    if (!msg.accepted) {
+      showToast(msg.reason === 'busy'
+        ? 'Kullanıcı şu anda başka bir denetim oturumunda.'
+        : 'Denetim teklifi reddedildi.', 'warn');
+      return;
+    }
+    if (!state.isSharing) {
+      broadcastTo(peerId, { type: 'ctrl-res', accepted: false, reqId: msg.reqId, reason: 'not-sharing' });
+      return;
+    }
+    if (state.controlledBy) {
+      broadcastTo(peerId, { type: 'ctrl-res', accepted: false, reqId: msg.reqId, reason: 'busy' });
+      return;
+    }
+    // Oturum, isteğe dayalı akışla BİREBİR aynı şekilde açılır (ctrl-res);
+    // karşı tarafta paralel bir kod yolu yoktur.
+    grantControlTo(peerId, msg.reqId);
   } else if (msg.type === 'ctrl-event') {
     // DİKKAT: activeControl kontrol EDEN tarafta tutulur; kontrol EDİLEN taraf
     // gelen girdileri controlledBy üzerinden doğrular. (Önceden activeControl'e
@@ -4439,6 +4973,74 @@ async function handleDataMessage(peerId, msg) {
 
 
 
+// ================= KONUŞMA ALGILAMA: TEK MERKEZLİ DÖNGÜ =================
+// ESKİ TASARIM (ve iki ayrı hatası):
+//   Her katılımcı için AYRI bir requestAnimationFrame zinciri koşuyordu.
+//   1) CPU: rAF ekran tazeleme hızında çalışır. Ölçüm (4 sahte peer, bu makine):
+//      saniyede 800 geri çağırma, 18.6 ms/s saf JS — üstelik rAF zinciri asla
+//      boşa düşmediği için Chromium çizim hattını sürekli ~200 fps'te tutuyordu.
+//      Oysa iş sadece "konuşuyor" noktasını yakıp söndürmek.
+//   2) ALT+TAB: rAF arka planda kısılır. Ölçüm: pencere simge durumuna
+//      küçültülünce hız 801/s -> 282/s'ye düştü (-65%). Bu döngü aynı zamanda
+//      askıya alınan AudioContext'i dirilten (resume) TEK yerdi ve
+//      state.speakingPeers'ı besliyordu; speakingPeers ise Yankı Kalkanı'nın
+//      (echoDuck) girdisi. Yani arka planda: gelen ses zinciri (ensurePeerBoostChain
+//      remoteAudioCtx üzerinden akar) askıda kalabiliyor -> GELEN ses bozuluyor;
+//      bayat speakingPeers yüzünden mikrofon kazancı 0.1'de takılı kalıyor ->
+//      GİDEN ses bozuluyor.
+// YENİ TASARIM: tüm katılımcılar tek bir setInterval'de, sabit ~16 Hz'de
+// taranır. setInterval backgroundThrottling:false ile arka planda da işler
+// (ölçümle doğrulandı: VU kapısı simge durumundayken de tam 20/s koştu).
+const SPEAKING_POLL_MS = 60; // ~16 Hz: göz için yeterli, rAF'in 1/12'si kadar iş
+const speakingNodes = new Map(); // peerId -> { source, analyser, silentGain, data }
+let speakingLoopTimer = null;
+
+function releaseSpeakingNode(peerId) {
+  const n = speakingNodes.get(peerId);
+  if (!n) return;
+  try { n.source.disconnect(); } catch (e) {}
+  try { n.analyser.disconnect(); } catch (e) {}
+  try { n.silentGain.disconnect(); } catch (e) {}
+  speakingNodes.delete(peerId);
+}
+
+function runSpeakingDetection() {
+  // AudioContext canlı tutma: Windows arka plana atınca/EcoQoS devreye girince
+  // bağlam 'suspended'a düşebiliyor. remoteAudioCtx yalnızca göstergeyi değil,
+  // %100 üzeri ses güçlendirmesi açık olan kişilerin GELEN sesini de taşır
+  // (bkz. ensurePeerBoostChain) — askıda kalırsa o kişileri hiç duyamazsınız.
+  const audioCtx = state.remoteAudioCtx;
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  if (state.gateAudioCtx && state.gateAudioCtx.state === 'suspended') {
+    state.gateAudioCtx.resume().catch(() => {});
+  }
+
+  speakingNodes.forEach((n, peerId) => {
+    if (!state.peers.has(peerId)) { releaseSpeakingNode(peerId); return; }
+    n.analyser.getByteFrequencyData(n.data);
+    let sum = 0;
+    for (let i = 0; i < n.data.length; i++) sum += n.data[i];
+    const avg = sum / n.data.length;
+    const speaking = avg > 15;
+    // Kirli-kontrol: DOM'a yalnızca durum GERÇEKTEN değiştiğinde dokunulur.
+    if (speaking) {
+      if (!state.speakingPeers.has(peerId)) {
+        state.speakingPeers.set(peerId, true);
+        updateUserUI(peerId);
+      }
+    } else if (state.speakingPeers.has(peerId)) {
+      state.speakingPeers.delete(peerId);
+      updateUserUI(peerId);
+    }
+  });
+
+  // Kimse kalmadıysa döngüyü tamamen durdur (boştayken sıfır CPU).
+  if (speakingNodes.size === 0) {
+    clearInterval(speakingLoopTimer);
+    speakingLoopTimer = null;
+  }
+}
+
 function setupSpeakingDetection(peerId, stream) {
   const peer = state.peers.get(peerId);
   if (!state.remoteAudioCtx || state.remoteAudioCtx.state === 'closed') {
@@ -4448,6 +5050,7 @@ function setupSpeakingDetection(peerId, stream) {
   if (audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {});
   }
+  releaseSpeakingNode(peerId); // aynı peer için yeniden kurulum: eskisini sızdırma
   const source = audioCtx.createMediaStreamSource(stream);
   const analyser = audioCtx.createAnalyser();
   analyser.fftSize = 512;
@@ -4464,35 +5067,11 @@ function setupSpeakingDetection(peerId, stream) {
     peer.silentGain = silentGain;
   }
 
-  const data = new Uint8Array(analyser.frequencyBinCount);
-  function check() {
-    if (!state.peers.has(peerId)) {
-      try { source.disconnect(); } catch(e) {}
-      try { analyser.disconnect(); } catch(e) {}
-      try { silentGain.disconnect(); } catch(e) {}
-      return;
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
-    }
-    analyser.getByteFrequencyData(data);
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) sum += data[i];
-    const avg = sum / data.length;
-    if (avg > 15) {
-      if (!state.speakingPeers.has(peerId)) {
-        state.speakingPeers.set(peerId, true);
-        updateUserUI(peerId);
-      }
-    } else {
-      if (state.speakingPeers.has(peerId)) {
-        state.speakingPeers.delete(peerId);
-        updateUserUI(peerId);
-      }
-    }
-    requestAnimationFrame(check);
-  }
-  check();
+  speakingNodes.set(peerId, {
+    source, analyser, silentGain,
+    data: new Uint8Array(analyser.frequencyBinCount)
+  });
+  if (!speakingLoopTimer) speakingLoopTimer = setInterval(runSpeakingDetection, SPEAKING_POLL_MS);
 }
 
 // Odayı yönetebilme yetkisi: kurucu her zaman yetkili, moderatörler ise
@@ -4620,14 +5199,25 @@ function isPeerScreenOpen(peerId) {
   return Boolean(peer && peer.sharing && screenShare && screenShare.joined && screenCard);
 }
 
+// Denetim düğmesi iki yerde bulunur: katılımcı listesindeki küçük 🖱️ ve
+// izlenen ekran kartının üzerindeki "Denetle" düğmesi (bkz. addVideoCard).
+// İkisi de aynı koşula bağlıdır, bu yüzden hepsi birlikte güncellenir.
 function updateControlRequestButton(peerId) {
-  const button = document.querySelector(`[data-ctrl="${peerId}"]`);
-  if (!button) return;
+  const buttons = document.querySelectorAll(`[data-ctrl="${peerId}"]`);
+  if (!buttons.length) return;
   const canRequestControl = isPeerScreenOpen(peerId);
-  button.disabled = !canRequestControl;
-  button.title = canRequestControl
-    ? 'Uzaktan kontrol iste'
-    : 'Kontrol isteği göndermek için önce ekran paylaşımını açın';
+  const active = !!(state.activeControl && state.activeControl.hostId === peerId);
+  buttons.forEach((button) => {
+    button.disabled = !canRequestControl && !active;
+    button.classList.toggle('is-active', active);
+    button.title = active
+      ? 'Denetim penceresini aç'
+      : (canRequestControl
+        ? 'Uzaktan kontrol iste'
+        : 'Kontrol isteği göndermek için önce ekran paylaşımını açın');
+    const label = button.querySelector('span');
+    if (label) label.textContent = active ? 'Denetimde' : 'Denetle';
+  });
 }
 
 function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) {
@@ -4764,6 +5354,66 @@ function showRoomUserProfile(targetId, targetName) {
   });
 }
 
+// Sağ tık menüsündeki ses bloğu. channel: 'mic' | 'screen'. Tek gövde, iki
+// kanal — data-volchan sayesinde syncPeerVolumeControls ikisini de tanır.
+function buildMenuVolumeBlock(targetId, channel, labelText, hintText) {
+  const chan = AUDIO_CHANNEL_FIELDS[channel] ? channel : 'mic';
+  const volWrap = document.createElement('div');
+  volWrap.className = 'ucm-vol' + (chan === 'screen' ? ' ucm-vol-screen' : '');
+  volWrap.dataset.volfor = targetId;
+  volWrap.dataset.volrole = 'wrap';
+  volWrap.dataset.volchan = chan;
+  const volHeader = document.createElement('div');
+  volHeader.className = 'ucm-vol-header';
+  const volLabel = document.createElement('span');
+  volLabel.textContent = labelText;
+  const volVal = document.createElement('span');
+  volVal.className = 'ucm-vol-val';
+  volVal.dataset.volfor = targetId;
+  volVal.dataset.volrole = 'value';
+  volVal.dataset.volchan = chan;
+  volHeader.appendChild(volLabel);
+  volHeader.appendChild(volVal);
+
+  const volRow = document.createElement('div');
+  volRow.className = 'ucm-vol-row';
+  const volMute = document.createElement('button');
+  volMute.className = 'ucm-vol-mute';
+  volMute.type = 'button';
+  volMute.dataset.volfor = targetId;
+  volMute.dataset.volrole = 'icon';
+  volMute.dataset.volchan = chan;
+  const volRange = document.createElement('input');
+  volRange.type = 'range';
+  volRange.className = 'ucm-vol-slider';
+  volRange.dataset.volfor = targetId;
+  volRange.dataset.volrole = 'slider';
+  volRange.dataset.volchan = chan;
+  volRange.min = '0';
+  volRange.max = '200';
+  volRange.step = '1';
+
+  volRange.addEventListener('input', (ev) => {
+    setUserVolumePercent(targetId, quantizeVolumePercent(parseInt(ev.target.value, 10) || 0), chan);
+  });
+  // Çift tık → %100 (varsayılan)
+  volRange.addEventListener('dblclick', () => setUserVolumePercent(targetId, 100, chan));
+  volMute.addEventListener('click', () => togglePeerMute(targetId, chan));
+
+  const volHint = document.createElement('div');
+  volHint.className = 'ucm-vol-hint';
+  volHint.textContent = hintText;
+
+  // Slider'a tıklamak menüyü kapatmasın
+  volWrap.addEventListener('click', (ev) => ev.stopPropagation());
+  volRow.appendChild(volMute);
+  volRow.appendChild(volRange);
+  volWrap.appendChild(volHeader);
+  volWrap.appendChild(volRow);
+  volWrap.appendChild(volHint);
+  return volWrap;
+}
+
 function showUserContextMenu(e, targetId, targetName) {
   const existing = document.getElementById('user-custom-context-menu');
   if (existing) existing.remove();
@@ -4795,36 +5445,18 @@ function showUserContextMenu(e, targetId, targetName) {
   menu.appendChild(title);
 
   // Kişi Bazlı Ses Seviyesi (Discord tarzı): %0–%200, sadece bu cihazda geçerli.
-  const volWrap = document.createElement('div');
-  volWrap.className = 'ucm-vol';
-  const volHeader = document.createElement('div');
-  volHeader.className = 'ucm-vol-header';
-  const volLabel = document.createElement('span');
-  volLabel.textContent = '🔊 Kullanıcı Ses Seviyesi';
-  const volVal = document.createElement('span');
-  volVal.className = 'ucm-vol-val';
-  const curVol = Math.round(getUserVolume(targetId) * 100);
-  volVal.textContent = `%${curVol}`;
-  volHeader.appendChild(volLabel);
-  volHeader.appendChild(volVal);
-  const volRange = document.createElement('input');
-  volRange.type = 'range';
-  volRange.className = 'ucm-vol-slider';
-  volRange.min = '0';
-  volRange.max = '200';
-  volRange.step = '5';
-  volRange.value = String(curVol);
-  volRange.addEventListener('input', (ev) => {
-    const pct = parseInt(ev.target.value, 10) || 0;
-    volVal.textContent = `%${pct}`;
-    volVal.style.color = pct > 100 ? 'var(--warn, #f59e0b)' : '';
-    setUserVolume(targetId, pct / 100);
-  });
-  // Slider'a tıklamak menüyü kapatmasın
-  volWrap.addEventListener('click', (ev) => ev.stopPropagation());
-  volWrap.appendChild(volHeader);
-  volWrap.appendChild(volRange);
-  menu.appendChild(volWrap);
+  // Yüzde ALGISAL ölçektedir (bkz. volumePercentToGain): %50 gerçekten "yarı
+  // kadar yüksek" duyulur. Sessize alma düğmesi, çift tıkla %100'e sıfırlama ve
+  // Shift ile %1'lik ince adım desteklenir.
+  menu.appendChild(buildMenuVolumeBlock(targetId, 'mic', 'Kullanıcı Ses Seviyesi', 'Çift tık: %100 • Shift: ince ayar'));
+
+  // Ekran (sistem) sesi satırı yalnızca kişi ses paylaşıyorken görünür.
+  const menuPeer = state.peers.get(targetId);
+  if (menuPeer && menuPeer.screenAudio) {
+    menu.appendChild(buildMenuVolumeBlock(targetId, 'screen', '🖥 Ekran Sesi', 'Müzik/oyun sesi — mikrofondan bağımsız'));
+  }
+  // (Boyama, menü body'ye eklendikten sonra yapılır — bkz. aşağıdaki
+  // syncPeerVolumeControls çağrısı; sync belge genelinde arama yapar.)
 
   // Profile Button
   const profileBtn = document.createElement('button');
@@ -4887,23 +5519,39 @@ function showUserContextMenu(e, targetId, targetName) {
   });
   menu.appendChild(msgBtn);
 
-  // Remote Control Button
-  const ctrlBtn = document.createElement('button');
-  ctrlBtn.className = 'user-context-menu-item';
-  const targetPeer = state.peers.get(targetId);
-  const canRequestControl = isPeerScreenOpen(targetId);
-  ctrlBtn.disabled = !canRequestControl;
-  ctrlBtn.title = canRequestControl
-    ? ''
-    : (targetPeer && targetPeer.sharing
-      ? 'Kontrol isteği göndermek için önce ekran paylaşımını açın.'
-      : 'Denetim izni yalnızca ekran paylaşılırken istenebilir.');
-  ctrlBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> ' + (canRequestControl ? 'Uzaktan Kontrol İste' : (targetPeer && targetPeer.sharing ? 'Önce ekranı açın' : 'Ekran paylaşılmıyor'));
-  ctrlBtn.addEventListener('click', () => {
-    requestControl(targetId);
-    menu.remove();
-  });
-  menu.appendChild(ctrlBtn);
+  // GÖREV 2 notu: "Uzaktan Kontrol İste" buradan KALDIRILDI. Denetim istemek
+  // artık izlenen ekranın üzerindeki "🖱️ Denetle" düğmesiyle tek tıkla yapılır
+  // (bkz. addVideoCard) — araya seçim menüsü girmez.
+
+  // GÖREV 3: Ters yön — EKRANI PAYLAŞAN kişi, istek beklemeden bir izleyiciye
+  // denetim verebilir. Bu satır yalnızca kendi ekranımı paylaşırken görünür.
+  if (state.isSharing) {
+    const grantBtn = document.createElement('button');
+    grantBtn.className = 'user-context-menu-item';
+    const controllingThis = state.controlledBy === targetId;
+    const busyWithOther = !!state.controlledBy && !controllingThis;
+    const offerPending = !!(state.pendingControlOffer && state.pendingControlOffer.peerId === targetId);
+    if (controllingThis) {
+      grantBtn.classList.add('danger');
+      grantBtn.innerHTML = '⛔ Denetimi Geri Al';
+      grantBtn.addEventListener('click', () => {
+        stopBeingControlled(true);
+        showToast('Denetim geri alındı.', 'info');
+        menu.remove();
+      });
+    } else {
+      grantBtn.disabled = busyWithOther || offerPending;
+      grantBtn.title = busyWithOther
+        ? 'Denetim şu anda başka bir kullanıcıda.'
+        : (offerPending ? 'Denetim teklifi gönderildi, yanıt bekleniyor.' : 'Bu kişiye denetim ver (istemesini beklemeden)');
+      grantBtn.innerHTML = '🎮 ' + (offerPending ? 'Teklif gönderildi…' : 'Denetim Ver');
+      grantBtn.addEventListener('click', () => {
+        offerControl(targetId);
+        menu.remove();
+      });
+    }
+    menu.appendChild(grantBtn);
+  }
 
   // Close Button
   const closeBtn = document.createElement('button');
@@ -4916,6 +5564,7 @@ function showUserContextMenu(e, targetId, targetName) {
   menu.appendChild(closeBtn);
 
   document.body.appendChild(menu);
+  syncPeerVolumeControls(targetId); // ses satırını mevcut değerle boya
 
   const closeHandler = (event) => {
     if (!menu.contains(event.target)) {
@@ -5305,6 +5954,58 @@ function removeInactiveOverlay(cardId) {
   }
 }
 
+// Kart üstündeki ses kutusu. channel: 'mic' | 'screen'. İki kanal da AYNI
+// yapıyı kullanır; yalnızca data-volchan ve etiket değişir — böylece
+// syncPeerVolumeControls tek bir seçiciyle ikisini de boyar.
+function buildCardVolumeBox(peerId, channel) {
+  const chan = AUDIO_CHANNEL_FIELDS[channel] ? channel : 'mic';
+  const volBox = document.createElement('div');
+  volBox.className = 'vcard-vol' + (chan === 'screen' ? ' vcard-vol-screen' : '');
+  if (chan === 'screen') volBox.title = 'Ekran (sistem) sesi — mikrofondan bağımsız';
+
+  if (chan === 'screen') {
+    const tag = document.createElement('span');
+    tag.className = 'vcard-vol-tag';
+    tag.textContent = '🖥';
+    volBox.appendChild(tag);
+  }
+
+  const muteBtn = document.createElement('button');
+  muteBtn.className = 'vcard-vol-btn';
+  muteBtn.dataset.volfor = peerId;
+  muteBtn.dataset.volrole = 'icon';
+  muteBtn.dataset.volchan = chan;
+  muteBtn.type = 'button';
+  const slider = document.createElement('input');
+  slider.type = 'range'; slider.className = 'vol-slider';
+  slider.min = '0'; slider.max = '200'; slider.step = '1';
+  slider.dataset.volfor = peerId;
+  slider.dataset.volrole = 'slider';
+  slider.dataset.volchan = chan;
+  const val = document.createElement('span');
+  val.className = 'vcard-vol-val';
+  val.dataset.volfor = peerId;
+  val.dataset.volrole = 'value';
+  val.dataset.volchan = chan;
+  slider.addEventListener('input', (e) => {
+    setUserVolumePercent(peerId, quantizeVolumePercent(parseInt(e.target.value, 10) || 0), chan);
+  });
+  // Çift tık: %100'e (varsayılana) sıfırla.
+  slider.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    setUserVolumePercent(peerId, 100, chan);
+  });
+  muteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePeerMute(peerId, chan);
+  });
+  [slider, volBox].forEach(el => el.addEventListener('click', e => e.stopPropagation()));
+  volBox.appendChild(muteBtn);
+  volBox.appendChild(slider);
+  volBox.appendChild(val);
+  return volBox;
+}
+
 function addVideoCard(peerId, peerName, videoEl, isScreen) {
   if (document.getElementById(`vc-${peerId}-${isScreen ? 's' : 'c'}`)) return;
   const card = document.createElement('div');
@@ -5314,8 +6015,11 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
   videoEl.autoplay = true;
   videoEl.playsInline = true;
   
-  if (peerId === 'self') videoEl.muted = true;
-  else videoEl.muted = false;
+  // Kişinin sesi TEK oynatıcıdan (peer.audioEl) çıkar. Video elemanı da aynı
+  // MediaStream'i taşır (mikrofon ve video aynı akışta gelir); sesi açık
+  // bırakılırsa kişi ÇİFT duyulur ve kart slider'ı yalnızca bu ikinci kopyayı
+  // kısar — "ekran paylaşımında ses kısma" tuhaflığının kaynağı buydu.
+  videoEl.muted = true;
 
   videoEl.play().catch(err => console.warn('videoEl play failed in addVideoCard:', err));
 
@@ -5323,24 +6027,55 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
   lbl.className = 'vlbl';
   lbl.innerHTML = `<span class="live"></span> ${escapeHtml(peerName)} ${isScreen ? '• Ekran' : ''}`;
   card.appendChild(lbl);
-  
+
   if (peerId !== 'self') {
     const actions = document.createElement('div');
     actions.className = 'card-actions';
-    const slider = document.createElement('input');
-    slider.type = 'range'; slider.className = 'vol-slider';
-    slider.min = '0'; slider.max = '1'; slider.step = '0.05'; slider.value = '1';
-    slider.title = 'Ses Seviyesi';
-    slider.addEventListener('input', e => { videoEl.volume = e.target.value; });
-    slider.addEventListener('click', e => e.stopPropagation());
-    actions.appendChild(slider);
+
+    // Kart slider'ı da kişi bazlı ses ayarının (state.userVolumes) ta kendisini
+    // sürer: sağ tık menüsüyle aynı değeri gösterir, ikisi birbirini ezmez.
+    actions.appendChild(buildCardVolumeBox(peerId, 'mic'));
+
+    // Ekran sesi (sistem sesi) MİKROFONDAN AYRI kısılır. Yalnızca o kişi
+    // gerçekten ses paylaşıyorken görünür (peer.screenAudio, 'sharing'
+    // mesajının audio bayrağından gelir; eski sürümlerde hiç gelmez).
+    const shPeer = state.peers.get(peerId);
+    if (isScreen && shPeer && shPeer.screenAudio) {
+      actions.appendChild(buildCardVolumeBox(peerId, 'screen'));
+    }
+
+    // GÖREV 2: "izliyorum → tek tıkla denetle". Ayrı bir menü/panel açılmaz;
+    // denetim düğmesi izlenen ekranın üstünde durur.
+    if (isScreen) {
+      const ctrlBtn = document.createElement('button');
+      ctrlBtn.className = 'vcard-ctrl-btn';
+      ctrlBtn.type = 'button';
+      ctrlBtn.dataset.ctrl = peerId;
+      ctrlBtn.innerHTML = '🖱️ <span>Denetle</span>';
+      ctrlBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Zaten denetim oturumu açıksa düğme pencereyi geri getirir.
+        if (state.activeControl && state.activeControl.hostId === peerId) {
+          document.getElementById('remote-modal').classList.remove('hidden');
+          return;
+        }
+        requestControl(peerId);
+      });
+      actions.appendChild(ctrlBtn);
+    }
+
     card.appendChild(actions);
   }
 
   makeCardFocusable(card);
   document.getElementById('grid').appendChild(card);
   updateEmptyGrid();
-  
+  // Kart DOM'a girdikten SONRA boyanır (sync belge genelinde arar).
+  if (peerId !== 'self') {
+    syncPeerVolumeControls(peerId);
+    updateControlRequestButton(peerId);
+  }
+
   if (isScreen && peerId !== 'self') {
     if (!state.screenShares) state.screenShares = {};
     if (!state.screenShares[peerId]) state.screenShares[peerId] = { joined: false };
@@ -5350,7 +6085,8 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
       showInactiveOverlay(card.id, 'Ekran Paylaşımı', () => {
          state.screenShares[peerId].joined = true;
          removeInactiveOverlay(card.id);
-         videoEl.muted = false;
+         // videoEl sessiz kalır: kişinin sesi peer.audioEl'den çıkar (çift ses
+         // olmasın), ses seviyesi kart slider'ı / sağ tık menüsünden ayarlanır.
          updateControlRequestButton(peerId);
          if (!focusedCard) toggleFocus(card);
          videoEl.play().catch(err => console.warn('videoEl play failed on join click:', err));
@@ -5671,6 +6407,21 @@ const I18N = {
     'room.chat': 'SOHBET',
     'room.waiting': 'Bağlantı Bekleniyor',
     'room.waitingDesc': 'Aynı oda anahtarını yazan biri bağlanınca burada görünecek.',
+    // Sohbet/DM görsel önizleme (lightbox) katmanı
+    'viewer.title': 'Görsel Önizleme',
+    'viewer.download': 'İndir',
+    'viewer.copy': 'Panoya Kopyala',
+    'viewer.copied': 'Görsel panoya kopyalandı.',
+    'viewer.copyFailed': 'Görsel panoya kopyalanamadı.',
+    'viewer.zoomIn': 'Yakınlaştır',
+    'viewer.zoomOut': 'Uzaklaştır',
+    'viewer.rotateLeft': 'Sola Döndür',
+    'viewer.rotateRight': 'Sağa Döndür',
+    'viewer.prev': 'Önceki Görsel',
+    'viewer.next': 'Sonraki Görsel',
+    'viewer.fit': 'Sığdır',
+    'viewer.actualSize': 'Gerçek Boyut',
+    'viewer.toggleSize': 'Gerçek Boyut / Sığdır',
     'share.chooseSource': 'Ekran / Pencere Seç',
     'share.systemAudio': 'Sistem Sesini de Paylaş',
     'toolbar.voice': 'Ses',
@@ -5855,6 +6606,21 @@ const I18N = {
     'room.chat': 'CHAT',
     'room.waiting': 'Waiting for Connection',
     'room.waitingDesc': 'Anyone entering the same room key will appear here.',
+    // Chat/DM image preview (lightbox) layer
+    'viewer.title': 'Image Preview',
+    'viewer.download': 'Download',
+    'viewer.copy': 'Copy to Clipboard',
+    'viewer.copied': 'Image copied to the clipboard.',
+    'viewer.copyFailed': 'The image could not be copied.',
+    'viewer.zoomIn': 'Zoom In',
+    'viewer.zoomOut': 'Zoom Out',
+    'viewer.rotateLeft': 'Rotate Left',
+    'viewer.rotateRight': 'Rotate Right',
+    'viewer.prev': 'Previous Image',
+    'viewer.next': 'Next Image',
+    'viewer.fit': 'Fit',
+    'viewer.actualSize': 'Actual Size',
+    'viewer.toggleSize': 'Actual Size / Fit',
     'share.chooseSource': 'Choose a Screen / Window',
     'share.systemAudio': 'Share System Audio',
     'toolbar.voice': 'Voice',
@@ -6022,6 +6788,82 @@ Object.assign(I18N.en, {
   'alert.alreadyFriend': 'This person is already your friend!',
   'alert.error': 'Error',
   'alert.serverIdRequired': 'Enter a Server ID!'
+});
+
+// Ayarlar → Kısayollar paneli ve merkezi bastırma kapısının metinleri.
+Object.assign(I18N.tr, {
+  'settings.shortcuts': 'Kısayollar',
+  'settings.shortcutsLead': 'Klavye kısayollarını aç, kapat veya yeniden ata.',
+  'settings.shortcutsMaster': 'Kısayolları Etkinleştir',
+  'settings.shortcutsMasterDesc': 'Kapatıldığında uygulamanın tüm klavye kısayolları devre dışı kalır.',
+  'settings.shortcutsListTitle': 'Kısayol listesi',
+  'settings.shortcutsResetAll': 'Tümünü varsayılana döndür',
+  'settings.shortcutRebind': 'Değiştirmek için tıkla',
+  'settings.shortcutListening': 'Tuşa basın…',
+  'settings.shortcutReset': 'Varsayılana döndür',
+  'settings.shortcutConflict': 'Bu tuş başka bir kısayolda kullanılıyor',
+  'settings.shortcutUpdated': 'Kısayol güncellendi.',
+  'settings.shortcutUnassigned': 'Atanmadı',
+  'settings.shortcutsSafetyTitle': 'Her zaman açık güvenlik kısayolları',
+  'settings.shortcutsSafetyDesc': 'Bu kısayollar kapatılamaz ve hiçbir durumda bastırılmaz.',
+  'settings.shortcutsKillSwitch': 'Ctrl+X ×2 — uzaktan denetimi anında kes',
+  'settings.shortcutsEscape': 'Esc — denetimden ve odak modundan çık',
+  'settings.shortcutsPaused': 'Kısayollar duraklatıldı',
+  'settings.shortcutsPausedDesc': 'Denetim, etkinlik ve yazı yazarken kısayollar otomatik olarak duraklatılır.',
+  'settings.shortcutsPttNote': 'Aç/kapat: Ses ve Görüntü sekmesi',
+  'settings.shortcutsAllOn': 'Kısayollar açıldı.',
+  'settings.shortcutsAllOff': 'Kısayollar kapatıldı.',
+  'shortcut.mic': 'Mikrofonu aç/kapat',
+  'shortcut.micDesc': 'Kendi mikrofonunu susturur veya açar.',
+  'shortcut.deafen': 'Sağırlaştır',
+  'shortcut.deafenDesc': 'Tüm sesleri kapatır ve mikrofonunu susturur.',
+  'shortcut.camera': 'Kamera',
+  'shortcut.cameraDesc': 'Kamerayı açar veya kapatır.',
+  'shortcut.share': 'Ekran paylaşımı',
+  'shortcut.shareDesc': 'Ekran paylaşımını başlatır veya durdurur.',
+  'shortcut.record': 'Kayıt',
+  'shortcut.recordDesc': 'Oturum kaydını başlatır veya durdurur.',
+  'shortcut.fullscreen': 'Tam ekran',
+  'shortcut.fullscreenDesc': 'Odaktaki kartı tam ekrana alır veya geri döndürür.',
+  'shortcut.ptt': 'Bas-Konuş tuşu',
+  'shortcut.pttDesc': 'Basılı tutulduğu sürece mikrofonu açar.'
+});
+Object.assign(I18N.en, {
+  'settings.shortcuts': 'Shortcuts',
+  'settings.shortcutsLead': 'Turn keyboard shortcuts on or off, or assign new keys.',
+  'settings.shortcutsMaster': 'Enable shortcuts',
+  'settings.shortcutsMasterDesc': 'When turned off, every keyboard shortcut in the app is disabled.',
+  'settings.shortcutsListTitle': 'Shortcut list',
+  'settings.shortcutsResetAll': 'Reset all to defaults',
+  'settings.shortcutRebind': 'Click to change',
+  'settings.shortcutListening': 'Press a key…',
+  'settings.shortcutReset': 'Reset to default',
+  'settings.shortcutConflict': 'That key is already used by another shortcut',
+  'settings.shortcutUpdated': 'Shortcut updated.',
+  'settings.shortcutUnassigned': 'Unassigned',
+  'settings.shortcutsSafetyTitle': 'Always-on safety shortcuts',
+  'settings.shortcutsSafetyDesc': 'These shortcuts can never be disabled or suppressed.',
+  'settings.shortcutsKillSwitch': 'Ctrl+X ×2 — instantly cut remote control',
+  'settings.shortcutsEscape': 'Esc — leave remote control and focus mode',
+  'settings.shortcutsPaused': 'Shortcuts paused',
+  'settings.shortcutsPausedDesc': 'Shortcuts pause automatically while controlling a screen, during activities and while typing.',
+  'settings.shortcutsPttNote': 'On/off: Voice & Video tab',
+  'settings.shortcutsAllOn': 'Shortcuts enabled.',
+  'settings.shortcutsAllOff': 'Shortcuts disabled.',
+  'shortcut.mic': 'Toggle microphone',
+  'shortcut.micDesc': 'Mutes or unmutes your own microphone.',
+  'shortcut.deafen': 'Deafen',
+  'shortcut.deafenDesc': 'Mutes every incoming sound and your microphone.',
+  'shortcut.camera': 'Camera',
+  'shortcut.cameraDesc': 'Turns your camera on or off.',
+  'shortcut.share': 'Screen share',
+  'shortcut.shareDesc': 'Starts or stops screen sharing.',
+  'shortcut.record': 'Recording',
+  'shortcut.recordDesc': 'Starts or stops the session recording.',
+  'shortcut.fullscreen': 'Full screen',
+  'shortcut.fullscreenDesc': 'Sends the focused card to full screen and back.',
+  'shortcut.ptt': 'Push-to-talk key',
+  'shortcut.pttDesc': 'Opens your microphone while the key is held down.'
 });
 
 // Locales deliberately inherit English rather than Turkish.  That guarantees
@@ -6511,7 +7353,7 @@ function translateLegacyStaticUI(language, root = document.body) {
   // receives the complete English safety net so a language switch cannot
   // produce a mixed Turkish interface.
   const dictionary = LEGACY_TEXT_BY_LOCALE[language] || LEGACY_TEXT_EN;
-  const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, .chat-msg, .dm-message, .uname-text, .vtitle';
+  const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, #img-lightbox, .chat-msg, .dm-message, .uname-text, .vtitle';
   const visitText = node => {
     const parent = node.parentElement;
     if (!parent || parent.closest(excludedSelector)) return;
@@ -6914,12 +7756,19 @@ function updateSettingsMicMeter(percent = 0) {
   const meter = document.getElementById('user-mic-meter');
   if (!meter) return;
   const safePercent = state.settingsMicTestActive ? Math.min(100, Math.max(0, percent)) : 0;
-  const bars = [...meter.children];
+  const bars = meter.children;
   const activeCount = Math.round((safePercent / 100) * bars.length);
-  bars.forEach((bar, index) => {
+  // Kirli-kontrol: yanan çubuk sayısı değişmediyse hiçbir DOM yazımı yapma.
+  // Bu fonksiyon VU döngüsünden saniyede 20 kez çağrılıyordu ve her çağrıda
+  // tüm çubukları dolaşıp iki classList.toggle + bir setAttribute yazıyordu.
+  if (meter.__lastActiveCount === activeCount) return;
+  meter.__lastActiveCount = activeCount;
+  const hotFrom = Math.round(bars.length * 0.82);
+  for (let index = 0; index < bars.length; index++) {
+    const bar = bars[index];
     bar.classList.toggle('active', index < activeCount);
-    bar.classList.toggle('hot', index < activeCount && index >= Math.round(bars.length * 0.82));
-  });
+    bar.classList.toggle('hot', index < activeCount && index >= hotFrom);
+  }
   meter.setAttribute('aria-valuenow', String(Math.round(safePercent)));
 }
 
@@ -7710,7 +8559,8 @@ function applyPttMode(enabled) {
   state.pttMode = enabled;
   const pttBtn = document.getElementById('ptt');
   if (enabled) {
-    window.electronAPI.registerPTT('Space');
+    // Tuş artık Ayarlar → Kısayollar panelinden değiştirilebilir; varsayılan Space.
+    window.electronAPI.registerPTT(window.getPttAccelerator ? window.getPttAccelerator() : 'Space');
     if (pttBtn) pttBtn.classList.remove('hidden');
     if (!state.pttAttached) {
       window.electronAPI.onPTT(() => {
@@ -7720,7 +8570,8 @@ function applyPttMode(enabled) {
         setMicEnabled(true);
       });
       document.addEventListener('keyup', (e) => {
-        if (e.code === 'Space' && state.pttMode) {
+        const isPttKey = window.matchesPttReleaseKey ? window.matchesPttReleaseKey(e) : e.code === 'Space';
+        if (isPttKey && state.pttMode) {
           state.pttActive = false;
           document.getElementById('ptt').classList.remove('active');
           setMicEnabled(false);
@@ -7811,15 +8662,28 @@ async function startScreenShare(sourceId) {
       }
     });
     const track = state.screenStream.getVideoTracks()[0];
+    // Kullanıcı paylaşım penceresinde sesi paylaşmamayı seçmiş olabilir —
+    // o zaman hiç ses track'i gelmez ve bu adım sessizce atlanır.
+    const screenAudioTrack = state.screenStream.getAudioTracks()[0] || null;
     state.peers.forEach(peer => {
       const sender = getVideoSender(peer.pc);
       if (sender) {
-        sender.replaceTrack(track).then(() => applyVideoQuality(sender)).catch(console.error);
+        // limitVideoQuality DEĞİL: burada eskiden tanımsız bir applyVideoQuality
+        // çağrılıyordu ve hata .catch içinde yutulduğu için kalite ayarı
+        // (Yüksek/Orta/Düşük) gönderici bit hızına HİÇ uygulanmıyordu.
+        sender.replaceTrack(track).then(() => limitVideoBitrate(sender)).catch(console.error);
       }
+      // Ses için de aynı "önceden açılmış sender + replaceTrack" deseni:
+      // yeniden müzakere YOK. Karşı taraf eski sürümse false döner, atlanır.
+      if (screenAudioTrack) sendScreenAudioToPeer(peer, screenAudioTrack);
     });
     state.isSharing = true;
     document.getElementById('share').classList.add('off');
-    broadcast({ type: 'sharing', sharing: true });
+    // audio bayrağı: alıcı tarafta "Ekran Sesi" slider'ının görünürlüğünü
+    // belirler. Eski sürümler bu alanı görmezden gelir.
+    broadcast({ type: 'sharing', sharing: true, audio: !!screenAudioTrack });
+    // Paylaşan kendi sistem sesini zaten hoparlöründen duyar; attachVideo
+    // muted:true olduğu için burada YEREL OLARAK TEKRAR ÇALINMAZ (yankı olmaz).
     addVideoCard('self', `${state.myName} (${t('common.you')})`, attachVideo(state.screenStream), true);
     track.onended = () => stopScreenShare();
   } catch (err) {
@@ -7837,12 +8701,20 @@ function stopScreenShare() {
       const blankTrack = state.localStream ? state.localStream.getVideoTracks()[0] : null;
       sender.replaceTrack(blankTrack || null);
     }
+    // Ekran sesi gönderimini durdur. Transceiver (m-line) YERİNDE KALIR —
+    // tekrar paylaşınca yeniden müzakere gerekmesin diye.
+    sendScreenAudioToPeer(peer, null);
   });
   state.screenStream = null;
   state.isSharing = false;
   if (state.pendingControlReq) {
     rejectControlRequest(state.pendingControlReq.peerId, state.pendingControlReq.reqId, 'not-sharing');
     closeCtrlModal();
+  }
+  // Paylaşım biterse bekleyen "denetim ver" teklifi de düşer.
+  if (state.pendingControlOffer) {
+    broadcastTo(state.pendingControlOffer.peerId, { type: 'ctrl-offer-cancel', reqId: state.pendingControlOffer.reqId });
+    clearControlOffer();
   }
   if (state.controlledBy) stopBeingControlled(true);
   document.getElementById('share').classList.remove('off');
@@ -7964,17 +8836,25 @@ document.getElementById('ctrl-accept').addEventListener('click', () => {
       return;
     }
     // Kabul: gelen ctrl-event'lerin işleneceği kaynak burada kaydedilir.
-    state.controlledBy = request.peerId;
-    state.controlOwner = 'host';
-    broadcastTo(request.peerId, { type: 'ctrl-res', accepted: true, reqId: request.reqId });
-    window.electronAPI.setRemoteControl(true);
-    window.electronAPI.setControlOwner('host');
-    const pill = document.getElementById('ctrl-active-pill');
-    updateHostControlPill();
-    if (pill) pill.classList.remove('hidden');
+    grantControlTo(request.peerId, request.reqId);
   }
   closeCtrlModal();
 });
+
+// Denetimi fiilen başlatan TEK nokta: hem "izleyen istedi → kabul ettim"
+// akışı hem de "paylaşan denetim verdi → izleyici kabul etti" akışı buradan
+// geçer. Böylece controlledBy/controlOwner ve main süreç bildirimleri tek
+// yerde kalır (paralel bir denetim sistemi kurulmaz).
+function grantControlTo(peerId, reqId) {
+  state.controlledBy = peerId;
+  state.controlOwner = 'host';
+  broadcastTo(peerId, { type: 'ctrl-res', accepted: true, reqId });
+  window.electronAPI.setRemoteControl(true);
+  window.electronAPI.setControlOwner('host');
+  const pill = document.getElementById('ctrl-active-pill');
+  updateHostControlPill();
+  if (pill) pill.classList.remove('hidden');
+}
 document.getElementById('ctrl-deny').addEventListener('click', () => {
   if (state.pendingControlReq) {
     rejectControlRequest(state.pendingControlReq.peerId, state.pendingControlReq.reqId, 'denied');
@@ -7986,6 +8866,105 @@ function closeCtrlModal() {
   ctrlReqTimer = null;
   document.getElementById('ctrl-modal').classList.add('hidden');
   state.pendingControlReq = null;
+}
+
+// ===== GÖREV 3: Paylaşan taraf istek beklemeden denetim verir ===============
+// Akış:  paylaşan "Denetim Ver"  →(ctrl-offer)→  izleyicide kabul kartı
+//        izleyici "Kabul Et"     →(ctrl-offer-res)→ paylaşan grantControlTo()
+//        paylaşan               →(ctrl-res accepted)→ izleyicide oturum açılır
+// İzleyici tarafında oturumun açılması, istek akışıyla AYNI ctrl-res koduyla
+// olur. Kabul zorunludur: kimsenin ekranı habersiz ele geçirilemez.
+let ctrlOfferTimer = null;   // paylaşan taraf: yanıt bekleme süresi
+let ctrlOfferNoteTimer = null; // izleyici tarafı: kabul kartının süresi
+
+function offerControl(peerId) {
+  const peer = state.peers.get(peerId);
+  if (!peer) return false;
+  if (!state.isSharing) {
+    showToast('Denetim vermek için önce ekranınızı paylaşın.', 'warn');
+    return false;
+  }
+  if (state.controlledBy) {
+    showToast('Denetim şu anda başka bir kullanıcıda.', 'warn');
+    return false;
+  }
+  if (state.pendingControlOffer) {
+    showToast('Bekleyen bir denetim teklifiniz var.', 'warn');
+    return false;
+  }
+  const reqId = 'offer-' + Date.now();
+  state.pendingControlOffer = { peerId, reqId };
+  broadcastTo(peerId, { type: 'ctrl-offer', reqId });
+  showToast(`${displayName(peerId, peer.name)} kişisine denetim teklif edildi.`, 'info');
+  clearTimeout(ctrlOfferTimer);
+  ctrlOfferTimer = setTimeout(() => {
+    if (state.pendingControlOffer && state.pendingControlOffer.reqId === reqId) {
+      broadcastTo(peerId, { type: 'ctrl-offer-cancel', reqId });
+      clearControlOffer();
+      showToast('Denetim teklifi yanıtlanmadı.', 'warn');
+    }
+  }, CTRL_REQ_TIMEOUT_MS);
+  return true;
+}
+
+function clearControlOffer() {
+  clearTimeout(ctrlOfferTimer);
+  ctrlOfferTimer = null;
+  state.pendingControlOffer = null;
+}
+
+function showControlOfferNote(peerId, peerName, reqId) {
+  const note = document.getElementById('ctrl-offer-modal');
+  if (!note) return false;
+  state.incomingControlOffer = { peerId, reqId };
+  const text = document.getElementById('ctrl-offer-text');
+  if (text) text.textContent = `${peerName} size kendi bilgisayarının denetimini vermek istiyor.`;
+  note.classList.remove('hidden');
+  const bar = document.getElementById('ctrl-offer-timer-bar');
+  if (bar) {
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    void bar.offsetWidth;
+    bar.style.transition = `width ${CTRL_REQ_TIMEOUT_MS}ms linear`;
+    bar.style.width = '0%';
+  }
+  clearTimeout(ctrlOfferNoteTimer);
+  ctrlOfferNoteTimer = setTimeout(() => {
+    if (state.incomingControlOffer) {
+      broadcastTo(state.incomingControlOffer.peerId, {
+        type: 'ctrl-offer-res', accepted: false, reqId: state.incomingControlOffer.reqId, reason: 'timeout'
+      });
+    }
+    closeCtrlOfferNote();
+  }, CTRL_REQ_TIMEOUT_MS);
+  return true;
+}
+
+function closeCtrlOfferNote() {
+  clearTimeout(ctrlOfferNoteTimer);
+  ctrlOfferNoteTimer = null;
+  const note = document.getElementById('ctrl-offer-modal');
+  if (note) note.classList.add('hidden');
+  state.incomingControlOffer = null;
+}
+
+const ctrlOfferAcceptBtn = document.getElementById('ctrl-offer-accept');
+if (ctrlOfferAcceptBtn) {
+  ctrlOfferAcceptBtn.addEventListener('click', () => {
+    const offer = state.incomingControlOffer;
+    closeCtrlOfferNote();
+    if (!offer) return;
+    broadcastTo(offer.peerId, { type: 'ctrl-offer-res', accepted: true, reqId: offer.reqId });
+  });
+}
+const ctrlOfferDenyBtn = document.getElementById('ctrl-offer-deny');
+if (ctrlOfferDenyBtn) {
+  ctrlOfferDenyBtn.addEventListener('click', () => {
+    const offer = state.incomingControlOffer;
+    closeCtrlOfferNote();
+    if (!offer) return;
+    broadcastTo(offer.peerId, { type: 'ctrl-offer-res', accepted: false, reqId: offer.reqId, reason: 'denied' });
+  });
 }
 
 function updateHostControlPill() {
@@ -8063,8 +9042,10 @@ function closeActiveControlSession(notifyHost) {
   setRemotePointerActive(false);
   setHostPassivePointer(null, false);
   document.getElementById('remote-modal').classList.add('hidden');
+  const formerHost = state.activeControl ? state.activeControl.hostId : null;
   state.activeControl = null;
   window.electronAPI.setRemoteControl(false);
+  if (formerHost) updateControlRequestButton(formerHost); // düğme "Denetle"ye döner
 }
 
 document.getElementById('remote-stop').addEventListener('click', () => {
@@ -8604,6 +9585,9 @@ function disconnectApp() {
   }
 
   state.room = null;
+  // Sesli oturum bitti: güç tasarrufu engeli ve yükseltilmiş süreç önceliği
+  // kaldırılsın (boştayken pil/CPU tüketimini artırmasın).
+  setVoiceSessionActive(false);
   state.pendingJoinReq = null;
   state.moderators = new Set();
   state.serverMutedIds = new Set();
@@ -9600,7 +10584,902 @@ window.checkSpectatorUI = function() {
   }
 };
 
-// Enforce spectator locks continuously
-setInterval(window.checkSpectatorUI, 300);
+// İzleyici kilitlerini sürekli zorla.
+// ESKİ: koşulsuz her 300 ms. Ölçüm: çağrı başına 0.15 ms ve ~25 getElementById
+// + ~20 classList/style yazımı; 2300 düğümlü DOM'da saniyede 3.3 kez stil
+// yeniden hesabı — kullanıcı hiçbir etkinliğe girmemiş olsa bile.
+// YENİ: yalnızca bir etkinlik/lobi aktifken koş (zaten kilitlenecek bir şey
+// ancak o zaman var). Lobiden çıkışta kilitleri kaldırmak için bir kez daha
+// koşar, sonra tamamen susar. Pencere ön planda değilken de gereksiz.
+let _specEnforceWasActive = false;
+setInterval(() => {
+  const active = !!state.activeLobbyId;
+  if (!active && !_specEnforceWasActive) return; // aktivite yok: hiçbir iş yapma
+  const runOnceMore = !active && _specEnforceWasActive;
+  _specEnforceWasActive = active;
+  if (!runOnceMore && state.uiActive === false) return; // arka planda çizmeye gerek yok
+  window.checkSpectatorUI();
+}, 500);
 
 
+
+/* ===========================================================================
+   SOHBET GÖRSEL ÖNİZLEME (LIGHTBOX)
+
+   Kapsanan yollar:
+   - Oda sohbeti: appendFileMsg() sonrası oluşan `.img-wrap > img.chat-img`
+     (hem 'file-done' ile gelen hem de sendFile() ile giden görseller).
+   - DM'ler: renderDMs() içindeki `.dm-msg img` (ana menü #dm-messages ve
+     sunucu içi #server-dm-messages).
+
+   Dinleyici, olay devri (event delegation) ile document üzerinde durur;
+   sohbet listeleri innerHTML ile sürekli yeniden çizildiği için her görsele
+   tek tek handler bağlamak güvenilir olmaz.
+   =========================================================================== */
+
+// Lightbox'ı açan görseller. Oda sohbetinde .chat-img sınıfı garanti;
+// DM baloncuklarındaki <img>'lerin sınıfı yok, kapsayıcıdan yakalanır.
+const LB_IMG_SELECTOR = 'img.chat-img, .dm-msg img';
+// Ok tuşlarıyla gezilecek "aynı mesaj listesi"nin sınırı.
+const LB_LIST_SELECTOR = '#msgs, #dm-messages, #server-dm-messages';
+const LB_MIN_SCALE = 0.05;
+const LB_MAX_SCALE = 24;
+const LB_WHEEL_STEP = 1.0015; // deltaY başına çarpan (satır/sayfa modu normalize edilir)
+const LB_BTN_STEP = 1.25;
+
+const lb = {
+  wired: false,
+  open: false,
+  root: null, stage: null, img: null,
+  nameEl: null, counterEl: null, pctEl: null, fitEl: null,
+  prevBtn: null, nextBtn: null, dlBtn: null,
+  items: [], index: -1,
+  scale: 1, fitScale: 1, rot: 0, tx: 0, ty: 0,
+  natW: 0, natH: 0,
+  dragging: false, moved: false, pointerId: null,
+  dragX: 0, dragY: 0, dragTx: 0, dragTy: 0,
+  lastFocus: null
+};
+
+function lbEnsure() {
+  if (!lb.root) {
+    lb.root = document.getElementById('img-lightbox');
+    if (!lb.root) return false;
+    lb.stage = document.getElementById('ilb-stage');
+    lb.img = document.getElementById('ilb-img');
+    lb.nameEl = document.getElementById('ilb-name');
+    lb.counterEl = document.getElementById('ilb-counter');
+    lb.pctEl = document.getElementById('ilb-zoom-pct');
+    lb.fitEl = document.getElementById('ilb-fit-state');
+    lb.prevBtn = document.getElementById('ilb-prev');
+    lb.nextBtn = document.getElementById('ilb-next');
+    lb.dlBtn = document.getElementById('ilb-download');
+  }
+  if (!lb.root || !lb.stage || !lb.img) return false;
+  if (lb.wired) return true;
+  lb.wired = true;
+
+  // Boşluğa tıklayınca kapanır. Sürükleme sonrası gelen click yutulur.
+  lb.root.addEventListener('click', (e) => {
+    if (lb.moved) { lb.moved = false; return; }
+    if (e.target === lb.root || e.target === lb.stage) lbClose();
+  });
+  lb.img.addEventListener('click', (e) => e.stopPropagation());
+  lb.img.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    lbToggleActualSize(e.clientX, e.clientY);
+  });
+  lb.stage.addEventListener('dblclick', (e) => {
+    if (e.target === lb.img) return;
+    e.preventDefault();
+    lbToggleActualSize(e.clientX, e.clientY);
+  });
+
+  // Fare tekerleği: imleç konumunu sabit tutarak yakınlaştırır.
+  lb.stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    let delta = e.deltaY;
+    if (e.deltaMode === 1) delta *= 16;       // satır
+    else if (e.deltaMode === 2) delta *= 400; // sayfa
+    const factor = Math.pow(LB_WHEEL_STEP, -delta);
+    lbZoomTo(lb.scale * factor, e.clientX, e.clientY, false);
+  }, { passive: false });
+
+  // Sürükleyerek gezinme (pan).
+  lb.img.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    lb.dragging = true;
+    lb.moved = false;
+    lb.pointerId = e.pointerId;
+    lb.dragX = e.clientX; lb.dragY = e.clientY;
+    lb.dragTx = lb.tx; lb.dragTy = lb.ty;
+    lb.img.classList.remove('ilb-anim');
+    lb.img.classList.add('ilb-grabbing');
+    try { lb.img.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  lb.img.addEventListener('pointermove', (e) => {
+    if (!lb.dragging || e.pointerId !== lb.pointerId) return;
+    const dx = e.clientX - lb.dragX;
+    const dy = e.clientY - lb.dragY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) lb.moved = true;
+    lb.tx = lb.dragTx + dx;
+    lb.ty = lb.dragTy + dy;
+    lbApply();
+  });
+  const endDrag = (e) => {
+    if (!lb.dragging || (e && e.pointerId !== lb.pointerId)) return;
+    lb.dragging = false;
+    lb.pointerId = null;
+    lb.img.classList.remove('ilb-grabbing');
+    try { if (e) lb.img.releasePointerCapture(e.pointerId); } catch (err) {}
+  };
+  lb.img.addEventListener('pointerup', endDrag);
+  lb.img.addEventListener('pointercancel', endDrag);
+
+  const bind = (id, handler) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handler(e); });
+  };
+  bind('ilb-close', () => lbClose());
+  bind('ilb-prev', () => lbStep(-1));
+  bind('ilb-next', () => lbStep(1));
+  bind('ilb-zoom-in', () => lbZoomTo(lb.scale * LB_BTN_STEP, null, null, true));
+  bind('ilb-zoom-out', () => lbZoomTo(lb.scale / LB_BTN_STEP, null, null, true));
+  bind('ilb-zoom-label', () => lbToggleActualSize(null, null));
+  bind('ilb-rotate-left', () => lbRotate(-90));
+  bind('ilb-rotate-right', () => lbRotate(90));
+  bind('ilb-copy', () => lbCopyImage());
+  // İndirme, sohbetteki .dl-btn ile aynı mekanizmadır: <a download> + blob/data
+  // URL. preventDefault edilmemeli, bu yüzden bind() kullanılmaz.
+  if (lb.dlBtn) lb.dlBtn.addEventListener('click', (e) => e.stopPropagation());
+
+  lb.img.addEventListener('load', () => {
+    lb.natW = lb.img.naturalWidth || 1;
+    lb.natH = lb.img.naturalHeight || 1;
+    lbFit(false);
+  });
+
+  window.addEventListener('resize', () => { if (lb.open) lbFit(false); });
+  return true;
+}
+
+function lbStageSize() {
+  const r = lb.stage.getBoundingClientRect();
+  return {
+    w: r.width || window.innerWidth,
+    h: r.height || window.innerHeight,
+    cx: r.left + r.width / 2,
+    cy: r.top + r.height / 2
+  };
+}
+
+// Döndürme sonrası ekranda kapladığı kutu (0/90/180/270 için basit takas).
+function lbRotatedSize() {
+  const swapped = (Math.abs(lb.rot) % 180) === 90;
+  return swapped ? { w: lb.natH, h: lb.natW } : { w: lb.natW, h: lb.natH };
+}
+
+function lbComputeFitScale() {
+  const s = lbStageSize();
+  const r = lbRotatedSize();
+  if (!r.w || !r.h) return 1;
+  // Üst/alt çubuklar ve yan oklar görseli örtmesin diye pay bırakılır.
+  const padX = Math.min(120, s.w * 0.22);
+  const padY = Math.min(150, s.h * 0.28);
+  const availW = Math.max(80, s.w - padX);
+  const availH = Math.max(80, s.h - padY);
+  // Küçük görseller büyütülmez: "sığdır" en fazla gerçek boyuta kadar çıkar.
+  return Math.max(LB_MIN_SCALE, Math.min(1, availW / r.w, availH / r.h));
+}
+
+function lbClamp() {
+  const s = lbStageSize();
+  const r = lbRotatedSize();
+  const limX = Math.max(0, (r.w * lb.scale) / 2 - s.w / 2);
+  const limY = Math.max(0, (r.h * lb.scale) / 2 - s.h / 2);
+  lb.tx = limX === 0 ? 0 : Math.max(-limX, Math.min(limX, lb.tx));
+  lb.ty = limY === 0 ? 0 : Math.max(-limY, Math.min(limY, lb.ty));
+}
+
+function lbApply() {
+  lbClamp();
+  lb.img.style.transform = 'translate(' + lb.tx + 'px, ' + lb.ty + 'px) rotate(' + lb.rot + 'deg) scale(' + lb.scale + ')';
+  lb.img.classList.toggle('ilb-pannable', lb.scale > lb.fitScale + 0.001);
+  lbUpdateUI();
+}
+
+function lbUpdateUI() {
+  if (lb.pctEl) lb.pctEl.textContent = Math.round(lb.scale * 100) + '%';
+  if (lb.fitEl) {
+    // Gösterge MEVCUT durumu söyler: %100'de "Gerçek Boyut", sığdırıldığında
+    // "Sığdır", serbest bir yakınlaştırmada boş kalır.
+    const atActual = Math.abs(lb.scale - 1) < 0.005;
+    const atFit = Math.abs(lb.scale - lb.fitScale) < 0.005;
+    lb.fitEl.textContent = atActual ? t('viewer.actualSize') : (atFit ? t('viewer.fit') : '');
+  }
+}
+
+function lbFit(animate) {
+  lb.fitScale = lbComputeFitScale();
+  lb.scale = lb.fitScale;
+  lb.tx = 0;
+  lb.ty = 0;
+  lb.img.classList.toggle('ilb-anim', !!animate);
+  lbApply();
+}
+
+// Yakınlaştırma. anchorX/anchorY verilirse o ekran noktası sabit kalır.
+// Döndürme matrisi hesapta sadeleştiği için formül açıdan bağımsızdır.
+function lbZoomTo(nextScale, anchorX, anchorY, animate) {
+  const clamped = Math.max(LB_MIN_SCALE, Math.min(LB_MAX_SCALE, nextScale));
+  if (Math.abs(clamped - lb.scale) < 1e-6) return;
+  const s = lbStageSize();
+  const ax = (anchorX == null) ? s.cx : anchorX;
+  const ay = (anchorY == null) ? s.cy : anchorY;
+  const k = clamped / lb.scale;
+  lb.tx = (ax - s.cx) - k * ((ax - s.cx) - lb.tx);
+  lb.ty = (ay - s.cy) - k * ((ay - s.cy) - lb.ty);
+  lb.scale = clamped;
+  lb.img.classList.toggle('ilb-anim', !!animate);
+  lbApply();
+}
+
+// Çift tıklama / gösterge düğmesi: %100 <-> sığdır.
+// Küçük görsellerde "sığdır" zaten %100 olduğundan geçişin görünür bir etkisi
+// olsun diye o durumda %200'e çıkılır.
+function lbToggleActualSize(anchorX, anchorY) {
+  const atFit = Math.abs(lb.scale - lb.fitScale) < 0.005;
+  if (!atFit) { lbFit(true); return; }
+  const target = Math.abs(lb.fitScale - 1) < 0.005 ? 2 : 1;
+  lbZoomTo(target, anchorX, anchorY, true);
+}
+
+function lbRotate(deg) {
+  lb.rot = (((lb.rot + deg) % 360) + 360) % 360;
+  lbFit(true);
+}
+
+// Görselin indirilebilir adı ve kaynağı. Oda sohbetinde zaten var olan
+// .dl-btn bağlantısı yeniden kullanılır (doğru dosya adı oradadır).
+function lbSourceInfo(el) {
+  const wrap = el.closest('.img-wrap');
+  const anchor = wrap ? wrap.querySelector('a.dl-btn[download]') : null;
+  const name = (anchor && anchor.getAttribute('download')) || el.getAttribute('alt') || 'gorsel.png';
+  const href = (anchor && anchor.getAttribute('href')) || el.currentSrc || el.src;
+  return { name: name, href: href };
+}
+
+function lbShow(index, animate) {
+  if (!lb.items.length) return;
+  lb.index = Math.max(0, Math.min(lb.items.length - 1, index));
+  const source = lb.items[lb.index];
+  const info = lbSourceInfo(source);
+  lb.rot = 0;
+  lb.natW = 0;
+  lb.natH = 0;
+  lb.img.classList.remove('ilb-anim');
+  lb.img.style.transform = 'translate(0px, 0px) rotate(0deg) scale(1)';
+  lb.img.alt = info.name;
+  lb.img.src = info.href;
+  if (lb.nameEl) lb.nameEl.textContent = info.name;
+  if (lb.counterEl) lb.counterEl.textContent = lb.items.length > 1 ? (lb.index + 1) + ' / ' + lb.items.length : '';
+  if (lb.dlBtn) {
+    lb.dlBtn.href = info.href;
+    lb.dlBtn.setAttribute('download', info.name);
+  }
+  const many = lb.items.length > 1;
+  if (lb.prevBtn) lb.prevBtn.classList.toggle('hidden', !many);
+  if (lb.nextBtn) lb.nextBtn.classList.toggle('hidden', !many);
+  // Önbellekten gelen görselde 'load' tetiklenmeyebilir.
+  if (lb.img.complete && lb.img.naturalWidth) {
+    lb.natW = lb.img.naturalWidth;
+    lb.natH = lb.img.naturalHeight;
+    lbFit(!!animate);
+  }
+}
+
+function lbStep(dir) {
+  if (lb.items.length < 2) return;
+  const next = (lb.index + dir + lb.items.length) % lb.items.length;
+  lbShow(next, false);
+}
+
+async function lbCopyImage() {
+  // CSP connect-src blob:/data: içermediği için fetch() kullanılamaz; görsel
+  // canvas üzerinden PNG'ye çevrilir (pano yalnızca PNG kabul eder).
+  try {
+    if (!lb.img || !lb.img.naturalWidth) throw new Error('image not ready');
+    const canvas = document.createElement('canvas');
+    canvas.width = lb.img.naturalWidth;
+    canvas.height = lb.img.naturalHeight;
+    canvas.getContext('2d').drawImage(lb.img, 0, 0);
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png');
+    });
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    showToast(t('viewer.copied'), 'ok');
+  } catch (err) {
+    console.warn('Lightbox kopyalama başarısız:', err);
+    showToast(t('viewer.copyFailed'), 'danger');
+  }
+}
+
+function lbKeyHandler(e) {
+  if (!lb.open) return;
+  let handled = true;
+  switch (e.key) {
+    case 'Escape': lbClose(); break;
+    case 'ArrowLeft': lbStep(-1); break;
+    case 'ArrowRight': lbStep(1); break;
+    case '+': case '=': lbZoomTo(lb.scale * LB_BTN_STEP, null, null, true); break;
+    case '-': case '_': lbZoomTo(lb.scale / LB_BTN_STEP, null, null, true); break;
+    case '0': lbFit(true); break;
+    case '1': lbZoomTo(1, null, null, true); break;
+    case 'r': case 'R': lbRotate(e.shiftKey ? -90 : 90); break;
+    default: handled = false;
+  }
+  if (!handled) return;
+  // Uygulamanın genel kısayolları (M/D/S/W/E/R, Escape ile odak/modal kapatma,
+  // uzak denetim tuş aktarımı) bu tuşları görmemeli.
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function openImageLightbox(imgEl) {
+  if (!imgEl || !lbEnsure()) return;
+  const list = imgEl.closest(LB_LIST_SELECTOR);
+  const scope = list || imgEl.parentElement || document.body;
+  const found = Array.from(scope.querySelectorAll(LB_IMG_SELECTOR));
+  lb.items = found.length ? found : [imgEl];
+  const at = lb.items.indexOf(imgEl);
+  lb.lastFocus = document.activeElement;
+  lb.open = true;
+  lb.root.classList.remove('hidden');
+  lb.root.setAttribute('aria-hidden', 'false');
+  lb.root.setAttribute('aria-label', t('viewer.title'));
+  document.addEventListener('keydown', lbKeyHandler, true);
+  lbShow(at < 0 ? 0 : at, false);
+  const closeBtn = document.getElementById('ilb-close');
+  if (closeBtn) closeBtn.focus({ preventScroll: true });
+}
+
+function lbClose() {
+  if (!lb.root) return;
+  lb.open = false;
+  lb.dragging = false;
+  lb.root.classList.add('hidden');
+  lb.root.setAttribute('aria-hidden', 'true');
+  document.removeEventListener('keydown', lbKeyHandler, true);
+  // Kaynak görsel listede kalmaya devam eder; burada yalnızca büyük çözülmüş
+  // görüntü bellekten düşürülür (blob URL'i revoke EDİLMEZ).
+  lb.img.removeAttribute('src');
+  lb.items = [];
+  lb.index = -1;
+  if (lb.lastFocus && document.contains(lb.lastFocus)) {
+    try { lb.lastFocus.focus({ preventScroll: true }); } catch (err) {}
+  }
+  lb.lastFocus = null;
+}
+
+window.openImageLightbox = openImageLightbox;
+window.closeImageLightbox = lbClose;
+
+// Sohbet listeleri innerHTML ile yeniden çizildiği için olay devri kullanılır.
+document.addEventListener('click', (e) => {
+  const target = e.target;
+  if (!target || target.tagName !== 'IMG') return;
+  if (target.closest('#img-lightbox')) return;
+  if (!target.matches(LB_IMG_SELECTOR)) return;
+  e.preventDefault();
+  openImageLightbox(target);
+});
+
+/* ===========================================================================
+ * KISAYOL MERKEZİ — Ayarlar → Kısayollar paneli + tek bastırma kapısı
+ * ---------------------------------------------------------------------------
+ * Tasarım notları (değiştirmeden önce oku):
+ *
+ * 1) Bu blok DOSYANIN SONUNDA durmak ZORUNDA. keydown dinleyicisi kabarma
+ *    (bubble) fazında document'e bağlanır ve kayıt SIRASI davranışı belirler:
+ *      - uzak denetimde tuşları karşı tarafa ileten dinleyici DAHA ÖNCE
+ *        kayıtlıdır → önce o çalışır, tuş iletimi asla bozulmaz;
+ *      - bindUI() içindeki ESKİ kısayol dinleyicisi odaya girerken, yani DAHA
+ *        SONRA kayıtlanır → stopImmediatePropagation() ile susturulabilir.
+ *    Blok yukarı taşınırsa bu sıra bozulur.
+ *
+ * 2) Eski dinleyici M/D/C/S/R/F tuşlarını modifier'a bakmadan işliyor. Yeniden
+ *    atama ve tek tek kapatmanın anlamlı olması için bu tuşlar HER DURUMDA
+ *    burada yutulur; eylemi yalnızca bu kapı yürütür.
+ *
+ * 3) GÜVENLİK İSTİSNALARI — bastırılmaz, kapatılamaz, yeniden atanamaz:
+ *      - Ctrl+X ×2 kill-switch: main.js globalShortcut ile yönetilir, bu dosya
+ *        ona hiç dokunmaz (bkz. main.js syncControlKillSwitch).
+ *      - Escape: denetimi bırakma / odak modundan çıkış / modal kapatma yolu.
+ *        Bu kapı Escape'i ASLA yutmaz ve ASLA bastırmaz.
+ *      - Bas-Konuş (ptt): sesi kesmek güvenlik değil erişilebilirlik sorunu
+ *        yaratır; bastırma kapısından muaftır, yalnızca yeniden atanabilir.
+ * =========================================================================== */
+
+const SHORTCUTS_ENABLED_KEY = 'teamsync_shortcuts_enabled';
+const SHORTCUTS_BINDINGS_KEY = 'teamsync_shortcut_bindings';
+
+// Eski dinleyicinin sahiplendiği tuşlar — bkz. tasarım notu (2).
+const LEGACY_SHORTCUT_CODES = new Set(['KeyM', 'KeyD', 'KeyC', 'KeyS', 'KeyR', 'KeyF']);
+
+// Bastırmadan muaf kısayollar (güvenlik/erişilebilirlik). Bkz. tasarım notu (3).
+const SHORTCUT_SUPPRESSION_EXEMPT = new Set(['ptt']);
+
+// Etkinlik/oyun kartları. Bunlardan biri önplandayken uygulama kısayolları
+// tetiklenmez; modüller kendi klavye girdilerini kullanıyor.
+const ACTIVITY_CARD_IDS = [
+  'wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card',
+  'lvs-card', 'wheel-card', 'poke-card', 'vampire-card'
+];
+
+const SHORTCUT_DEFS = [
+  {
+    id: 'mic', nameKey: 'shortcut.mic', descKey: 'shortcut.micDesc',
+    def: { code: 'KeyM' }, run: () => document.getElementById('mic')?.click()
+  },
+  {
+    id: 'deafen', nameKey: 'shortcut.deafen', descKey: 'shortcut.deafenDesc',
+    def: { code: 'KeyD' }, run: () => document.getElementById('deaf')?.click()
+  },
+  {
+    id: 'camera', nameKey: 'shortcut.camera', descKey: 'shortcut.cameraDesc',
+    def: { code: 'KeyC' }, run: () => document.getElementById('cam')?.click()
+  },
+  {
+    id: 'share', nameKey: 'shortcut.share', descKey: 'shortcut.shareDesc',
+    def: { code: 'KeyS' }, run: () => document.getElementById('share')?.click()
+  },
+  {
+    id: 'record', nameKey: 'shortcut.record', descKey: 'shortcut.recordDesc',
+    def: { code: 'KeyR' }, run: () => document.getElementById('rec')?.click()
+  },
+  {
+    id: 'fullscreen', nameKey: 'shortcut.fullscreen', descKey: 'shortcut.fullscreenDesc',
+    def: { code: 'KeyF' },
+    run: () => { if (typeof focusedCard !== 'undefined' && focusedCard) toggleFocusFullscreen(); }
+  },
+  // Bas-Konuş main süreçte globalShortcut ile kayıtlı; burada yalnızca tuşu
+  // saklanır. Aç/kapat anahtarı Ses ve Görüntü sekmesindeki "Bas-Konuş"tur.
+  {
+    id: 'ptt', nameKey: 'shortcut.ptt', descKey: 'shortcut.pttDesc',
+    def: { code: 'Space' }, global: true, toggleable: false, run: null
+  }
+];
+
+function shortcutDef(id) {
+  return SHORTCUT_DEFS.find(def => def.id === id) || null;
+}
+
+function getShortcutsMasterEnabled() {
+  return localStorage.getItem(SHORTCUTS_ENABLED_KEY) !== '0';
+}
+
+function readShortcutBindings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SHORTCUTS_BINDINGS_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeShortcutBindings(map) {
+  try { localStorage.setItem(SHORTCUTS_BINDINGS_KEY, JSON.stringify(map)); } catch (e) {}
+}
+
+// Kaydedilmiş değer + varsayılan birleşimi. Kayıt yoksa varsayılan döner.
+function getShortcutBinding(id) {
+  const def = shortcutDef(id);
+  if (!def) return null;
+  const saved = readShortcutBindings()[id] || {};
+  return {
+    id,
+    code: typeof saved.code === 'string' && saved.code ? saved.code : def.def.code,
+    ctrl: 'ctrl' in saved ? !!saved.ctrl : !!def.def.ctrl,
+    alt: 'alt' in saved ? !!saved.alt : !!def.def.alt,
+    shift: 'shift' in saved ? !!saved.shift : !!def.def.shift,
+    enabled: def.toggleable === false ? true : saved.enabled !== false
+  };
+}
+
+function shortcutComboFromEvent(event) {
+  return {
+    code: event.code,
+    ctrl: !!(event.ctrlKey || event.metaKey),
+    alt: !!event.altKey,
+    shift: !!event.shiftKey
+  };
+}
+
+function shortcutBindingMatches(binding, combo) {
+  if (!binding || !binding.code || !combo) return false;
+  return binding.code === combo.code
+    && !!binding.ctrl === !!combo.ctrl
+    && !!binding.alt === !!combo.alt
+    && !!binding.shift === !!combo.shift;
+}
+
+const SHORTCUT_KEY_LABELS = {
+  Space: 'Space', Escape: 'Esc', Enter: 'Enter', NumpadEnter: 'Num Enter', Tab: 'Tab',
+  Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End',
+  PageUp: 'PgUp', PageDown: 'PgDn', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←',
+  ArrowRight: '→', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']',
+  Backslash: '\\', Semicolon: ';', Quote: '\'', Comma: ',', Period: '.', Slash: '/',
+  Backquote: '`', CapsLock: 'CapsLock'
+};
+
+function shortcutKeyLabel(code) {
+  if (!code) return '';
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  if (/^Numpad[0-9]$/.test(code)) return 'Num ' + code.slice(6);
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
+  return SHORTCUT_KEY_LABELS[code] || code;
+}
+
+function shortcutComboLabel(binding) {
+  if (!binding || !binding.code) return t('settings.shortcutUnassigned');
+  const parts = [];
+  if (binding.ctrl) parts.push('Ctrl');
+  if (binding.alt) parts.push('Alt');
+  if (binding.shift) parts.push('Shift');
+  parts.push(shortcutKeyLabel(binding.code));
+  return parts.join(' + ');
+}
+
+// Electron accelerator biçimi (main.js globalShortcut.register bunu bekler).
+function shortcutAcceleratorKey(code) {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  if (/^Numpad[0-9]$/.test(code)) return 'num' + code.slice(6);
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
+  const map = {
+    Space: 'Space', Escape: 'Escape', Enter: 'Return', NumpadEnter: 'Return', Tab: 'Tab',
+    Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End',
+    PageUp: 'PageUp', PageDown: 'PageDown', ArrowUp: 'Up', ArrowDown: 'Down',
+    ArrowLeft: 'Left', ArrowRight: 'Right', Minus: '-', Equal: '=', BracketLeft: '[',
+    BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: '\'', Comma: ',',
+    Period: '.', Slash: '/', Backquote: '`'
+  };
+  return map[code] || null;
+}
+
+function shortcutAccelerator(binding) {
+  if (!binding) return null;
+  const key = shortcutAcceleratorKey(binding.code);
+  if (!key) return null;
+  const parts = [];
+  if (binding.ctrl) parts.push('CommandOrControl');
+  if (binding.alt) parts.push('Alt');
+  if (binding.shift) parts.push('Shift');
+  parts.push(key);
+  return parts.join('+');
+}
+
+/* --------------------------------------------------------------------------
+ * BASTIRMA KAPISI — tüm kısayol kararları buradan geçer.
+ * -------------------------------------------------------------------------- */
+
+// Uzak denetim: hem denetleyen (activeControl) hem denetlenen (controlledBy)
+// taraf. Bayraklar yalnızca OKUNUR.
+function isRemoteControlEngaged() {
+  try {
+    if (typeof state !== 'undefined' && state && (state.activeControl || state.controlledBy)) return true;
+  } catch (e) {}
+  try {
+    if (typeof remotePointerActive !== 'undefined' && remotePointerActive) return true;
+  } catch (e) {}
+  return false;
+}
+
+function isShortcutTypingTarget(node) {
+  const el = node && node.nodeType === 1 ? node : null;
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  // Gömülü içerik (webview/iframe) tuşları kendi işler.
+  if (tag === 'WEBVIEW' || tag === 'IFRAME') return true;
+  return !!el.isContentEditable;
+}
+
+// Etkinlik/oyun önplanda mı? Odaklanmış kart bir etkinlik kartıysa ya da
+// klavye odağı görünür bir etkinlik kartının içindeyse önplandadır.
+function isActivityForeground() {
+  try {
+    if (typeof focusedCard !== 'undefined' && focusedCard && ACTIVITY_CARD_IDS.includes(focusedCard.id)) return true;
+  } catch (e) {}
+  const active = document.activeElement;
+  for (const id of ACTIVITY_CARD_IDS) {
+    const card = document.getElementById(id);
+    if (!card || card.classList.contains('hidden')) continue;
+    // Vampir Köylü tüm ekranı kaplar; görünür olması önplan demektir.
+    if (id === 'vampire-card') return true;
+    if (active && card.contains(active)) return true;
+  }
+  return false;
+}
+
+// Görsel önizleyici veya herhangi bir modal açıkken kısayollar durur.
+function isShortcutOverlayForeground() {
+  const lightbox = document.getElementById('img-lightbox');
+  if (lightbox && !lightbox.classList.contains('hidden')) return true;
+  return !!document.querySelector('.modal:not(.hidden)');
+}
+
+// Bastırma nedeni: 'control' | 'typing' | 'activity' | 'overlay' | null
+function shortcutSuppressionReason(event) {
+  if (isRemoteControlEngaged()) return 'control';
+  if (isShortcutTypingTarget(event && event.target)) return 'typing';
+  if (isShortcutTypingTarget(document.activeElement)) return 'typing';
+  if (isActivityForeground()) return 'activity';
+  if (isShortcutOverlayForeground()) return 'overlay';
+  return null;
+}
+
+function isShortcutSuppressed(event) {
+  return shortcutSuppressionReason(event) !== null;
+}
+
+// TEK KARAR NOKTASI. Her kısayol handler'ı bunu çağırır.
+function shortcutsAllowed(id, event) {
+  const binding = getShortcutBinding(id);
+  if (!binding) return false;
+  // Bkz. tasarım notu (3): muaf kısayollar ana anahtardan da bastırmadan da etkilenmez.
+  if (SHORTCUT_SUPPRESSION_EXEMPT.has(id)) return true;
+  if (!getShortcutsMasterEnabled()) return false;
+  if (!binding.enabled) return false;
+  return !isShortcutSuppressed(event);
+}
+
+/* --------------------------------------------------------------------------
+ * KAPI DİNLEYİCİSİ
+ * -------------------------------------------------------------------------- */
+
+let shortcutRebindState = null;
+
+function handleShortcutGateKeydown(event) {
+  // Yeniden atama sürüyorsa tuşu window-capture dinleyicisi zaten yakaladı.
+  if (shortcutRebindState) return;
+  // Escape hiçbir zaman yutulmaz — güvenlik çıkış yolu (tasarım notu 3).
+  if (event.code === 'Escape') return;
+  const tag = event.target && event.target.tagName;
+  // Eski dinleyici de bunları yok sayıyor; yutmak metin alanlarını bozar.
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  const combo = shortcutComboFromEvent(event);
+  const match = SHORTCUT_DEFS.find(def => def.run && shortcutBindingMatches(getShortcutBinding(def.id), combo));
+  const swallow = !!match || LEGACY_SHORTCUT_CODES.has(event.code);
+  if (!swallow) return;
+
+  // Eski kısayol dinleyicisi (bindUI) bu tuşu görmemeli; yorumu burada yapılır.
+  event.stopImmediatePropagation();
+  if (!match) return;
+  if (!shortcutsAllowed(match.id, event)) return;
+  try { match.run(event); } catch (e) { console.warn('Kısayol çalıştırılamadı:', match.id, e); }
+}
+
+document.addEventListener('keydown', handleShortcutGateKeydown);
+
+/* --------------------------------------------------------------------------
+ * BAS-KONUŞ SENKRONU (main.js register-ptt)
+ * -------------------------------------------------------------------------- */
+
+function getPttAccelerator() {
+  return shortcutAccelerator(getShortcutBinding('ptt')) || 'Space';
+}
+
+// applyPttMode() içindeki keyup karşılaştırması bunu kullanır.
+function matchesPttReleaseKey(event) {
+  const binding = getShortcutBinding('ptt');
+  return !!binding && event.code === binding.code;
+}
+
+// Tuş değişince main süreçteki globalShortcut kaydını tazeler. PTT kapalıysa
+// (state.pttMode false) hiçbir şey yapılmaz; açılınca applyPttMode kaydeder.
+function applyPttShortcut() {
+  try {
+    if (typeof state === 'undefined' || !state || !state.pttMode) return;
+    if (!window.electronAPI?.registerPTT) return;
+    window.electronAPI.registerPTT(getPttAccelerator());
+  } catch (e) {
+    console.warn('PTT kısayolu güncellenemedi:', e);
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * AYARLAR PANELİ
+ * -------------------------------------------------------------------------- */
+
+function setShortcutEnabled(id, enabled) {
+  const map = readShortcutBindings();
+  map[id] = Object.assign({}, map[id], { enabled: !!enabled });
+  writeShortcutBindings(map);
+  renderShortcutSettings();
+}
+
+function resetShortcut(id) {
+  const def = shortcutDef(id);
+  if (!def) return;
+  const map = readShortcutBindings();
+  delete map[id];
+  writeShortcutBindings(map);
+  renderShortcutSettings();
+  if (id === 'ptt') applyPttShortcut();
+}
+
+function resetAllShortcuts() {
+  try {
+    localStorage.removeItem(SHORTCUTS_BINDINGS_KEY);
+    localStorage.removeItem(SHORTCUTS_ENABLED_KEY);
+  } catch (e) {}
+  renderShortcutSettings();
+  applyPttShortcut();
+  showToast(t('settings.shortcutUpdated'), 'ok');
+}
+
+const SHORTCUT_MODIFIER_CODES = new Set([
+  'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight',
+  'ShiftLeft', 'ShiftRight', 'MetaLeft', 'MetaRight'
+]);
+
+function cancelShortcutRebind() {
+  if (!shortcutRebindState) return;
+  const { button, previousLabel } = shortcutRebindState;
+  shortcutRebindState = null;
+  window.removeEventListener('keydown', onShortcutRebindKey, true);
+  if (button) {
+    button.classList.remove('listening');
+    button.textContent = previousLabel;
+  }
+}
+
+function onShortcutRebindKey(event) {
+  if (!shortcutRebindState) return;
+  // Yakalama fazında window'a bağlı: görsel önizleyici dahil hiçbir dinleyici
+  // bu tuşu görmemeli, ayarlar modalı da Escape ile kapanmamalı.
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (SHORTCUT_MODIFIER_CODES.has(event.code)) return; // sadece modifier: beklemeye devam
+  if (event.code === 'Escape') { cancelShortcutRebind(); return; } // Escape ayrılmış
+
+  const id = shortcutRebindState.id;
+  const combo = shortcutComboFromEvent(event);
+  if (!shortcutAcceleratorKey(combo.code)) { cancelShortcutRebind(); return; }
+  const clash = SHORTCUT_DEFS.find(def => def.id !== id && shortcutBindingMatches(getShortcutBinding(def.id), combo));
+  if (clash) {
+    cancelShortcutRebind();
+    showToast(`${t('settings.shortcutConflict')}: ${t(clash.nameKey)}`, 'warn');
+    return;
+  }
+  const map = readShortcutBindings();
+  map[id] = Object.assign({}, map[id], {
+    code: combo.code, ctrl: combo.ctrl, alt: combo.alt, shift: combo.shift
+  });
+  writeShortcutBindings(map);
+  cancelShortcutRebind();
+  renderShortcutSettings();
+  if (id === 'ptt') applyPttShortcut();
+  showToast(t('settings.shortcutUpdated'), 'ok');
+}
+
+function beginShortcutRebind(id, button) {
+  cancelShortcutRebind();
+  shortcutRebindState = { id, button, previousLabel: button.textContent };
+  button.classList.add('listening');
+  button.textContent = t('settings.shortcutListening');
+  window.addEventListener('keydown', onShortcutRebindKey, true);
+  window.addEventListener('blur', cancelShortcutRebind, { once: true });
+}
+
+function renderShortcutSettings() {
+  const list = document.getElementById('user-shortcuts-list');
+  if (!list) return;
+  cancelShortcutRebind();
+  const master = getShortcutsMasterEnabled();
+  const masterEl = document.getElementById('user-shortcuts-enabled');
+  if (masterEl) masterEl.checked = master;
+  list.classList.toggle('shortcuts-list-off', !master);
+
+  const fragment = document.createDocumentFragment();
+  SHORTCUT_DEFS.forEach(def => {
+    const binding = getShortcutBinding(def.id);
+    const row = document.createElement('div');
+    row.className = 'shortcut-row';
+    row.dataset.shortcutId = def.id;
+
+    const info = document.createElement('div');
+    info.className = 'shortcut-info';
+    const name = document.createElement('strong');
+    name.textContent = t(def.nameKey);
+    const desc = document.createElement('p');
+    desc.textContent = t(def.descKey);
+    info.append(name, desc);
+
+    const keyBtn = document.createElement('button');
+    keyBtn.type = 'button';
+    keyBtn.className = 'shortcut-key';
+    keyBtn.textContent = shortcutComboLabel(binding);
+    keyBtn.title = t('settings.shortcutRebind');
+    keyBtn.setAttribute('aria-label', `${t(def.nameKey)} — ${t('settings.shortcutRebind')}`);
+    keyBtn.addEventListener('click', () => beginShortcutRebind(def.id, keyBtn));
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'shortcut-reset';
+    resetBtn.textContent = '⟲';
+    resetBtn.title = t('settings.shortcutReset');
+    resetBtn.setAttribute('aria-label', t('settings.shortcutReset'));
+    resetBtn.addEventListener('click', () => resetShortcut(def.id));
+
+    row.append(info, keyBtn, resetBtn);
+
+    if (def.toggleable === false) {
+      const note = document.createElement('span');
+      note.className = 'shortcut-note';
+      note.textContent = t('settings.shortcutsPttNote');
+      row.append(note);
+    } else {
+      const label = document.createElement('label');
+      label.className = 'switch';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = binding.enabled;
+      checkbox.addEventListener('change', () => setShortcutEnabled(def.id, checkbox.checked));
+      const slider = document.createElement('span');
+      slider.className = 'slider round';
+      label.append(checkbox, slider);
+      row.append(label);
+      row.classList.toggle('shortcut-row-off', !binding.enabled);
+    }
+    fragment.append(row);
+  });
+  list.replaceChildren(fragment);
+}
+
+/* --------------------------------------------------------------------------
+ * "Kısayollar duraklatıldı" rozeti (denetim sırasında)
+ * -------------------------------------------------------------------------- */
+
+let shortcutsPausedBadgeVisible = null;
+
+function updateShortcutsPausedBadge() {
+  const badge = document.getElementById('shortcuts-paused-badge');
+  if (!badge) return;
+  const show = getShortcutsMasterEnabled() && isRemoteControlEngaged();
+  if (show === shortcutsPausedBadgeVisible) return;
+  shortcutsPausedBadgeVisible = show;
+  badge.classList.toggle('hidden', !show);
+}
+
+function initShortcutSettings() {
+  const masterEl = document.getElementById('user-shortcuts-enabled');
+  if (masterEl) {
+    masterEl.addEventListener('change', () => {
+      localStorage.setItem(SHORTCUTS_ENABLED_KEY, masterEl.checked ? '1' : '0');
+      renderShortcutSettings();
+      updateShortcutsPausedBadge();
+      showToast(masterEl.checked ? t('settings.shortcutsAllOn') : t('settings.shortcutsAllOff'), 'info');
+    });
+  }
+  document.getElementById('user-shortcuts-reset-all')?.addEventListener('click', resetAllShortcuts);
+  // Panel her açılışta yeniden çizilir: dil değişimi ve dışarıdan yapılan
+  // değişiklikler böylece görünür olur.
+  document.querySelector('[data-settings-panel="shortcuts"]')?.addEventListener('click', renderShortcutSettings);
+  renderShortcutSettings();
+  updateShortcutsPausedBadge();
+  setInterval(updateShortcutsPausedBadge, 700);
+}
+
+document.addEventListener('DOMContentLoaded', initShortcutSettings);
+
+window.shortcutsAllowed = shortcutsAllowed;
+window.isShortcutSuppressed = isShortcutSuppressed;
+window.getPttAccelerator = getPttAccelerator;
+window.matchesPttReleaseKey = matchesPttReleaseKey;
+window.renderShortcutSettings = renderShortcutSettings;

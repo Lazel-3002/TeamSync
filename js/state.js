@@ -49,6 +49,11 @@ window.state = {
   controlOwner: 'host',     // paylaşılan masaüstünde şu an gerçek beyaz imleci kim yönetiyor
   remoteControlPointer: null,
   pendingControlReq: null,
+  // Paylaşan taraf: istek beklemeden bir izleyiciye gönderilen denetim teklifi
+  // { peerId, reqId } — izleyici kabul edene/reddedene ya da süre dolana kadar.
+  pendingControlOffer: null,
+  // İzleyici tarafı: paylaşan kişiden gelen ve kabul/ret bekleyen teklif.
+  incomingControlOffer: null,
   speakingPeers: new Map(),
   analyser: null,
   gainNode: null,

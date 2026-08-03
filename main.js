@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, screen, shell, Tray, nativeImage, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, powerSaveBlocker, screen, shell, Tray, nativeImage, safeStorage } = require('electron');
 app.name = 'TeamSync';
 // Donanım hızlandırma tercihi ayarlardan değiştirilebilir (settings.json).
 // Varsayılan: AÇIK — backdrop-filter (buzlu cam) yalnızca GPU açıkken çalışır.
@@ -15,7 +15,28 @@ try {
     }
   }
 } catch (e) { /* ayar okunamazsa varsayılan: donanım hızlandırma açık */ }
-app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
+// --- ARKA PLAN KISITLAMALARINI KAPAT (alt+tab'da ses bozulmasının kök nedeni) ---
+// Chromium bir pencere arka plana düşünce/örtülünce sırasıyla: zamanlayıcıları
+// 1 sn'ye kadar kısar (background timer throttling), 5 dk sonra "intensive wake
+// up throttling" ile dakikada 1'e indirir, rAF'i tamamen durdurur, renderer
+// sürecinin işletim sistemi önceliğini düşürür (renderer backgrounding) ve
+// "native window occlusion" hesabıyla çizim hattını kapatır. Sesli sohbette bu,
+// gürültü kapısının donmasına ve ses analiz/onarım döngülerinin durmasına yol
+// açar. webPreferences.backgroundThrottling:false tek başına YETMEZ; occlusion
+// ve renderer-backgrounding ayrı anahtarlarla kapatılmalıdır.
+//
+// DİKKAT: 'disable-features' TEK bir anahtardır. appendSwitch ikinci kez
+// çağrılırsa öncekini sessizce EZER — bu yüzden tüm değerler tek bir virgülle
+// ayrılmış listede toplanmak zorunda.
+app.commandLine.appendSwitch('disable-features', [
+  'WebRtcHideLocalIpsWithMdns',
+  'CalculateNativeWinOcclusion',
+  'IntensiveWakeUpThrottling',
+  'HighEfficiencyModeAvailable'
+].join(','));
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('allow-loopback-in-peer-connection');
 app.commandLine.appendSwitch('disable-async-dns');
 
@@ -166,6 +187,68 @@ let isQuitting = false;
 let notificationWindow = null;
 
 const DISCOVERY_PORT = 41234;
+
+// ===================== SESLİ OTURUM GÜÇ YÖNETİMİ =====================
+// Sorun: kullanıcı alt+tab yapıp başka pencereye geçtiğinde önce GELEN, bir
+// süre sonra GİDEN ses bozuluyordu. Sebep katmanlı:
+//   1) Chromium arka plan kısıtlamaları  -> yukarıdaki commandLine anahtarları
+//   2) Windows güç tasarrufu / uygulama askıya alma -> powerSaveBlocker
+//   3) Windows 11 EcoQoS: ön planda olmayan sürecin CPU'su verimlilik
+//      çekirdeklerine düşürülür, ses işleme gecikmesi patlar -> süreç önceliği
+// Burası (2) ve (3)'ü ele alır. Sadece gerçekten sesli oturumdayken açılır ki
+// boştayken pil/CPU tüketimi artmasın.
+let voiceSessionActive = false;
+let voicePowerBlockerId = null;
+let voicePriorityPids = [];
+
+function raiseProcessPriorities(raise) {
+  const os = require('os');
+  const target = raise ? os.constants.priority.PRIORITY_ABOVE_NORMAL : os.constants.priority.PRIORITY_NORMAL;
+  if (raise) {
+    voicePriorityPids = [];
+    let metrics = [];
+    try { metrics = app.getAppMetrics(); } catch (e) { metrics = []; }
+    for (const p of metrics) {
+      // Sadece ses zincirindeki süreçler: ana süreç, renderer'lar ve ses servisi.
+      // GPU/ağ süreçlerini yükseltmek gereksiz, sistemi haksız yere zorlar.
+      if (!/^(Browser|Tab|Utility)$/.test(p.type)) continue;
+      if (p.type === 'Utility' && !/audio/i.test(p.name || '')) continue;
+      try { os.setPriority(p.pid, target); voicePriorityPids.push(p.pid); } catch (e) { /* yetki yoksa yoksay */ }
+    }
+  } else {
+    for (const pid of voicePriorityPids) {
+      try { os.setPriority(pid, target); } catch (e) {}
+    }
+    voicePriorityPids = [];
+  }
+}
+
+function setVoiceSessionActive(active) {
+  active = Boolean(active);
+  if (active === voiceSessionActive) return;
+  voiceSessionActive = active;
+  if (active) {
+    try {
+      // 'prevent-app-suspension': ekran kapanabilir ama uygulama askıya
+      // alınmaz/CPU'su kısılmaz. 'prevent-display-sleep' istemiyoruz —
+      // sesli sohbet ekranı açık tutmayı gerektirmez.
+      if (voicePowerBlockerId === null || !powerSaveBlocker.isStarted(voicePowerBlockerId)) {
+        voicePowerBlockerId = powerSaveBlocker.start('prevent-app-suspension');
+      }
+    } catch (e) { console.warn('powerSaveBlocker başlatılamadı:', e.message); }
+    raiseProcessPriorities(true);
+    console.log('🔊 Sesli oturum aktif: güç tasarrufu engellendi, süreç önceliği yükseltildi');
+  } else {
+    try {
+      if (voicePowerBlockerId !== null && powerSaveBlocker.isStarted(voicePowerBlockerId)) {
+        powerSaveBlocker.stop(voicePowerBlockerId);
+      }
+    } catch (e) {}
+    voicePowerBlockerId = null;
+    raiseProcessPriorities(false);
+    console.log('🔇 Sesli oturum bitti: güç tasarrufu engeli kaldırıldı');
+  }
+}
 
 try {
   robot = require('@jitsi/robotjs');
@@ -488,6 +571,27 @@ function createWindow() {
     frame: false
   });
   
+  // webPreferences.backgroundThrottling bazı Electron/Chromium sürümlerinde
+  // sadece ilk yüklemede uygulanıyor; her yeniden yüklemede de garanti altına al.
+  try { mainWindow.webContents.setBackgroundThrottling(false); } catch (e) {}
+  mainWindow.webContents.on('did-finish-load', () => {
+    try { mainWindow.webContents.setBackgroundThrottling(false); } catch (e) {}
+  });
+
+  // Pencere ön planda mı? Renderer bu bilgiyle SADECE görsel işleri (VU çubuğu,
+  // konuşma göstergesi çizimi) askıya alır — ses işleme yolu asla durdurulmaz.
+  // NOT: 'window-visibility' kanalı ayrı bir iş yapıyor (tray'e gizlenince
+  // webview sesini susturmak); alt+tab'da onu tetiklemek videoyu susturur.
+  const sendUiActive = (active) => {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('window-ui-active', active);
+    } catch (e) {}
+  };
+  mainWindow.on('minimize', () => sendUiActive(false));
+  mainWindow.on('restore', () => sendUiActive(true));
+  mainWindow.on('blur', () => sendUiActive(false));
+  mainWindow.on('focus', () => sendUiActive(true));
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Do not hand file:, javascript: or custom protocols to the OS just because
     // a page (or an embedded page) asked to open a new window.
@@ -598,6 +702,13 @@ function createWindow() {
 function isMainWindowSender(event) {
   return Boolean(mainWindow && !mainWindow.isDestroyed() && event && event.sender === mainWindow.webContents);
 }
+
+// Renderer odaya girince true, odadan çıkınca/uygulama kapanınca false gönderir.
+// Bkz. setVoiceSessionActive: powerSaveBlocker + Windows süreç önceliği.
+ipcMain.on('set-voice-session', (event, active) => {
+  if (!isMainWindowSender(event)) return;
+  setVoiceSessionActive(active);
+});
 
 ipcMain.handle('get-local-ips', () => getLocalIPs());
 
@@ -927,15 +1038,27 @@ ipcMain.on('direct-connect', (event, ip) => {
 
 ipcMain.on('register-ptt', (event, key) => {
   globalShortcut.unregisterAll();
-  const k = key || 'Space';
-  try {
-    globalShortcut.register(k, () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('ptt-trigger');
-      }
-    });
-  } catch (e) {
-    console.error('PTT kayıt hatası:', e);
+  // Tuş artık kullanıcı tarafından yeniden atanabiliyor (Ayarlar → Kısayollar).
+  // Geçersiz/başka uygulamaca kapılmış bir accelerator gelirse register() atar
+  // ya da false döner; her iki durumda Space'e düşülür ki bas-konuş ölmesin.
+  const fire = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('ptt-trigger');
+    }
+  };
+  const tryRegister = (accelerator) => {
+    if (!accelerator) return false;
+    try {
+      return globalShortcut.register(accelerator, fire) !== false;
+    } catch (e) {
+      console.error('PTT kayıt hatası:', accelerator, e);
+      return false;
+    }
+  };
+  const requested = key || 'Space';
+  if (!tryRegister(requested) && requested !== 'Space') {
+    console.warn('PTT kısayolu kaydedilemedi, Space kullanılıyor:', requested);
+    tryRegister('Space');
   }
   // unregisterAll kill-switch'i de sildiği için geri yükle
   syncControlKillSwitch();
@@ -1310,6 +1433,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => { isQuitting = true; });
 
 app.on('will-quit', () => {
+  setVoiceSessionActive(false);
   if (cloudflaredProcess) cloudflaredProcess.kill();
   stopLocalInputHook();
   if (cursorOverlayWindow && !cursorOverlayWindow.isDestroyed()) cursorOverlayWindow.destroy();
@@ -1340,3 +1464,4 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
