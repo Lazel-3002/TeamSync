@@ -1377,6 +1377,7 @@ function ensurePeerBoostChain(peer, channel) {
     const pump = new Audio();
     pump.srcObject = peer[F.raw];
     pump.muted = true;
+    pump.volume = 0;
     pump.play().catch(() => {});
     peer[F.pump] = pump;
     peer[F.src] = src;
@@ -2087,6 +2088,64 @@ async function diagnoseIceFailure(peerId) {
   } catch (e) {}
 }
 
+let activeRoomOperation = null;
+
+function beginRoomOperation(kind, roomLabel) {
+  if (activeRoomOperation) activeRoomOperation.cancelled = true;
+  const operation = { kind, roomLabel, cancelled: false };
+  activeRoomOperation = operation;
+
+  const modal = document.getElementById('room-operation-modal');
+  const title = document.getElementById('room-operation-title');
+  const detail = document.getElementById('room-operation-detail');
+  const cancel = document.getElementById('room-operation-cancel');
+  if (title) title.textContent = kind === 'join'
+    ? `${roomLabel} Odasına Katılıyor`
+    : `${roomLabel} Odası Oluşturuluyor`;
+  if (detail) detail.textContent = kind === 'join'
+    ? 'Oda aranıyor ve güvenli bağlantı hazırlanıyor…'
+    : 'Oda ve ses bağlantısı hazırlanıyor…';
+  if (modal) modal.classList.remove('hidden');
+
+  if (cancel) cancel.onclick = () => {
+    if (activeRoomOperation !== operation) return;
+    operation.cancelled = true;
+    state.isJoining = false;
+    if (state.joinTimeout) {
+      clearTimeout(state.joinTimeout);
+      state.joinTimeout = null;
+    }
+    finishRoomOperation(operation);
+    disconnectApp();
+
+    const joinButton = document.getElementById('btn-join');
+    if (joinButton) {
+      joinButton.textContent = t('common.join');
+      joinButton.disabled = false;
+    }
+
+    // İptalden sonra kullanıcıyı başladığı forma geri getir.
+    const action = document.getElementById('step-action');
+    const target = document.getElementById(kind === 'join' ? 'step-join' : 'step-create');
+    if (action) action.classList.add('hidden');
+    if (target) target.classList.remove('hidden');
+  };
+  return operation;
+}
+
+function finishRoomOperation(operation) {
+  if (operation && activeRoomOperation !== operation) return;
+  const modal = document.getElementById('room-operation-modal');
+  if (modal) modal.classList.add('hidden');
+  activeRoomOperation = null;
+}
+
+function roomOperationWasCancelled(operation) {
+  if (!operation || !operation.cancelled) return false;
+  disconnectApp();
+  return true;
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   // Başlangıç menüsünün sol altına uygulama sürümünü yaz (package.json'dan).
   try {
@@ -2762,7 +2821,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false, useGameMode = false, useRelay = false) => {
+  const startApp = async (roomId, pw, useAI, pttMode, serverName, isJoining = false, useSFW = false, useGameMode = false, useRelay = false, roomOperation = null) => {
     roomId = roomId.toLowerCase();
     state.useRelay = useRelay;
     if (useRelay) {
@@ -2778,6 +2837,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (useSFW) {
        showToast("Yapay zeka modelleri yükleniyor (3MB), Lütfen bekleyin...", "info");
        await loadAIFilter();
+       if (roomOperationWasCancelled(roomOperation)) return false;
     }
     document.getElementById('login').classList.add('hidden');
     state.room = roomId;
@@ -2803,15 +2863,20 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     try {
       state.cryptoKey = await setupCrypto(state.password);
+      if (roomOperationWasCancelled(roomOperation)) return false;
       detectTunnelInterference(); // await yok: girişte bloklamasın, toast async gelsin
       await refreshDynamicTurn();
+      if (roomOperationWasCancelled(roomOperation)) return false;
       await resolveTurnHostsViaDoH();
+      if (roomOperationWasCancelled(roomOperation)) return false;
       await setupLocalAudio();
+      if (roomOperationWasCancelled(roomOperation)) return false;
       if (!state.uiBound) {
         bindUI();
         initFileTransfer();
         setupVUMeter();
         await setupDeviceList();
+        if (roomOperationWasCancelled(roomOperation)) return false;
         state.uiBound = true;
       }
       
@@ -2843,13 +2908,17 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (pttMode) applyPttMode(true);
 
       setConnStatus(true);
+      return true;
     } catch (err) {
+      finishRoomOperation(roomOperation);
       alert(`${t('alert.error')}: ${err.message}`);
       console.error(err);
+      disconnectApp();
+      return false;
     }
   };
 
-  btnJoin.addEventListener('click', () => {
+  btnJoin.addEventListener('click', async () => {
     document.getElementById('error-modal').classList.add('hidden');
     const roomId = joinId.value.trim().toLowerCase();
     if (!roomId) return alert(t('alert.serverIdRequired'));
@@ -2861,7 +2930,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.isJoining = true;
     const useRelay = document.getElementById('join-useRelay') ? document.getElementById('join-useRelay').checked : false;
     const pttEnabled = localStorage.getItem('teamsync_ptt_enabled') === '1';
-    startApp(roomId, joinPw.value, joinAi.checked, pttEnabled, "Sunucu " + roomId, true, false, false, useRelay);
+    const roomOperation = beginRoomOperation('join', roomId);
+    const started = await startApp(roomId, joinPw.value, joinAi.checked, pttEnabled, "Sunucu " + roomId, true, false, false, useRelay, roomOperation);
+    if (!started || roomOperation.cancelled) {
+      btnJoin.textContent = originalText;
+      btnJoin.disabled = false;
+      return;
+    }
 
     // Sunucu var mı kontrolü (15 saniye içinde kimse bulunamazsa iptal et)
     if (state.joinTimeout) clearTimeout(state.joinTimeout);
@@ -2873,6 +2948,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       // Eğer hiç peer yoksa, sunucu yok demektir (veya boş)
       if (state.peers.size === 0) {
+        finishRoomOperation(roomOperation);
         disconnectApp();
         document.getElementById('error-text').textContent = "Böyle bir sunucu bulunamadı veya bağlantı zaman aşımına uğradı. Lütfen ID'yi kontrol edin.";
         document.getElementById('error-modal').classList.remove('hidden');
@@ -2897,7 +2973,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // ilk bağlantıların SDP'sine uygular.
     const bitrateSel = document.getElementById('create-bitrate');
     state.audioBitrate = bitrateSel ? (parseInt(bitrateSel.value, 10) || 128) : 128;
-    startApp(odaId, createPw.value, createAi.checked, pttEnabled, sName, false, useSFW, useGameMode, useRelay);
+    const roomOperation = beginRoomOperation('create', sName);
+    const started = await startApp(odaId, createPw.value, createAi.checked, pttEnabled, sName, false, useSFW, useGameMode, useRelay, roomOperation);
+    if (started && !roomOperation.cancelled) finishRoomOperation(roomOperation);
   });
 
   document.getElementById('btn-copy-id').addEventListener('click', () => {
@@ -3481,6 +3559,7 @@ async function handlePeerDiscovered(peer) {
   
   if (state.isJoining) {
     state.isJoining = false;
+    finishRoomOperation(activeRoomOperation);
     document.getElementById('login').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'flex';
@@ -3821,7 +3900,10 @@ function applyAudioSdpParams(sdp) {
 // (replaceTrack aynı uzak track üzerinden çalışır). Bu yüzden burada kurulan
 // eleman/zincir paylaşım bitince YIKILMAZ, yalnızca sessizleşir.
 function attachPeerScreenAudio(peerId, peer, e) {
-  const stream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
+  // e.streams[0] mikrofon/video gibi başka parçaları da taşıyabilir. Yalnızca bu
+  // transceiver'ın ses parçasını bağla; aksi halde aynı ses hem mikrofon hem ekran
+  // oynatıcısından çıkar ve kişisel seviye değişince yankı gibi duyulur.
+  const stream = new MediaStream([e.track]);
   if (!peer.screenAudioEl) {
     const a = document.createElement('audio');
     a.autoplay = true;
@@ -4102,7 +4184,9 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
         attachPeerScreenAudio(peerId, peer, e);
         return;
       }
-      const audioStream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
+      // Uzak MediaStream birden fazla parça içerebilir. Oynatıcıya bütün stream'i
+      // vermek, video/ekran elemanlarının mikrofonu ikinci kez çalmasına yol açar.
+      const audioStream = new MediaStream([e.track]);
       peer.rawAudioStream = audioStream;
       if (peer.gainNode && peer.gainSrc && state.remoteAudioCtx) {
         // Yeniden müzakerede (renegotiation) güçlendirme zinciri korunur:
@@ -4119,7 +4203,8 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
       peer.audioEl.play().catch((err) => console.warn('Audio play failed:', err));
       setupSpeakingDetection(peerId, audioStream);
     } else if (e.track.kind === 'video') {
-      const videoStream = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
+      // Video elemanına yalnızca video parçası gider; ses ayrı audioEl zincirinde.
+      const videoStream = new MediaStream([e.track]);
       peer.videoEl.srcObject = videoStream;
       peer.videoEl.play().catch((err) => console.warn('peer.videoEl play failed in ontrack:', err));
       if (state.activeControl && state.activeControl.hostId === peerId) {
@@ -4152,7 +4237,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
   state.peers.set(peerId, {
     pc,
     audioEl: (function(){ const a = document.createElement('audio'); a.autoplay = true; a.style.display = 'none'; applySpeakerTo(a); document.body.appendChild(a); return a; })(),
-    videoEl: (function(){ const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; applySpeakerTo(v); return v; })(),
+    videoEl: (function(){ const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.muted = true; return v; })(),
     dc,
     name: peerName,
     // Profil kartı (showRoomUserProfile) avatarı buradan okur; eskiden bu

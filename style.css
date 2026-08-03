@@ -1727,6 +1727,27 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .mcard h4 { margin: 20px 0 8px; font-size: 14px; color: var(--txt-main); font-weight: 600; }
 .mcard p.muted { margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
 
+.room-operation-modal { z-index: 12000; }
+.room-operation-card {
+  width: min(390px, calc(100vw - 40px));
+  padding: 30px;
+  text-align: center;
+  overflow: hidden;
+}
+.room-operation-card h3 { justify-content: center; margin: 4px 0 8px; }
+.room-operation-card p { margin: 0 0 22px; }
+.room-operation-card button { width: 100%; padding: 11px 18px; }
+.room-operation-spinner {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 18px;
+  border: 4px solid color-mix(in srgb, var(--acc) 20%, transparent);
+  border-top-color: var(--acc);
+  border-radius: 50%;
+  animation: roomOperationSpin .8s linear infinite;
+}
+@keyframes roomOperationSpin { to { transform: rotate(360deg); } }
+
 .mcard input[type=text], .mcard textarea {
   width: 100%;
   background: rgba(0,0,0,0.2);
