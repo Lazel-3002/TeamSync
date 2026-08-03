@@ -1,16 +1,16 @@
 # Graph Report - kanka-voice  (2026-08-03)
 
 ## Corpus Check
-- 107 files · ~636,107 words
+- 107 files · ~635,425 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1127 nodes · 2385 edges · 88 communities (66 shown, 22 thin omitted)
+- 1124 nodes · 2377 edges · 90 communities (67 shown, 23 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 69 edges (avg confidence: 0.59)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b445ba58`
+- Built from commit: `5f5789e4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -99,6 +99,8 @@
 - enterFocus
 - broadcast
 - shortcuts-settings.test.js
+- founder-rnnoise-toggle.test.js
+- i18n-coverage.test.js
 
 ## God Nodes (most connected - your core abstractions)
 1. `evalJS()` - 50 edges
@@ -108,7 +110,7 @@
 5. `showToast()` - 33 edges
 6. `spawnPeer()` - 31 edges
 7. `waitFor()` - 28 edges
-8. `t()` - 27 edges
+8. `t()` - 26 edges
 9. `initUserSettings()` - 25 edges
 10. `cleanupPeer()` - 25 edges
 
@@ -133,7 +135,7 @@
 - **Create-Room premium options (RNNoise, SFW AI, Game Mode, Relay, Bitrate) configured together at room creation** — index_step_create_form, index_rnnoise_toggle_option, index_sfw_toggle_option, index_game_mode_toggle_option, index_relay_toggle_option, index_bitrate_select [EXTRACTED 0.90]
 - **TeamSync release pipeline: version bump in index/docs marketing pages triggers GitHub Actions build published to GitHub Releases** — github_workflows_release_release_workflow, docs_index_github_releases_link, index_teamsync_login_flow [INFERRED 0.65]
 
-## Communities (88 total, 22 thin omitted)
+## Communities (90 total, 23 thin omitted)
 
 ### Community 0 - "UNO Card Game"
 Cohesion: 0.12
@@ -145,7 +147,7 @@ Nodes (39): App(), Activities(), Chat(), Dashboard(), accountItemStyle, cardStyl
 
 ### Community 2 - "Chat & Renderer Utilities"
 Cohesion: 0.03
-Nodes (60): acceptServerInvite(), AUDIO_CHANNEL_FIELDS, badWordsList, badWordsRegex, beginRoomOperation(), chatBlobUrls, closeAllCards(), closeJoinRequestNote() (+52 more)
+Nodes (51): ACTIVITY_CARD_IDS, AUDIO_CHANNEL_FIELDS, badWordsList, badWordsRegex, chatBlobUrls, closeJoinRequestNote(), ctrlOfferAcceptBtn, ctrlOfferDenyBtn (+43 more)
 
 ### Community 3 - "Electron Main Process"
 Cohesion: 0.06
@@ -156,8 +158,8 @@ Cohesion: 0.06
 Nodes (37): Blastoise Battle Card, Bulbasaur Battle Card, Charizard Battle Card, Pikachu Battle Card, Poke Savaşları Battle Cover Image, Download CTA Section, Features Section (P2P, Device ID, Screen Share, SFW, Activities, RNNoise), GitHub Releases Link (Lazel-3002/TeamSync) (+29 more)
 
 ### Community 5 - "Audio Bitrate & Mic Controls"
-Cohesion: 0.12
-Nodes (35): addVideoCard(), attachVideo(), broadcast(), broadcastTo(), checkTextWithAI(), clearControlOffer(), closeActiveControlSession(), closeCtrlModal() (+27 more)
+Cohesion: 0.11
+Nodes (41): addUser(), addVideoCard(), appendChat(), applyMicState(), broadcast(), broadcastTo(), checkAvatar(), checkTextWithAI() (+33 more)
 
 ### Community 6 - "User List & Avatars"
 Cohesion: 0.15
@@ -172,30 +174,22 @@ Cohesion: 0.10
 Nodes (19): actionSectionStyle, avatarStyle, badgeStyle, baseActionBtn, btnCreateStyle, btnJoinStyle, emptyTextStyle, friendAvatarPlaceholder (+11 more)
 
 ### Community 9 - "WebRTC ICE & TURN"
-Cohesion: 0.10
-Nodes (31): adoptScreenAudioTransceiver(), applyAudioSdpParams(), applyIceEscalationPolicy(), applyScreenAudioQuality(), applySharedTurn(), applySpeakerTo(), attachPeerScreenAudio(), attemptIceRestart() (+23 more)
+Cohesion: 0.09
+Nodes (36): adoptScreenAudioTransceiver(), applyAudioSdpParams(), applyIceEscalationPolicy(), applyScreenAudioQuality(), applySharedTurn(), applySpeakerTo(), applySpeakerToAll(), attachPeerScreenAudio() (+28 more)
 
 ### Community 10 - "E2E Test: MQTT/First Run"
-Cohesion: 0.19
-Nodes (11): setValueWhenReady(), waitFor(), fs, inspectFamily(), path, run(), {
+Cohesion: 0.21
+Nodes (6): assert, fs, path, {
   spawnPeer,
   cleanupPeer,
   createRoom,
   evalJS,
   waitFor,
-}, assert (+3 more)
+}, assert, { spawnPeer, cleanupPeer, evalJS }
 
 ### Community 11 - "E2E Test Harness"
-Cohesion: 0.15
-Nodes (15): assert, audioState(), setFounderToggle(), {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  joinRoom,
-  waitForPeerConnected,
-  evalJS,
-  waitFor,
-}, clickWhenReady(), createRoom(), joinRoom(), waitForPeerConnected() (+7 more)
+Cohesion: 0.14
+Nodes (17): APP_DIR, clickWhenReady(), ELECTRON_BIN, fs, joinRoom(), os, path, setValueWhenReady() (+9 more)
 
 ### Community 12 - "E2E Test: Scroll/Download"
 Cohesion: 0.15
@@ -210,8 +204,8 @@ Cohesion: 0.32
 Nodes (15): handleSBMessage(), initSharedBrowser(), sbApplyRemoteNav(), sbBroadcastAuth(), sbCanInteract(), sbCurrentUrl(), sbHandleHostLeft(), sbIsHost() (+7 more)
 
 ### Community 15 - "Focus Mode UI"
-Cohesion: 0.10
-Nodes (35): ACTIVITY_CARD_IDS, applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), getShortcutsMasterEnabled(), handleShortcutGateKeydown() (+27 more)
+Cohesion: 0.13
+Nodes (28): applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), getShortcutsMasterEnabled(), handleShortcutGateKeydown(), initShortcutSettings() (+20 more)
 
 ### Community 16 - "E2E Test: RNNoise Toggle"
 Cohesion: 0.25
@@ -226,8 +220,8 @@ Cohesion: 0.13
 Nodes (15): concurrently, cross-env, electron, electron-builder, electron-packager, devDependencies, concurrently, cross-env (+7 more)
 
 ### Community 19 - "Chat Messaging & Invites"
-Cohesion: 0.18
-Nodes (19): applyPeerLimiter(), applyPeerVolume(), AUDIO_CHANNELS, buildCardVolumeBox(), buildMenuVolumeBlock(), channelFields(), ensurePeerBoostChain(), getUserVolume() (+11 more)
+Cohesion: 0.13
+Nodes (29): applyPeerLimiter(), applyPeerVolume(), AUDIO_CHANNELS, buildCardVolumeBox(), buildMenuVolumeBlock(), channelFields(), ensurePeerBoostChain(), getNickname() (+21 more)
 
 ### Community 20 - "Diagnostics Tool"
 Cohesion: 0.35
@@ -324,8 +318,8 @@ Cohesion: 0.40
 Nodes (5): Build & Portable Distribution, P2P Serverless Architecture, Project Structure Layout, RNNoise Noise Suppression, TeamSync Application
 
 ### Community 37 - "E2E Test: Pokemon Moves"
-Cohesion: 0.10
-Nodes (39): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), applyRoomNoiseSuppression(), bindUI(), canManageRoom(), canModerateTarget(), clearFocusInlineLayout() (+31 more)
+Cohesion: 0.15
+Nodes (21): applyAudioBitrateToPeers(), applyPttMode(), applyRoomNoiseSuppression(), bindUI(), canManageRoom(), canModerateTarget(), getAudioBitrate(), getShareableTurn() (+13 more)
 
 ### Community 38 - "HTML Patch Tool v1"
 Cohesion: 0.40
@@ -377,7 +371,7 @@ Nodes (32): addFiles(), bindDropzone(), bindFilterGroup(), closeAttachmentMenu()
 
 ### Community 60 - "Cross-Fetch Dependency"
 Cohesion: 0.11
-Nodes (41): APP_THEMES, applyCustomThemeColors(), applyMicrophoneVolume(), applySimpleUi(), applySpeakerToAll(), applySpeakerVolume(), applyUserLanguage(), applyUserTheme() (+33 more)
+Nodes (39): APP_THEMES, applyCustomThemeColors(), applyMicrophoneVolume(), applySimpleUi(), applySpeakerVolume(), applyUserTheme(), CUSTOM_THEME_PRESETS, fillAudioDeviceSelect() (+31 more)
 
 ### Community 66 - "handlePeerDiscovered"
 Cohesion: 0.21
@@ -404,16 +398,22 @@ Cohesion: 0.60
 Nodes (4): load(), Generate review-required locale drafts; never use this at application runtime., run(), save()
 
 ### Community 81 - "settings-language.test.js"
-Cohesion: 0.11
-Nodes (17): { spawnPeer, cleanupPeer, waitFor }, assert, { spawnPeer, cleanupPeer, evalJS }, { spawnPeer, cleanupPeer, waitFor, evalJS, createRoom }, APP_DIR, cleanupPeer(), ELECTRON_BIN, fs (+9 more)
+Cohesion: 0.15
+Nodes (17): { spawnPeer, cleanupPeer, waitFor }, { spawnPeer, cleanupPeer, waitFor, evalJS, createRoom }, cleanupPeer(), createRoom(), waitFor(), assert, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
+}, fs (+9 more)
 
 ### Community 84 - "escapeHtml"
-Cohesion: 0.15
-Nodes (24): addUser(), appendChat(), appendFileMsg(), checkAvatar(), cleanText(), displayName(), escapeHtml(), getNickname() (+16 more)
+Cohesion: 0.13
+Nodes (19): acceptServerInvite(), appendFileMsg(), closeAllCards(), connectGlobalBroker(), disconnectApp(), escapeHtml(), initFileTransfer(), isImageFile() (+11 more)
 
 ### Community 85 - "enterFocus"
-Cohesion: 0.50
-Nodes (3): assert, dispatchKey(), { spawnPeer, cleanupPeer, createRoom, evalJS, waitFor }
+Cohesion: 0.26
+Nodes (17): applyUserLanguage(), clearFocusInlineLayout(), ensureFocusControlsVisible(), enterFocus(), exitFocus(), makeCardFocusable(), minimizeFocus(), openCardFocused() (+9 more)
 
 ### Community 86 - "broadcast"
 Cohesion: 0.40
@@ -429,6 +429,18 @@ Nodes (4): assert, fs, path, {
 Cohesion: 0.29
 Nodes (11): checkSession(), deviceLogin(), getActiveSlot(), getDeviceAccounts(), loadSupabaseProfile(), loginWithProfileData(), renderDeviceAccounts(), saveDeviceAccounts() (+3 more)
 
+### Community 88 - "founder-rnnoise-toggle.test.js"
+Cohesion: 0.40
+Nodes (4): assert, audioState(), setFounderToggle(), {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  joinRoom,
+  waitForPeerConnected,
+  evalJS,
+  waitFor,
+}
+
 ## Ambiguous Edges - Review These
 - `window.handlePokeImgError() sprite fallback chain` → `PokeAPI (pokeapi.co)`  [AMBIGUOUS]
   index.html · relation: calls
@@ -436,17 +448,17 @@ Nodes (11): checkSession(), deviceLogin(), getActiveSlot(), getDeviceAccounts(),
 ## Knowledge Gaps
 - **335 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+330 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **23 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `window.handlePokeImgError() sprite fallback chain` and `PokeAPI (pokeapi.co)`?**
   _Edge tagged AMBIGUOUS (relation: calls) - confidence is low._
-- **Why does `t()` connect `Cross-Fetch Dependency` to `Chat & Renderer Utilities`, `handlePeerDiscovered`, `Audio Bitrate & Mic Controls`, `Poke Feature Init`, `E2E Test: Pokemon Moves`, `Focus Mode UI`?**
-  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+- **Why does `t()` connect `Cross-Fetch Dependency` to `Chat & Renderer Utilities`, `handlePeerDiscovered`, `Poke Feature Init`, `WebRTC ICE & TURN`, `Focus Mode UI`, `escapeHtml`, `enterFocus`?**
+  _High betweenness centrality (0.088) - this node is a cross-community bridge._
 - **Why does `initPoke()` connect `Poke Feature Init` to `Cross-Fetch Dependency`?**
-  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+  _High betweenness centrality (0.088) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `render()` (e.g. with `addBot()` and `continueAfterVoteResult()`) actually correct?**
   _`render()` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**

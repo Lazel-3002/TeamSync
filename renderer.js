@@ -249,7 +249,11 @@ function setupInternetSignaling(roomId, myId, myName) {
       if (mqttClient !== client) return; // bayat istemci geri çağrısı yok sayılır
       reconnectAttempts = 0;
     console.log('🌐 İnternet sunucusuna bağlanıldı (MQTT)');
-    mqttClient.subscribe(`teamsync/room/${roomId}/#`);
+    // qos:1 istenir: broker, publish tarafında QoS 1 ile gönderilen dosya/GIF
+    // chunk'larını (teamsync/room/<id>/file) yine de min(pub,sub) kuralıyla
+    // QoS 0'a düşürüp teslim ederdi — abonelik de QoS 1 istemeden publish'teki
+    // QoS 1 hiçbir işe yaramaz.
+    mqttClient.subscribe(`teamsync/room/${roomId}/#`, { qos: 1 });
     
     if (internetAnnounceInterval) clearInterval(internetAnnounceInterval);
     internetAnnounceInterval = setInterval(() => {
@@ -1614,7 +1618,10 @@ function connectGlobalBroker(idx, session) {
     }
     reconnectAttempts = 0;
     console.log(`🔗 Global MQTT (Arkadaşlık) bağlandı: ${brokerUrl}`);
-    client.subscribe(`teamsync/user/${state.friendId}/events`);
+    // qos:1: dm_file_start/dm_file_chunk publish'leri QoS 1 ile atılıyor;
+    // abonelik QoS 0 kalırsa broker teslimde min(pub,sub)=0'a düşürür ve
+    // büyük GIF/dosya transferlerinde tek chunk kaybı yine sessizce oluşur.
+    client.subscribe(`teamsync/user/${state.friendId}/events`, { qos: 1 });
 
     // Açılışta eski oturumdan kalan "online" bayrağını sıfırla (yanlış çevrimiçi
     // göstermesin); gerçekten çevrimiçi olanlar en geç 5 sn içinde presence ile
@@ -1776,6 +1783,10 @@ setInterval(() => {
   Object.keys(state.incomingDMFiles || {}).forEach(fileId => {
     const f = state.incomingDMFiles[fileId];
     if (f && now - (f.lastChunkAt || 0) > 120000) {
+      // Önceden tamamen sessizdi: chunk kaybı yüzünden yarım kalan bir GIF/dosya
+      // hiçbir iz bırakmadan yok oluyordu. En azından alıcıya bildiriyoruz.
+      const senderName = state.friends[f.fromId]?.name || 'Biri';
+      showToast(`${senderName} bir dosya/GIF gönderdi ama transfer tamamlanamadı (bağlantı kopması). Tekrar göndermesini isteyebilirsin.`, 'warn');
       delete state.incomingDMFiles[fileId];
     }
   });
@@ -9708,7 +9719,10 @@ function initFileTransfer() {
     if (e.dataTransfer.files.length) sendFile(e.dataTransfer.files[0]);
   });
   
-  document.getElementById('fbtn').addEventListener('click', () => document.getElementById('finput').click());
+  document.getElementById('fbtn').addEventListener('click', event => {
+    if (typeof window.openDMAttachmentMenu === 'function') window.openDMAttachmentMenu(event.currentTarget, 'finput', 'room');
+    else document.getElementById('finput').click();
+  });
   document.getElementById('finput').addEventListener('change', (e) => {
     if (e.target.files.length) sendFile(e.target.files[0]);
   });
@@ -9788,7 +9802,8 @@ async function sendFile(file) {
       msgBuf.set(chunk, header.length);
 
       try {
-        mqttClient.publish(`teamsync/room/${state.room}/file`, msgBuf);
+        // QoS 1: DM medya transferindeki aynı sessiz-chunk-kaybı riskini taşıyor.
+        mqttClient.publish(`teamsync/room/${state.room}/file`, msgBuf, { qos: 1 });
       } catch (e) {
         console.warn('MQTT file send failed:', e);
       }
@@ -9939,24 +9954,30 @@ window.renderServerDMFriends = () => {
   const list = document.getElementById('server-dm-friend-list');
   if (!list) return;
   list.innerHTML = '';
-  const onlineFriends = Object.keys(state.friends).filter(fId => state.friends[fId].online);
-  
-  if (onlineFriends.length === 0) {
-    list.innerHTML = '<li class="muted" style="text-align: center; padding: 16px;">Şu an çevrimiçi arkadaşın yok.</li>';
+  // Çevrimdışı arkadaşlar da listelenir: eski mesajlara bakmak ya da yeni
+  // mesaj yazmak (karşı taraf tekrar bağlandığında iletilir) için filtrelemeye
+  // gerek yok; sadece durumu online/offline noktasıyla ayırt ediyoruz.
+  const friendIds = Object.keys(state.friends);
+
+  if (friendIds.length === 0) {
+    list.innerHTML = '<li class="muted" style="text-align: center; padding: 16px;">Henüz arkadaşın yok.</li>';
     return;
   }
-  
-  onlineFriends.forEach(fId => {
-    const f = state.friends[fId];
-    const isActive = state.activeDM === fId;
-    const li = document.createElement('li');
-    li.className = `server-dm-friend${isActive ? ' active' : ''}`;
-    li.innerHTML = `<div class="friend-status online"></div> <b>${escapeHtml(f.name)}</b>`;
-    li.onmouseover = () => { if (!isActive) li.classList.add('hover'); };
-    li.onmouseout = () => { if (!isActive) li.classList.remove('hover'); };
-    li.onclick = () => { openDM(fId); renderServerDMFriends(); };
-    list.appendChild(li);
-  });
+
+  friendIds
+    .sort((a, b) => (state.friends[b].online ? 1 : 0) - (state.friends[a].online ? 1 : 0))
+    .forEach(fId => {
+      const f = state.friends[fId];
+      const isActive = state.activeDM === fId;
+      const isOnline = !!f.online;
+      const li = document.createElement('li');
+      li.className = `server-dm-friend${isActive ? ' active' : ''}${isOnline ? '' : ' offline'}`;
+      li.innerHTML = `<div class="friend-status ${isOnline ? 'online' : ''}"></div> <b>${escapeHtml(f.name)}</b>`;
+      li.onmouseover = () => { if (!isActive) li.classList.add('hover'); };
+      li.onmouseout = () => { if (!isActive) li.classList.remove('hover'); };
+      li.onclick = () => { openDM(fId); renderServerDMFriends(); };
+      list.appendChild(li);
+    });
 };
 
 // Aynı kişiden/bize art arda gelen birebir aynı metin mesajı (spam) yeni bir
@@ -10061,6 +10082,11 @@ window.sendDMFile = async (file) => {
   const totalChunks = Math.ceil(base64Data.length / dmChunkSize);
   const fileId = crypto.randomUUID();
 
+  // QoS 1 (en az bir kez teslim): dosya/GIF transferi onlarca-yüzlerce chunk'a
+  // bölünüyor, varsayılan QoS 0'da tek bir chunk'ın broker'da sessizce
+  // düşmesi (özellikle büyük GIF'lerde chunk sayısı arttıkça daha olası)
+  // transferi hiçbir hata göstermeden tamamlanamaz bırakıyor ve karşı taraf
+  // medyayı asla görmüyordu (bkz. 2dk'lık sessiz temizleme, aşağıda).
   state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
     type: 'dm_file_start',
     fromId: state.friendId,
@@ -10069,7 +10095,7 @@ window.sendDMFile = async (file) => {
     msgType,
     fileName: file.name,
     totalChunks
-  }));
+  }), { qos: 1 });
 
   for (let i = 0; i < totalChunks; i++) {
     const chunk = base64Data.substr(i * dmChunkSize, dmChunkSize);
@@ -10079,7 +10105,7 @@ window.sendDMFile = async (file) => {
       fileId,
       chunkIndex: i,
       data: chunk
-    }));
+    }), { qos: 1 });
     await new Promise(resolve => setTimeout(resolve, 15));
   }
   return true;

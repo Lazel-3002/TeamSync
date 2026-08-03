@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1785786363.3766072,
-    "ast_hash": "c835803932592778a6795513459584d4",
+    "mtime": 1785779869.8259606,
+    "ast_hash": "28f91749ae6816175c725256e0a5b6a9",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -140,8 +140,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1785785076.2195425,
-    "ast_hash": "48d7279a036432345642f99a3d744727",
+    "mtime": 1785778830.2622223,
+    "ast_hash": "f468137872dcdf3f7f74d9061a9399ae",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -505,8 +505,8 @@
     "semantic_hash": ""
   },
   "js/media-library.js": {
-    "mtime": 1785786252.6000855,
-    "ast_hash": "93af31ebc88f53ae8d497be80419777a",
+    "mtime": 1784920812.026713,
+    "ast_hash": "9bdd3a6a88bb45d60fb14a746586bffc",
     "semantic_hash": ""
   },
   "js/vampire-villager.js": {

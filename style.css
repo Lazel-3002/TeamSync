@@ -824,7 +824,10 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   z-index: 10000;
   background: color-mix(in srgb, var(--bg-dark) 68%, transparent);
 }
-.server-dm-card {
+/* .mcard (tanımlı daha sonra, aynı özgüllük) width/padding'i ezip pencereyi
+   480px'e küçültüyordu ("mesajlar menüsü küçücük" hatası) — .mcard.server-dm-card
+   ile özgüllüğü artırıp kazanmasını garanti ediyoruz. */
+.mcard.server-dm-card {
   width: 700px;
   height: 500px;
   display: flex;

@@ -11,6 +11,7 @@
   let pickerFilter = 'all';
   let pickerQuery = '';
   let activeAttachmentInputId = 'dm-file-input';
+  let activeAttachmentMode = 'dm'; // 'dm' | 'room' — kimin bağlamında açıldığını belirler
   let attachmentMenuRequestId = 0;
   const settingsObjectUrls = new Set();
   const pickerObjectUrls = new Set();
@@ -297,7 +298,17 @@
         type: item.type,
         lastModified: item.lastModified || Date.now()
       });
-      const sent = typeof window.sendDMFile === 'function' ? await window.sendDMFile(file) : false;
+      let sent = false;
+      if (activeAttachmentMode === 'room') {
+        // Oda sohbeti: DM'den farklı olarak başarı/başarısızlık dönmez
+        // (sendFile kendi ilerleme balonunu kendi oluşturur), o yüzden
+        // atılabildiyse (fonksiyon var ve hata fırlatmadıysa) başarılı sayılır.
+        if (typeof window.sendFile === 'function') {
+          try { await window.sendFile(file); sent = true; } catch (error) { console.error('Oda medya gönderimi hatası:', error); }
+        }
+      } else {
+        sent = typeof window.sendDMFile === 'function' ? await window.sendDMFile(file) : false;
+      }
       if (sent) {
         closePicker();
         notify('mediaPicker.sent', 'Kayıtlı medya gönderildi.', 'ok');
@@ -379,8 +390,9 @@
     document.getElementById('dm-attach-menu')?.classList.add('hidden');
   }
 
-  async function openAttachmentMenu(button, inputId) {
-    if (!state.activeDM) {
+  async function openAttachmentMenu(button, inputId, mode) {
+    activeAttachmentMode = mode === 'room' ? 'room' : 'dm';
+    if (activeAttachmentMode === 'dm' && !state.activeDM) {
       notify('attach.selectFriend', 'Önce mesaj göndereceğin bir arkadaş seç.', 'warn');
       return;
     }
@@ -478,7 +490,7 @@
     document.addEventListener('pointerdown', event => {
       const attachMenu = document.getElementById('dm-attach-menu');
       if (!attachMenu || attachMenu.classList.contains('hidden')) return;
-      if (event.target.closest('#dm-attach-menu, #dm-btn-file, #server-dm-btn-file')) return;
+      if (event.target.closest('#dm-attach-menu, #dm-btn-file, #server-dm-btn-file, #fbtn')) return;
       closeAttachmentMenu();
     });
     document.addEventListener('keydown', event => {
