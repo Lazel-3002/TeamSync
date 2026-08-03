@@ -18,6 +18,9 @@ module.exports = async function run() {
       mobile: false,
     });
 
+    // Aşağıdaki bildirim metinleri Türkçe beklendiği için arayüz dili sabitlenir
+    // (uygulamanın varsayılanı İngilizce'dir).
+    await evalJS(peer.client, `applyUserLanguage('tr'); 1`);
     await evalJS(peer.client, `openUserSettings('media'); 1`);
     await waitFor(
       peer.client,
@@ -264,7 +267,193 @@ module.exports = async function run() {
     assert.strictEqual(videoState.type, 'video', JSON.stringify(videoState, null, 2));
     assert.strictEqual(videoState.rendered, 1, JSON.stringify(videoState, null, 2));
 
-    console.log(JSON.stringify({ newLimitState, libraryState, menuState, sentState, largerDmState, videoState, settingsPath, pickerPath }, null, 2));
+    // --- İsim ve etiket akışı ---
+    await evalJS(peer.client, `openUserSettings('media'); 1`);
+    await waitFor(
+      peer.client,
+      `document.querySelector('[data-settings-content="media"]').classList.contains('active')`,
+      5000,
+      'media settings panel reopened'
+    );
+
+    await evalJS(
+      peer.client,
+      `(() => {
+        const binary = atob('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==');
+        const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+        const file = new File([bytes], 'cat.gif', { type: 'image/gif', lastModified: 1770000009000 });
+        // review penceresi kapanana kadar beklediği için await edilmez.
+        window.__reviewPromise = TeamSyncMediaLibrary.addFiles([file], { review: true });
+        return true;
+      })()`
+    );
+
+    const detailState = await waitFor(
+      peer.client,
+      `(() => {
+        const modal = document.getElementById('media-detail-modal');
+        if (!modal || modal.classList.contains('hidden')) return null;
+        return {
+          name: document.getElementById('media-detail-name').value,
+          title: document.getElementById('media-detail-title').textContent,
+          stepHidden: document.getElementById('media-detail-step').classList.contains('hidden')
+        };
+      })()`,
+      5000,
+      'media naming dialog'
+    );
+    assert.strictEqual(detailState.name, 'cat.gif', JSON.stringify(detailState, null, 2));
+    assert.strictEqual(detailState.stepHidden, true, JSON.stringify(detailState, null, 2));
+
+    const tagChips = await evalJS(
+      peer.client,
+      `(() => {
+        document.getElementById('media-detail-name').value = 'dans eden kedi';
+        const tagInput = document.getElementById('media-detail-tag-input');
+        tagInput.value = '#kedi, komik';
+        tagInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        return [...document.querySelectorAll('#media-detail-tags .media-tag-chip')].map(chip => chip.textContent);
+      })()`
+    );
+    assert.deepStrictEqual(tagChips, ['#kedi×', '#komik×'], JSON.stringify(tagChips));
+
+    await evalJS(peer.client, `document.getElementById('media-detail-save').click(); 1`);
+    await waitFor(
+      peer.client,
+      `document.getElementById('media-detail-modal').classList.contains('hidden')`,
+      5000,
+      'naming dialog closed after save'
+    );
+
+    const taggedState = await evalJS(
+      peer.client,
+      `(async () => {
+        const items = await TeamSyncMediaLibrary.getItems();
+        const saved = items.find(item => item.name === 'dans eden kedi');
+        const card = [...document.querySelectorAll('#settings-media-grid .media-library-card')]
+          .find(node => node.querySelector('.media-library-info strong')?.textContent === 'dans eden kedi');
+        return {
+          count: items.length,
+          tags: saved ? saved.tags : null,
+          kind: saved ? saved.kind : null,
+          cardTags: card ? [...card.querySelectorAll('.media-tag-chip')].map(chip => chip.textContent) : null
+        };
+      })()`,
+      true
+    );
+    assert.strictEqual(taggedState.count, 2, JSON.stringify(taggedState, null, 2));
+    assert.deepStrictEqual(taggedState.tags, ['kedi', 'komik'], JSON.stringify(taggedState, null, 2));
+    assert.deepStrictEqual(taggedState.cardTags, ['#kedi', '#komik'], JSON.stringify(taggedState, null, 2));
+
+    // --- Sağ tıkla sonradan düzenleme ---
+    const contextState = await evalJS(
+      peer.client,
+      `(() => {
+        const card = [...document.querySelectorAll('#settings-media-grid .media-library-card')]
+          .find(node => node.querySelector('.media-library-info strong')?.textContent === 'dans eden kedi');
+        card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 240 }));
+        const menu = document.getElementById('media-context-menu');
+        return {
+          visible: !menu.classList.contains('hidden'),
+          sendHidden: menu.querySelector('[data-media-action="send"]').classList.contains('hidden'),
+          options: [...menu.querySelectorAll('button:not(.hidden)')].map(button => button.dataset.mediaAction)
+        };
+      })()`
+    );
+    assert.strictEqual(contextState.visible, true, JSON.stringify(contextState, null, 2));
+    assert.strictEqual(contextState.sendHidden, true, JSON.stringify(contextState, null, 2));
+    assert.deepStrictEqual(contextState.options, ['edit', 'delete'], JSON.stringify(contextState, null, 2));
+
+    await evalJS(peer.client, `document.querySelector('#media-context-menu [data-media-action="edit"]').click(); 1`);
+    const editState = await waitFor(
+      peer.client,
+      `(() => {
+        const modal = document.getElementById('media-detail-modal');
+        if (!modal || modal.classList.contains('hidden')) return null;
+        return {
+          name: document.getElementById('media-detail-name').value,
+          tags: [...document.querySelectorAll('#media-detail-tags .media-tag-chip span')].map(chip => chip.textContent),
+          deleteVisible: !document.getElementById('media-detail-delete').classList.contains('hidden'),
+          contextClosed: document.getElementById('media-context-menu').classList.contains('hidden')
+        };
+      })()`,
+      5000,
+      'edit dialog from context menu'
+    );
+    assert.strictEqual(editState.name, 'dans eden kedi', JSON.stringify(editState, null, 2));
+    assert.deepStrictEqual(editState.tags, ['#kedi', '#komik'], JSON.stringify(editState, null, 2));
+    assert.strictEqual(editState.deleteVisible, true, JSON.stringify(editState, null, 2));
+    assert.strictEqual(editState.contextClosed, true, JSON.stringify(editState, null, 2));
+
+    const retaggedState = await evalJS(
+      peer.client,
+      `(async () => {
+        document.querySelector('#media-detail-tags .media-tag-chip button').click();
+        const tagInput = document.getElementById('media-detail-tag-input');
+        tagInput.value = '#dans';
+        tagInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        document.getElementById('media-detail-save').click();
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const items = await TeamSyncMediaLibrary.getItems();
+        return {
+          closed: document.getElementById('media-detail-modal').classList.contains('hidden'),
+          tags: items.find(item => item.name === 'dans eden kedi')?.tags
+        };
+      })()`,
+      true
+    );
+    assert.strictEqual(retaggedState.closed, true, JSON.stringify(retaggedState, null, 2));
+    assert.deepStrictEqual(retaggedState.tags, ['komik', 'dans'], JSON.stringify(retaggedState, null, 2));
+
+    // --- Seçme penceresinde etiketle arama ve filtre ---
+    await evalJS(peer.client, `document.getElementById('settings-v2-close').click(); TeamSyncMediaLibrary.openPicker(); 1`);
+    await waitFor(
+      peer.client,
+      `!document.getElementById('media-picker-modal').classList.contains('hidden') &&
+       document.querySelectorAll('#media-picker-grid .media-picker-card').length === 2`,
+      5000,
+      'picker with two items'
+    );
+
+    const tagSearchState = await evalJS(
+      peer.client,
+      `(async () => {
+        const chips = [...document.querySelectorAll('#media-picker-tags .media-tag-chip')].map(chip => chip.textContent);
+        const search = document.getElementById('media-picker-search');
+        search.value = '#dans';
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 350));
+        const byTag = [...document.querySelectorAll('#media-picker-grid .media-picker-card strong')].map(node => node.textContent);
+        search.value = 'spark';
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 350));
+        const byName = [...document.querySelectorAll('#media-picker-grid .media-picker-card strong')].map(node => node.textContent);
+        search.value = '';
+        search.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 350));
+        document.querySelector('#media-picker-tags .media-tag-chip').click();
+        await new Promise(resolve => setTimeout(resolve, 350));
+        return {
+          chips,
+          byTag,
+          byName,
+          byChip: [...document.querySelectorAll('#media-picker-grid .media-picker-card strong')].map(node => node.textContent),
+          count: document.getElementById('media-picker-count').textContent
+        };
+      })()`,
+      true
+    );
+    assert.deepStrictEqual(tagSearchState.chips.sort(), ['#dans', '#komik'], JSON.stringify(tagSearchState, null, 2));
+    assert.deepStrictEqual(tagSearchState.byTag, ['dans eden kedi'], JSON.stringify(tagSearchState, null, 2));
+    assert.deepStrictEqual(tagSearchState.byName, ['spark.gif'], JSON.stringify(tagSearchState, null, 2));
+    assert.deepStrictEqual(tagSearchState.byChip, ['dans eden kedi'], JSON.stringify(tagSearchState, null, 2));
+    assert.strictEqual(tagSearchState.count, '1 / 2', JSON.stringify(tagSearchState, null, 2));
+
+    const taggedShot = await peer.client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const taggedPath = path.join(process.env.TEMP, 'teamsync-media-library-tags.png');
+    fs.writeFileSync(taggedPath, Buffer.from(taggedShot.result.data, 'base64'));
+
+    console.log(JSON.stringify({ newLimitState, libraryState, menuState, sentState, largerDmState, videoState, detailState, taggedState, contextState, editState, retaggedState, tagSearchState, settingsPath, pickerPath, taggedPath }, null, 2));
   } finally {
     cleanupPeer(peer);
   }

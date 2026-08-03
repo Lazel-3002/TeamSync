@@ -2041,7 +2041,7 @@
           <div class="media-picker-controls">
             <div class="media-picker-search">
               <span aria-hidden="true">⌕</span>
-              <input id="media-picker-search" type="search" data-i18n-placeholder="mediaPicker.search" placeholder="Kütüphanende ara..." autocomplete="off" />
+              <input id="media-picker-search" type="search" data-i18n-placeholder="mediaPicker.search" placeholder="Ad veya #etiket ara..." autocomplete="off" />
             </div>
             <div class="media-filter-chips" id="media-picker-filters">
               <button class="active" type="button" data-media-filter="all" data-i18n="settings.mediaAll">Tümü</button>
@@ -2049,6 +2049,7 @@
               <button type="button" data-media-filter="image" data-i18n="settings.mediaImages">Fotoğraflar</button>
               <button type="button" data-media-filter="video" data-i18n="settings.mediaVideos">Videolar</button>
             </div>
+            <div id="media-picker-tags" class="media-tag-filter-row hidden" aria-label="Etiketler"></div>
           </div>
           <div id="media-picker-grid" class="media-picker-grid"></div>
           <div id="media-picker-empty" class="media-picker-empty hidden">
@@ -2062,6 +2063,57 @@
             <span data-i18n="mediaPicker.sendHint">Göndermek için bir medyaya tıkla</span>
           </div>
         </div>
+      </div>
+
+      <div id="media-detail-modal" class="modal media-detail-modal hidden">
+        <div class="media-detail-shell" role="dialog" aria-modal="true" aria-labelledby="media-detail-title">
+          <div class="media-detail-head">
+            <div>
+              <span class="media-picker-eyebrow" id="media-detail-step">1 / 1</span>
+              <h3 id="media-detail-title" data-i18n="mediaDetail.titleNew">Medyanı adlandır</h3>
+              <p id="media-detail-lead" data-i18n="mediaDetail.lead">Bir ad ve #etiket ver; kütüphanende saniyede bulursun.</p>
+            </div>
+            <button id="media-detail-close" class="settings-close" type="button" data-i18n-title="common.close" aria-label="Kapat">×</button>
+          </div>
+          <div class="media-detail-body">
+            <div class="media-detail-preview" id="media-detail-preview"></div>
+            <div class="media-detail-fields">
+              <label class="media-detail-field">
+                <span data-i18n="mediaDetail.nameLabel">Ad</span>
+                <input id="media-detail-name" type="text" maxlength="180" data-i18n-placeholder="mediaDetail.namePlaceholder" placeholder="Örn: dans eden kedi" autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="media-detail-field">
+                <span data-i18n="mediaDetail.tagsLabel">Etiketler</span>
+                <div class="media-tag-input" id="media-detail-tag-box">
+                  <span id="media-detail-tags" class="media-tag-chips"></span>
+                  <input id="media-detail-tag-input" type="text" maxlength="24" data-i18n-placeholder="mediaDetail.tagsPlaceholder" placeholder="#kedi #komik" autocomplete="off" spellcheck="false" />
+                </div>
+                <small data-i18n="mediaDetail.tagsHint">Enter veya boşluk ile ekle · en fazla 8 etiket</small>
+              </div>
+              <div class="media-detail-suggested hidden" id="media-detail-suggested-wrap">
+                <span data-i18n="mediaDetail.suggested">Sık kullandıkların</span>
+                <div id="media-detail-suggested" class="media-tag-chips"></div>
+              </div>
+            </div>
+          </div>
+          <div class="media-detail-foot">
+            <button id="media-detail-delete" class="media-detail-danger hidden" type="button" data-i18n="mediaLibrary.delete">Sil</button>
+            <button id="media-detail-skip" class="btn-sec" type="button" data-i18n="mediaDetail.skip">Atla</button>
+            <button id="media-detail-save" class="btn-pri" type="button" data-i18n="common.save">Kaydet</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="media-context-menu" class="media-context-menu hidden" role="menu">
+        <button type="button" role="menuitem" data-media-action="send" class="media-context-send">
+          <span aria-hidden="true">➤</span><span data-i18n="mediaLibrary.send">Gönder</span>
+        </button>
+        <button type="button" role="menuitem" data-media-action="edit">
+          <span aria-hidden="true">✎</span><span data-i18n="mediaLibrary.edit">İsim ve etiketleri düzenle</span>
+        </button>
+        <button type="button" role="menuitem" data-media-action="delete" class="media-context-danger">
+          <span aria-hidden="true">×</span><span data-i18n="mediaLibrary.delete">Sil</span>
+        </button>
       </div>
 
       <div id="dm-attach-menu" class="dm-attach-menu hidden" role="menu">
