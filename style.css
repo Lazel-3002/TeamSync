@@ -587,8 +587,10 @@ body { padding-top: 35px; } /* Prevent overlap */
   position: relative;
 }
 .menu-layout.dm-open {
-  /* Keep the conversation inside the viewport so its message list can scroll. */
-  height: min(440px, calc(100vh - 190px));
+  /* Keep the conversation inside the viewport so its message list can scroll.
+     --dm-menu-height, panelin üst kenarından sürüklenerek büyütülen yüksekliktir
+     (js/dm-resize.js); min() kelepçesi ekranı taşırmasını engeller. */
+  height: min(var(--dm-menu-height, 440px), calc(100vh - 190px));
 }
 .global-ping {
   position: fixed;
@@ -832,7 +834,9 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
    ile özgüllüğü artırıp kazanmasını garanti ediyoruz. */
 .mcard.server-dm-card {
   width: 700px;
-  height: 500px;
+  /* --dm-server-height: üst kenardan sürüklenerek ayarlanan yükseklik. */
+  height: min(var(--dm-server-height, 500px), calc(100vh - 90px));
+  position: relative;
   display: flex;
   flex-direction: row;
   padding: 0;
@@ -1210,7 +1214,11 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   border-top: var(--border);
   display: flex;
   flex-direction: column;
-  height: 280px;
+  /* --room-chat-height: üst kenardaki tutamaç yukarı sürüklenerek ayarlanır
+     (js/dm-resize.js). Kelepçe JS'te yapılır, çünkü üst bloğun (kullanıcılar +
+     ses testi) ihtiyacı viewport'a göre değişir. */
+  height: var(--room-chat-height, 280px);
+  position: relative;
   background: rgba(0,0,0,0.1);
 }
 .msgs {
@@ -3667,21 +3675,33 @@ body.no-hw-accel .dl-btn:hover {
 
 
 /* ===== RESPONSIVE DESIGN ===== */
-/* Odak modu her pencere boyutunda ana çalışma alanını kullanır. Sidebar,
-   180px küçük-kart şeridi ve çok satırlı alt çubuk birlikte focus-spacer'ı
-   daraltıp kartı ince bir şeride çevirmemeli. Küçük kartlar kompakt tutulur;
-   genel kontroller tek satırda kalır ve gerektiğinde yatay kaydırılır. */
+/* Odak modu ana çalışma alanını kullanır ama sol paneli (kullanıcılar +
+   sohbet) ve üst çubuğu GİZLEMEZ: eskiden `.sidebar { display:none }` ve
+   `.top-bar { display:none }` vardı, bu yüzden Etkinlik/Ekran/Tahta odağına
+   girer girmez sunucudaki kişiler, sohbet ve Mesajlar/Arkadaşlar düğmeleri
+   tamamen kayboluyordu. Panel yalnızca gerçekten dar pencerelerde (<=900px)
+   gizlenir — orada sidebar zaten dikey yığılıp odaklı karta yer bırakmıyor.
+   Küçük kartlar kompakt tutulur; genel kontroller tek satırda kalır ve
+   gerektiğinde yatay kaydırılır. */
 .app:has(> .main.focus-mode) > .sidebar {
-  display: none;
+  /* flex-shrink:0 şart: .main odak modunda tüm boşluğu istediği için sidebar
+     (varsayılan flex-shrink:1) daralıp kullanıcı listesi/sohbet okunamaz hale
+     geliyordu. */
+  flex: 0 0 280px;
 }
 .app > .main.focus-mode {
   flex: 1 1 auto;
-  width: 100%;
+  /* width:100% DEĞİL: flex-basis:auto ile .main tüm .app genişliğini talep
+     edip yanındaki sidebar'ı sıfıra kadar eziyordu. */
+  min-width: 0;
   height: 100%;
   min-height: 0;
 }
 .main.focus-mode > .top-bar {
-  display: none !important;
+  /* Odakta üst çubuk kalır ama alçalır — odaklı karta dikey yer bırakmak için. */
+  min-height: 44px;
+  padding: 6px 16px;
+  gap: 8px;
 }
 .main.focus-mode .grid {
   height: 112px;
@@ -3699,7 +3719,11 @@ body.no-hw-accel .dl-btn:hover {
 .main.focus-mode > .bar {
   flex: 0 0 auto;
   flex-wrap: nowrap;
-  justify-content: flex-start;
+  /* Odak dışındaki görünümle aynı: düğmeler ortalı kalır. "safe center",
+     içerik taştığında flex-start gibi davranır; düz "center" ile taşan
+     çubukta soldaki düğmelere kaydırarak bile ulaşılamıyordu. */
+  justify-content: center;
+  justify-content: safe center;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -3707,6 +3731,12 @@ body.no-hw-accel .dl-btn:hover {
 .main.focus-mode > .bar > .bar-group {
   flex: 0 0 auto;
   flex-wrap: nowrap;
+}
+/* Dar pencerede sidebar + odaklı kart aynı anda sığmaz: odakta paneli gizle. */
+@media (max-width: 900px) {
+  .app:has(> .main.focus-mode) > .sidebar {
+    display: none;
+  }
 }
 
 @media (max-width: 750px) {
@@ -9805,3 +9835,82 @@ body.no-hw-accel .ilb-nav {
 .ucm-vol-screen .ucm-vol-slider { accent-color: #a78bfa; }
 .ucm-vol-screen .ucm-vol-slider::-webkit-slider-thumb { background: #ddd6fe; }
 .ucm-vol-screen .ucm-vol-header { color: #c4b5fd; }
+
+/* ===== MESAJ PENCERESİ YÜKSEKLİK TUTAMACI =====
+   Hem sunucu içi Mesajlar modalinin hem de ana menüdeki DM panelinin üst
+   kenarında durur; fareyle yukarı sürüklenince pencere büyür. Çift tıklama
+   varsayılan yüksekliğe döndürür (js/dm-resize.js). */
+.dm-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  z-index: 6;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.dm-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 46px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--txt-main) 34%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.dm-resize-handle:hover::after,
+.dm-resize-handle.dragging::after { opacity: 1; }
+/* Sürükleme sırasında metin seçimi ve imleç titremesi olmasın. */
+body.dm-resizing { cursor: ns-resize; user-select: none; }
+body.dm-resizing * { cursor: ns-resize !important; }
+
+/* ===== KOLEKSİYONA EKLE DÜĞMESİ =====
+   Sohbet/DM içindeki GIF, görsel ve videoların üstüne gelince beliren yüzen
+   düğme. position: fixed olduğu için kaydırılan listelerde kırpılmaz; indirme
+   düğmesiyle çakışmasın diye sol üst köşeye konumlanır (js/media-collect.js). */
+.media-collect-btn {
+  position: fixed;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+  background: rgba(17, 24, 39, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 11px;
+  backdrop-filter: blur(10px) saturate(135%);
+  -webkit-backdrop-filter: blur(10px) saturate(135%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.media-collect-btn.hidden { display: none; }
+.media-collect-btn svg { width: 15px; height: 15px; flex: 0 0 auto; display: block; }
+.media-collect-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-collect-btn:hover {
+  background: rgba(17, 24, 39, 0.28);
+  border-color: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.media-collect-btn:active { transform: scale(0.96); }
+.media-collect-btn:disabled { opacity: 0.6; cursor: default; }
+.media-collect-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+/* Donanım hızlandırma kapalıyken cam etkisi render edilmez; opak zemine düşer. */
+body.no-hw-accel .media-collect-btn {
+  background: rgba(20, 26, 40, 0.86);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}

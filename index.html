@@ -6,7 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.youtube.com https://s.ytimg.com; connect-src 'self' wss://broker.emqx.io:8084 https://s3.amazonaws.com https://unpkg.com https://cdn.jsdelivr.net https://pokeapi.co https://1.1.1.1 https://8.8.8.8 https://*.metered.live https://zperyrjpfumtblossyod.supabase.co wss://zperyrjpfumtblossyod.supabase.co http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob: https://*; frame-src 'self' https://www.youtube.com; worker-src 'self' blob:; object-src 'none';">
   <meta name="referrer" content="no-referrer" />
   <title>TeamSync</title>
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="style.css?v=20" />
   <script>
     try {
       document.documentElement.dataset.theme = localStorage.getItem('teamsync_theme') || 'aurora';
@@ -308,6 +308,7 @@
         </div>
 
         <div class="menu-right">
+          <div class="dm-resize-handle" data-dm-resize="menu" role="separator" aria-orientation="horizontal" data-i18n-title="dmPanel.resize" title="Yüksekliği değiştirmek için sürükle"></div>
           <div class="dm-header">
             <div style="display:flex; align-items:center; gap:8px;">
               <span id="dm-active-name">...</span>
@@ -509,6 +510,7 @@
 
       <div class="lbl" data-i18n="room.chat">SOHBET</div>
       <div class="chat">
+        <div class="dm-resize-handle" data-dm-resize="roomChat" role="separator" aria-orientation="horizontal" data-i18n-title="dmPanel.resize" title="Yüksekliği değiştirmek için sürükle"></div>
         <div id="msgs" class="msgs"></div>
         <form id="cform" class="cform">
           <input type="file" id="finput" class="hidden" />
@@ -2509,6 +2511,7 @@
   <!-- Sunucu İçi DM Modali -->
   <div id="server-dm-modal" class="modal server-dm-modal hidden">
     <div class="mcard server-dm-card">
+      <div class="dm-resize-handle" data-dm-resize="server" role="separator" aria-orientation="horizontal" data-i18n-title="dmPanel.resize" title="Yüksekliği değiştirmek için sürükle"></div>
       <div class="server-dm-sidebar">
         <div class="server-dm-sidebar-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> Mesajlar</div>
         <ul id="server-dm-friend-list" class="server-dm-friend-list">
@@ -2594,6 +2597,8 @@
   <script src="resources/localization/catalogs.bundle.js"></script>
   <script src="renderer.js"></script>
   <script src="js/media-library.js"></script>
+  <script src="js/media-collect.js"></script>
+  <script src="js/dm-resize.js"></script>
   <script src="js/whiteboard.js"></script>
   <script src="js/watch-together.js"></script>
   <script src="js/shared-browser.js"></script>

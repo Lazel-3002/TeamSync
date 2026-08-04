@@ -166,7 +166,11 @@ const fileBuffer = new Map();
 // temizlense bile). Odadan çıkarken topluca serbest bırakılır.
 const chatBlobUrls = [];
 function releaseChatBlobUrls() {
-  chatBlobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  chatBlobUrls.forEach(u => {
+    try { URL.revokeObjectURL(u); } catch (e) {}
+    // Koleksiyon kaydı da düşürülür, aksi halde Blob'lar registry'de asılı kalır.
+    window.forgetChatMedia?.(u);
+  });
   chatBlobUrls.length = 0;
 }
 
@@ -4893,6 +4897,9 @@ async function handleDataMessage(peerId, msg) {
       const blob = new Blob(f.chunks, { type: f.meta.mime });
       const url = URL.createObjectURL(blob);
       chatBlobUrls.push(url);
+      // "Koleksiyona ekle" düğmesi bu kayıttan okur: CSP connect-src blob:
+      // içermediği için blob URL'i sonradan fetch ile geri okunamıyor.
+      window.registerChatMedia?.(url, blob, f.meta.name);
       const div = document.getElementById('file-' + msg.id);
       if (div) {
         if (isImageFile(f.meta.name, f.meta.mime)) {
@@ -9853,6 +9860,7 @@ async function sendFile(file) {
   if (div) {
     const url = URL.createObjectURL(file);
     chatBlobUrls.push(url);
+    window.registerChatMedia?.(url, file, file.name);
     if (isImageFile(file.name, file.type)) {
       div.innerHTML = '';
       div.style.background = 'transparent';
@@ -9955,9 +9963,10 @@ window.renderDMs = () => {
       // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
       contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
     } else if (m.type === 'image') {
-      contentHtml = `<img src="${m.content}" alt="${escapeHtml(m.fileName || 'Görsel')}" />`;
+      // data-media-name: "Koleksiyona ekle" dosyayı özgün adıyla kaydetsin.
+      contentHtml = `<img src="${m.content}" alt="${escapeHtml(m.fileName || 'Görsel')}" data-media-name="${escapeHtml(m.fileName || '')}" />`;
     } else if (m.type === 'video') {
-      contentHtml = `<video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}"></video>`;
+      contentHtml = `<video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}" data-media-name="${escapeHtml(m.fileName || '')}"></video>`;
     } else if (m.type === 'file') {
       contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
     }
