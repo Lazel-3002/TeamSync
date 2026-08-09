@@ -288,7 +288,6 @@ function setupInternetSignaling(roomId, myId, myName) {
           bannedIds: state.isRoomFounder ? Array.from(state.bannedIds || []) : undefined,
           serverMutedIds: state.isRoomFounder ? Array.from(state.serverMutedIds || []) : undefined,
           audioBitrate: state.isRoomFounder ? getAudioBitrate() : undefined,
-          noiseSuppressionEnabled: state.isRoomFounder ? !!state.useAI : undefined
         }));
       }
     }, 3000);
@@ -381,14 +380,6 @@ function setupInternetSignaling(roomId, myId, myName) {
           if (typeof data.audioBitrate === 'number' && data.audioBitrate !== state.audioBitrate) {
             state.audioBitrate = data.audioBitrate;
             applyAudioBitrateToPeers();
-          }
-          // Kurucunun RNNoise tercihi oda durumunun parçasıdır. Periyodik hello
-          // sayesinde sonradan katılanlar da kendi giriş ekranı tercihlerinden
-          // bağımsız olarak sunucunun güncel ayarını alır.
-          if (!state.isRoomFounder
-              && typeof data.noiseSuppressionEnabled === 'boolean'
-              && data.noiseSuppressionEnabled !== state.useAI) {
-            await applyRoomNoiseSuppression(data.noiseSuppressionEnabled);
           }
         }
         applySharedTurn(data.turn);
@@ -723,6 +714,9 @@ window.renderAccountsList = async function() {
       </div>
     `;
     
+    const accountTrashButton = row.querySelector('.account-row-delete-btn');
+    if (accountTrashButton) accountTrashButton.innerHTML = trashIconSvg();
+
     // Checkbox toggle handler
     const chk = row.querySelector('.default-chk');
     chk.onchange = async (e) => {
@@ -901,7 +895,9 @@ function renderFriends() {
     friendKeys.forEach(fId => {
       const f = state.friends[fId];
       const isOnline = f.online ? 'online' : '';
-      const inRoom = f.room ? true : false;
+      // Oda bilgisi son presence paketinden kalmış olabilir. Çevrimdışı bir
+      // arkadaş hiçbir zaman "Sunucuda" veya katılınabilir gösterilmemeli.
+      const inRoom = Boolean(f.online && f.room);
       const avatarHtml = f.avatar 
         ? `<img src="${escapeHtml(f.avatar)}" class="friend-avatar" />`
         : `<div class="friend-avatar" style="background: rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:16px;">👤</div>`;
@@ -945,7 +941,7 @@ window.showFriendProfile = (fId) => {
   const f = state.friends[fId];
   if (!f) return;
   const badges = [];
-  if (f.room) badges.push({ text: '🟢 Sunucuda', color: '#10b981' });
+  if (f.online && f.room) badges.push({ text: '🟢 Sunucuda', color: '#10b981' });
   else if (f.online) badges.push({ text: '🟢 Çevrimiçi', color: '#10b981' });
   else badges.push({ text: '⚪ Çevrimdışı', color: '#94a3b8' });
 
@@ -1552,6 +1548,21 @@ window.removeFriend = async (id) => {
 let presenceInterval = null;
 let pingInterval = null;
 
+function markFriendOffline(friend) {
+  if (!friend) return;
+  friend.online = false;
+  friend.room = null;
+  friend.lastSeen = 0;
+}
+
+function trashIconSvg() {
+  return `<svg class="trash-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path class="trash-icon-lid" d="M4 6.25h16v2H4zM8.2 4.25l.7-2h6.2l.7 2z" />
+    <path class="trash-icon-body" d="M6.25 8.25h11.5l-1 13.25H7.25z" />
+    <path class="trash-icon-lines" d="M9.5 11v7.25M12 11v7.25M14.5 11v7.25" />
+  </svg>`;
+}
+
 // Kendi çevrimiçi durumumu (ad, oda, avatar URL) arkadaşlara yayınlar.
 function publishPresence() {
   if (state.globalMqtt && state.globalMqtt.connected) {
@@ -1634,7 +1645,7 @@ function connectGlobalBroker(idx, session) {
     // göstermesin); gerçekten çevrimiçi olanlar en geç 5 sn içinde presence ile
     // yeniden işaretlenir.
     Object.keys(state.friends).forEach(fId => {
-      state.friends[fId].online = false;
+      markFriendOffline(state.friends[fId]);
       client.subscribe(`teamsync/user/${fId}/presence`);
     });
     renderFriends();
@@ -1658,6 +1669,15 @@ function connectGlobalBroker(idx, session) {
           const oldRoom = state.friends[data.id].room;
           const oldAvatarHash = state.friends[data.id].avatarHash;
           const oldAvatar = state.friends[data.id].avatar;
+
+          // Uygulama düzgün kapanırken açıkça online:false yayınlar. Önceki kod
+          // her presence paketini çevrimiçi kabul ettiği için bu paket bile
+          // arkadaşın yeşil görünmesine neden oluyordu.
+          if (data.online === false) {
+            markFriendOffline(state.friends[data.id]);
+            if (wasOnline || oldRoom) renderFriends();
+            return;
+          }
 
           state.friends[data.id].online = true;
           state.friends[data.id].lastSeen = Date.now();
@@ -1777,12 +1797,14 @@ setInterval(() => {
   let changed = false;
   Object.keys(state.friends).forEach(fId => {
     if (state.friends[fId].online && now - (state.friends[fId].lastSeen || 0) > 15000) {
-      state.friends[fId].online = false;
-      const dot = document.getElementById(`status-${fId}`);
-      if (dot) dot.classList.remove('online');
+      markFriendOffline(state.friends[fId]);
       changed = true;
     }
   });
+
+  // Sadece noktayı söndürmek yeterli değil: "Sunucuda" metni ve katıl butonu
+  // da DOM'dan kaldırılmalı.
+  if (changed) renderFriends();
 
   // Yarım kalan DM dosya transferleri: gönderen ortada çevrimdışı olursa
   // biriken base64 chunk'lar süresiz bellekte kalıyordu — 2 dk sessiz kalan
@@ -2363,6 +2385,28 @@ window.addEventListener('DOMContentLoaded', async () => {
   function saveDeviceAccounts(list) {
     localStorage.setItem(DEVICE_ACCOUNTS_KEY, JSON.stringify(list));
   }
+  async function deleteDeviceAccount(slot) {
+    const accounts = getDeviceAccounts();
+    const account = accounts.find(item => item.slot === slot);
+    if (!account) return;
+    const confirmed = await window.showConfirm(
+      '⚠️ Hesabı Sil',
+      `"${account.name || 'Anonim'}" hesabını bu cihazdan silmek istediğinize emin misiniz?`
+    );
+    if (!confirmed) return;
+
+    const remaining = accounts.filter(item => item.slot !== slot);
+    saveDeviceAccounts(remaining);
+    if (getActiveSlot() === slot) {
+      if (remaining.length) {
+        remaining.sort((a, b) => a.slot - b.slot);
+        localStorage.setItem(ACTIVE_SLOT_KEY, String(remaining[0].slot));
+      } else {
+        localStorage.removeItem(ACTIVE_SLOT_KEY);
+      }
+    }
+    await renderDeviceAccounts();
+  }
   function getActiveSlot() {
     const s = parseInt(localStorage.getItem(ACTIVE_SLOT_KEY), 10);
     return Number.isInteger(s) && s >= 0 ? s : 0;
@@ -2376,7 +2420,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     saveDeviceAccounts(list);
   }
   window.syncActiveDeviceAccount = () => {
-    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar });
+    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar, id: state.friendId });
   };
 
   async function deviceLogin(slot) {
@@ -2432,9 +2476,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('step-accounts').classList.remove('hidden');
     container.innerHTML = '';
 
-    const list = getDeviceAccounts();
+    const deviceList = getDeviceAccounts();
+    const legacyList = (await getAccounts()).filter(acc => acc && acc.id && !deviceList.some(device => device.id === acc.id));
+    const list = [
+      ...deviceList.map(acc => ({ ...acc, accountType: 'device' })),
+      ...legacyList.map(acc => ({ ...acc, accountType: 'legacy' }))
+    ];
     if (!list.length) {
-      await deviceLogin(0);
+      container.innerHTML = '<div class="muted" style="text-align:center; padding:16px;">Kayıtlı hesap bulunamadı.</div>';
       return;
     }
     const activeSlot = getActiveSlot();
@@ -2450,11 +2499,36 @@ window.addEventListener('DOMContentLoaded', async () => {
           <div class="account-row-name">${escapeHtml(acc.name || 'Anonim')}</div>
           <div class="account-row-id">Bu cihazın kimliği · Hesap #${acc.slot + 1}${acc.slot === activeSlot ? ' · son kullanılan' : ''}</div>
         </div>
+        <div class="account-row-actions">
+          <button class="account-row-delete-btn" type="button" title="Hesabı Sil" aria-label="Hesabı Sil">🗑️</button>
+        </div>
       `;
-      if (acc.slot === activeSlot) {
+      const deviceTrashButton = row.querySelector('.account-row-delete-btn');
+      if (deviceTrashButton) deviceTrashButton.innerHTML = trashIconSvg();
+      if (acc.accountType === 'legacy') {
+        const idEl = row.querySelector('.account-row-id');
+        if (idEl) idEl.textContent = `Eski profil · ${acc.id}`;
+      }
+      if (acc.accountType === 'device' && acc.slot === activeSlot) {
         row.style.border = '1px solid var(--acc)';
       }
-      row.onclick = () => deviceLogin(acc.slot);
+      const deleteButton = row.querySelector('.account-row-delete-btn');
+      deleteButton.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (acc.accountType === 'legacy') {
+          const confirmed = await window.showConfirm(
+            '⚠️ Hesabı Sil',
+            `"${acc.name || 'Anonim'}" hesabını bu cihazdan silmek istediğinize emin misiniz?`
+          );
+          if (!confirmed) return;
+          await deleteAccount(acc.id);
+          await renderDeviceAccounts();
+        } else {
+          await deleteDeviceAccount(acc.slot);
+        }
+      };
+      row.onclick = () => acc.accountType === 'legacy' ? loginWithAccount(acc) : deviceLogin(acc.slot);
       container.appendChild(row);
     });
   }
@@ -2584,7 +2658,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('step-action').classList.remove('hidden');
     document.querySelector('.login-card').classList.add('expanded');
 
-    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar });
+    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar, id: state.friendId });
 
     renderFriends();
     setupGlobalMQTT();
@@ -2896,7 +2970,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // almasını/CPU'sunu kısmasını engelle (alt+tab'da ses bozulması).
     setVoiceSessionActive(true);
     state.password = pw;
-    state.useAI = useAI;
+    // RNNoise kiÅŸisel bir mikrofondur: oda/kurucu ayarÄ±ndan baÄŸÄ±msÄ±z olarak
+    // yalnÄ±zca bu kullanÄ±cÄ±nÄ±n gÃ¶nderdiÄŸi sesi filtreler.
+    state.useAI = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
     state.pttMode = pttMode;
     state.isRoomFounder = !isJoining;
     state.friendsOnlyMode = false;
@@ -4433,7 +4509,6 @@ function setupDataChannel(peerId, dc) {
         if (state.isRoomFounder) {
           dc.send(JSON.stringify({
             type: 'founder_settings_update',
-            noiseSuppressionEnabled: !!state.useAI
           }));
         }
         if (state.isSharing) dc.send(JSON.stringify({
@@ -4562,13 +4637,6 @@ async function handleDataMessage(peerId, msg) {
     if (msg.sfwMode !== undefined) {
       state.sfwMode = msg.sfwMode;
       if (state.sfwMode) loadAIFilter();
-    }
-    if (typeof msg.noiseSuppressionEnabled === 'boolean'
-        && msg.noiseSuppressionEnabled !== state.useAI) {
-      await applyRoomNoiseSuppression(msg.noiseSuppressionEnabled);
-      showToast(msg.noiseSuppressionEnabled
-        ? 'Kurucu RNNoise gürültü engellemeyi açtı.'
-        : 'Kurucu RNNoise gürültü engellemeyi kapattı.', 'info');
     }
     console.log('👑 Founder settings updated:', msg);
     return;
@@ -6478,6 +6546,7 @@ const USER_THEME_KEY = 'teamsync_theme';
 const USER_SIMPLE_UI_KEY = 'teamsync_simple_ui';
 const USER_QUALITY_KEY = 'teamsync_media_quality';
 const USER_MIC_DEVICE_KEY = 'teamsync_mic_device_id';
+const USER_NOISE_SUPPRESSION_KEY = 'teamsync_noise_suppression';
 const USER_MIC_VOLUME_KEY = 'teamsync_mic_volume';
 const USER_SPEAKER_VOLUME_KEY = 'teamsync_speaker_volume';
 const USER_STREAM_PREVIEWS_KEY = 'teamsync_stream_previews';
@@ -8066,6 +8135,8 @@ function openUserSettings(panel = 'general') {
   document.getElementById('user-turn-user').value = localStorage.getItem('teamsync_turn_user') || '';
   document.getElementById('user-turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
   document.getElementById('user-settings-ptt').checked = localStorage.getItem('teamsync_ptt_enabled') === '1';
+  const noiseSuppressionEl = document.getElementById('user-settings-noise-suppression');
+  if (noiseSuppressionEl) noiseSuppressionEl.checked = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
   document.getElementById('user-quality-select').value = localStorage.getItem(USER_QUALITY_KEY) || document.getElementById('quality-select').value || 'medium';
   document.getElementById('user-stream-fps').value = localStorage.getItem(USER_STREAM_FPS_KEY) || '30';
   document.getElementById('user-stream-previews').checked = localStorage.getItem(USER_STREAM_PREVIEWS_KEY) !== '0';
@@ -8090,11 +8161,12 @@ function openUserSettings(panel = 'general') {
   }
 }
 
-function saveUserSettings() {
+async function saveUserSettings() {
   const turnUrl = document.getElementById('user-turn-url').value.trim();
   const turnUser = document.getElementById('user-turn-user').value.trim();
   const turnPass = document.getElementById('user-turn-pass').value.trim();
   const pttEnabled = document.getElementById('user-settings-ptt').checked;
+  const noiseSuppressionEnabled = document.getElementById('user-settings-noise-suppression')?.checked !== false;
   const quality = document.getElementById('user-quality-select').value;
   const streamFps = document.getElementById('user-stream-fps').value;
   const showStreamPreviews = document.getElementById('user-stream-previews').checked;
@@ -8106,6 +8178,7 @@ function saveUserSettings() {
   localStorage.setItem('teamsync_turn_user', turnUser);
   localStorage.setItem('teamsync_turn_pass', turnPass);
   localStorage.setItem('teamsync_ptt_enabled', pttEnabled ? '1' : '0');
+  localStorage.setItem(USER_NOISE_SUPPRESSION_KEY, noiseSuppressionEnabled ? '1' : '0');
   localStorage.setItem(USER_QUALITY_KEY, quality);
   localStorage.setItem(USER_STREAM_FPS_KEY, streamFps);
   localStorage.setItem(USER_STREAM_PREVIEWS_KEY, showStreamPreviews ? '1' : '0');
@@ -8123,6 +8196,7 @@ function saveUserSettings() {
   document.getElementById('settings-ptt').checked = pttEnabled;
   document.getElementById('quality-select').value = quality;
   if (typeof state !== 'undefined' && state.room) applyPttMode(pttEnabled);
+  await applyRoomNoiseSuppression(noiseSuppressionEnabled);
 
   const status = document.getElementById('settings-save-status');
   if (status) {
@@ -8139,6 +8213,25 @@ function initUserSettings() {
   // altında tanımlı; #app ana menüde gizli olduğundan body'ye portal edilmelidir.
   const settingsModal = document.getElementById('settings-modal');
   if (settingsModal && settingsModal.parentElement !== document.body) document.body.appendChild(settingsModal);
+  state.useAI = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
+  // RNNoise artÄ±k sunucu/oda politikasÄ± deÄŸil, kiÅŸisel ses ayarÄ±dÄ±r.
+  // Eski kurulumlardan kalan oda ve katÄ±l ekranÄ± kontrollerini gÃ¶stermeyip
+  // tek kaynaÄŸÄ± normal Ayarlar > Ses ve GÃ¶rÃ¼ntÃ¼ panelinde tutuyoruz.
+  ['join-useAI', 'create-useAI'].forEach(id => {
+    const input = document.getElementById(id);
+    const option = input?.closest('.premium-option');
+    // DOM dÄ±ÅŸÄ±na Ã§Ä±karmÄ±yoruz; eski olay baÄŸlayÄ±cÄ±larÄ± bu referanslarÄ±
+    // kullanÄ±yor. GÃ¶rsel olarak gizleyip kiÅŸisel ayarÄ± tek kaynak tutuyoruz.
+    if (option) option.style.display = 'none';
+  });
+  const legacyFounderNoise = document.getElementById('founder-noise-suppression');
+  if (legacyFounderNoise) {
+    const row = legacyFounderNoise.closest('div[style*="justify-content"]');
+    if (row) {
+      row.style.display = 'none';
+      if (row.nextElementSibling) row.nextElementSibling.style.display = 'none';
+    }
+  }
   renderLanguageOptions();
   initCustomThemeEditor();
   applySimpleUi(getSimpleUiEnabled());
@@ -8603,7 +8696,7 @@ function bindUI() {
   });
 
   document.getElementById('founder-noise-suppression').addEventListener('change', async (e) => {
-    if (!state.isRoomFounder) {
+    if (true) {
       e.target.checked = !!state.useAI;
       return;
     }
@@ -8612,7 +8705,6 @@ function bindUI() {
     e.target.disabled = true;
     try {
       await applyRoomNoiseSuppression(enabled);
-      broadcast({ type: 'founder_settings_update', noiseSuppressionEnabled: enabled });
       showToast(enabled
         ? 'RNNoise gürültü engelleme tüm katılımcılar için açıldı.'
         : 'RNNoise gürültü engelleme tüm katılımcılar için kapatıldı.', 'ok');

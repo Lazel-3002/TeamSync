@@ -228,7 +228,7 @@
       <!-- Adım 0: Hesaplar -->
       <div id="step-accounts" class="hidden">
         <label>Hesap Seçin</label>
-        <div id="accounts-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; margin: 10px 0 15px; padding-right: 4px;">
+        <div id="accounts-list" class="account-list-scroll">
           <!-- Dinamik Liste -->
         </div>
         <button id="btn-new-account" class="btn-pri" style="margin-top: 5px;">Yeni Hesap Oluştur</button>
@@ -1714,7 +1714,7 @@
                RNNoise Gürültü Engelleme
             </label>
             <label class="switch">
-              <input type="checkbox" id="founder-noise-suppression">
+              <input type="checkbox" id="founder-noise-suppression" class="hidden" aria-hidden="true" tabindex="-1">
               <span class="slider round"></span>
             </label>
           </div>
@@ -1948,6 +1948,13 @@
                   <p data-i18n="settings.pttDesc">Yalnızca SPACE tuşuna basılıyken ses iletir.</p>
                 </div>
                 <label class="switch"><input type="checkbox" id="user-settings-ptt"><span class="slider round"></span></label>
+              </div>
+              <div class="settings-card settings-row">
+                <div>
+                  <strong data-i18n="menu.noiseSuppression">RNNoise Gürültü Engelleme</strong>
+                  <p data-i18n="menu.noiseSuppressionDesc">Yalnızca kendi mikrofonundan gönderilen arka plan gürültüsünü filtreler; diğer katılımcıların ayarından bağımsızdır.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="user-settings-noise-suppression"><span class="slider round"></span></label>
               </div>
             </div>
 

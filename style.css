@@ -3048,7 +3048,7 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   }
   .settings-shell {
     width: 100vw;
-    height: 100%;
+    height: calc(100% - 1px);
     min-height: 0;
     grid-template-columns: 82px minmax(0, 1fr);
     border: 0;
@@ -5718,6 +5718,31 @@ body.no-hw-accel .dl-btn:hover {
 
 
 /* ===== HESAP YÖNETİCİSİ (ACCOUNT SWITCHER) ===== */
+.account-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  margin: 10px 0 15px;
+  padding: 2px 6px 2px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--acc-light) transparent;
+}
+.account-list-scroll::-webkit-scrollbar { width: 6px; }
+.account-list-scroll::-webkit-scrollbar-thumb {
+  background: var(--acc-light);
+  border-radius: 999px;
+}
+#founder-settings-modal div:has(> label > #founder-noise-suppression),
+#founder-settings-modal div:has(> label > #founder-noise-suppression) + p {
+  display: none !important;
+}
+#step-join .premium-option:has(#join-useAI),
+#step-join .premium-option:has(#join-useRelay),
+#step-create .premium-option:has(#create-useAI) {
+  display: none !important;
+}
 .account-row {
   display: flex;
   align-items: center;
@@ -5782,18 +5807,39 @@ body.no-hw-accel .dl-btn:hover {
   letter-spacing: 0px !important;
 }
 .account-row-delete-btn {
-  background: transparent;
-  border: none;
-  color: var(--txt-mut);
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #3b82f6;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  color: #173968;
   cursor: pointer;
-  font-size: 14px;
-  padding: 4px;
+  padding: 0;
   border-radius: var(--radius-sm);
   transition: all 0.2s;
 }
 .account-row-delete-btn:hover {
-  color: var(--danger);
-  background: rgba(239, 68, 68, 0.1);
+  color: #173968;
+  background: #3b82f6;
+  transform: none;
+}
+.trash-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  overflow: visible;
+}
+.trash-icon-lid,
+.trash-icon-body {
+  fill: currentColor;
+}
+.trash-icon-lines {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 /* User Context Menu Styles */
@@ -5988,6 +6034,37 @@ body.no-hw-accel .dl-btn:hover {
 .account-row-delete-btn:hover {
   color: var(--danger);
   background: rgba(239, 68, 68, 0.1);
+}
+
+.account-row-delete-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #3b82f6;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  color: #173968;
+  padding: 0;
+}
+.account-row-delete-btn:hover {
+  color: #173968;
+  background: #3b82f6;
+  transform: none;
+}
+.trash-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  overflow: visible;
+}
+.trash-icon-lid,
+.trash-icon-body { fill: currentColor; }
+.trash-icon-lines {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 /* User Context Menu Styles */

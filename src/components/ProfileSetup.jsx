@@ -163,7 +163,12 @@ const accountItemStyle = {
 };
 
 const deleteBtnStyle = {
-  background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '5px'
+  width: '34px', height: '34px', border: '1px solid rgba(96,165,250,0.45)',
+  borderRadius: '8px', backgroundColor: '#3b82f6', color: '#173968',
+  cursor: 'pointer', padding: '0', fontSize: '0', display: 'flex',
+  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M4 6.25h16v2H4zM8.2 4.25l.7-2h6.2l.7 2zM6.25 8.25h11.5l-1 13.25H7.25z%27 fill=%27%23173968%27/%3E%3Cpath d=%27M9.5 11v7.25M12 11v7.25M14.5 11v7.25%27 fill=%27none%27 stroke=%27white%27 stroke-width=%271.8%27 stroke-linecap=%27round%27/%3E%3C/svg%3E")',
+  backgroundRepeat: 'no-repeat', backgroundPosition: 'center', backgroundSize: '18px 18px',
+  alignItems: 'center', justifyContent: 'center'
 };
 
 const primaryBtnStyle = {

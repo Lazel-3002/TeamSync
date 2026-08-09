@@ -1,5 +1,5 @@
-// The founder owns the room-wide RNNoise policy. Verify that late joiners sync
-// to it and that live changes replace outbound audio tracks without reconnecting.
+// RNNoise is a personal microphone preference. Verify that each participant
+// can change their own outbound audio without changing anyone else's filter.
 const assert = require('assert');
 const {
   spawnPeer,
@@ -33,13 +33,12 @@ function audioState(client) {
   })()`);
 }
 
-async function setFounderToggle(founder, enabled) {
-  await evalJS(founder.client, `(() => {
-    const toggle = document.getElementById('founder-noise-suppression');
-    toggle.checked = ${enabled};
-    toggle.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  })()`);
+async function setPersonalToggle(peer, enabled) {
+  const value = enabled ? 1 : 0;
+  await evalJS(peer.client, `(() => {
+    localStorage.setItem('teamsync_noise_suppression', String(${value}));
+    return applyRoomNoiseSuppression(${enabled});
+  })()`, true);
 }
 
 module.exports = async function run() {
@@ -48,72 +47,41 @@ module.exports = async function run() {
 
   try {
     const roomId = await createRoom(founder);
-
-    // Deliberately choose the opposite local preference. The founder's hello
-    // must override this for a participant joining after room creation.
-    await evalJS(guest.client, `document.getElementById('join-useAI').checked = false; 1`);
+    // Guest deliberately starts with a different personal preference.
+    await setPersonalToggle(guest, false);
     await joinRoom(guest, roomId);
     await waitForPeerConnected(founder);
     await waitForPeerConnected(guest);
 
     await waitFor(
       guest.client,
-      `window.state && window.state.useAI === true && window.state.rnnoiseStatus === 'active'`,
+      `window.state && window.state.useAI === false
+        && window.state.rnnoiseStatus === 'off'`,
       20000,
-      'late joiner inherits founder RNNoise setting'
-    );
-
-    await evalJS(founder.client, `document.getElementById('founder-settings').click(); 1`);
-    assert.strictEqual(
-      await evalJS(founder.client, `document.getElementById('founder-noise-suppression').checked`),
-      true,
-      'founder modal reflects the active room policy'
+      'guest keeps their personal RNNoise setting'
     );
 
     const beforeFounder = await audioState(founder.client);
     const beforeGuest = await audioState(guest.client);
+    assert.strictEqual(beforeFounder.enabled, true);
+    assert.strictEqual(beforeGuest.enabled, false);
 
-    await setFounderToggle(founder, false);
-    for (const peer of [founder, guest]) {
-      await waitFor(
-        peer.client,
-        `window.state && window.state.useAI === false
-          && window.state.rnnoiseStatus === 'off'
-          && window.state.noiseSuppressionApplyPromise === null`,
-        20000,
-        `${peer.name} disables RNNoise live`
-      );
-    }
+    // Changing the founder's preference must not change the guest.
+    await setPersonalToggle(founder, false);
+    await waitFor(founder.client, `window.state && window.state.useAI === false && window.state.noiseSuppressionApplyPromise === null`, 20000, 'founder disables personal RNNoise');
+    await waitFor(guest.client, `window.state && window.state.useAI === false && window.state.noiseSuppressionApplyPromise === null`, 20000, 'guest remains disabled');
 
     const offFounder = await audioState(founder.client);
-    const offGuest = await audioState(guest.client);
     assert.notStrictEqual(offFounder.localTrackId, beforeFounder.localTrackId);
-    assert.notStrictEqual(offGuest.localTrackId, beforeGuest.localTrackId);
     assert.strictEqual(offFounder.senderTrackId, offFounder.localTrackId);
-    assert.strictEqual(offGuest.senderTrackId, offGuest.localTrackId);
     assert.ok(['connected', 'completed'].includes(offFounder.connectionState));
-    assert.ok(['connected', 'completed'].includes(offGuest.connectionState));
 
-    await setFounderToggle(founder, true);
-    for (const peer of [founder, guest]) {
-      await waitFor(
-        peer.client,
-        `window.state && window.state.useAI === true
-          && window.state.rnnoiseStatus === 'active'
-          && window.state.noiseSuppressionApplyPromise === null`,
-        20000,
-        `${peer.name} enables RNNoise live`
-      );
-    }
-
-    const onFounder = await audioState(founder.client);
+    // The guest can enable their own filter independently.
+    await setPersonalToggle(guest, true);
+    await waitFor(guest.client, `window.state && window.state.useAI === true && window.state.noiseSuppressionApplyPromise === null`, 20000, 'guest enables personal RNNoise');
     const onGuest = await audioState(guest.client);
-    assert.notStrictEqual(onFounder.localTrackId, offFounder.localTrackId);
-    assert.notStrictEqual(onGuest.localTrackId, offGuest.localTrackId);
-    assert.strictEqual(onFounder.senderTrackId, onFounder.localTrackId);
+    assert.notStrictEqual(onGuest.localTrackId, beforeGuest.localTrackId);
     assert.strictEqual(onGuest.senderTrackId, onGuest.localTrackId);
-    assert.ok(onFounder.active && onGuest.active);
-    assert.ok(['connected', 'completed'].includes(onFounder.connectionState));
     assert.ok(['connected', 'completed'].includes(onGuest.connectionState));
   } finally {
     cleanupPeer(founder);
