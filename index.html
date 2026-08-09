@@ -1696,6 +1696,28 @@
           </div>
           <p class="muted" style="margin-top:10px; font-size:12px;">Tüm katılımcıların sohbet mesajları ve profil fotoğrafları AI ile denetlenir.</p>
 
+          <div id="founder-sfw-chat-ban-settings" class="hidden" style="margin-top:16px; padding:12px; border:1px solid rgba(248,113,113,0.25); border-radius:8px; background:rgba(248,113,113,0.06);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <label for="founder-sfw-chat-ban" style="font-weight:bold;">Argo kullanımında sohbet yasağı</label>
+              <label class="switch">
+                <input type="checkbox" id="founder-sfw-chat-ban">
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="sfw-threshold-setting">
+              <div class="sfw-threshold-copy">
+                <strong>İhlal eşiği</strong>
+                <span>Bu sayıya ulaşınca otomatik sohbet yasağı uygulanır.</span>
+              </div>
+              <div class="sfw-threshold-control" role="group" aria-label="İhlal eşiği">
+                <button type="button" class="sfw-threshold-step" data-sfw-chat-ban-step="-1" aria-label="İhlal eşiğini azalt">−</button>
+                <input id="founder-sfw-chat-ban-threshold" class="sfw-threshold-input" type="number" min="1" max="100" step="1" value="3" inputmode="numeric" aria-label="İhlal sayısı">
+                <button type="button" class="sfw-threshold-step" data-sfw-chat-ban-step="1" aria-label="İhlal eşiğini artır">+</button>
+              </div>
+            </div>
+            <p class="muted" style="margin:8px 0 0; font-size:11px;">Kurucu, oyuncu listesinden kişiyi manuel olarak da sohbetten yasaklayabilir. Bu yasak ses ve oda erişimini etkilemez.</p>
+          </div>
+
           <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
             <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>

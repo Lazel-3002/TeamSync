@@ -89,12 +89,161 @@ function setVoiceSessionActive(active) {
   } catch (e) {}
 }
 
+function normalizeFilterText(text) {
+  return String(text || '')
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    // Dotless ı is intentionally preserved: mapping it to i would turn the
+    // ordinary Turkish word "sıkıntı" into the profanity substring "sik".
+}
+
 const badWordsList = ['amk', 'amq', 'aq', 'oç', 'piç', 'yarak', 'yarrak', 'amcık', 'sik', 'sikerim', 'siktir', 'orospu', 'göt', 'pezevenk', 'fuck', 'shit', 'bitch', 'asshole', 'döl', 'dol', 'meme', 'yarak', 'yarrag', 'yaraq', 'yarraq', 'sg', 'siktir', 'sktir', 'am', 'kaltak', 'sürtük', 'pç'];
-const badWordsRegex = new RegExp('\\b(' + badWordsList.join('|') + ')\\b', 'gi');
+const normalizedBadWords = [...new Set(badWordsList.map(normalizeFilterText))];
+
+function isSubsequence(shortText, longText) {
+  let i = 0;
+  for (const ch of longText) {
+    if (ch === shortText[i]) i++;
+    if (i === shortText.length) return true;
+  }
+  return shortText.length > 0 && i === shortText.length;
+}
+
+function levenshteinDistance(a, b, limit = 2) {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    let rowMinimum = current[0];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+      rowMinimum = Math.min(rowMinimum, current[j]);
+    }
+    if (rowMinimum > limit) return limit + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+/** SFW matching intentionally errs on the side of blocking. */
+function isProfaneText(text) {
+  const normalized = normalizeFilterText(text);
+  if (!normalized) return false;
+  const compact = normalized.replace(/[^a-z0-9]+/g, '');
+  const tokens = normalized.split(/[^a-z0-9]+/g).filter(Boolean);
+
+  return normalizedBadWords.some((badWord) => {
+    if (!badWord) return false;
+    // Catches a profanity glued to another word or split by spaces/punctuation.
+    const compactBadWord = badWord.replace(/[^a-z0-9]/g, '');
+    const canMatchShortWord = compactBadWord.length >= 2 && badWord !== 'am';
+    if ((badWord.length >= 3 || canMatchShortWord) && compact.includes(compactBadWord)) return true;
+    // Keep the ordinary word "ama" clean, but still catch a punctuated "a.m".
+    if (badWord === 'am' && /a[^a-z0-9]+m/i.test(normalized)) return true;
+    return tokens.some((token) => {
+      if (token === badWord) return true;
+      // One/two character edits cover common typos and repeated letters.
+      if (badWord.length >= 3 && token.length >= 3) {
+        const typoLimit = badWord.length >= 6 ? 2 : 1;
+        if (levenshteinDistance(token, badWord, typoLimit) <= typoLimit) return true;
+      }
+      // First/last-letter abbreviations such as "qy" for a longer profanity.
+      return badWord.length >= 4 && token.length >= 2 && token.length < badWord.length &&
+        token[0] === badWord[0] && token[token.length - 1] === badWord[badWord.length - 1] &&
+        isSubsequence(token, badWord);
+    });
+  });
+}
+
+function filterProjection(text) {
+  const compact = [];
+  const originalIndexes = [];
+  for (let i = 0; i < String(text || '').length; i++) {
+    const normalizedChar = String(text[i])
+      .toLocaleLowerCase('tr-TR')
+      .normalize('NFKD')
+      .replace(/\p{M}/gu, '');
+    for (const ch of normalizedChar) {
+      if (/^[a-z0-9]$/i.test(ch)) {
+        compact.push(ch);
+        originalIndexes.push(i);
+      }
+    }
+  }
+  return { compact: compact.join(''), originalIndexes };
+}
+
+function maskCensoredSegment(segment) {
+  return String(segment || '').replace(/[^\s]/gu, '█');
+}
+
+function censorProfaneText(text) {
+  if (typeof text !== 'string' || !isProfaneText(text)) return text;
+
+  const ranges = [];
+  const projection = filterProjection(text);
+  normalizedBadWords.forEach((badWord) => {
+    const compactBadWord = badWord.replace(/[^a-z0-9]/g, '');
+    if (compactBadWord.length < 2) return;
+    let from = 0;
+    while (from < projection.compact.length) {
+      const found = projection.compact.indexOf(compactBadWord, from);
+      if (found === -1) break;
+      const first = projection.originalIndexes[found];
+      const last = projection.originalIndexes[found + compactBadWord.length - 1];
+      const originalSegment = first !== undefined && last !== undefined ? text.slice(first, last + 1) : '';
+      const isUnseparatedShortAm = badWord === 'am' && !/[^a-z0-9]/i.test(originalSegment);
+      if (first !== undefined && last !== undefined && !isUnseparatedShortAm) {
+        let rangeStart = first;
+        let rangeEnd = last + 1;
+        while (rangeStart > 0 && /[^\p{L}\p{N}\s]/u.test(text[rangeStart - 1])) rangeStart--;
+        while (rangeEnd < text.length && /[^\p{L}\p{N}\s]/u.test(text[rangeEnd])) rangeEnd++;
+        ranges.push([rangeStart, rangeEnd]);
+      }
+      from = found + compactBadWord.length;
+    }
+  });
+
+  // A fuzzy typo/abbreviation may not contain the exact bad-word substring;
+  // in that case mask only its original token, not the surrounding sentence.
+  const tokenPattern = /[\p{L}\p{N}]+/gu;
+  let tokenMatch;
+  while ((tokenMatch = tokenPattern.exec(text))) {
+    const hasExactRange = ranges.some(([start, end]) =>
+      start >= tokenMatch.index && end <= tokenPattern.lastIndex
+    );
+    if (isProfaneText(tokenMatch[0]) && !hasExactRange) {
+      ranges.push([tokenMatch.index, tokenPattern.lastIndex]);
+    }
+  }
+
+  if (!ranges.length) return text;
+  ranges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const merged = [];
+  ranges.forEach(([start, end]) => {
+    const previous = merged[merged.length - 1];
+    if (previous && start <= previous[1]) previous[1] = Math.max(previous[1], end);
+    else merged.push([start, end]);
+  });
+  let result = text;
+  for (let i = merged.length - 1; i >= 0; i--) {
+    const [start, end] = merged[i];
+    result = result.slice(0, start) + maskCensoredSegment(result.slice(start, end)) + result.slice(end);
+  }
+  return result;
+}
+
+function censoredTextHtml(text) {
+  const safeText = escapeHtml(String(text || ''));
+  const badge = '<span style="color:#f87171;font-size:11px;font-style:italic;margin-left:6px;">🛡 Sansürlendi</span>';
+  return safeText ? `<span class="censored-text">${safeText}</span>${badge}` : badge;
+}
 
 function cleanText(text, isUsername = false) {
   if (!state.sfwMode || !text || typeof text !== 'string') return text;
-  if (text.match(badWordsRegex)) {
+  if (isProfaneText(text)) {
     if (isUsername) return "Anonim";
     return "Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.";
   }
@@ -277,11 +426,14 @@ function setupInternetSignaling(roomId, myId, myName) {
           // seçilir; damga sahibinin kendisinden geldiği için herkeste aynıdır.
           joinedAt: state.joinedAt || 0,
           sfwMode: state.sfwMode,
+          sfwChatBanEnabled: state.isRoomFounder ? !!state.sfwChatBanEnabled : undefined,
+          sfwChatBanThreshold: state.isRoomFounder ? state.sfwChatBanThreshold : undefined,
+          chatBannedIds: state.isRoomFounder ? Array.from(state.chatBannedIds || []) : undefined,
           turn: getShareableTurn(),
           // Yalnızca kurucu otoritesi taşınır: oda adı ve güncel yetkili
           // listesi kurucunun periyodik hello'suyla tüm katılımcılara (geç
           // katılanlar dahil) her 3 saniyede bir yayılır.
-          roomName: state.isRoomFounder ? state.roomName : undefined,
+          roomName: state.isRoomFounder ? censorProfaneText(state.roomName) : undefined,
           moderators: state.isRoomFounder ? Array.from(state.moderators) : undefined,
           // Geç katılanların da öğrenmesi için kurucu otoritesiyle taşınan diğer
           // sunucu durumu: yasak listesi, susturulanlar ve ses bit hızı.
@@ -341,10 +493,15 @@ function setupInternetSignaling(roomId, myId, myName) {
           // Kurucunun otoritesi: oda adı ve yetkili listesi her hello'da
           // senkronize edilir — geç katılanlar da en geç 3 saniyede öğrenir.
           state.founderId = data.id;
+          if (typeof data.sfwChatBanEnabled === 'boolean') state.sfwChatBanEnabled = data.sfwChatBanEnabled;
+          if (Number.isFinite(data.sfwChatBanThreshold)) {
+            state.sfwChatBanThreshold = Math.max(1, Math.min(100, Math.floor(data.sfwChatBanThreshold)));
+          }
+          if (Array.isArray(data.chatBannedIds)) state.chatBannedIds = new Set(data.chatBannedIds);
           if (!state.isRoomFounder && data.roomName && state.roomName !== data.roomName) {
-            state.roomName = data.roomName;
+            state.roomName = state.sfwMode ? censorProfaneText(data.roomName) : data.roomName;
             const titleEl = document.getElementById('room-title');
-            if (titleEl) titleEl.textContent = '# ' + data.roomName + (state.cryptoKey ? ' 🔒' : '');
+            if (titleEl) titleEl.textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
           }
           if (Array.isArray(data.moderators)) {
             const incoming = new Set(data.moderators);
@@ -2958,6 +3115,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     }
     state.sfwMode = useSFW;
+    state.sfwChatBanEnabled = false;
+    state.sfwChatBanThreshold = 3;
+    state.chatBannedIds = new Set();
+    state.chatViolationCounts = new Map();
     state.gameMode = useGameMode;
     if (useSFW) {
        showToast("Yapay zeka modelleri yükleniyor (3MB), Lütfen bekleyin...", "info");
@@ -3015,8 +3176,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'flex';
       }
       
-      state.roomName = serverName;
-      document.getElementById('room-title').textContent = '# ' + serverName + (state.cryptoKey ? ' 🔒' : '');
+      state.roomName = state.sfwMode ? censorProfaneText(serverName) : serverName;
+      document.getElementById('room-title').textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
       document.getElementById('display-server-id').textContent = roomId;
 
       addUser({ id: 'self', name: `${state.myName} (${t('common.you')})`, mic: true, deaf: false, sharing: false, self: true, avatar: state.myAvatar, isFounder: state.isRoomFounder });
@@ -3095,6 +3256,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     const odaId = `ts-${crypto.randomUUID()}`;
     
     const useSFW = document.getElementById('create-useSFW').checked;
+    if (useSFW && isProfaneText(sName)) {
+      showToast('Aile Dostu Yapay Zeka açıkken parti adı küfür veya uygunsuz ifade içeremez.', 'danger');
+      return;
+    }
     const useGameMode = document.getElementById('create-gameMode') ? document.getElementById('create-gameMode').checked : false;
     const useRelay = document.getElementById('create-useRelay') ? document.getElementById('create-useRelay').checked : false;
     const pttEnabled = localStorage.getItem('teamsync_ptt_enabled') === '1';
@@ -4634,11 +4799,33 @@ async function handleDataMessage(peerId, msg) {
     if (peerId !== state.founderId) return;
     if (msg.friendsOnlyMode !== undefined) state.friendsOnlyMode = msg.friendsOnlyMode;
     if (msg.gameMode !== undefined) state.gameMode = msg.gameMode;
+    if (msg.sfwChatBanEnabled !== undefined) state.sfwChatBanEnabled = !!msg.sfwChatBanEnabled;
+    if (msg.sfwChatBanThreshold !== undefined) state.sfwChatBanThreshold = getSfwChatBanThreshold(msg.sfwChatBanThreshold);
     if (msg.sfwMode !== undefined) {
       state.sfwMode = msg.sfwMode;
+      if (state.sfwMode && state.roomName) {
+        state.roomName = censorProfaneText(state.roomName);
+        const titleEl = document.getElementById('room-title');
+        if (titleEl) titleEl.textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
+      }
       if (state.sfwMode) loadAIFilter();
     }
     console.log('👑 Founder settings updated:', msg);
+    return;
+  } else if (msg.type === 'chat_ban') {
+    if (peerId !== state.founderId) return;
+    if (!msg.targetId || msg.targetId === state.myId) return;
+    if (!state.chatBannedIds) state.chatBannedIds = new Set();
+    if (msg.banned) {
+      state.chatBannedIds.add(msg.targetId);
+      const peer = state.peers.get(msg.targetId);
+      if (peer) showToast(`${peer.name || 'Oyuncu'} sohbetten yasaklandı.`, 'danger');
+    } else {
+      state.chatBannedIds.delete(msg.targetId);
+      if (state.chatViolationCounts) state.chatViolationCounts.delete(msg.targetId);
+      const peer = state.peers.get(msg.targetId);
+      if (peer) showToast(`${peer.name || 'Oyuncu'} için sohbet yasağı kaldırıldı.`, 'ok');
+    }
     return;
   } else if (msg.type === 'check_friend') {
     if (state.friends[msg.targetId]) {
@@ -4754,7 +4941,13 @@ async function handleDataMessage(peerId, msg) {
     
     // Keep our own hosted lobbies, and replace everything else with incoming lobbies hosted by others
     const myHostedLobbies = (state.lobbies || []).filter(l => l.hostId === state.myId);
-    const incomingOtherLobbies = incomingLobbies.filter(l => l.hostId !== state.myId);
+    const incomingOtherLobbies = incomingLobbies
+      .filter(l => l.hostId !== state.myId)
+      .map(l => state.sfwMode ? {
+        ...l,
+        name: censorProfaneText(l.name || ''),
+        hostName: censorProfaneText(l.hostName || '')
+      } : l);
     
     state.lobbies = myHostedLobbies.concat(incomingOtherLobbies);
     console.log('🔄 Lobi listesi senkronize edildi. Güncel lobiler:', state.lobbies);
@@ -4955,22 +5148,38 @@ async function handleDataMessage(peerId, msg) {
     }
     updateUserUI(peerId);
   } else if (msg.type === 'chat') {
+    if (isChatBanned(peerId)) return;
     let isCensored = msg.isCensored || false;
+    let safeText = msg.text || '';
+    let violation = !!msg.sfwViolation;
     if (!isCensored) {
       const res = await checkTextWithAI(msg.text);
-      if (!res.ok) isCensored = true;
+      if (!res.ok) {
+        isCensored = true;
+        violation = true;
+        safeText = res.text || '';
+      }
     }
-    appendChat(peerId, peer.name, msg.text || '', isCensored);
+    if (violation && registerSfwChatViolation(peerId)) return;
+    appendChat(peerId, peer.name, safeText, isCensored);
   } else if (msg.type === 'chat-enc') {
+    if (isChatBanned(peerId)) return;
     let isCensored = msg.isCensored || false;
     if (state.cryptoKey) {
       const dec = await decryptMsg(msg.data, state.cryptoKey);
       if (dec || dec === '') {
+         let safeText = dec || '';
+         let violation = !!msg.sfwViolation;
          if (!isCensored && dec !== '') {
             const res = await checkTextWithAI(dec);
-            if (!res.ok) isCensored = true;
+            if (!res.ok) {
+              isCensored = true;
+              violation = true;
+              safeText = res.text || '';
+            }
          }
-         appendChat(peerId, peer.name, dec || '', isCensored);
+         if (violation && registerSfwChatViolation(peerId)) return;
+         appendChat(peerId, peer.name, safeText, isCensored);
       } else {
          appendChat(peerId, peer.name, '🔒 [Şifre Çözülemedi]');
       }
@@ -6323,14 +6532,46 @@ function removeVideoCard(peerId, isScreen) {
   }
   updateEmptyGrid();
 }
+function getSfwChatBanThreshold(value = state.sfwChatBanThreshold) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.max(1, Math.min(100, parsed)) : 3;
+}
+
+function isChatBanned(peerId) {
+  return !!peerId && !!state.chatBannedIds && state.chatBannedIds.has(peerId);
+}
+
+function setChatBan(peerId, banned, announce = true) {
+  if (!state.isRoomFounder || !peerId || peerId === state.myId) return false;
+  if (!state.chatBannedIds) state.chatBannedIds = new Set();
+  if (banned) state.chatBannedIds.add(peerId);
+  else state.chatBannedIds.delete(peerId);
+  if (!banned && state.chatViolationCounts) state.chatViolationCounts.delete(peerId);
+  if (announce) broadcast({ type: 'chat_ban', targetId: peerId, banned: !!banned });
+  return true;
+}
+
+function registerSfwChatViolation(peerId) {
+  if (!state.isRoomFounder || !state.sfwMode || !state.sfwChatBanEnabled || !peerId || peerId === state.myId) return false;
+  if (isChatBanned(peerId)) return true;
+  if (!state.chatViolationCounts) state.chatViolationCounts = new Map();
+  const count = (state.chatViolationCounts.get(peerId) || 0) + 1;
+  state.chatViolationCounts.set(peerId, count);
+  if (count < getSfwChatBanThreshold()) return false;
+  setChatBan(peerId, true);
+  const peer = state.peers.get(peerId);
+  showToast(`${peer?.name || 'Oyuncu'} argo kullanım sınırını aştığı için sohbetten yasaklandı.`, 'danger');
+  return true;
+}
+
 async function checkTextWithAI(text) {
   if (typeof text !== 'string') text = String(text || '');
   if (!state.sfwMode || !text) return { ok: true, text: text };
   
   const warning = "Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.";
 
-  if (text.match(badWordsRegex)) {
-    return { ok: false, warning: warning };
+  if (isProfaneText(text)) {
+    return { ok: false, warning: warning, text: censorProfaneText(text) };
   }
 
   if (state.useModel && text.length > 5) {
@@ -6361,7 +6602,7 @@ async function checkTextWithAI(text) {
        }
        
        if (maxSimilarity > 0.65) {
-          return { ok: false, warning: warning };
+          return { ok: false, warning: warning, text: '' };
        }
     } catch(e) {
       console.error("Metin yapay zeka analizi hatası:", e);
@@ -6376,22 +6617,25 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   const input = document.getElementById('cinput');
   const rawText = input.value.trim();
   if (!rawText) return;
+  if (isChatBanned(state.myId)) {
+    showToast('Sohbetten yasaklandığınız için mesaj gönderemezsiniz.', 'danger');
+    input.value = '';
+    return;
+  }
 
   const res = await checkTextWithAI(rawText);
-  let textToSend = rawText;
-  let isCensored = false;
+  let textToSend = res.ok ? rawText : (res.text || '');
+  let isCensored = !res.ok;
 
   if (!res.ok) {
      showToast(res.warning, 'danger');
-     textToSend = '';
-     isCensored = true;
   }
   
   if (state.cryptoKey) {
     const enc = await encryptMsg(textToSend, state.cryptoKey);
-    broadcast({ type: 'chat-enc', data: enc, isCensored: isCensored });
+    broadcast({ type: 'chat-enc', data: enc, isCensored: isCensored, sfwViolation: !res.ok });
   } else {
-    broadcast({ type: 'chat', text: textToSend, isCensored: isCensored });
+    broadcast({ type: 'chat', text: textToSend, isCensored: isCensored, sfwViolation: !res.ok });
   }
   
   appendChat('self', state.myName, textToSend, isCensored);
@@ -6415,7 +6659,7 @@ function loadLocalChatHistory() {
        
        let msgHtml = textToHtmlEscape(msg.text);
        if (msg.isCensored) {
-         msgHtml = '<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"> Sansürlendi</span>';
+         msgHtml = censoredTextHtml(msg.text);
        }
        div.innerHTML = '<span class="n">' + textToHtmlEscape(msg.name) + '</span><span class="t">' + t + '</span><div>' + msgHtml + '</div>';
        wrap.appendChild(div);
@@ -6474,6 +6718,7 @@ function appendChat(uid, name, text, isCensored = false) {
       msgHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
     }
 
+    if (isCensored) msgHtml = censoredTextHtml(text);
     div.innerHTML = `<span class="n">${escapeHtml(name)}</span><span class="t">${t}</span><div>${msgHtml}</div>`;
     wrap.appendChild(div);
     wrap.scrollTop = wrap.scrollHeight;
@@ -8495,10 +8740,20 @@ function bindUI() {
     });
   }
 
+  const refreshSfwChatBanSettings = () => {
+    const panel = document.getElementById('founder-sfw-chat-ban-settings');
+    if (panel) panel.classList.toggle('hidden', !state.isRoomFounder || !state.sfwMode);
+    const enabledEl = document.getElementById('founder-sfw-chat-ban');
+    if (enabledEl) enabledEl.checked = !!state.sfwChatBanEnabled;
+    const thresholdEl = document.getElementById('founder-sfw-chat-ban-threshold');
+    if (thresholdEl) thresholdEl.value = String(getSfwChatBanThreshold());
+  };
+
   document.getElementById('founder-settings').addEventListener('click', () => {
     document.getElementById('founder-settings-modal').classList.remove('hidden');
     document.getElementById('founder-friends-only').checked = state.friendsOnlyMode || false;
     document.getElementById('founder-sfw-mode').checked = state.sfwMode || false;
+    refreshSfwChatBanSettings();
     document.getElementById('founder-game-mode').checked = state.gameMode || false;
     document.getElementById('founder-noise-suppression').checked = !!state.useAI;
     const bitrateEl = document.getElementById('founder-bitrate');
@@ -8660,9 +8915,26 @@ function bindUI() {
             document.getElementById('founder-settings').dispatchEvent(new Event('click'));
           };
 
+          const chatBanned = isChatBanned(peerId);
+          const chatBanBtn = document.createElement('button');
+          chatBanBtn.className = 'btn-sec btn-sm';
+          chatBanBtn.style.padding = '4px 8px';
+          chatBanBtn.style.fontSize = '12px';
+          chatBanBtn.style.color = chatBanned ? 'var(--ok)' : '#fbbf24';
+          chatBanBtn.style.borderColor = chatBanned ? 'rgba(74,222,128,0.3)' : 'rgba(251,191,36,0.3)';
+          chatBanBtn.innerHTML = chatBanned ? '💬 Sohbet yasağını kaldır' : '💬 Sohbetten yasakla';
+          chatBanBtn.onclick = async () => {
+            const action = chatBanned ? 'sohbet yasağı kaldırılsın mı?' : 'sohbetten yasaklansın mı?';
+            if (!(await window.showConfirm('💬 Sohbet Moderasyonu', `"${peer.name}" ${action}`))) return;
+            setChatBan(peerId, !chatBanned);
+            showToast(chatBanned ? `${peer.name} için sohbet yasağı kaldırıldı.` : `${peer.name} sohbetten yasaklandı.`, 'info');
+            document.getElementById('founder-settings').dispatchEvent(new Event('click'));
+          };
+
           actionsDiv.appendChild(modBtn);
           actionsDiv.appendChild(transferBtn);
           actionsDiv.appendChild(banBtn);
+          actionsDiv.appendChild(chatBanBtn);
         }
 
         div.appendChild(nameSpan);
@@ -8683,10 +8955,50 @@ function bindUI() {
   });
 
   document.getElementById('founder-sfw-mode').addEventListener('change', (e) => {
+    if (!state.isRoomFounder) {
+      e.target.checked = !!state.sfwMode;
+      return;
+    }
     state.sfwMode = e.target.checked;
+    if (state.sfwMode && state.roomName) {
+      state.roomName = censorProfaneText(state.roomName);
+      const titleEl = document.getElementById('room-title');
+      if (titleEl) titleEl.textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
+    }
     if (state.sfwMode) loadAIFilter();
-    broadcast({ type: 'founder_settings_update', sfwMode: state.sfwMode });
+    refreshSfwChatBanSettings();
+    broadcast({
+      type: 'founder_settings_update',
+      sfwMode: state.sfwMode,
+      sfwChatBanEnabled: !!state.sfwChatBanEnabled,
+      sfwChatBanThreshold: getSfwChatBanThreshold()
+    });
     showToast(state.sfwMode ? 'Yapay Zeka Koruması aktif!' : 'Yapay Zeka Koruması kapatıldı.', 'info');
+  });
+
+  document.getElementById('founder-sfw-chat-ban')?.addEventListener('change', (e) => {
+    if (!state.isRoomFounder) return;
+    state.sfwChatBanEnabled = !!e.target.checked;
+    broadcast({ type: 'founder_settings_update', sfwChatBanEnabled: state.sfwChatBanEnabled });
+    showToast(state.sfwChatBanEnabled ? 'Otomatik sohbet yasağı aktif.' : 'Otomatik sohbet yasağı kapatıldı.', 'info');
+  });
+
+  document.getElementById('founder-sfw-chat-ban-threshold')?.addEventListener('change', (e) => {
+    if (!state.isRoomFounder) return;
+    state.sfwChatBanThreshold = getSfwChatBanThreshold(e.target.value);
+    e.target.value = String(state.sfwChatBanThreshold);
+    broadcast({ type: 'founder_settings_update', sfwChatBanThreshold: state.sfwChatBanThreshold });
+  });
+
+  document.querySelectorAll('[data-sfw-chat-ban-step]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!state.isRoomFounder) return;
+      const input = document.getElementById('founder-sfw-chat-ban-threshold');
+      if (!input) return;
+      const step = Number.parseInt(button.dataset.sfwChatBanStep, 10) || 0;
+      input.value = String(getSfwChatBanThreshold(Number(input.value) + step));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
   });
 
   document.getElementById('founder-game-mode').addEventListener('change', (e) => {
@@ -10143,6 +10455,7 @@ window.renderDMs = () => {
       contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
     }
 
+    if (m.isCensored) contentHtml = censoredTextHtml(m.content);
     if (m.count > 1) {
       contentHtml += `<span class="msg-repeat-badge">×${m.count}</span>`;
     }
@@ -10211,13 +10524,11 @@ window.sendDMText = async (text) => {
   const friendId = state.activeDM;
 
   const res = await checkTextWithAI(text);
-  let textToSend = text;
-  let isCensored = false;
+  let textToSend = res.ok ? text : (res.text || '');
+  let isCensored = !res.ok;
 
   if (!res.ok) {
      showToast(res.warning, 'danger');
-     textToSend = '';
-     isCensored = true;
   }
 
   // Local store
@@ -10339,12 +10650,16 @@ window.receiveDM = async (fromId, data) => {
 
   if (data.type === 'dm_msg') {
     let isCensored = data.isCensored || false;
+    let safeContent = data.content;
     if (!isCensored && data.content) {
        const res = await checkTextWithAI(data.content);
-       if (!res.ok) isCensored = true;
+       if (!res.ok) {
+         isCensored = true;
+         safeContent = res.text || '';
+       }
     }
     
-    pushDmMessage(fromId, { sender: 'them', type: data.msgType, content: data.content, isCensored: isCensored, timestamp: Date.now() });
+    pushDmMessage(fromId, { sender: 'them', type: data.msgType, content: safeContent, isCensored: isCensored, timestamp: Date.now() });
     saveDMs();
     if (state.activeDM === fromId) renderDMs();
     else showToast(`${state.friends[fromId]?.name || 'Biri'} sana mesaj gönderdi.`, 'info');
@@ -10358,7 +10673,7 @@ window.receiveDM = async (fromId, data) => {
           alici_id: state.friendId || 'Anonim',
           alici_adi: state.myName || 'Anonim',
           tip: 'dm',
-          icerik: data.content,
+          icerik: safeContent,
           is_censored: isCensored
         }
       ]).then(({ error }) => {
@@ -10623,7 +10938,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const newLobby = {
       id: `LOB-${crypto.randomUUID()}`,
       activity: act,
-      name: `${state.myName}'in ${names[act]} Lobisi`,
+      name: state.sfwMode
+        ? censorProfaneText(`${state.myName}'in ${names[act]} Lobisi`)
+        : `${state.myName}'in ${names[act]} Lobisi`,
       hostId: state.myId,
       hostName: state.myName,
       players: [{ id: state.myId, name: state.myName }],
@@ -10733,13 +11050,15 @@ window.renderLobbiesList = function(activity) {
     const playerCount = lob.players.length;
     const specCount = lob.spectators.length;
     
-    const infoText = `Kurucu: ${escapeHtml(lob.hostName)} • Oyuncular: ${playerCount}/${maxPlayers} ${specCount > 0 ? `(${specCount} İzleyici)` : ''}`;
+    const lobbyName = state.sfwMode ? censorProfaneText(lob.name || '') : (lob.name || '');
+    const lobbyHostName = state.sfwMode ? censorProfaneText(lob.hostName || '') : (lob.hostName || '');
+    const infoText = `Kurucu: ${escapeHtml(lobbyHostName)} • Oyuncular: ${playerCount}/${maxPlayers} ${specCount > 0 ? `(${specCount} İzleyici)` : ''}`;
     const statusText = lob.status === 'playing' ? '🎮 Devam Ediyor' : '⌛ Bekliyor';
     const statusColor = lob.status === 'playing' ? '#f59e0b' : 'var(--ok)';
 
     row.innerHTML = `
       <div>
-        <div style="font-weight:bold; color:#fff;">${escapeHtml(lob.name)}</div>
+        <div style="font-weight:bold; color:#fff;">${escapeHtml(lobbyName)}</div>
         <div style="font-size:11px; color:var(--txt-mut); margin-top:2px;">${infoText}</div>
         <div style="font-size:10px; font-weight:bold; color:${statusColor}; margin-top:4px;">${statusText}</div>
       </div>

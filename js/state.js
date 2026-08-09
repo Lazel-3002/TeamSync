@@ -106,6 +106,10 @@ window.state = {
   spectating: false,
   selectedLobbyActivity: null,
   sfwMode: false,
+  sfwChatBanEnabled: false,
+  sfwChatBanThreshold: 3,
+  chatBannedIds: new Set(),
+  chatViolationCounts: new Map(),
   aiModel: null,
   gameMode: false,
   // Sunucu geneli ses bit hızı (kbps). Kurucu, sunucu oluştururken ve kurucu
