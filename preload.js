@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, status) => cb(status)),
   // Kişisel tema seçildiğinde pencerenin native arka planını da günceller
   // (frame:false olduğu için yeniden boyutlandırmada bu renk görünür).
-  setWindowTheme: (theme, persist, customBg) => ipcRenderer.send('set-window-theme', theme, persist, customBg)
+  setWindowTheme: (theme, persist, customBg) => ipcRenderer.send('set-window-theme', theme, persist, customBg),
+  // İndirmeler main süreçte İndirilenler klasörüne yazılır (bkz. main.js
+  // will-download); arayüz sonucu buradan öğrenip bildirim gösterir.
+  onDownloadDone: (cb) => ipcRenderer.on('download-done', (_e, info) => cb(info)),
+  showInFolder: (filePath) => ipcRenderer.send('show-in-folder', filePath)
 });
 

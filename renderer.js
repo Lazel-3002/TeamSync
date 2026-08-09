@@ -273,6 +273,9 @@ function setupInternetSignaling(roomId, myId, myName) {
           avatar: state.myAvatar || null,
           isRoomFounder: state.isRoomFounder,
           isModerator: state.moderators.has(myId),
+          // Odaya giriş anı: kurucu ayrılınca halef "en erken giren" kuralıyla
+          // seçilir; damga sahibinin kendisinden geldiği için herkeste aynıdır.
+          joinedAt: state.joinedAt || 0,
           sfwMode: state.sfwMode,
           turn: getShareableTurn(),
           // Yalnızca kurucu otoritesi taşınır: oda adı ve güncel yetkili
@@ -389,7 +392,7 @@ function setupInternetSignaling(roomId, myId, myName) {
           }
         }
         applySharedTurn(data.turn);
-        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder, isModerator: data.isModerator, friendId: data.friendId });
+        handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder, isModerator: data.isModerator, friendId: data.friendId, joinedAt: data.joinedAt });
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
         if (!peer) {
@@ -2217,6 +2220,39 @@ window.addEventListener('DOMContentLoaded', async () => {
       .catch(() => {});
   }
 
+  // İndirme bitti bildirimi. Dosyayı main süreç İndirilenler klasörüne yazar
+  // (bkz. main.js will-download); burada tıklanınca klasörde gösteren bir
+  // bildirim çıkar. Dosya adı ayrı bir düğümde tutulur ki dil değişiminde
+  // yalnızca etiketler çevrilsin.
+  if (window.electronAPI && window.electronAPI.onDownloadDone) {
+    window.electronAPI.onDownloadDone((info) => {
+      const container = document.getElementById('toast-container');
+      if (!info || !info.ok) { showToast('İndirme tamamlanamadı', 'danger'); return; }
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast toast-ok toast-download';
+      const label = document.createElement('span');
+      label.textContent = 'İndirildi';
+      const name = document.createElement('span');
+      name.className = 'toast-file';
+      name.textContent = info.name;
+      const hint = document.createElement('span');
+      hint.className = 'toast-hint';
+      hint.textContent = 'Klasörde göster';
+      toast.append(label, name, hint);
+      toast.title = info.path;
+      toast.addEventListener('click', () => {
+        try { window.electronAPI.showInFolder(info.path); } catch (e) {}
+      });
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 10);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 6000);
+    });
+  }
+
   // TEŞHİS: DIAG açıkken, DOM'a eklenen GERÇEK indirme butonlarını yakalayıp
   // ana sürece yolla (computed renk + hangi eleman). Kullanıcının gördüğü mor
   // butonun kesin kimliğini öğrenmek için — sentetik probe yerine canlı DOM.
@@ -2873,6 +2909,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     // ise liste kurucunun hello mesajıyla senkronize edilir.
     state.bannedIds = state.isRoomFounder ? loadRoomBans(roomId) : new Set();
     state.founderId = state.isRoomFounder ? state.myId : null;
+    // Giriş sırası damgası: kurucu düştüğünde halef seçiminde kullanılır.
+    state.joinedAt = Date.now();
 
     updateFounderMenuVisibility();
 
@@ -3527,6 +3565,8 @@ async function handlePeerDiscovered(peer) {
     // Kalıcı kimlik periyodik hello ile gelir; DM/arkadaşlık isteklerinin
     // doğru konuya gidebilmesi için peer üzerinde güncel tutulur.
     if (peer.friendId) existing.friendId = peer.friendId;
+    // Giriş damgası hello ile gelir (keşif anında bilinmeyebilir).
+    if (typeof peer.joinedAt === 'number' && peer.joinedAt > 0) existing.joinedAt = peer.joinedAt;
     if (existing.name !== peer.name) {
       existing.name = peer.name;
       // Satırdaki gerçek ismi güncelle; ekranda lakap varsa lakap kalır.
@@ -3595,6 +3635,7 @@ async function handlePeerDiscovered(peer) {
   // kalıcı kimliği (varsa) o nesneye aktar ki ilk hello beklenmesin.
   const created = state.peers.get(peer.id);
   if (created && peer.friendId) created.friendId = peer.friendId;
+  if (created && typeof peer.joinedAt === 'number' && peer.joinedAt > 0) created.joinedAt = peer.joinedAt;
   showToast(displayName(peer.id, peer.name) + ' bulundu', 'info');
 }
 
@@ -3602,9 +3643,14 @@ setInterval(() => {
   const now = Date.now();
   state.peers.forEach((peer, id) => {
     if (peer.lastSeen && now - peer.lastSeen > 12000) {
-      // MQTT geçici koparsa bile WebRTC bağlantısı sağlamsa peer'ı düşürme
+      // MQTT geçici koparsa bile WebRTC bağlantısı sağlamsa peer'ı düşürme.
+      // Ancak alt+F4/çökme durumunda ICE bir süre daha "connected" görünebiliyor
+      // ve hello 3 saniyede bir geldiği için 30 saniyelik sessizlik artık
+      // kesin ölümdür — aksi halde kurucu alt+F4 attığında sahiplik devri
+      // (handleFounderLeft) hiç tetiklenmiyordu.
       const iceState = peer.pc ? peer.pc.iceConnectionState : null;
-      if (iceState === 'connected' || iceState === 'completed') return;
+      const silentTooLong = now - peer.lastSeen > 30000;
+      if (!silentTooLong && (iceState === 'connected' || iceState === 'completed')) return;
       console.log('⏳ Peer zaman aşımına uğradı:', peer.name);
       removePeer(id);
     }
@@ -4448,8 +4494,10 @@ function setupDataChannel(peerId, dc) {
               }));
             }
           } else if (activeAct === 'wb' && state.myId < peerId) {
-            const wbData = document.getElementById('wb-canvas').toDataURL('image/jpeg', 0.5);
-            dc.send(JSON.stringify({ type: 'wb-sync', data: wbData }));
+            // Tahta artık nesne listesi olarak senkronlanır (parçalı wb2-sync);
+            // eski JPEG anlık görüntüsü hem büyüktü hem de geri alma/silme
+            // bilgisini taşımıyordu.
+            if (typeof window.whiteboardSyncTo === 'function') window.whiteboardSyncTo(peerId);
           }
         }
       } catch (e) {}
@@ -4499,7 +4547,13 @@ async function handleDataMessage(peerId, msg) {
       processedMessages.delete(first);
     }
   }
-  
+
+  // Beyaz Tahta kendi paketlerini (wb2-* ve eski draw/wb-clear/wb-sync)
+  // js/whiteboard.js içinde işler; burada yalnızca yönlendirilir. Modül
+  // paketi tanıdıysa true döner ve zincir kısa devre olur.
+  if (typeof window.whiteboardHandleMessage === 'function'
+      && window.whiteboardHandleMessage(peerId, msg)) return;
+
   if (msg.type === 'founder_settings_update') {
     // Sunucu çapındaki ayarlar yalnızca gerçek kurucudan kabul edilir.
     if (peerId !== state.founderId) return;
@@ -4855,39 +4909,6 @@ async function handleDataMessage(peerId, msg) {
     } else {
       appendChat(peerId, peer.name, '🔒 [Kilitli Mesaj]');
     }
-  } else if (msg.type === 'draw') {
-    if (state.wbContext) {
-      document.getElementById('wb-card').classList.remove('hidden');
-      makeCardFocusable(document.getElementById('wb-card'));
-      if (!state.wbJoined) {
-         showInactiveOverlay('wb-card', 'Beyaz Tahta', () => {
-             state.wbJoined = true;
-             removeInactiveOverlay('wb-card');
-             if (!focusedCard) toggleFocus(document.getElementById('wb-card'));
-         });
-      }
-      drawWb(msg.tool, msg.x0 * 1920, msg.y0 * 1080, msg.x1 * 1920, msg.y1 * 1080, msg.color, msg.size, msg.text);
-    }
-  } else if (msg.type === 'wb-clear') {
-    state.wbContext.fillStyle = '#ffffff';
-    state.wbContext.fillRect(0,0,1920,1080);
-  } else if (msg.type === 'wb-sync') {
-    const img = new Image();
-    img.onload = () => {
-      state.wbContext.drawImage(img, 0, 0);
-      const wbCard = document.getElementById('wb-card');
-      wbCard.classList.remove('hidden');
-      makeCardFocusable(wbCard);
-      if (!state.wbJoined) {
-         showInactiveOverlay('wb-card', 'Beyaz Tahta', () => {
-             state.wbJoined = true;
-             removeInactiveOverlay('wb-card');
-             if (!focusedCard) toggleFocus(wbCard);
-         });
-      }
-      updateEmptyGrid();
-    };
-    img.src = msg.data;
   } else if (msg.type === 'file-meta') {
     fileBuffer.set(msg.id, { meta: msg, chunks: [], received: 0 });
     appendFileMsg(msg.id, msg.name, msg.size, true);
@@ -5220,19 +5241,40 @@ function saveRoomBans(roomId) {
   } catch (e) { /* kota dolu olabilir; yoksay */ }
 }
 
-// Kurucu odadan ayrıldığında sahiplik boşta kalmasın: hâlâ odada olan en küçük
-// id'li moderatör deterministik olarak yeni kurucu olur (tüm istemciler aynı
-// seçimi yapar, split-brain olmaz). Moderatör yoksa oda sahipsiz kalır ve eski
-// kurucu geri dönebilir. (item 4)
+// Kurucu odadan ayrıldığında (çıkış düğmesiyle ya da alt+F4/çökme sonrası
+// zaman aşımıyla) sahiplik boşta kalmasın: önce hâlâ odada olan yetkililer,
+// yetkili yoksa sıradan kullanıcılar arasından odaya EN ÖNCE giren kişi yeni
+// kurucu olur. Giriş damgası (joinedAt) sahibinin hello'suyla yayıldığı için
+// her istemci aynı sıralamayı hesaplar; eşitlikte id ile kırılır, böylece
+// split-brain olmaz. (item 4)
+function founderSuccessorId() {
+  const alive = [];
+  if (state.myId) alive.push({ id: state.myId, joinedAt: state.joinedAt || 0 });
+  state.peers.forEach((peer, id) => {
+    if (id === state.founderId) return;
+    if (state.bannedIds && state.bannedIds.has(id)) return;
+    alive.push({ id, joinedAt: peer.joinedAt || 0 });
+  });
+  // Damgası bilinmeyen (0) kişiler en sona düşmeli; yoksa hello'su henüz
+  // gelmemiş biri "en erken giren" sanılır.
+  const order = (a, b) => {
+    const aj = a.joinedAt || Number.MAX_SAFE_INTEGER;
+    const bj = b.joinedAt || Number.MAX_SAFE_INTEGER;
+    if (aj !== bj) return aj - bj;
+    return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+  };
+  const mods = alive.filter(c => isPeerModerator(c.id)).sort(order);
+  if (mods.length > 0) return mods[0].id;
+  const plain = alive.slice().sort(order);
+  return plain.length > 0 ? plain[0].id : null;
+}
+
 function handleFounderLeft(prevFounderId) {
-  const candidates = Array.from(state.moderators || [])
-    .filter(id => id === state.myId || state.peers.has(id))
-    .sort();
-  if (candidates.length === 0) {
+  const newFounderId = founderSuccessorId();
+  if (!newFounderId) {
     state.founderId = null;
     return;
   }
-  const newFounderId = candidates[0];
   state.founderId = newFounderId;
   state.moderators.delete(newFounderId);
   if (newFounderId === state.myId) {
@@ -7084,6 +7126,42 @@ const LEGACY_TEXT_EN = {
   'Çember': 'Circle',
   'Yazı': 'Text',
   'Temizle': 'Clear',
+  // Beyaz Tahta v2 araç rayı ve denetimleri (bkz. js/whiteboard.js). Başlıklar
+  // kısayol harfini taşıdığı için tam dize olarak çevrilir; parça eşleşmesine
+  // bırakılırsa "Fırça (P)" gibi başlıklar yarı Türkçe kalabiliyor.
+  'Seç (V)': 'Select (V)',
+  'Fırça (P)': 'Brush (P)',
+  'Fosforlu (H)': 'Highlighter (H)',
+  'Silgi (E)': 'Eraser (E)',
+  'Çizgi (L)': 'Line (L)',
+  'Ok (A)': 'Arrow (A)',
+  'Dikdörtgen (R)': 'Rectangle (R)',
+  'Çember (O)': 'Circle (O)',
+  'Yazı (T)': 'Text (T)',
+  'Kaydır (Boşluk)': 'Pan (Space)',
+  'Renk ve Kalınlık': 'Color and Thickness',
+  'Renk': 'Color',
+  'Kalınlık': 'Thickness',
+  'Özel renk': 'Custom color',
+  'Geri Al': 'Undo',
+  'Yinele': 'Redo',
+  'Izgara': 'Grid',
+  'Zemin': 'Background',
+  'PNG İndir': 'Download PNG',
+  'Uzaklaştır': 'Zoom Out',
+  'Yakınlaştır': 'Zoom In',
+  'Sığdır': 'Fit',
+  'Gerçek Boyut': 'Actual Size',
+  'Tahta temizlendi — Ctrl+Z ile geri alabilirsin': 'Board cleared — press Ctrl+Z to undo',
+  'Döndür': 'Rotate',
+  'Seçimi döndürmek için sürükle': 'Drag to rotate the selection',
+  'Fotoğraf Ekle': 'Add Photo',
+  'Fotoğraf çok büyük': 'Photo is too large',
+  'Fotoğraf yüklenemedi': 'Photo could not be loaded',
+  // İndirme bildirimi (main.js will-download → renderer toast)
+  'İndirildi': 'Downloaded',
+  'Klasörde göster': 'Show in folder',
+  'İndirme tamamlanamadı': 'Download could not be completed',
   'Etkinlikler': 'Activities',
   'Hızlı Anket': 'Quick Poll',
   'Şans Çarkı': 'Lucky Wheel',
@@ -9695,9 +9773,11 @@ function disconnectApp() {
   releaseChatBlobUrls();
   
   const grid = document.getElementById('grid');
-  document.querySelectorAll('.vcard').forEach(el => {
-    if (el.id !== 'wb-card') el.classList.add('hidden');
-  });
+  // Beyaz Tahta da kapanır ve içeriği silinir: eskiden açık bırakılıyordu ve
+  // bir sonraki odaya girildiğinde önceki odanın çizimleri wb2-sync ile
+  // karşı tarafa gidiyordu.
+  document.querySelectorAll('.vcard').forEach(el => el.classList.add('hidden'));
+  if (typeof window.whiteboardReset === 'function') window.whiteboardReset();
   if (!document.getElementById('empty-state')) {
     const empty = document.createElement('div');
     empty.id = 'empty-state';

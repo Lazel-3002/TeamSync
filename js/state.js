@@ -119,5 +119,9 @@ window.state = {
   // giremezler. Kurucu tarafında localStorage'a da yazılır (bkz: room bans).
   bannedIds: new Set(),
   founderId: null,
+  // Odaya giriş sırası: kurucu ayrıldığında halef seçimi bu damgaya göre
+  // yapılır (en erken giren önce). Her istemci kendi damgasını hello ile
+  // yayınlar; böylece tüm istemciler aynı sıralamayı hesaplar.
+  joinedAt: 0,
   roomName: null
 };

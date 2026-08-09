@@ -1292,6 +1292,50 @@ app.whenReady().then(() => {
     console.warn('Adblocker modülü yüklenemedi, atlanıyor:', e.message);
   }
 
+  // --- İNDİRMELER ---
+  // Uygulamada hiç 'will-download' dinleyicisi yoktu; Electron bu durumda
+  // kendi "Farklı Kaydet" penceresini açmaya çalışıyor ve çerçevesiz ana
+  // pencerede bu iletişim kutusu kullanıcıya ulaşmıyordu — beyaz tahta PNG'si,
+  // sohbet dosyaları ve ses kaydı sessizce hiçbir yere inmiyordu. Artık
+  // dosyalar doğrudan Windows İndirilenler klasörüne yazılır (tarayıcı
+  // davranışı) ve arayüze bildirilir.
+  const downloadDir = () => {
+    try { return app.getPath('downloads'); } catch (e) { return app.getPath('temp'); }
+  };
+  const uniqueDownloadPath = (name) => {
+    const dir = downloadDir();
+    const ext = path.extname(name);
+    const base = path.basename(name, ext) || 'dosya';
+    let candidate = path.join(dir, base + ext);
+    let n = 1;
+    while (fs.existsSync(candidate)) candidate = path.join(dir, `${base} (${n++})${ext}`);
+    return candidate;
+  };
+  session.defaultSession.on('will-download', (event, item, webContents) => {
+    let target;
+    try {
+      target = uniqueDownloadPath(item.getFilename() || 'dosya');
+      item.setSavePath(target);
+    } catch (e) {
+      console.warn('İndirme yolu ayarlanamadı:', e.message);
+      return;
+    }
+    item.once('done', (_e, state) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.webContents.send('download-done', {
+        ok: state === 'completed',
+        path: target,
+        name: path.basename(target)
+      });
+    });
+  });
+  // Bildirimdeki "Klasörü aç" için: yalnızca gerçekten var olan bir dosyayı
+  // gösterir, keyfi yol açtırılamaz.
+  ipcMain.on('show-in-folder', (event, filePath) => {
+    if (!isMainWindowSender(event) || typeof filePath !== 'string') return;
+    try { if (fs.existsSync(filePath)) shell.showItemInFolder(filePath); } catch (e) {}
+  });
+
   // --- WEBRTC MEDYA VE EKRAN PAYLAŞIMI İZİNLERİ ---
   // Webview content uses a separate, sandboxed session and must never inherit
   // microphone, camera or display permissions from the application shell.
