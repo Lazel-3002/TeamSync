@@ -97,7 +97,5 @@
   "95": "saveRoomBans",
   "96": "filterActivityCards",
   "97": "setAuthorizedCursorProfile",
-  "98": "shortcutComboLabel",
-  "99": "censorProfaneText",
-  "100": "media-collect-resize.test.js"
+  "98": "shortcutComboLabel"
 }
