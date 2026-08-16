@@ -64,6 +64,22 @@ module.exports = async function run() {
     assert.strictEqual(result.actionP1, null);
     assert.strictEqual(result.round, 1);
     assert.strictEqual(result.executingRound, null);
+    const tacticalSwitchUi = JSON.parse(await evalJS(peer.client, `JSON.stringify((() => {
+      window.pokeState.actionP1 = null;
+      window.pokeState.actionP2 = { type:'poke_action_select', id:'BOT', switchTo:1, round:window.pokeState.round };
+      window.pokeActivityHandler({ type:'poke_sync', state:window.pokeState });
+      const stateAfterTacticalSwitch = {
+        selectionHidden: document.getElementById('poke-selection-panel').classList.contains('hidden'),
+        movesHidden: document.getElementById('poke-moves-grid').classList.contains('hidden'),
+        title: document.getElementById('poke-action-title').textContent
+      };
+      window.pokeState.actionP2 = null;
+      window.pokeActivityHandler({ type:'poke_sync', state:window.pokeState });
+      return stateAfterTacticalSwitch;
+    })())`));
+    assert.strictEqual(tacticalSwitchUi.selectionHidden, false);
+    assert.strictEqual(tacticalSwitchUi.movesHidden, false);
+    assert.ok(tacticalSwitchUi.title.includes('Sıra sende'));
     const forcedSwitchGuard = JSON.parse(await evalJS(peer.client, `JSON.stringify((() => {
       window.pokeState.p2.hp = 0;
       window.pokeState.requiresSwitch2 = true;

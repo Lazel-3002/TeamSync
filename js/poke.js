@@ -1554,7 +1554,6 @@ POKEMONS.fairy.push(
       const opponentSlot = mySlot === 'p1' ? 'p2' : 'p1';
       const opponentNeedsSwitch = Boolean(
         pokeState['requiresSwitch' + opponentSlot.slice(1).toUpperCase()]
-        || isPokeSwitchAction(pokeState['action' + opponentSlot.toUpperCase()])
       );
       if (opponentNeedsSwitch) return;
       if (pokeState[mySlot].moves[moveIdx]?.isTransform) {
@@ -2018,7 +2017,9 @@ POKEMONS.fairy.push(
          ? Boolean(pokeState['requiresSwitch' + opponentSlot.slice(1).toUpperCase()])
          : false;
        const opponentAction = opponentSlot ? pokeState['action' + opponentSlot.toUpperCase()] : null;
-       const waitingForOpponentSwitch = !forcedSwitch && Boolean(opponentRequiresSwitch || isPokeSwitchAction(opponentAction));
+       // A tactical switch is still a normal simultaneous round action. Only
+       // a fainted Pokemon's forced replacement blocks my move selection.
+       const waitingForOpponentSwitch = !forcedSwitch && Boolean(opponentRequiresSwitch);
        const myAction = mySlot ? pokeState['action' + mySlot.toUpperCase()] : null;
        const waitingForOpponentAction = Boolean(myAction && !opponentAction);
        const opponentHasAction = Boolean(opponentAction && !myAction);
