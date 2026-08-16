@@ -44,17 +44,26 @@ module.exports = async function run() {
     assert.strictEqual(switchUi.cardCount, 1);
     assert.strictEqual(switchUi.imageCount, 1);
     assert.strictEqual(switchUi.hpBarCount, 1);
+    const staleRoundGuard = JSON.parse(await evalJS(peer.client, `JSON.stringify((() => {
+      const before = { round: window.pokeState.round, actionP1: window.pokeState.actionP1 };
+      window.pokeActivityHandler({ type:'poke_action_select', id:state.myId, moveIdx:0, round:99 });
+      return { round:window.pokeState.round, actionP1:window.pokeState.actionP1, before };
+    })())`));
+    assert.strictEqual(staleRoundGuard.round, staleRoundGuard.before.round);
+    assert.strictEqual(staleRoundGuard.actionP1, null);
     await evalJS(peer.client, `(() => {
       window.pokeActivityHandler({ type:'poke_action_select', id:state.myId, switchTo:1 });
       window.pokeActivityHandler({ type:'poke_action_select', id:'BOT', moveIdx:0 });
       return 1;
     })()`);
-    await waitFor(peer.client, `window.pokeState.activeIndex1 === 1 && window.pokeState.actionP1 === null`, 10000, 'switch action');
-    const result = JSON.parse(await evalJS(peer.client, `JSON.stringify({ activeIndex:window.pokeState.activeIndex1, activeName:window.pokeState.p1.evoName, hp:window.pokeState.p1.hp, maxHp:window.pokeState.p1.maxHp, actionP1:window.pokeState.actionP1 })`));
+    await waitFor(peer.client, `window.pokeState.activeIndex1 === 1 && window.pokeState.actionP1 === null && window.pokeState.round === 1`, 10000, 'switch action and round advance');
+    const result = JSON.parse(await evalJS(peer.client, `JSON.stringify({ activeIndex:window.pokeState.activeIndex1, activeName:window.pokeState.p1.evoName, hp:window.pokeState.p1.hp, maxHp:window.pokeState.p1.maxHp, actionP1:window.pokeState.actionP1, round:window.pokeState.round, executingRound:window.pokeState.executingRound })`));
     assert.strictEqual(result.activeIndex, 1);
     assert.strictEqual(result.activeName, 'Two');
     assert.ok(result.hp < result.maxHp, 'the opponent attack should hit the switched-in Pokémon');
     assert.strictEqual(result.actionP1, null);
+    assert.strictEqual(result.round, 1);
+    assert.strictEqual(result.executingRound, null);
     const forcedSwitchGuard = JSON.parse(await evalJS(peer.client, `JSON.stringify((() => {
       window.pokeState.p2.hp = 0;
       window.pokeState.requiresSwitch2 = true;

@@ -77,6 +77,8 @@ function initPoke() {
     activeIndex2: 0,
     spectators: [],
     round: 0,
+    executingRound: null,
+    lastBroadcastRound: null,
     status: 'waiting', // waiting, selecting, revealed, round_end
     openingReveal: false,
     actionP1: null,
@@ -86,6 +88,12 @@ function initPoke() {
 
   const normalizeBattleSize = value => [1, 3, 6].includes(Number(value)) ? Number(value) : 1;
   const isPokeHost = () => Boolean(state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId));
+  const isPokeBotId = id => typeof id === 'string' && (id === 'BOT' || id === 'BOT_1' || id === 'BOT_2');
+  const getPokeBotId = slot => slot === 'p1' ? 'BOT_1' : 'BOT';
+  const getPokeBotSlot = id => pokeState.p1?.id === id ? 'p1' : pokeState.p2?.id === id ? 'p2' : null;
+  const showPokeLobbyToast = message => {
+    if (typeof showToast === 'function') showToast(message, 'warn');
+  };
   const getBattleSize = () => normalizeBattleSize(pokeState.battleSize);
   const getTeam = slot => {
     const teamKey = slot === 'p1' ? 'team1' : 'team2';
@@ -114,6 +122,13 @@ function initPoke() {
   const availableSwitches = slot => getTeam(slot).map((fighter, index) => ({ fighter, index }))
     .filter(({ fighter, index }) => index !== getActiveIndex(slot) && fighter && fighter.hp > 0);
   const isPokeSwitchAction = action => Number.isInteger(Number(action?.switchTo));
+  const getPokeRound = value => {
+    const round = Number(value);
+    return Number.isInteger(round) && round >= 0 ? round : null;
+  };
+  const withPokeRound = action => action
+    ? { ...action, round: getPokeRound(action.round) ?? pokeState.round }
+    : action;
   const resetTeamForBattle = slot => {
     const team = getTeam(slot);
     team.forEach((fighter, index) => {
@@ -486,7 +501,10 @@ POKEMONS.fairy.push(
   document.getElementById('poke-close')?.addEventListener('click', () => {
     closeAllCards(true);
     broadcast({ type: 'activity_change', activity: 'none' });
-    window.pokeState = { p1: null, p2: null, spectators: [], round: 0, status: 'waiting' };
+    window.pokeState = {
+      p1: null, p2: null, spectators: [], round: 0,
+      executingRound: null, lastBroadcastRound: null, status: 'waiting'
+    };
     renderPokeLobby();
   });
 
@@ -524,6 +542,16 @@ POKEMONS.fairy.push(
       }
 
       const isHost = isPokeHost();
+      [1, 2].forEach(slotNumber => {
+        const slot = `p${slotNumber}`;
+        const occupant = pokeState[slot];
+        const joinButton = document.getElementById(`poke-join-${slotNumber}`);
+        const botButton = document.getElementById(`poke-bot-${slotNumber}`);
+        const removeBotButton = document.getElementById(`poke-remove-bot-${slotNumber}`);
+        joinButton?.classList.toggle('hidden', Boolean(occupant));
+        botButton?.classList.toggle('hidden', !isHost || Boolean(occupant));
+        removeBotButton?.classList.toggle('hidden', !isHost || !isPokeBotId(occupant?.id));
+      });
       const rulesControl = document.getElementById('poke-rules-control');
       const rulesSelect = document.getElementById('poke-battle-size');
       if (rulesSelect) {
@@ -668,24 +696,45 @@ POKEMONS.fairy.push(
     } catch(e) {}
   };
 
-  // Join slots
-  document.getElementById('poke-join-1')?.addEventListener('click', () => {
-    if ((pokeState.p1 && pokeState.p1.id === state.myId) || (pokeState.p2 && pokeState.p2.id === state.myId)) {
-      if (typeof showToast === 'function') showToast("Zaten bir slota katıldınız!", "warn");
+  // Join slots and bot management. Slot occupancy is checked again in the
+  // activity handler so a late bot click can never replace a real player.
+  const requestPokeJoin = slotNumber => {
+    if (pokeState.status !== 'waiting') return;
+    if (pokeState.p1?.id === state.myId || pokeState.p2?.id === state.myId) {
+      showPokeLobbyToast('Zaten bir slota katıldınız!');
       return;
     }
-    broadcastPokeMsg({ type: 'poke_join', slot: 1, id: state.myId, name: state.myName, avatar: state.myAvatar });
-  });
-  document.getElementById('poke-join-2')?.addEventListener('click', () => {
-    if ((pokeState.p1 && pokeState.p1.id === state.myId) || (pokeState.p2 && pokeState.p2.id === state.myId)) {
-      if (typeof showToast === 'function') showToast("Zaten bir slota katıldınız!", "warn");
+    const slot = `p${slotNumber}`;
+    if (pokeState[slot]) {
+      showPokeLobbyToast('Bu tarafta bir oyuncu var.');
       return;
     }
-    broadcastPokeMsg({ type: 'poke_join', slot: 2, id: state.myId, name: state.myName, avatar: state.myAvatar });
-  });
+    broadcastPokeMsg({ type: 'poke_join', slot: slotNumber, id: state.myId, name: state.myName, avatar: state.myAvatar, requestedBy: state.myId });
+  };
+  document.getElementById('poke-join-1')?.addEventListener('click', () => requestPokeJoin(1));
+  document.getElementById('poke-join-2')?.addEventListener('click', () => requestPokeJoin(2));
 
-  document.getElementById('poke-bot-2')?.addEventListener('click', () => {
-    broadcastPokeMsg({ type: 'poke_join', slot: 2, id: 'BOT', name: '🤖 Taktik Ustası Bot', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=PokeBot' });
+  const requestPokeBot = slotNumber => {
+    if (!isPokeHost()) {
+      showPokeLobbyToast('Sadece kurucu bot ekleyebilir.');
+      return;
+    }
+    const slot = `p${slotNumber}`;
+    if (pokeState[slot]) {
+      showPokeLobbyToast('Bu tarafta bir oyuncu var. Bot eklenemedi.');
+      return;
+    }
+    broadcastPokeMsg({ type: 'poke_join', slot: slotNumber, id: getPokeBotId(slot), name: '🤖 Taktik Ustası Bot', avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=PokeBot${slotNumber}`, requestedBy: state.myId });
+  };
+  const removePokeBot = slotNumber => {
+    if (!isPokeHost()) return;
+    const slot = `p${slotNumber}`;
+    if (!isPokeBotId(pokeState[slot]?.id)) return;
+    broadcastPokeMsg({ type: 'poke_leave', slot: slotNumber, id: pokeState[slot].id, requestedBy: state.myId });
+  };
+  [1, 2].forEach(slotNumber => {
+    document.getElementById(`poke-bot-${slotNumber}`)?.addEventListener('click', () => requestPokeBot(slotNumber));
+    document.getElementById(`poke-remove-bot-${slotNumber}`)?.addEventListener('click', () => removePokeBot(slotNumber));
   });
 
   // Start Battle
@@ -1084,7 +1133,13 @@ POKEMONS.fairy.push(
     }, 500);
   };
 
-     const executeRound = (action1, action2) => {
+     const executeRound = (action1, action2, roundId = pokeState.round) => {
+       const normalizedRound = getPokeRound(roundId);
+       if (!action1 || !action2 || normalizedRound === null || normalizedRound !== pokeState.round) return;
+       if (pokeState.executingRound === normalizedRound) return;
+       pokeState.executingRound = normalizedRound;
+       action1 = withPokeRound(action1);
+       action2 = withPokeRound(action2);
        window.pokeAnimPlaying = true;
        const m1 = isPokeSwitchAction(action1) ? { name: 'Pokémon değiştiriyor', power: 0, priority: 1000, damage_class: 'status' } : pokeState.p1.moves[action1.moveIdx];
        const m2 = isPokeSwitchAction(action2) ? { name: 'Pokémon değiştiriyor', power: 0, priority: 1000, damage_class: 'status' } : pokeState.p2.moves[action2.moveIdx];
@@ -1254,11 +1309,12 @@ POKEMONS.fairy.push(
                  // Both survived, next turn!
                 pokeState.actionP1 = null;
                 pokeState.actionP2 = null;
+                pokeState.round = normalizedRound + 1;
+                pokeState.executingRound = null;
+                pokeState.lastBroadcastRound = null;
                 customRenderBattleArena();
                 const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-                if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
-                   setTimeout(botPlay, 500);
-                }
+                if (isHostFallback) runPokeBots();
              }
           });
        });
@@ -1293,37 +1349,43 @@ POKEMONS.fairy.push(
       document.getElementById('poke-spectator-msg').style.display = 'block';
     }
     window.pokeAnimPlaying = false;
+    pokeState.executingRound = null;
+    pokeState.lastBroadcastRound = null;
     pokeState.status = 'game_over';
   };
 
-    const botPlay = () => {
-       if (pokeState.status !== 'revealed' || pokeState.actionP2 !== null) return;
-       if (pokeState.requiresSwitch2) {
-         const choices = availableSwitches('p2');
+    const botPlay = (botSlot = 'p2') => {
+       const opponentSlot = botSlot === 'p1' ? 'p2' : 'p1';
+       const actionKey = 'action' + botSlot.toUpperCase();
+       const bot = pokeState[botSlot];
+       const opponent = pokeState[opponentSlot];
+       if (pokeState.status !== 'revealed' || !bot || !opponent || !isPokeBotId(bot.id) || pokeState[actionKey] !== null) return;
+       if (pokeState['requiresSwitch' + botSlot.slice(1).toUpperCase()]) {
+         const choices = availableSwitches(botSlot);
          if (choices.length) {
-           const targetIndex = getBestBotIndex(getTeam('p2'), pokeState.p1, getActiveIndex('p2'));
+           const targetIndex = getBestBotIndex(getTeam(botSlot), opponent, getActiveIndex(botSlot));
            const choice = choices.find(item => item.index === targetIndex) || choices[0];
-           broadcastPokeMsg({ type: 'poke_action_select', id: 'BOT', switchTo: choice.index });
+           broadcastPokeMsg({ type: 'poke_action_select', id: bot.id, switchTo: choice.index, round: pokeState.round });
          }
          return;
        }
 
        // Taktiksel geçiş yalnızca yeni turun başında yapılır. Böylece bot,
        // oyuncunun saldırısı çözülürken tepki verip Pokémon değiştiremez.
-       const activeBot = pokeState.p2;
-       const botChoices = availableSwitches('p2');
-       if (activeBot && botChoices.length && activeBot.maxHp > 0) {
-         const hpRatio = activeBot.hp / activeBot.maxHp;
-         const bestIndex = getBestBotIndex(getTeam('p2'), pokeState.p1, getActiveIndex('p2'));
-         const currentScore = getBotFighterScore(activeBot, pokeState.p1);
-         const bestScore = bestIndex >= 0 ? getBotFighterScore(getTeam('p2')[bestIndex], pokeState.p1) : -Infinity;
+       const botChoices = availableSwitches(botSlot);
+       if (botChoices.length && bot.maxHp > 0) {
+         const hpRatio = bot.hp / bot.maxHp;
+         const bestIndex = getBestBotIndex(getTeam(botSlot), opponent, getActiveIndex(botSlot));
+         const currentScore = getBotFighterScore(bot, opponent);
+         const bestScore = bestIndex >= 0 ? getBotFighterScore(getTeam(botSlot)[bestIndex], opponent) : -Infinity;
          if (hpRatio <= 0.35 && bestIndex >= 0 && bestScore > currentScore * 1.12) {
-           broadcastPokeMsg({ type: 'poke_action_select', id: 'BOT', switchTo: bestIndex });
+           broadcastPokeMsg({ type: 'poke_action_select', id: bot.id, switchTo: bestIndex, round: pokeState.round });
            return;
          }
        }
        
-       const myMoves = pokeState.p2.moves;
+       const myMoves = bot.moves || [];
+       if (!myMoves.length) return;
        let bestMoveIdx = 0;
        let bestScore = -1000;
        
@@ -1332,7 +1394,7 @@ POKEMONS.fairy.push(
           let score = 0;
           
           if (move.power > 0) {
-              const estimatedDamage = calculatePokeDamage(pokeState.p2, pokeState.p1, move, 1);
+               const estimatedDamage = calculatePokeDamage(bot, opponent, move, 1);
               const parsedAccuracy = Number(move.accuracy);
               const accuracy = move.accuracy === null
                 || move.accuracy === undefined
@@ -1344,21 +1406,21 @@ POKEMONS.fairy.push(
               score += Math.random() * 10;
           } else if (move.damage_class === 'status') {
               if (move.isTransform) {
-                  score = pokeState.p2.transformed ? 20 : 135 + Math.random() * 20;
-              } else if (move.healing > 0) {
-                  const hpPct = pokeState.p2.hp / pokeState.p2.maxHp;
+                   score = bot.transformed ? 20 : 135 + Math.random() * 20;
+               } else if (move.healing > 0) {
+                   const hpPct = bot.hp / bot.maxHp;
                   if (hpPct < 0.4) score = 150 + Math.random() * 50; // Priority!
                   else if (hpPct < 0.7) score = 80 + Math.random() * 20;
                   else score = -100; // Do not heal if HP is high
               } else if (move.stat_changes && move.stat_changes.length > 0) {
                   const isBuff = move.target === 'user' || move.target === 'user-and-allies';
                   if (isBuff) {
-                      const currentAtkStage = pokeState.p2.atkStage || 0;
-                      const currentDefStage = pokeState.p2.defStage || 0;
+                       const currentAtkStage = bot.atkStage || 0;
+                       const currentDefStage = bot.defStage || 0;
                       if (currentAtkStage < 2 && currentDefStage < 2) score = 90 + Math.random() * 30;
                       else score = 10;
                   } else {
-                      const currentP1Atk = pokeState.p1.atkStage || 0;
+                       const currentP1Atk = opponent.atkStage || 0;
                       if (currentP1Atk > 0) score = 100 + Math.random() * 20;
                       else score = 70 + Math.random() * 30;
                   }
@@ -1371,21 +1433,40 @@ POKEMONS.fairy.push(
           }
        }
        
-       const botAction = { type: 'poke_action_select', id: 'BOT', moveIdx: bestMoveIdx };
+       const botAction = { type: 'poke_action_select', id: bot.id, moveIdx: bestMoveIdx, round: pokeState.round };
        if (myMoves[bestMoveIdx]?.isTransform) {
-          botAction.transformCopyMoveIdx = (pokeState.p1.moves || []).reduce((bestIdx, move, index, moves) => {
+          botAction.transformCopyMoveIdx = (opponent.moves || []).reduce((bestIdx, move, index, moves) => {
              return (move.power || 0) > (moves[bestIdx]?.power || 0) ? index : bestIdx;
           }, 0);
           botAction.transformReplaceMoveIdx = bestMoveIdx;
        }
        broadcastPokeMsg(botAction);
-    };
+     };
+
+     const runPokeBots = () => {
+       ['p1', 'p2'].filter(slot => isPokeBotId(pokeState[slot]?.id))
+         .forEach(slot => setTimeout(() => botPlay(slot), 500));
+     };
+
+     const startPokeBotBaseSelections = () => {
+       if (!isPokeHost()) return;
+       ['p1', 'p2'].filter(slot => isPokeBotId(pokeState[slot]?.id) && !(pokeState[slot].teamDraft || []).length).forEach(slot => {
+         const botId = pokeState[slot].id;
+         setTimeout(() => {
+           const count = getBattleSize();
+           const families = [...window.POKEMON_FAMILIES].sort(() => Math.random() - .5).slice(0, count);
+           families.forEach((family, index) => broadcastPokeMsg({ type: 'poke_action_base_select', id: botId, baseName: family.baseName, typeStr: family.type, types: getFamilyTypes(family), teamIndex: index }));
+           if (count > 1) setTimeout(() => broadcastPokeMsg({ type: 'poke_team_bases_ready', id: botId }), 350);
+         }, 300);
+       });
+     };
 
     const submitPokeBattleAction = (slot, action) => {
-      if (slot === 'p1') pokeState.actionP1 = action;
-      else pokeState.actionP2 = action;
+      const roundAction = withPokeRound(action);
+      if (slot === 'p1') pokeState.actionP1 = roundAction;
+      else pokeState.actionP2 = roundAction;
       customRenderBattleArena();
-      broadcastPokeMsg(action);
+      broadcastPokeMsg(roundAction);
     };
 
     const openTransformSelection = (slot, transformMoveIdx) => {
@@ -1938,6 +2019,9 @@ POKEMONS.fairy.push(
          : false;
        const opponentAction = opponentSlot ? pokeState['action' + opponentSlot.toUpperCase()] : null;
        const waitingForOpponentSwitch = !forcedSwitch && Boolean(opponentRequiresSwitch || isPokeSwitchAction(opponentAction));
+       const myAction = mySlot ? pokeState['action' + mySlot.toUpperCase()] : null;
+       const waitingForOpponentAction = Boolean(myAction && !opponentAction);
+       const opponentHasAction = Boolean(opponentAction && !myAction);
        const switchToggle = document.getElementById('poke-switch-toggle');
        if (switchPanel && switchList && mySlot) {
          const choices = availableSwitches(mySlot);
@@ -1977,7 +2061,7 @@ POKEMONS.fairy.push(
            button.append(image, info);
            button.onclick = () => {
              if (window.pokeAnimPlaying || waitingForOpponentSwitch || pokeState['action' + mySlot.toUpperCase()]) return;
-             const action = { type: 'poke_action_select', id: state.myId, switchTo: index };
+             const action = { type: 'poke_action_select', id: state.myId, switchTo: index, round: pokeState.round };
              if (mySlot === 'p1') pokeState.actionP1 = action; else pokeState.actionP2 = action;
              customRenderBattleArena();
              broadcastPokeMsg(action);
@@ -1993,8 +2077,14 @@ POKEMONS.fairy.push(
          document.getElementById('poke-moves-grid').classList.add('hidden');
        } else if (waitingForOpponentSwitch) {
          document.getElementById('poke-action-title').textContent = 'Rakip Pokémonunu değiştiriyor';
-         document.getElementById('poke-moves-grid').classList.add('hidden');
-       } else {
+          document.getElementById('poke-moves-grid').classList.add('hidden');
+        } else if (waitingForOpponentAction) {
+          document.getElementById('poke-action-title').textContent = 'Hamlen gönderildi - Rakip bekleniyor';
+          document.getElementById('poke-moves-grid').classList.add('hidden');
+        } else if (opponentHasAction) {
+          document.getElementById('poke-action-title').textContent = 'Rakip hamlesini seçti - Sıra sende';
+          document.getElementById('poke-moves-grid').classList.remove('hidden');
+        } else {
          document.getElementById('poke-action-title').textContent = 'Saldırı seç';
          document.getElementById('poke-moves-grid').classList.remove('hidden');
        }
@@ -2034,9 +2124,13 @@ POKEMONS.fairy.push(
       } else {
         document.getElementById('poke-selection-panel').classList.add('hidden');
         if (!window.pokeAnimPlaying) {
-          if (waitingForOpponentSwitch) {
-            logBox.textContent = 'Rakip yeni Pokémonunu sahaya gönderiyor...';
-          } else {
+           if (waitingForOpponentSwitch) {
+             logBox.textContent = 'Rakip yeni Pokémonunu sahaya gönderiyor...';
+           } else if (waitingForOpponentAction) {
+             logBox.textContent = 'Hamlen gönderildi. Rakibin hamlesi bekleniyor...';
+           } else if (opponentHasAction) {
+             logBox.textContent = 'Rakip hamlesini seçti. Sıra sende!';
+           } else {
             let waitingFor = [];
             if (!pokeState.actionP1 && pokeState.p1) waitingFor.push(pokeState.p1.name);
             if (!pokeState.actionP2 && pokeState.p2) waitingFor.push(pokeState.p2.name);
@@ -2148,15 +2242,45 @@ POKEMONS.fairy.push(
       }
     }
     if (data.type === 'poke_join') {
+      if (pokeState.status !== 'waiting' || ![1, 2].includes(Number(data.slot))) return;
+      const slot = `p${Number(data.slot)}`;
+      const current = pokeState[slot];
+      if (current && current.id !== data.id) {
+        if (data.requestedBy === state.myId) {
+          showPokeLobbyToast(isPokeBotId(data.id)
+            ? 'Bu tarafta bir oyuncu var. Bot eklenemedi.'
+            : 'Bu tarafta bir oyuncu var. Katılım reddedildi.');
+        }
+        return;
+      }
+      if (!isPokeBotId(data.id)) {
+        const otherSlot = slot === 'p1' ? 'p2' : 'p1';
+        if (pokeState[otherSlot]?.id === data.id) {
+          if (data.requestedBy === state.myId) showPokeLobbyToast('Zaten bir slota katıldınız!');
+          return;
+        }
+      }
       const pData = { id: data.id, name: data.name, avatar: data.avatar, ready: false, type: null, types: [], pokemon: null, hp: 0, maxHp: 0, moves: [], atkStage: 0, defStage: 0, spdStage: 0, transformed: false, team: [] };
-      if (data.slot === 1) pokeState.p1 = pData;
-      else if (data.slot === 2) pokeState.p2 = pData;
+      pokeState[slot] = pData;
+      renderPokeLobby();
+    }
+    if (data.type === 'poke_leave') {
+      if (pokeState.status !== 'waiting' || ![1, 2].includes(Number(data.slot))) return;
+      const slot = `p${Number(data.slot)}`;
+      const current = pokeState[slot];
+      if (!current || !isPokeBotId(current.id) || (data.id && data.id !== current.id)) return;
+      pokeState[slot] = null;
       renderPokeLobby();
     }
      if (data.type === 'poke_lobby') {
         pokeState.status = 'waiting';
         pokeState.openingReveal = false;
         pokeState.rulesLocked = false;
+        pokeState.round = 0;
+        pokeState.executingRound = null;
+        pokeState.lastBroadcastRound = null;
+        pokeState.actionP1 = null;
+        pokeState.actionP2 = null;
         pokeState.activeIndex1 = 0; pokeState.activeIndex2 = 0;
         pokeState.team1 = []; pokeState.team2 = [];
        if(pokeState.p1) { pokeState.p1.pokemon = null; /*pokeState.p1.hp = 100;*/ }
@@ -2176,6 +2300,11 @@ POKEMONS.fairy.push(
       pokeState.rulesLocked = true;
       pokeState.status = 'selecting';
       pokeState.openingReveal = false;
+      pokeState.round = 0;
+      pokeState.executingRound = null;
+      pokeState.lastBroadcastRound = null;
+      pokeState.actionP1 = null;
+      pokeState.actionP2 = null;
       pokeState.activeIndex1 = 0; pokeState.activeIndex2 = 0;
       if (pokeState.p1) { pokeState.p1.ready = false; pokeState.p1.team = []; pokeState.p1.atkStage = 0; pokeState.p1.defStage = 0; pokeState.p1.spdStage = 0; pokeState.p1.transformed = false; pokeState.p1.originalForm = null; }
       if (pokeState.p2) { pokeState.p2.ready = false; pokeState.p2.team = []; pokeState.p2.atkStage = 0; pokeState.p2.defStage = 0; pokeState.p2.spdStage = 0; pokeState.p2.transformed = false; pokeState.p2.originalForm = null; }
@@ -2183,8 +2312,8 @@ POKEMONS.fairy.push(
       document.getElementById('poke-lobby-view').classList.add('hidden');
       customRenderBattleArena();
 
-      // ONLY player 1 computes random logic to prevent conflicts
-      if (pokeState.p1 && pokeState.p1.id === state.myId) {
+      // The lobby host computes random teams once, even when slot 1 is a bot.
+      if (isPokeHost()) {
          const isRandom = data.randomMoves;
          const generateGame = async () => {
              if (isRandom) {
@@ -2262,16 +2391,7 @@ POKEMONS.fairy.push(
           document.getElementById('poke-base-selection-modal').classList.add('hidden');
        }
 
-        // Bot logic for base selection
-        const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-        if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
-           setTimeout(() => {
-              const count = getBattleSize();
-              const families = [...window.POKEMON_FAMILIES].sort(() => Math.random() - .5).slice(0, count);
-              families.forEach((rFam, index) => broadcastPokeMsg({ type: 'poke_action_base_select', id: 'BOT', baseName: rFam.baseName, typeStr: rFam.type, types: getFamilyTypes(rFam), teamIndex: index }));
-              if (count > 1) setTimeout(() => broadcastPokeMsg({ type: 'poke_team_bases_ready', id: 'BOT' }), 350);
-           }, 300);
-        }
+        startPokeBotBaseSelections();
     }
 
     
@@ -2391,16 +2511,17 @@ POKEMONS.fairy.push(
           });
        }
 
-       // Bot logic for evo selection
-       if (data.id === 'BOT') {
-          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-          if (isHostFallback) {
-             setTimeout(() => {
-                const fam = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
-                const rEvo = fam.evolutions[Math.floor(Math.random() * fam.evolutions.length)];
-                broadcastPokeMsg({
-                  type: 'poke_action_evo_select',
-                  id: 'BOT',
+        // Bot logic for evo selection
+        if (isPokeBotId(data.id)) {
+           const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
+           if (isHostFallback) {
+              setTimeout(() => {
+                 const fam = window.POKEMON_FAMILIES.find(f => f.baseName === data.baseName);
+                 if (!fam) return;
+                 const rEvo = fam.evolutions[Math.floor(Math.random() * fam.evolutions.length)];
+                 broadcastPokeMsg({
+                   type: 'poke_action_evo_select',
+                   id: data.id,
                   evoName: rEvo.name,
                   evoUrl: rEvo.url,
                   apiName: rEvo.apiName,
@@ -2421,11 +2542,15 @@ POKEMONS.fairy.push(
         pokeState.status = 'evolution_selection';
         const localSlot = getLocalPokeSlot();
         if (localSlot) showEvolutionForTeamIndex(localSlot, 0);
-        if (isPokeHost() && pokeState.p2?.id === 'BOT') {
-          const draft = pokeState.p2.teamDraft[0];
-          const fam = window.POKEMON_FAMILIES.find(item => item.baseName === draft.baseName);
-          const evo = fam.evolutions[Math.floor(Math.random() * fam.evolutions.length)];
-          broadcastPokeMsg({ type: 'poke_action_evo_select', id: 'BOT', teamIndex: 0, evoName: evo.name, evoUrl: evo.url, apiName: evo.apiName, typeStr: evo.type, types: getFamilyTypes(evo) });
+        if (isPokeHost()) {
+          ['p1', 'p2'].filter(botSlot => isPokeBotId(pokeState[botSlot]?.id)).forEach(botSlot => {
+            const draft = pokeState[botSlot].teamDraft?.[0];
+            if (!draft || draft.evoReady) return;
+            const fam = window.POKEMON_FAMILIES.find(item => item.baseName === draft.baseName);
+            if (!fam) return;
+            const evo = fam.evolutions[Math.floor(Math.random() * fam.evolutions.length)];
+            broadcastPokeMsg({ type: 'poke_action_evo_select', id: pokeState[botSlot].id, teamIndex: 0, evoName: evo.name, evoUrl: evo.url, apiName: evo.apiName, typeStr: evo.type, types: getFamilyTypes(evo) });
+          });
         }
       }
     }
@@ -2447,10 +2572,10 @@ POKEMONS.fairy.push(
             document.getElementById('poke-waiting-moves-msg').style.display = 'none';
             document.getElementById('poke-move-selection-pokename').textContent = draft.evoName;
             renderMoveSelection(result.moves, result.stats.speed);
-          } else if (data.id === 'BOT' && isPokeHost()) {
+          } else if (isPokeBotId(data.id) && isPokeHost()) {
             const result = await fetchPokemonStatsAndMoves(draft.apiName, draft.type, true);
             const moves = result.moves.sort(() => .5 - Math.random()).slice(0, 4);
-            broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', teamIndex: index, moves, stats: result.stats, height: result.height, types: result.types });
+            broadcastPokeMsg({ type: 'poke_moves_ready', id: data.id, teamIndex: index, moves, stats: result.stats, height: result.height, types: result.types });
           }
           return;
        }
@@ -2490,15 +2615,18 @@ POKEMONS.fairy.push(
           });
        }
 
-       // Bot logic for move selection
-       if (data.id === 'BOT') {
-          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-          if (isHostFallback) {
-             setTimeout(() => {
-                fetchPokemonStatsAndMoves(pokeState.p2.apiName || pokeState.p2.evoName || pokeState.p2.baseName, pokeState.p2.type, true).then(res => {
-                   const bMoves = res.moves.sort(() => 0.5 - Math.random()).slice(0, 4);
-                   broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves, stats: res.stats, height: res.height, types: res.types });
-                });
+        // Bot logic for move selection
+        if (isPokeBotId(data.id)) {
+           const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
+           if (isHostFallback) {
+              const botSlot = getPokeBotSlot(data.id);
+              const botState = botSlot ? pokeState[botSlot] : null;
+              if (!botState) return;
+              setTimeout(() => {
+                 fetchPokemonStatsAndMoves(botState.apiName || botState.evoName || botState.baseName, botState.type, true).then(res => {
+                    const bMoves = res.moves.sort(() => 0.5 - Math.random()).slice(0, 4);
+                    broadcastPokeMsg({ type: 'poke_moves_ready', id: data.id, moves: bMoves, stats: res.stats, height: res.height, types: res.types });
+                 });
              }, 300);
           }
        }
@@ -2537,13 +2665,13 @@ POKEMONS.fairy.push(
        
        // Handle bot
        const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-       if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') {
-          // auto pick 4 moves for bot
-          const bMoves = data.p2.movePool.sort(() => 0.5 - Math.random()).slice(0, 4);
-          setTimeout(() => {
-             broadcastPokeMsg({ type: 'poke_moves_ready', id: 'BOT', moves: bMoves });
-          }, 300);
-       }
+        if (isHostFallback) {
+          ['p1', 'p2'].filter(botSlot => isPokeBotId(pokeState[botSlot]?.id)).forEach(botSlot => {
+            const botData = botSlot === 'p1' ? data.p1 : data.p2;
+            const bMoves = (botData?.movePool || []).sort(() => 0.5 - Math.random()).slice(0, 4);
+            setTimeout(() => broadcastPokeMsg({ type: 'poke_moves_ready', id: pokeState[botSlot].id, moves: bMoves }), 300);
+          });
+        }
     }
     
         if (data.type === 'poke_moves_ready') {
@@ -2559,11 +2687,11 @@ POKEMONS.fairy.push(
          const nextIndex = pokeState[slot].teamDraft.findIndex(item => !item.movesReady);
          if (nextIndex >= 0) {
            if (data.id === state.myId) showEvolutionForTeamIndex(slot, nextIndex);
-           if (data.id === 'BOT' && isPokeHost()) {
+           if (isPokeBotId(data.id) && isPokeHost()) {
              const nextDraft = pokeState[slot].teamDraft[nextIndex];
              const fam = window.POKEMON_FAMILIES.find(item => item.baseName === nextDraft.baseName);
              const evo = fam.evolutions[Math.floor(Math.random() * fam.evolutions.length)];
-             broadcastPokeMsg({ type: 'poke_action_evo_select', id: 'BOT', teamIndex: nextIndex, evoName: evo.name, evoUrl: evo.url, apiName: evo.apiName, typeStr: evo.type, types: getFamilyTypes(evo) });
+             broadcastPokeMsg({ type: 'poke_action_evo_select', id: data.id, teamIndex: nextIndex, evoName: evo.name, evoUrl: evo.url, apiName: evo.apiName, typeStr: evo.type, types: getFamilyTypes(evo) });
            }
          } else {
            pokeState[slot].teamReady = true;
@@ -2626,7 +2754,7 @@ POKEMONS.fairy.push(
     }
     
     if (data.type === 'poke_mercy_request') {
-        if (data.id !== state.myId && data.id !== 'BOT') {
+        if (data.id !== state.myId && !isPokeBotId(data.id)) {
             // Rakip pes etti, bize affet/reddet çıktı
             document.getElementById('poke-surrender-btn').classList.add('hidden');
             document.getElementById('poke-mercy-actions').classList.remove('hidden');
@@ -2641,9 +2769,11 @@ POKEMONS.fairy.push(
             btn.style.opacity = '0.5';
             
             // Eğer rakip BOT ise, otomatik olarak kabul etsin
-            if (pokeState.p2 && pokeState.p2.id === 'BOT' && pokeState.p1 && pokeState.p1.id === state.myId) {
+            const localSlot = getLocalPokeSlot();
+            const opponentSlot = localSlot === 'p1' ? 'p2' : localSlot === 'p2' ? 'p1' : null;
+            if (opponentSlot && isPokeBotId(pokeState[opponentSlot]?.id)) {
                  setTimeout(() => {
-                      broadcastPokeMsg({ type: 'poke_mercy_accept', id: 'BOT' });
+                      broadcastPokeMsg({ type: 'poke_mercy_accept', id: pokeState[opponentSlot].id });
                  }, 1500);
             }
         }
@@ -2703,7 +2833,10 @@ POKEMONS.fairy.push(
       pokeState.openingReveal = true;
       document.getElementById('poke-move-selection-modal')?.classList.add('hidden');
       pokeState.actionP1 = null;
-        pokeState.actionP2 = null;
+      pokeState.actionP2 = null;
+      pokeState.round = 0;
+      pokeState.executingRound = null;
+      pokeState.lastBroadcastRound = null;
       pokeState.team1 = Array.isArray(data.team1) && data.team1.length ? data.team1 : [data.p1];
       pokeState.team2 = Array.isArray(data.team2) && data.team2.length ? data.team2 : [data.p2];
       pokeState.team1.forEach(fighter => { fighter.id = pokeState.p1?.id; fighter.name = pokeState.p1?.name; fighter.avatar = pokeState.p1?.avatar; });
@@ -2775,12 +2908,16 @@ POKEMONS.fairy.push(
         if (pokeState.status !== 'revealed' || !pokeState.openingReveal) return;
         pokeState.openingReveal = false;
         customRenderBattleArena();
-        if (isHostFallback && pokeState.p2 && pokeState.p2.id === 'BOT') setTimeout(botPlay, 500);
+        if (isHostFallback) runPokeBots();
       }, 1500);
     }
 
     if (data.type === 'poke_action_select') {
          if (pokeState.status !== 'revealed') return;
+         const incomingRound = getPokeRound(data.round);
+         if (incomingRound !== null && incomingRound !== pokeState.round) return;
+         if (pokeState.executingRound === pokeState.round) return;
+         const action = withPokeRound(data);
          const slot = pokeState.p1 && pokeState.p1.id === data.id
            ? 'p1'
            : pokeState.p2 && pokeState.p2.id === data.id
@@ -2793,9 +2930,9 @@ POKEMONS.fairy.push(
          const opponentRequiresSwitch = Boolean(
            pokeState['requiresSwitch' + opponentSlot.slice(1).toUpperCase()]
          );
-         if (opponentRequiresSwitch && !isPokeSwitchAction(data)) return;
-         if (pokeState[requiresSwitchKey] && isPokeSwitchAction(data)) {
-           const targetIndex = Number(data.switchTo);
+         if (opponentRequiresSwitch && !isPokeSwitchAction(action)) return;
+         if (pokeState[requiresSwitchKey] && isPokeSwitchAction(action)) {
+           const targetIndex = Number(action.switchTo);
            if (!availableSwitches(slot).some(item => item.index === targetIndex)) return;
            setActivePokemon(slot, targetIndex);
            pokeState[requiresSwitchKey] = false;
@@ -2803,13 +2940,21 @@ POKEMONS.fairy.push(
            customRenderBattleArena();
            return;
          }
-         pokeState[actionKey] = data;
+         pokeState[actionKey] = action;
          customRenderBattleArena();
          
          const isHostFallback = state.isLobbyHost || (pokeState.p1 && pokeState.p1.id === state.myId);
-         if (pokeState.actionP1 && pokeState.actionP2 && isHostFallback) {
+         if (
+           pokeState.actionP1
+           && pokeState.actionP2
+           && isHostFallback
+           && pokeState.lastBroadcastRound !== pokeState.round
+           && pokeState.executingRound !== pokeState.round
+         ) {
+            pokeState.lastBroadcastRound = pokeState.round;
             broadcastPokeMsg({
                 type: 'poke_round_execute',
+                round: pokeState.round,
                 actionP1: pokeState.actionP1,
                 actionP2: pokeState.actionP2
             });
@@ -2818,9 +2963,12 @@ POKEMONS.fairy.push(
       
       if (data.type === 'poke_round_execute') {
          if (pokeState.status !== 'revealed') return;
-         pokeState.actionP1 = data.actionP1;
-         pokeState.actionP2 = data.actionP2;
-         executeRound(data.actionP1, data.actionP2);
+         const roundId = getPokeRound(data.round);
+         if (roundId === null || roundId !== pokeState.round || pokeState.executingRound === roundId) return;
+         if (!data.actionP1 || !data.actionP2) return;
+         pokeState.actionP1 = withPokeRound(data.actionP1);
+         pokeState.actionP2 = withPokeRound(data.actionP2);
+         executeRound(pokeState.actionP1, pokeState.actionP2, roundId);
       }
 
 

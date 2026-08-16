@@ -1,16 +1,16 @@
 # Graph Report - TeamSync  (2026-08-17)
 
 ## Corpus Check
-- 114 files · ~667,039 words
+- 114 files · ~667,873 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1338 nodes · 3023 edges · 95 communities (74 shown, 21 thin omitted)
+- 1338 nodes · 3023 edges · 94 communities (72 shown, 22 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 85 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `51ddaaaa`
+- Built from commit: `0061dbde`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -101,7 +101,6 @@
 - deviceLogin
 - disconnectApp
 - seed_machine_draft.py
-- founder-rnnoise-toggle.test.js
 - shortcuts-settings.test.js
 - i18n-coverage.test.js
 - TeamSync localization terminology
@@ -140,7 +139,7 @@
 - **Create-Room premium options (RNNoise, SFW AI, Game Mode, Relay, Bitrate) configured together at room creation** — index_step_create_form, index_rnnoise_toggle_option, index_sfw_toggle_option, index_game_mode_toggle_option, index_relay_toggle_option, index_bitrate_select [EXTRACTED 0.90]
 - **TeamSync release pipeline: version bump in index/docs marketing pages triggers GitHub Actions build published to GitHub Releases** — github_workflows_release_release_workflow, docs_index_github_releases_link, index_teamsync_login_flow [INFERRED 0.65]
 
-## Communities (95 total, 21 thin omitted)
+## Communities (94 total, 22 thin omitted)
 
 ### Community 0 - "UNO Card Game"
 Cohesion: 0.12
@@ -193,8 +192,16 @@ Nodes (4): assert, fs, path, {
 }
 
 ### Community 11 - "E2E Test Harness"
-Cohesion: 0.14
-Nodes (17): APP_DIR, clickWhenReady(), ELECTRON_BIN, fs, joinRoom(), os, path, setValueWhenReady() (+9 more)
+Cohesion: 0.12
+Nodes (23): assert, audioState(), setPersonalToggle(), {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  joinRoom,
+  waitForPeerConnected,
+  evalJS,
+  waitFor,
+}, { spawnPeer, cleanupPeer, waitFor, evalJS, createRoom }, clickWhenReady(), createRoom(), joinRoom() (+15 more)
 
 ### Community 12 - "E2E Test: Scroll/Download"
 Cohesion: 0.15
@@ -241,13 +248,18 @@ Cohesion: 0.30
 Nodes (4): { app }, fs, path, YapayDenetleyici
 
 ### Community 23 - "Device Auth & Session"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (15): { spawnPeer, cleanupPeer, waitFor }, assert, {
   spawnPeer,
   cleanupPeer,
   evalJS,
   waitFor,
-}, assert, { spawnPeer, cleanupPeer, evalJS }, cleanupPeer(), assert, { spawnPeer, cleanupPeer, evalJS } (+7 more)
+}, cleanupPeer(), assert, fs, path, {
+  spawnPeer,
+  cleanupPeer,
+  evalJS,
+  waitFor,
+} (+7 more)
 
 ### Community 24 - "NPM Scripts"
 Cohesion: 0.12
@@ -276,13 +288,8 @@ Nodes (5): assert, fs, inspectWheel(), path, {
 }
 
 ### Community 29 - "E2E Test: Quick Poll"
-Cohesion: 0.29
-Nodes (5): assert, fs, inspectPoll(), path, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
-}
+Cohesion: 0.25
+Nodes (5): assert, fs, os, path, { spawnPeer, cleanupPeer, createRoom, evalJS, waitFor }
 
 ### Community 30 - "E2E Test: Focus Minimize"
 Cohesion: 0.33
@@ -391,16 +398,8 @@ Cohesion: 0.06
 Nodes (87): initLuckyWheel(), addBot(), addBotMemory(), addLobbyChatMessage(), addressedMessageFor(), afterNight(), analyzeChatClaim(), applyBotReward() (+79 more)
 
 ### Community 69 - "Poke Feature Init"
-Cohesion: 0.11
-Nodes (21): initPoke(), assert, audioState(), setPersonalToggle(), {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  joinRoom,
-  waitForPeerConnected,
-  evalJS,
-  waitFor,
-}, evalJS(), assert, installMockOllama() (+13 more)
+Cohesion: 0.10
+Nodes (22): initPoke(), evalJS(), armNavCounter(), assert, http, navigateVia(), { spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected, evalJS, waitFor }, assert (+14 more)
 
 ### Community 70 - "Supabase Client Dependency"
 Cohesion: 0.29
@@ -420,14 +419,8 @@ Cohesion: 0.54
 Nodes (7): apply(), applyStored(), bindHandle(), clamp(), init(), limitFor(), stored()
 
 ### Community 81 - "settings-language.test.js"
-Cohesion: 0.16
-Nodes (14): { spawnPeer, cleanupPeer, waitFor, evalJS, createRoom }, createRoom(), waitFor(), assert, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
-  waitFor,
-}, fs, inspectFamily(), path (+6 more)
+Cohesion: 0.11
+Nodes (14): assert, { spawnPeer, cleanupPeer, evalJS }, APP_DIR, ELECTRON_BIN, fs, os, path, { spawn } (+6 more)
 
 ### Community 82 - "TeamSync localization terminology"
 Cohesion: 0.25
@@ -455,22 +448,9 @@ Nodes (4): assert, fs, path, {
 Cohesion: 0.27
 Nodes (13): checkSession(), deleteDeviceAccount(), deviceLogin(), getActiveSlot(), getDeviceAccounts(), loadSupabaseProfile(), loginWithProfileData(), renderDeviceAccounts() (+5 more)
 
-### Community 88 - "disconnectApp"
-Cohesion: 0.25
-Nodes (5): armNavCounter(), assert, http, navigateVia(), { spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected, evalJS, waitFor }
-
 ### Community 89 - "seed_machine_draft.py"
 Cohesion: 0.60
 Nodes (4): load(), Generate review-required locale drafts; never use this at application runtime., run(), save()
-
-### Community 90 - "founder-rnnoise-toggle.test.js"
-Cohesion: 0.40
-Nodes (4): assert, fs, path, {
-  spawnPeer,
-  cleanupPeer,
-  evalJS,
-  waitFor,
-}
 
 ### Community 91 - "shortcuts-settings.test.js"
 Cohesion: 0.50
@@ -491,7 +471,7 @@ Nodes (4): assert, fs, path, { spawnPeer, cleanupPeer, evalJS, waitFor }
 ## Knowledge Gaps
 - **357 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+352 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_

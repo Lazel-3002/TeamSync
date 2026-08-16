@@ -10815,8 +10815,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_founder_rnnoise_toggle_test",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "founder-rnnoise-toggle.test.js"
     },
     {
@@ -10826,8 +10826,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "test_e2e_founder_rnnoise_toggle_test_assert",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "assert"
     },
     {
@@ -10837,8 +10837,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "test_e2e_founder_rnnoise_toggle_test_spawnpeer_cleanuppeer_createroom_joinroom_waitforpeerconnected_evaljs_waitfor",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "{\n  spawnpeer,\n  cleanuppeer,\n  createroom,\n  joinroom,\n  waitforpeerconnected,\n  evaljs,\n  waitfor,\n}"
     },
     {
@@ -10848,8 +10848,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "test_e2e_founder_rnnoise_toggle_test_audiostate",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "audiostate()"
     },
     {
@@ -10859,8 +10859,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "test_e2e_founder_rnnoise_toggle_test_setpersonaltoggle",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "setpersonaltoggle()"
     },
     {
@@ -10969,8 +10969,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_i18n_coverage_test",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "i18n-coverage.test.js"
     },
     {
@@ -10980,8 +10980,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_i18n_coverage_test_assert",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "assert"
     },
     {
@@ -10991,8 +10991,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_i18n_coverage_test_spawnpeer_cleanuppeer_evaljs",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "{ spawnpeer, cleanuppeer, evaljs }"
     },
     {
@@ -11002,8 +11002,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_join_request_test",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "join-request.test.js"
     },
     {
@@ -11013,8 +11013,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "test_e2e_join_request_test_spawnpeer_cleanuppeer_waitfor_evaljs_createroom",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "{ spawnpeer, cleanuppeer, waitfor, evaljs, createroom }"
     },
     {
@@ -11024,8 +11024,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_lib_harness",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "harness.js"
     },
     {
@@ -11035,8 +11035,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_spawn",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "{ spawn }"
     },
     {
@@ -11046,8 +11046,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_path",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "path"
     },
     {
@@ -11057,8 +11057,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_fs",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "fs"
     },
     {
@@ -11068,8 +11068,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_os",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "os"
     },
     {
@@ -11079,8 +11079,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_app_dir",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "app_dir"
     },
     {
@@ -11090,8 +11090,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_electron_bin",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "electron_bin"
     },
     {
@@ -11145,8 +11145,8 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_waitfor",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "waitfor()"
     },
     {
@@ -11200,8 +11200,8 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_createroom",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "createroom()"
     },
     {
@@ -11365,8 +11365,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_media_library_test",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "media-library.test.js"
     },
     {
@@ -11376,8 +11376,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_assert",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "assert"
     },
     {
@@ -11387,8 +11387,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_fs",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "fs"
     },
     {
@@ -11398,8 +11398,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_path",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "path"
     },
     {
@@ -11409,8 +11409,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_spawnpeer_cleanuppeer_evaljs_waitfor",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "{\r\n  spawnpeer,\r\n  cleanuppeer,\r\n  evaljs,\r\n  waitfor,\r\n}"
     },
     {
@@ -11486,8 +11486,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "pokemon-evolution-forms.test.js"
     },
     {
@@ -11497,8 +11497,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_fs",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "fs"
     },
     {
@@ -11508,8 +11508,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_path",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "path"
     },
     {
@@ -11519,8 +11519,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "{\r\n  spawnpeer,\r\n  cleanuppeer,\r\n  createroom,\r\n  evaljs,\r\n  waitfor,\r\n}"
     },
     {
@@ -11530,8 +11530,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_inspectfamily",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "inspectfamily()"
     },
     {
@@ -11541,8 +11541,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_run",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "run()"
     },
     {
@@ -11607,8 +11607,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_team_battle_test",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 88,
+      "community_name": "disconnectApp",
       "norm_label": "pokemon-team-battle.test.js"
     },
     {
@@ -11618,8 +11618,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_team_battle_test_assert",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 88,
+      "community_name": "disconnectApp",
       "norm_label": "assert"
     },
     {
@@ -11629,8 +11629,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_pokemon_team_battle_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
-      "community": 81,
-      "community_name": "settings-language.test.js",
+      "community": 88,
+      "community_name": "disconnectApp",
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, evaljs, waitfor }"
     },
     {
@@ -11640,8 +11640,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_quick_poll_redesign_test",
-      "community": 29,
-      "community_name": "E2E Test: Quick Poll",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "quick-poll-redesign.test.js"
     },
     {
@@ -11651,8 +11651,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_quick_poll_redesign_test_assert",
-      "community": 29,
-      "community_name": "E2E Test: Quick Poll",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "assert"
     },
     {
@@ -11662,8 +11662,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_quick_poll_redesign_test_fs",
-      "community": 29,
-      "community_name": "E2E Test: Quick Poll",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "fs"
     },
     {
@@ -11673,8 +11673,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "test_e2e_quick_poll_redesign_test_path",
-      "community": 29,
-      "community_name": "E2E Test: Quick Poll",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "path"
     },
     {
@@ -11684,8 +11684,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "test_e2e_quick_poll_redesign_test_spawnpeer_cleanuppeer_createroom_evaljs",
-      "community": 29,
-      "community_name": "E2E Test: Quick Poll",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "{\n  spawnpeer,\n  cleanuppeer,\n  createroom,\n  evaljs,\n}"
     },
     {
@@ -11695,8 +11695,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_quick_poll_redesign_test_inspectpoll",
-      "community": 29,
-      "community_name": "E2E Test: Quick Poll",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "inspectpoll()"
     },
     {
@@ -11706,8 +11706,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "test_e2e_quick_poll_redesign_test_screenshot",
-      "community": 29,
-      "community_name": "E2E Test: Quick Poll",
+      "community": 23,
+      "community_name": "Device Auth & Session",
       "norm_label": "screenshot()"
     },
     {
@@ -11981,8 +11981,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "shared-browser.test.js"
     },
     {
@@ -11992,8 +11992,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_assert",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "assert"
     },
     {
@@ -12003,8 +12003,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_http",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "http"
     },
     {
@@ -12014,8 +12014,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_spawnpeer_cleanuppeer_createroom_joinroom_waitforpeerconnected_evaljs_waitfor",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, joinroom, waitforpeerconnected, evaljs, waitfor }"
     },
     {
@@ -12025,8 +12025,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_startlocalsite",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "startlocalsite()"
     },
     {
@@ -12036,8 +12036,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_armnavcounter",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "armnavcounter()"
     },
     {
@@ -12047,8 +12047,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_navigatevia",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "navigatevia()"
     },
     {
@@ -12058,8 +12058,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_webviewurlexpr",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "webviewurlexpr()"
     },
     {
@@ -12113,8 +12113,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_turn_config_test",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "turn-config.test.js"
     },
     {
@@ -12124,8 +12124,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "test_e2e_turn_config_test_assert",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "assert"
     },
     {
@@ -12135,8 +12135,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_turn_config_test_spawnpeer_cleanuppeer_evaljs",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "{ spawnpeer, cleanuppeer, evaljs }"
     },
     {
@@ -12388,8 +12388,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "whiteboard.test.js"
     },
     {
@@ -12399,8 +12399,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test_assert",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "assert"
     },
     {
@@ -12410,8 +12410,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test_fs",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "fs"
     },
     {
@@ -12421,8 +12421,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test_os",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "os"
     },
     {
@@ -12432,8 +12432,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test_path",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "path"
     },
     {
@@ -12443,8 +12443,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, evaljs, waitfor }"
     },
     {
@@ -12454,8 +12454,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test_strokescript",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "strokescript()"
     },
     {
@@ -12465,8 +12465,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "test_e2e_whiteboard_test_screenshot",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 29,
+      "community_name": "E2E Test: Quick Poll",
       "norm_label": "screenshot()"
     },
     {
@@ -18180,7 +18180,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "js/poke.js",
-      "source_location": "L588",
+      "source_location": "L601",
       "weight": 1.0,
       "_origin": "ast",
       "source": "js_poke_initpoke",
@@ -18192,7 +18192,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "js/poke.js",
-      "source_location": "L1381",
+      "source_location": "L1404",
       "weight": 1.0,
       "_origin": "ast",
       "source": "js_poke_initpoke",
@@ -50062,5 +50062,5 @@
       "source_file": ".github/workflows/release.yml"
     }
   ],
-  "built_at_commit": "51ddaaaaff904c5e27f1c0996e032bc10ca8f400"
+  "built_at_commit": "0061dbdedfdc928b34ee05d3f2cbe8824982a448"
 }
