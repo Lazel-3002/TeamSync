@@ -5887,8 +5887,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "renderer_normalizefiltertext",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "normalizefiltertext()"
     },
     {
@@ -5920,8 +5920,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "renderer_issubsequence",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "issubsequence()"
     },
     {
@@ -5931,8 +5931,8 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "renderer_levenshteindistance",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "levenshteindistance()"
     },
     {
@@ -5942,8 +5942,8 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "renderer_isprofanetext",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "isprofanetext()"
     },
     {
@@ -5953,8 +5953,8 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "renderer_filterprojection",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "filterprojection()"
     },
     {
@@ -5964,8 +5964,8 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "renderer_maskcensoredsegment",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "maskcensoredsegment()"
     },
     {
@@ -5975,8 +5975,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "renderer_censorprofanetext",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "censorprofanetext()"
     },
     {
@@ -6063,8 +6063,8 @@
       "source_location": "L331",
       "_origin": "ast",
       "id": "renderer_isimagefile",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "isimagefile()"
     },
     {
@@ -6261,8 +6261,8 @@
       "source_location": "L1140",
       "_origin": "ast",
       "id": "renderer_warnstalefriendentry",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 9,
+      "community_name": "WebRTC ICE & TURN",
       "norm_label": "warnstalefriendentry()"
     },
     {
@@ -6613,8 +6613,8 @@
       "source_location": "L2031",
       "_origin": "ast",
       "id": "renderer_expandturnfamily",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "expandturnfamily()"
     },
     {
@@ -6624,8 +6624,8 @@
       "source_location": "L2062",
       "_origin": "ast",
       "id": "renderer_getturnipcache",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "getturnipcache()"
     },
     {
@@ -6635,8 +6635,8 @@
       "source_location": "L2066",
       "_origin": "ast",
       "id": "renderer_parseturnhost",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "parseturnhost()"
     },
     {
@@ -6646,8 +6646,8 @@
       "source_location": "L2072",
       "_origin": "ast",
       "id": "renderer_isipliteral",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isipliteral()"
     },
     {
@@ -6657,8 +6657,8 @@
       "source_location": "L2076",
       "_origin": "ast",
       "id": "renderer_expandturnwithipvariants",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "expandturnwithipvariants()"
     },
     {
@@ -6668,8 +6668,8 @@
       "source_location": "L2099",
       "_origin": "ast",
       "id": "renderer_dohresolve",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "dohresolve()"
     },
     {
@@ -6679,8 +6679,8 @@
       "source_location": "L2126",
       "_origin": "ast",
       "id": "renderer_resolveturnhostsviadoh",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "resolveturnhostsviadoh()"
     },
     {
@@ -6690,8 +6690,8 @@
       "source_location": "L2160",
       "_origin": "ast",
       "id": "renderer_refreshdynamicturn",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 9,
+      "community_name": "WebRTC ICE & TURN",
       "norm_label": "refreshdynamicturn()"
     },
     {
@@ -6976,8 +6976,8 @@
       "source_location": "L3731",
       "_origin": "ast",
       "id": "renderer_applyspeakertoall",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 9,
+      "community_name": "WebRTC ICE & TURN",
       "norm_label": "applyspeakertoall()"
     },
     {
@@ -7009,8 +7009,8 @@
       "source_location": "L3901",
       "_origin": "ast",
       "id": "renderer_removepeer",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "removepeer()"
     },
     {
@@ -7053,8 +7053,8 @@
       "source_location": "L4061",
       "_origin": "ast",
       "id": "renderer_getvideosender",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "getvideosender()"
     },
     {
@@ -7416,8 +7416,8 @@
       "source_location": "L5617",
       "_origin": "ast",
       "id": "renderer_ispeerscreenopen",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "ispeerscreenopen()"
     },
     {
@@ -7427,8 +7427,8 @@
       "source_location": "L5627",
       "_origin": "ast",
       "id": "renderer_updatecontrolrequestbutton",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "updatecontrolrequestbutton()"
     },
     {
@@ -7526,8 +7526,8 @@
       "source_location": "L6022",
       "_origin": "ast",
       "id": "renderer_updateemptygrid",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "updateemptygrid()"
     },
     {
@@ -7724,8 +7724,8 @@
       "source_location": "L6342",
       "_origin": "ast",
       "id": "renderer_showinactiveoverlay",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "showinactiveoverlay()"
     },
     {
@@ -7735,8 +7735,8 @@
       "source_location": "L6371",
       "_origin": "ast",
       "id": "renderer_removeinactiveoverlay",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "removeinactiveoverlay()"
     },
     {
@@ -7757,8 +7757,8 @@
       "source_location": "L6431",
       "_origin": "ast",
       "id": "renderer_addvideocard",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "addvideocard()"
     },
     {
@@ -7768,8 +7768,8 @@
       "source_location": "L6523",
       "_origin": "ast",
       "id": "renderer_removevideocard",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "removevideocard()"
     },
     {
@@ -7779,8 +7779,8 @@
       "source_location": "L6535",
       "_origin": "ast",
       "id": "renderer_getsfwchatbanthreshold",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "getsfwchatbanthreshold()"
     },
     {
@@ -7790,8 +7790,8 @@
       "source_location": "L6540",
       "_origin": "ast",
       "id": "renderer_ischatbanned",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "ischatbanned()"
     },
     {
@@ -7801,8 +7801,8 @@
       "source_location": "L6544",
       "_origin": "ast",
       "id": "renderer_setchatban",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "setchatban()"
     },
     {
@@ -7812,8 +7812,8 @@
       "source_location": "L6554",
       "_origin": "ast",
       "id": "renderer_registersfwchatviolation",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "registersfwchatviolation()"
     },
     {
@@ -7823,8 +7823,8 @@
       "source_location": "L6567",
       "_origin": "ast",
       "id": "renderer_checktextwithai",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 99,
+      "community_name": "censorProfaneText",
       "norm_label": "checktextwithai()"
     },
     {
@@ -7878,8 +7878,8 @@
       "source_location": "L6735",
       "_origin": "ast",
       "id": "renderer_broadcast",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "broadcast()"
     },
     {
@@ -8175,8 +8175,8 @@
       "source_location": "L8123",
       "_origin": "ast",
       "id": "renderer_t",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 7,
+      "community_name": "Electron Builder Config",
       "norm_label": "t()"
     },
     {
@@ -8428,8 +8428,8 @@
       "source_location": "L9233",
       "_origin": "ast",
       "id": "renderer_attachvideo",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "attachvideo()"
     },
     {
@@ -8439,8 +8439,8 @@
       "source_location": "L9242",
       "_origin": "ast",
       "id": "renderer_showsharemodal",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "showsharemodal()"
     },
     {
@@ -8450,8 +8450,8 @@
       "source_location": "L9264",
       "_origin": "ast",
       "id": "renderer_startscreenshare",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "startscreenshare()"
     },
     {
@@ -8472,8 +8472,8 @@
       "source_location": "L9342",
       "_origin": "ast",
       "id": "renderer_startrecording",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "startrecording()"
     },
     {
@@ -8494,8 +8494,8 @@
       "source_location": "L9387",
       "_origin": "ast",
       "id": "renderer_requestcontrol",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "requestcontrol()"
     },
     {
@@ -8560,8 +8560,8 @@
       "source_location": "L9527",
       "_origin": "ast",
       "id": "renderer_clearcontroloffer",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "clearcontroloffer()"
     },
     {
@@ -8890,8 +8890,8 @@
       "source_location": "L9919",
       "_origin": "ast",
       "id": "renderer_showtoast",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 9,
+      "community_name": "WebRTC ICE & TURN",
       "norm_label": "showtoast()"
     },
     {
@@ -8956,8 +8956,8 @@
       "source_location": "L10117",
       "_origin": "ast",
       "id": "renderer_getvideoconstraints",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "getvideoconstraints()"
     },
     {
@@ -8967,8 +8967,8 @@
       "source_location": "L10124",
       "_origin": "ast",
       "id": "renderer_limitvideobitrate",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "limitvideobitrate()"
     },
     {
@@ -8989,8 +8989,8 @@
       "source_location": "L10235",
       "_origin": "ast",
       "id": "renderer_initfiletransfer",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "initfiletransfer()"
     },
     {
@@ -9000,8 +9000,8 @@
       "source_location": "L10254",
       "_origin": "ast",
       "id": "renderer_appendfilemsg",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "appendfilemsg()"
     },
     {
@@ -9011,8 +9011,8 @@
       "source_location": "L10271",
       "_origin": "ast",
       "id": "renderer_sendfile",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "sendfile()"
     },
     {
@@ -9121,8 +9121,8 @@
       "source_location": "L11436",
       "_origin": "ast",
       "id": "renderer_lbupdateui",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 7,
+      "community_name": "Electron Builder Config",
       "norm_label": "lbupdateui()"
     },
     {
@@ -9209,8 +9209,8 @@
       "source_location": "L11532",
       "_origin": "ast",
       "id": "renderer_lbcopyimage",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 9,
+      "community_name": "WebRTC ICE & TURN",
       "norm_label": "lbcopyimage()"
     },
     {
@@ -9275,8 +9275,8 @@
       "source_location": "L11659",
       "_origin": "ast",
       "id": "renderer_activity_card_ids",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "activity_card_ids"
     },
     {
@@ -9440,8 +9440,8 @@
       "source_location": "L11824",
       "_origin": "ast",
       "id": "renderer_isshortcuttypingtarget",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isshortcuttypingtarget()"
     },
     {
@@ -9451,8 +9451,8 @@
       "source_location": "L11836",
       "_origin": "ast",
       "id": "renderer_isactivityforeground",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isactivityforeground()"
     },
     {
@@ -9462,8 +9462,8 @@
       "source_location": "L11852",
       "_origin": "ast",
       "id": "renderer_isshortcutoverlayforeground",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isshortcutoverlayforeground()"
     },
     {
@@ -9473,8 +9473,8 @@
       "source_location": "L11859",
       "_origin": "ast",
       "id": "renderer_shortcutsuppressionreason",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "shortcutsuppressionreason()"
     },
     {
@@ -11365,8 +11365,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_media_library_test",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 91,
+      "community_name": "connectGlobalBroker",
       "norm_label": "media-library.test.js"
     },
     {
@@ -11376,8 +11376,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_assert",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 91,
+      "community_name": "connectGlobalBroker",
       "norm_label": "assert"
     },
     {
@@ -11387,8 +11387,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_fs",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 91,
+      "community_name": "connectGlobalBroker",
       "norm_label": "fs"
     },
     {
@@ -11398,8 +11398,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_path",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 91,
+      "community_name": "connectGlobalBroker",
       "norm_label": "path"
     },
     {
@@ -11409,8 +11409,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_spawnpeer_cleanuppeer_evaljs_waitfor",
-      "community": 90,
-      "community_name": "founder-rnnoise-toggle.test.js",
+      "community": 91,
+      "community_name": "connectGlobalBroker",
       "norm_label": "{\r\n  spawnpeer,\r\n  cleanuppeer,\r\n  evaljs,\r\n  waitfor,\r\n}"
     },
     {
@@ -11843,43 +11843,10 @@
       "norm_label": "path"
     },
     {
-      "label": "{ spawn }",
-      "file_type": "code",
-      "source_file": "test/e2e/run-all.js",
-      "source_location": "L6",
-      "_origin": "ast",
-      "id": "test_e2e_run_all_spawn",
-      "community": 42,
-      "community_name": "E2E Test Runner",
-      "norm_label": "{ spawn }"
-    },
-    {
-      "label": "TEST_TIMEOUT_MS",
-      "file_type": "code",
-      "source_file": "test/e2e/run-all.js",
-      "source_location": "L8",
-      "_origin": "ast",
-      "id": "test_e2e_run_all_test_timeout_ms",
-      "community": 42,
-      "community_name": "E2E Test Runner",
-      "norm_label": "test_timeout_ms"
-    },
-    {
-      "label": "runIsolatedTest()",
-      "file_type": "code",
-      "source_file": "test/e2e/run-all.js",
-      "source_location": "L10",
-      "_origin": "ast",
-      "id": "test_e2e_run_all_runisolatedtest",
-      "community": 42,
-      "community_name": "E2E Test Runner",
-      "norm_label": "runisolatedtest()"
-    },
-    {
       "label": "main()",
       "file_type": "code",
       "source_file": "test/e2e/run-all.js",
-      "source_location": "L52",
+      "source_location": "L7",
       "_origin": "ast",
       "id": "test_e2e_run_all_main",
       "community": 42,
@@ -12069,8 +12036,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 90,
+      "community_name": "founder-rnnoise-toggle.test.js",
       "norm_label": "shortcuts-settings.test.js"
     },
     {
@@ -12080,8 +12047,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test_assert",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 90,
+      "community_name": "founder-rnnoise-toggle.test.js",
       "norm_label": "assert"
     },
     {
@@ -12091,8 +12058,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 90,
+      "community_name": "founder-rnnoise-toggle.test.js",
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, evaljs, waitfor }"
     },
     {
@@ -12102,8 +12069,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test_dispatchkey",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 90,
+      "community_name": "founder-rnnoise-toggle.test.js",
       "norm_label": "dispatchkey()"
     },
     {
@@ -18180,7 +18147,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "js/poke.js",
-      "source_location": "L589",
+      "source_location": "L565",
       "weight": 1.0,
       "_origin": "ast",
       "source": "js_poke_initpoke",
@@ -18192,7 +18159,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "js/poke.js",
-      "source_location": "L1381",
+      "source_location": "L1358",
       "weight": 1.0,
       "_origin": "ast",
       "source": "js_poke_initpoke",
@@ -47242,7 +47209,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "test/e2e/run-all.js",
-      "source_location": "L52",
+      "source_location": "L7",
       "weight": 1.0,
       "_origin": "ast",
       "source": "test_e2e_run_all",
@@ -47258,51 +47225,6 @@
       "_origin": "ast",
       "source": "test_e2e_run_all",
       "target": "test_e2e_run_all_path",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "test/e2e/run-all.js",
-      "source_location": "L10",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "test_e2e_run_all",
-      "target": "test_e2e_run_all_runisolatedtest",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "test/e2e/run-all.js",
-      "source_location": "L6",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "test_e2e_run_all",
-      "target": "test_e2e_run_all_spawn",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "test/e2e/run-all.js",
-      "source_location": "L8",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "test_e2e_run_all",
-      "target": "test_e2e_run_all_test_timeout_ms",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "test/e2e/run-all.js",
-      "source_location": "L68",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "test_e2e_run_all_main",
-      "target": "test_e2e_run_all_runisolatedtest",
       "confidence_score": 1.0
     },
     {

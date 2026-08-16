@@ -92,6 +92,9 @@ module.exports = async function run() {
            infoIconCount: document.querySelectorAll(
              '#poke-move-selection-list .move-info-icon'
            ).length,
+           selectedPreviewCount: document.querySelectorAll(
+             '#poke-selected-moves-preview > span'
+           ).length,
            requiredCount: document.getElementById('poke-move-required-count').textContent,
            confirmEnabled: !document.getElementById('poke-confirm-moves-btn').disabled
          };
@@ -107,6 +110,7 @@ module.exports = async function run() {
       `Canonical Machamp attacks are missing: ${result.names.join(', ')}`
     );
     assert.strictEqual(result.infoIconCount, result.names.length);
+    assert.strictEqual(result.selectedPreviewCount, 4);
     assert.strictEqual(result.requiredCount, '4');
     assert.strictEqual(result.confirmEnabled, true);
 

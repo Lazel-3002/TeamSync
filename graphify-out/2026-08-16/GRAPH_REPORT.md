@@ -1,11 +1,11 @@
-# Graph Report - TeamSync  (2026-08-17)
+# Graph Report - TeamSync  (2026-08-16)
 
 ## Corpus Check
-- 114 files · ~667,382 words
+- 114 files · ~666,351 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1338 nodes · 3023 edges · 95 communities (74 shown, 21 thin omitted)
+- 1335 nodes · 3019 edges · 96 communities (74 shown, 22 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 85 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
@@ -102,9 +102,10 @@
 - disconnectApp
 - seed_machine_draft.py
 - founder-rnnoise-toggle.test.js
-- shortcuts-settings.test.js
+- connectGlobalBroker
 - i18n-coverage.test.js
 - TeamSync localization terminology
+- censorProfaneText
 - media-collect-resize.test.js
 
 ## God Nodes (most connected - your core abstractions)
@@ -140,7 +141,7 @@
 - **Create-Room premium options (RNNoise, SFW AI, Game Mode, Relay, Bitrate) configured together at room creation** — index_step_create_form, index_rnnoise_toggle_option, index_sfw_toggle_option, index_game_mode_toggle_option, index_relay_toggle_option, index_bitrate_select [EXTRACTED 0.90]
 - **TeamSync release pipeline: version bump in index/docs marketing pages triggers GitHub Actions build published to GitHub Releases** — github_workflows_release_release_workflow, docs_index_github_releases_link, index_teamsync_login_flow [INFERRED 0.65]
 
-## Communities (95 total, 21 thin omitted)
+## Communities (96 total, 22 thin omitted)
 
 ### Community 0 - "UNO Card Game"
 Cohesion: 0.12
@@ -152,7 +153,7 @@ Nodes (39): App(), Activities(), Chat(), Dashboard(), accountItemStyle, cardStyl
 
 ### Community 2 - "Chat & Renderer Utilities"
 Cohesion: 0.03
-Nodes (73): acceptServerInvite(), appendFileMsg(), AUDIO_CHANNEL_FIELDS, badWordsList, beginRoomOperation(), censorProfaneText(), chatBlobUrls, checkTextWithAI() (+65 more)
+Nodes (73): acceptServerInvite(), ACTIVITY_CARD_IDS, AUDIO_CHANNEL_FIELDS, badWordsList, beginRoomOperation(), chatBlobUrls, closeAllCards(), closeJoinRequestNote() (+65 more)
 
 ### Community 3 - "Electron Main Process"
 Cohesion: 0.06
@@ -163,24 +164,24 @@ Cohesion: 0.06
 Nodes (37): Blastoise Battle Card, Bulbasaur Battle Card, Charizard Battle Card, Pikachu Battle Card, Poke Savaşları Battle Cover Image, Download CTA Section, Features Section (P2P, Device ID, Screen Share, SFW, Activities, RNNoise), GitHub Releases Link (Lazel-3002/TeamSync) (+29 more)
 
 ### Community 5 - "Audio Bitrate & Mic Controls"
-Cohesion: 0.15
-Nodes (28): addVideoCard(), broadcastTo(), clearControlOffer(), closeActiveControlSession(), closeCtrlModal(), closeCtrlOfferNote(), decryptMsg(), grantControlTo() (+20 more)
+Cohesion: 0.11
+Nodes (33): appendFileMsg(), attachVideo(), broadcast(), broadcastTo(), closeActiveControlSession(), closeCtrlModal(), closeCtrlOfferNote(), decryptMsg() (+25 more)
 
 ### Community 6 - "User List & Avatars"
 Cohesion: 0.15
 Nodes (10): catalogDir, EXPECTED_LOCALES, fs, path, renderer, report, requiredLegacy, requiredStructured (+2 more)
 
 ### Community 7 - "Electron Builder Config"
-Cohesion: 0.10
-Nodes (35): ACTIVITY_CARD_IDS, applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), getShortcutsMasterEnabled(), handleShortcutGateKeydown() (+27 more)
+Cohesion: 0.12
+Nodes (32): applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), getShortcutsMasterEnabled(), handleShortcutGateKeydown(), initShortcutSettings() (+24 more)
 
 ### Community 8 - "Sidebar UI Components"
 Cohesion: 0.10
 Nodes (19): actionSectionStyle, avatarStyle, badgeStyle, baseActionBtn, btnCreateStyle, btnJoinStyle, emptyTextStyle, friendAvatarPlaceholder (+11 more)
 
 ### Community 9 - "WebRTC ICE & TURN"
-Cohesion: 0.09
-Nodes (36): adoptScreenAudioTransceiver(), applyAudioSdpParams(), applyIceEscalationPolicy(), applyScreenAudioQuality(), applySharedTurn(), applySpeakerTo(), attachPeerScreenAudio(), attachVideo() (+28 more)
+Cohesion: 0.11
+Nodes (28): adoptScreenAudioTransceiver(), applyAudioSdpParams(), applyIceEscalationPolicy(), applyScreenAudioQuality(), applySharedTurn(), applySpeakerTo(), applySpeakerToAll(), attachPeerScreenAudio() (+20 more)
 
 ### Community 10 - "E2E Test: MQTT/First Run"
 Cohesion: 0.40
@@ -250,8 +251,8 @@ Nodes (15): { spawnPeer, cleanupPeer, waitFor }, assert, {
 }, assert, { spawnPeer, cleanupPeer, evalJS }, cleanupPeer(), assert, { spawnPeer, cleanupPeer, evalJS } (+7 more)
 
 ### Community 24 - "NPM Scripts"
-Cohesion: 0.12
-Nodes (28): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), bindUI(), broadcast(), canManageRoom(), canModerateTarget(), founderSuccessorId() (+20 more)
+Cohesion: 0.14
+Nodes (24): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), bindUI(), canManageRoom(), canModerateTarget(), founderSuccessorId(), getAudioBitrate() (+16 more)
 
 ### Community 25 - "RNNoise Noise Suppression"
 Cohesion: 0.43
@@ -342,10 +343,6 @@ Nodes (4): css, endIndex, fs, startIndex
 Cohesion: 0.50
 Nodes (4): Smeargle Blue Sprite, Smeargle Green Sprite, Smeargle Indigo Sprite, Smeargle Orange Sprite
 
-### Community 42 - "E2E Test Runner"
-Cohesion: 0.33
-Nodes (6): fs, main(), path, runIsolatedTest(), { spawn }, TEST_TIMEOUT_MS
-
 ### Community 43 - "Death Animation Patch"
 Cohesion: 0.50
 Nodes (3): css, fs, pokeJs
@@ -379,8 +376,8 @@ Cohesion: 0.12
 Nodes (56): addDetailTags(), addFiles(), advanceDetail(), bindContextMenu(), bindDetailModal(), bindDropzone(), bindFilterGroup(), cleanTag() (+48 more)
 
 ### Community 60 - "Cross-Fetch Dependency"
-Cohesion: 0.11
-Nodes (40): APP_THEMES, applyCustomThemeColors(), applyMicrophoneVolume(), applyRoomNoiseSuppression(), applySimpleUi(), applySpeakerToAll(), applySpeakerVolume(), applyUserTheme() (+32 more)
+Cohesion: 0.12
+Nodes (35): APP_THEMES, applyCustomThemeColors(), applyMicrophoneVolume(), applyRoomNoiseSuppression(), applySimpleUi(), applySpeakerVolume(), applyUserTheme(), CUSTOM_THEME_PRESETS (+27 more)
 
 ### Community 66 - "handlePeerDiscovered"
 Cohesion: 0.25
@@ -434,8 +431,8 @@ Cohesion: 0.25
 Nodes (7): author, description, license, main, name, releaseName, version
 
 ### Community 84 - "showToast"
-Cohesion: 0.16
-Nodes (24): addUser(), appendChat(), censoredTextHtml(), checkAvatar(), cleanText(), displayName(), escapeHtml(), formatUserTime() (+16 more)
+Cohesion: 0.12
+Nodes (31): addUser(), addVideoCard(), appendChat(), censoredTextHtml(), checkAvatar(), cleanText(), clearControlOffer(), displayName() (+23 more)
 
 ### Community 85 - "enterFocus"
 Cohesion: 0.33
@@ -464,6 +461,10 @@ Cohesion: 0.60
 Nodes (4): load(), Generate review-required locale drafts; never use this at application runtime., run(), save()
 
 ### Community 90 - "founder-rnnoise-toggle.test.js"
+Cohesion: 0.50
+Nodes (3): assert, dispatchKey(), { spawnPeer, cleanupPeer, createRoom, evalJS, waitFor }
+
+### Community 91 - "connectGlobalBroker"
 Cohesion: 0.40
 Nodes (4): assert, fs, path, {
   spawnPeer,
@@ -472,13 +473,13 @@ Nodes (4): assert, fs, path, {
   waitFor,
 }
 
-### Community 91 - "shortcuts-settings.test.js"
-Cohesion: 0.50
-Nodes (3): assert, dispatchKey(), { spawnPeer, cleanupPeer, createRoom, evalJS, waitFor }
-
 ### Community 92 - "i18n-coverage.test.js"
 Cohesion: 0.06
 Nodes (111): accentColor(), addOps(), announceRemoteActivity(), applyLive(), bboxOf(), bindUI(), buildSwatches(), call() (+103 more)
+
+### Community 99 - "censorProfaneText"
+Cohesion: 0.29
+Nodes (8): censorProfaneText(), checkTextWithAI(), filterProjection(), isProfaneText(), isSubsequence(), levenshteinDistance(), maskCensoredSegment(), normalizeFilterText()
 
 ### Community 100 - "media-collect-resize.test.js"
 Cohesion: 0.40
@@ -489,23 +490,23 @@ Nodes (4): assert, fs, path, { spawnPeer, cleanupPeer, evalJS, waitFor }
   index.html · relation: calls
 
 ## Knowledge Gaps
-- **357 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+352 more)
+- **355 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+350 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `window.handlePokeImgError() sprite fallback chain` and `PokeAPI (pokeapi.co)`?**
   _Edge tagged AMBIGUOUS (relation: calls) - confidence is low._
-- **Why does `t()` connect `Cross-Fetch Dependency` to `Chat & Renderer Utilities`, `handlePeerDiscovered`, `Poke Feature Init`, `Electron Builder Config`, `WebRTC ICE & TURN`, `E2E Test: RNNoise Toggle`?**
-  _High betweenness centrality (0.058) - this node is a cross-community bridge._
-- **Why does `initPoke()` connect `Poke Feature Init` to `Cross-Fetch Dependency`?**
+- **Why does `t()` connect `Electron Builder Config` to `Chat & Renderer Utilities`, `handlePeerDiscovered`, `Poke Feature Init`, `Audio Bitrate & Mic Controls`, `WebRTC ICE & TURN`, `E2E Test: RNNoise Toggle`, `NPM Scripts`, `Cross-Fetch Dependency`?**
+  _High betweenness centrality (0.059) - this node is a cross-community bridge._
+- **Why does `initPoke()` connect `Poke Feature Init` to `Electron Builder Config`?**
   _High betweenness centrality (0.058) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `render()` (e.g. with `addBot()` and `continueAfterVoteResult()`) actually correct?**
   _`render()` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
-  _357 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _355 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `UNO Card Game` be split into smaller, more focused modules?**
   _Cohesion score 0.11779448621553884 - nodes in this community are weakly interconnected._
 - **Should `App Shell & Pokedex Data` be split into smaller, more focused modules?**
