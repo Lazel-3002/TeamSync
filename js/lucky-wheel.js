@@ -142,6 +142,7 @@ function initLuckyWheel() {
   const renderPollPreview = () => {
     const question = sanitizePollText(pollEls.question.value, 120);
     const options = pollEditorOptions();
+    pollEls.previewQuestion.toggleAttribute('data-i18n-ignore', Boolean(question));
     pollEls.previewQuestion.textContent = question || 'Sence en iyi seçenek hangisi?';
     pollEls.previewState.textContent = question
       ? `${Math.max(options.length, 2)} seçenekli anket`
@@ -154,6 +155,7 @@ function initLuckyWheel() {
       letter.style.setProperty('--poll-color', POLL_COLORS[index]);
       letter.textContent = String.fromCharCode(65 + index);
       const label = document.createElement('span');
+      if (options.length) label.dataset.i18nIgnore = 'true';
       label.textContent = option;
       row.append(letter, label);
       pollEls.previewOptions.appendChild(row);
@@ -249,6 +251,7 @@ function initLuckyWheel() {
     const localChoice = pollState.voters[localPollVoterId()];
     pollState.myVote = Number.isInteger(localChoice) ? localChoice : null;
 
+    pollEls.viewQuestion.dataset.i18nIgnore = 'true';
     pollEls.viewQuestion.textContent = pollState.question;
     pollEls.totalVotes.textContent = `${total} oy`;
     pollEls.donutTotal.textContent = String(total);
@@ -292,6 +295,7 @@ function initLuckyWheel() {
       const copy = document.createElement('span');
       copy.className = 'poll-opt-copy';
       const label = document.createElement('strong');
+      label.dataset.i18nIgnore = 'true';
       label.textContent = option;
       const detail = document.createElement('small');
       detail.textContent = pollState.myVote === index ? '✓ Senin oyun' : `${count} oy`;
@@ -331,6 +335,7 @@ function initLuckyWheel() {
       const firstLeader = leaders[0];
       pollEls.leaderIcon.textContent = leaders.length > 1 ? '=' : String.fromCharCode(65 + firstLeader);
       pollEls.leaderIcon.style.background = leaders.length > 1 ? '#51485e' : POLL_COLORS[firstLeader];
+      pollEls.leaderText.toggleAttribute('data-i18n-ignore', leaders.length === 1);
       pollEls.leaderText.textContent = leaders.length > 1
         ? `${leaders.length} seçenek berabere`
         : pollState.options[firstLeader];

@@ -107,7 +107,7 @@ const handleIncomingHandshake = async (data) => {
   if (!data || !data.from || !data.publicKey) return;
 
   // Ortak anahtarı türet
-  await deriveSharedKey(data.publicKey);
+  await deriveSharedKey(data.from, data.publicKey);
   console.log(`🔐 ${data.from} ile ECDH anahtarı türetildi.`);
 
   // Eğer bu bir 'offer' ise, biz de kendi public key'imizle 'answer' dönmeliyiz
@@ -135,9 +135,10 @@ export const signalEvents = new EventTarget();
 /**
  * 4. Gelen şifreli WebRTC sinyalini çözer.
  */
-const handleIncomingSignal = async (encryptedBase64) => {
+const handleIncomingSignal = async (envelope) => {
   try {
-    const decryptedData = await decryptMessage(encryptedBase64);
+    if (!envelope || typeof envelope !== 'object' || typeof envelope.from !== 'string' || typeof envelope.data !== 'string') return;
+    const decryptedData = await decryptMessage(envelope.data, envelope.from);
     if (decryptedData) {
       if (onWebRTCSignal) onWebRTCSignal(decryptedData);
       signalEvents.dispatchEvent(new CustomEvent('signal', { detail: decryptedData }));
@@ -152,8 +153,8 @@ const handleIncomingSignal = async (encryptedBase64) => {
  */
 export const sendEncryptedSignal = async (targetUserId, data) => {
   try {
-    const encryptedData = await encryptMessage(data);
-    await sendUdpOrSupabase(targetUserId, 'signal', encryptedData);
+    const encryptedData = await encryptMessage(data, targetUserId);
+    await sendUdpOrSupabase(targetUserId, 'signal', { from: currentUserId, data: encryptedData });
   } catch (error) {
     console.error('Sinyal gönderim hatası:', error);
   }

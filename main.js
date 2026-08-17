@@ -551,7 +551,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       webviewTag: true,
       webRTCIPHandlingPolicy: 'default_public_and_private_interfaces',
       autoplayPolicy: 'no-user-gesture-required',
@@ -611,6 +611,10 @@ function createWindow() {
   // Böylece render sürecindeki bir hata/açık, webview'e Node.js erişimi
   // sızdıramaz.
   mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    if (params.src && !/^https?:\/\//i.test(params.src) && params.src !== 'about:blank') {
+      event.preventDefault();
+      return;
+    }
     delete webPreferences.preload;
     delete webPreferences.preloadURL;
     webPreferences.nodeIntegration = false;
@@ -621,6 +625,16 @@ function createWindow() {
 
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     console.log(`[Renderer ${level}] ${message} (${line})`);
+  });
+
+  mainWindow.webContents.on('did-attach-webview', (_event, guestWebContents) => {
+    guestWebContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) guestWebContents.loadURL(url).catch(() => {});
+      return { action: 'deny' };
+    });
+    guestWebContents.on('will-navigate', (event, url) => {
+      if (!/^https?:\/\//i.test(url) && url !== 'about:blank') event.preventDefault();
+    });
   });
 
   const _indexPath = path.join(__dirname, 'index.html');
@@ -702,6 +716,18 @@ function createWindow() {
 function isMainWindowSender(event) {
   return Boolean(mainWindow && !mainWindow.isDestroyed() && event && event.sender === mainWindow.webContents);
 }
+
+ipcMain.handle('get-env', (event) => {
+  if (!isMainWindowSender(event)) return null;
+  return {
+    SUPABASE_URL: process.env.SUPABASE_URL || null,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || null
+  };
+});
+
+ipcMain.handle('get-app-version', (event) => {
+  return isMainWindowSender(event) ? app.getVersion() : null;
+});
 
 function boundedString(value, maxLength) {
   return typeof value === 'string' && value.length <= maxLength ? value : null;
