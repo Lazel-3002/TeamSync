@@ -309,6 +309,7 @@ async function checkAvatar(base64Str) {
 
 const CHUNK_SIZE = 64 * 1024;
 const MAX_DM_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_ROOM_FILE_SIZE = 100 * 1024 * 1024;
 const fileBuffer = new Map();
 // Sohbette paylaşılan dosyaların blob URL'leri: revoke edilmezse dosyanın
 // tüm içeriği uygulama kapanana kadar bellekte kalır (sohbet DOM'u
@@ -468,7 +469,7 @@ function setupInternetSignaling(roomId, myId, myName) {
           try {
             const header = JSON.parse(headerStr);
             const f = fileBuffer.get(header.id);
-            if (f) {
+            if (f && chunk.length <= CHUNK_SIZE && f.received + chunk.length <= f.meta.size) {
               f.chunks.push(chunk);
               f.received += chunk.length;
               const prog = document.getElementById(`prog-${header.id}`);
@@ -4764,9 +4765,9 @@ function setupDataChannel(peerId, dc) {
         const chunk = buf.slice(pipeIdx + 1);
         try {
           const header = JSON.parse(headerStr);
-          const f = fileBuffer.get(header.id);
-          if (f) {
-            f.chunks.push(chunk);
+           const f = fileBuffer.get(header.id);
+           if (f && chunk.length <= CHUNK_SIZE && f.received + chunk.length <= f.meta.size) {
+              f.chunks.push(chunk);
             f.received += chunk.length;
             const prog = document.getElementById(`prog-${header.id}`);
             if (prog) prog.style.width = (f.received / f.meta.size * 100) + '%';
@@ -5187,11 +5188,20 @@ async function handleDataMessage(peerId, msg) {
       appendChat(peerId, peer.name, '🔒 [Kilitli Mesaj]');
     }
   } else if (msg.type === 'file-meta') {
-    fileBuffer.set(msg.id, { meta: msg, chunks: [], received: 0 });
-    appendFileMsg(msg.id, msg.name, msg.size, true);
+    const validId = typeof msg.id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(msg.id);
+    const validName = typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 255;
+    const validSize = Number.isInteger(msg.size) && msg.size > 0 && msg.size <= MAX_ROOM_FILE_SIZE;
+    const validMime = typeof msg.mime === 'string' && msg.mime.length <= 128;
+    if (!validId || !validName || !validSize || !validMime || fileBuffer.has(msg.id) || fileBuffer.size >= 20) return;
+    fileBuffer.set(msg.id, { meta: { ...msg, name: safeFileName(msg.name), mime: msg.mime }, chunks: [], received: 0 });
+    appendFileMsg(msg.id, safeFileName(msg.name), msg.size, true);
   } else if (msg.type === 'file-done') {
     const f = fileBuffer.get(msg.id);
-    if (f) {
+    if (f && f.received !== f.meta.size) {
+      fileBuffer.delete(msg.id);
+      return;
+    }
+    if (f && f.received === f.meta.size) {
       const blob = new Blob(f.chunks, { type: f.meta.mime });
       const url = URL.createObjectURL(blob);
       chatBlobUrls.push(url);
@@ -5222,7 +5232,7 @@ async function handleDataMessage(peerId, msg) {
           
           const aDl = document.createElement('a');
           aDl.href = url;
-          aDl.download = f.meta.name;
+          aDl.download = safeFileName(f.meta.name);
           aDl.className = 'text-dl';
           aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> İndir`;
           btnGroup.appendChild(aDl);
@@ -6355,7 +6365,7 @@ function showInactiveOverlay(cardId, title, onJoin) {
     
     const btn = document.createElement('button');
     btn.className = 'btn-pri';
-    btn.innerHTML = `<span style="font-size:24px; font-weight:bold;">+</span><br/>Katıl: ${title}`;
+    btn.innerHTML = `<span style="font-size:24px; font-weight:bold;">+</span><br/>Katıl: ${escapeHtml(title)}`;
     btn.style.cssText = 'padding: 10px 20px; border-radius: 12px; display:flex; flex-direction:column; align-items:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer; border: none; background: var(--acc); color: white;';
     
     btn.onclick = (e) => {
@@ -6783,6 +6793,19 @@ function broadcast(msg) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function safeFileName(value) {
+  return String(value || 'dosya').replace(/[\u0000-\u001f\\/:*?"<>|]/g, '_').slice(0, 255) || 'dosya';
+}
+
+function safeMediaUrl(value, type) {
+  if (typeof value !== 'string' || value.length > 30 * 1024 * 1024) return '';
+  if (/^blob:/i.test(value)) return value;
+  const prefix = type === 'image' ? 'data:image/' : type === 'video' ? 'data:video/' : 'data:';
+  if (!value.toLowerCase().startsWith(prefix)) return '';
+  if (type === 'file' && /^data:(?:text\/html|text\/javascript|application\/javascript|image\/svg\+xml)/i.test(value)) return '';
+  return value;
 }
 
 const USER_LANGUAGE_KEY = 'teamsync_language';
@@ -10269,6 +10292,10 @@ function appendFileMsg(fileId, name, size, incoming) {
 }
 
 async function sendFile(file) {
+  if (!file || file.size > MAX_ROOM_FILE_SIZE) {
+    showToast('Dosya boyutu izin verilen sınırı aşıyor.', 'warn');
+    return;
+  }
   const fileId = crypto.randomUUID();
   appendFileMsg(fileId, file.name, file.size, false);
 
@@ -10440,6 +10467,8 @@ window.renderDMs = () => {
   const html = messages.map(m => {
     const cls = m.sender === 'me' ? 'sent' : 'recv';
     let contentHtml = escapeHtml(m.content || '');
+    const originalContent = m.content;
+    const originalFileName = m.fileName;
     
     if (m.isCensored) {
        contentHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
@@ -10447,14 +10476,22 @@ window.renderDMs = () => {
       // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
       contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
     } else if (m.type === 'image') {
+      m.content = escapeHtml(safeMediaUrl(m.content, 'image'));
+      m.fileName = escapeHtml(safeFileName(m.fileName || 'Gorsel'));
       // data-media-name: "Koleksiyona ekle" dosyayı özgün adıyla kaydetsin.
       contentHtml = `<img src="${m.content}" alt="${escapeHtml(m.fileName || 'Görsel')}" data-media-name="${escapeHtml(m.fileName || '')}" />`;
     } else if (m.type === 'video') {
+      m.content = escapeHtml(safeMediaUrl(m.content, 'video'));
+      m.fileName = escapeHtml(safeFileName(m.fileName || 'Video'));
       contentHtml = `<video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}" data-media-name="${escapeHtml(m.fileName || '')}"></video>`;
     } else if (m.type === 'file') {
+      m.content = escapeHtml(safeMediaUrl(m.content, 'file'));
+      m.fileName = escapeHtml(safeFileName(m.fileName || 'dosya'));
       contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
     }
 
+    m.content = originalContent;
+    m.fileName = originalFileName;
     if (m.isCensored) contentHtml = censoredTextHtml(m.content);
     if (m.count > 1) {
       contentHtml += `<span class="msg-repeat-badge">×${m.count}</span>`;
@@ -10638,6 +10675,7 @@ window.sendDMFile = async (file) => {
 state.incomingDMFiles = {};
 
 window.receiveDM = async (fromId, data) => {
+  if (typeof fromId !== 'string' || fromId.length > 128 || !data || typeof data !== 'object') return;
   if (!state.dms[fromId]) state.dms[fromId] = [];
 
   // Sunucudan (arkadaş olmayan birinden) gelen DM: gönderen listede yoksa
@@ -10649,6 +10687,7 @@ window.receiveDM = async (fromId, data) => {
   }
 
   if (data.type === 'dm_msg') {
+    if (!['text', 'image', 'video', 'file'].includes(data.msgType) || typeof data.content !== 'string' || data.content.length > (data.msgType === 'text' ? 20_000 : 30 * 1024 * 1024)) return;
     let isCensored = data.isCensored || false;
     let safeContent = data.content;
     if (!isCensored && data.content) {
@@ -10680,12 +10719,18 @@ window.receiveDM = async (fromId, data) => {
         if (error) console.error('Supabase DM receive error:', error);
       });
     }
-  } 
+  }
   else if (data.type === 'dm_file_start') {
+    const maxChunks = Math.ceil(MAX_DM_FILE_SIZE * 1.4 / 60000);
+    if (typeof data.fileId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(data.fileId)
+      || data.fromId !== fromId || !['image', 'video', 'file'].includes(data.msgType)
+      || typeof data.fileName !== 'string' || data.fileName.length === 0 || data.fileName.length > 255
+      || !Number.isInteger(data.totalChunks) || data.totalChunks < 1 || data.totalChunks > maxChunks
+      || Object.keys(state.incomingDMFiles).length >= 20) return;
     state.incomingDMFiles[data.fileId] = {
       fromId: data.fromId,
       msgType: data.msgType,
-      fileName: data.fileName,
+      fileName: safeFileName(data.fileName),
       totalChunks: data.totalChunks,
       chunks: [],
       lastChunkAt: Date.now()
@@ -10693,7 +10738,9 @@ window.receiveDM = async (fromId, data) => {
   }
   else if (data.type === 'dm_file_chunk') {
     const fileData = state.incomingDMFiles[data.fileId];
-    if (fileData) {
+    if (fileData && data.fromId === fromId && Number.isInteger(data.chunkIndex)
+      && data.chunkIndex >= 0 && data.chunkIndex < fileData.totalChunks
+      && typeof data.data === 'string' && data.data.length <= 90_000) {
       fileData.lastChunkAt = Date.now();
       fileData.chunks[data.chunkIndex] = data.data;
       if (fileData.chunks.filter(c => c).length === fileData.totalChunks) {

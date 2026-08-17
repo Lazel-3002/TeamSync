@@ -2205,8 +2205,11 @@ POKEMONS.fairy.push(
     fam.evolutions.forEach(evo => {
       const card = document.createElement('div');
       card.className = fam.baseName === 'smeargle' ? 'poke-evo-card poke-variant-card' : 'poke-evo-card';
-      card.innerHTML = `<img src="${evo.url}" data-realname="${evo.apiName || evo.name}" loading="lazy" onerror="window.handlePokeImgError(this)" />
-        <div class="poke-evo-name">${evo.label || evo.name}</div><div class="poke-evo-stage">${evo.stage > 0 ? `${evo.stage}. EVRİM` : 'BAŞLANGIÇ'}${evo.isForm ? ' · FORM' : ''}</div>
+      const safeEvoUrl = escapeHtml(/^https:\/\//i.test(String(evo.url || '')) ? String(evo.url) : UNKNOWN_AVATAR);
+      const safeEvoName = escapeHtml(String(evo.apiName || evo.name || 'Pokemon'));
+      const safeEvoLabel = escapeHtml(String(evo.label || evo.name || 'Pokemon'));
+      card.innerHTML = `<img src="${safeEvoUrl}" data-realname="${safeEvoName}" loading="lazy" onerror="window.handlePokeImgError(this)" />
+        <div class="poke-evo-name">${safeEvoLabel}</div><div class="poke-evo-stage">${evo.stage > 0 ? `${evo.stage}. EVRİM` : 'BAŞLANGIÇ'}${evo.isForm ? ' · FORM' : ''}</div>
         <div class="poke-type-badges poke-evo-type-badges">${renderFamilyTypeBadges(evo)}</div>`;
       card.onclick = () => {
         document.getElementById('poke-waiting-evo-msg').style.display = 'block';
