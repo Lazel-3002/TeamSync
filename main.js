@@ -551,7 +551,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       webviewTag: true,
       webRTCIPHandlingPolicy: 'default_public_and_private_interfaces',
       autoplayPolicy: 'no-user-gesture-required',
@@ -611,6 +611,10 @@ function createWindow() {
   // Böylece render sürecindeki bir hata/açık, webview'e Node.js erişimi
   // sızdıramaz.
   mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    if (params.src && !/^https?:\/\//i.test(params.src) && params.src !== 'about:blank') {
+      event.preventDefault();
+      return;
+    }
     delete webPreferences.preload;
     delete webPreferences.preloadURL;
     webPreferences.nodeIntegration = false;
@@ -621,6 +625,16 @@ function createWindow() {
 
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     console.log(`[Renderer ${level}] ${message} (${line})`);
+  });
+
+  mainWindow.webContents.on('did-attach-webview', (_event, guestWebContents) => {
+    guestWebContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) guestWebContents.loadURL(url).catch(() => {});
+      return { action: 'deny' };
+    });
+    guestWebContents.on('will-navigate', (event, url) => {
+      if (!/^https?:\/\//i.test(url) && url !== 'about:blank') event.preventDefault();
+    });
   });
 
   const _indexPath = path.join(__dirname, 'index.html');
@@ -703,6 +717,53 @@ function isMainWindowSender(event) {
   return Boolean(mainWindow && !mainWindow.isDestroyed() && event && event.sender === mainWindow.webContents);
 }
 
+ipcMain.handle('get-env', (event) => {
+  if (!isMainWindowSender(event)) return null;
+  return {
+    SUPABASE_URL: process.env.SUPABASE_URL || null,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || null
+  };
+});
+
+ipcMain.handle('get-app-version', (event) => {
+  return isMainWindowSender(event) ? app.getVersion() : null;
+});
+
+function boundedString(value, maxLength) {
+  return typeof value === 'string' && value.length <= maxLength ? value : null;
+}
+
+function validIPv4(value) {
+  return typeof value === 'string' && require('net').isIP(value) === 4;
+}
+
+function sanitizeRemoteInput(data) {
+  if (!data || typeof data !== 'object' || typeof data.type !== 'string') return null;
+  const type = data.type;
+  if (type === 'mousemove' || type === 'mousedown' || type === 'mouseup' || type === 'click') {
+    if (!Number.isFinite(data.x) || !Number.isFinite(data.y)) return null;
+    return {
+      type,
+      x: Math.max(0, Math.min(1, data.x)),
+      y: Math.max(0, Math.min(1, data.y)),
+      button: data.button === 2 ? 2 : data.button === 1 ? 1 : 0,
+    };
+  }
+  if (type === 'keydown' || type === 'keyup') {
+    const key = boundedString(data.key, 32);
+    return key ? { type, key } : null;
+  }
+  if (type === 'scroll') {
+    if (!Number.isFinite(data.deltaX || 0) || !Number.isFinite(data.deltaY || 0)) return null;
+    return {
+      type,
+      deltaX: Math.max(-1000, Math.min(1000, data.deltaX || 0)),
+      deltaY: Math.max(-1000, Math.min(1000, data.deltaY || 0)),
+    };
+  }
+  return null;
+}
+
 // Renderer odaya girince true, odadan çıkınca/uygulama kapanınca false gönderir.
 // Bkz. setVoiceSessionActive: powerSaveBlocker + Windows süreç önceliği.
 ipcMain.on('set-voice-session', (event, active) => {
@@ -710,13 +771,14 @@ ipcMain.on('set-voice-session', (event, active) => {
   setVoiceSessionActive(active);
 });
 
-ipcMain.handle('get-local-ips', () => getLocalIPs());
+ipcMain.handle('get-local-ips', (event) => isMainWindowSender(event) ? getLocalIPs() : []);
 
 // Cloudflare WARP tespiti: 1.1.1.1/cdn-cgi/trace yanıtındaki warp=on/plus
 // alanı, isteğin WARP tünelinden çıktığını söyler. Renderer'dan fetch ile
 // yapılamıyor (endpoint CORS başlığı göndermiyor); ana süreç CORS'a tabi
 // değil. IP-literal olduğu için WARP'ın bozabileceği DNS'e de bağımlı değil.
-ipcMain.handle('detect-warp', () => {
+ipcMain.handle('detect-warp', (event) => {
+  if (!isMainWindowSender(event)) return null;
   return new Promise((resolve) => {
     const req = require('https').get({ host: '1.1.1.1', path: '/cdn-cgi/trace', timeout: 5000 }, (res) => {
       let data = '';
@@ -731,7 +793,8 @@ ipcMain.handle('detect-warp', () => {
   });
 });
 
-ipcMain.handle('toggle-fullscreen', () => {
+ipcMain.handle('toggle-fullscreen', (event) => {
+  if (!isMainWindowSender(event)) return false;
   if (mainWindow) {
     const isFull = mainWindow.isFullScreen();
     mainWindow.setFullScreen(!isFull);
@@ -740,7 +803,8 @@ ipcMain.handle('toggle-fullscreen', () => {
   return false;
 });
 
-ipcMain.handle('load-accounts', () => {
+ipcMain.handle('load-accounts', (event) => {
+  if (!isMainWindowSender(event)) return [];
   const filePath = path.join(baseUserData, 'accounts.json');
   if (fs.existsSync(filePath)) {
     try {
@@ -753,6 +817,7 @@ ipcMain.handle('load-accounts', () => {
 });
 
 ipcMain.handle('save-accounts', (event, accounts) => {
+  if (!isMainWindowSender(event) || !Array.isArray(accounts) || accounts.length > 20) return false;
   const filePath = path.join(baseUserData, 'accounts.json');
   try {
     fs.writeFileSync(filePath, JSON.stringify(accounts, null, 2), 'utf8');
@@ -778,9 +843,10 @@ function writeSettings(obj) {
     return false;
   }
 }
-ipcMain.handle('get-hardware-acceleration', () => readSettings().hardwareAcceleration !== false);
-ipcMain.handle('get-effective-hardware-acceleration', () => _diagHwAccelEffective);
+ipcMain.handle('get-hardware-acceleration', (event) => isMainWindowSender(event) && readSettings().hardwareAcceleration !== false);
+ipcMain.handle('get-effective-hardware-acceleration', (event) => isMainWindowSender(event) ? _diagHwAccelEffective : false);
 ipcMain.handle('set-hardware-acceleration', (event, enabled) => {
+  if (!isMainWindowSender(event)) return false;
   const s = readSettings();
   s.hardwareAcceleration = !!enabled;
   return writeSettings(s);
@@ -799,6 +865,7 @@ const THEME_BG_COLORS = {
 };
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 ipcMain.on('set-window-theme', (event, theme, persist, customBg) => {
+  if (!isMainWindowSender(event)) return;
   const isCustom = theme === 'custom' && HEX_COLOR_RE.test(customBg || '');
   const color = isCustom ? customBg : (THEME_BG_COLORS[theme] || THEME_BG_COLORS.aurora);
   if (persist) {
@@ -810,15 +877,18 @@ ipcMain.on('set-window-theme', (event, theme, persist, customBg) => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setBackgroundColor(color);
 });
 
-ipcMain.handle('is-second-instance', () => {
+ipcMain.handle('is-second-instance', (event) => {
+  if (!isMainWindowSender(event)) return false;
   return isSecondInstance;
 });
 
 // --- TEŞHİS: renderer'ın canlı DOM'dan yakaladığı indirme butonlarını günlükle ---
-ipcMain.handle('diag-enabled', () => {
+ipcMain.handle('diag-enabled', (event) => {
+  if (!isMainWindowSender(event)) return false;
   try { return require('./diagnostics').isEnabled(); } catch (e) { return false; }
 });
 ipcMain.on('diag-capture', (e, info) => {
+  if (!isMainWindowSender(e)) return;
   try { require('./diagnostics').appendCapture(info); } catch (err) {}
 });
 
@@ -856,6 +926,7 @@ function loadOrCreateDeviceSecret() {
 // slot: aynı cihazda birden çok hesap. Hepsi aynı cihaz kimliğini (deviceId)
 // paylaşır; slot 0'ın türetimi ilk sürümle birebir aynı kalmalı (geriye uyum).
 ipcMain.handle('get-device-credentials', (event, slot) => {
+  if (!isMainWindowSender(event)) return null;
   const s = Number.isInteger(slot) && slot > 0 ? slot : 0;
   const secret = loadOrCreateDeviceSecret();
   const deviceId = nodeCrypto.createHash('sha256').update('teamsync-device-id:' + secret).digest('hex').slice(0, 40);
@@ -868,6 +939,10 @@ ipcMain.handle('get-device-credentials', (event, slot) => {
 });
 
 ipcMain.handle('start-cloudflared', async (event, port) => {
+  if (!isMainWindowSender(event) || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Geçersiz yerel port');
+  }
+  if (cloudflaredProcess) return null;
   return new Promise((resolve, reject) => {
     const exePath = path.join(app.getAppPath(), 'vendor', 'cloudflared', 'cloudflared.exe');
     cloudflaredProcess = spawn(exePath, ['tunnel', '--url', `localhost:${port}`]);
@@ -890,7 +965,8 @@ ipcMain.handle('start-cloudflared', async (event, port) => {
   });
 });
 
-ipcMain.on('stop-cloudflared', () => {
+ipcMain.on('stop-cloudflared', (event) => {
+  if (!isMainWindowSender(event)) return;
   if (cloudflaredProcess) {
     cloudflaredProcess.kill();
     cloudflaredProcess = null;
@@ -898,10 +974,12 @@ ipcMain.on('stop-cloudflared', () => {
 });
 
 // Custom titlebar handlers
-ipcMain.on('window-min', () => {
+ipcMain.on('window-min', (event) => {
+  if (!isMainWindowSender(event)) return;
   if (mainWindow) mainWindow.minimize();
 });
-ipcMain.on('window-max', () => {
+ipcMain.on('window-max', (event) => {
+  if (!isMainWindowSender(event)) return;
   if (mainWindow) {
     if (mainWindow.isMaximized()) {
       mainWindow.unmaximize();
@@ -910,7 +988,8 @@ ipcMain.on('window-max', () => {
     }
   }
 });
-ipcMain.on('window-close', () => {
+ipcMain.on('window-close', (event) => {
+  if (!isMainWindowSender(event)) return;
   if (mainWindow) mainWindow.close();
 });
 function forceQuit() {
@@ -926,7 +1005,8 @@ function forceQuit() {
   process.exit(0);
 }
 
-ipcMain.on('app-quit-force', () => {
+ipcMain.on('app-quit-force', (event) => {
+  if (!isMainWindowSender(event)) return;
   forceQuit();
 });
 
@@ -966,13 +1046,18 @@ function setupAutoUpdater() {
   setInterval(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 4 * 3600 * 1000);
 }
 
-ipcMain.handle('update-check', async () => {
+ipcMain.handle('update-check', async (event) => {
+  if (!isMainWindowSender(event)) return { state: 'denied' };
   if (!autoUpdater) return { state: app.isPackaged ? 'error' : 'dev' };
   try { await autoUpdater.checkForUpdates(); } catch (e) {}
   return updateStatus;
 });
-ipcMain.handle('update-get-status', () => (autoUpdater ? updateStatus : { state: app.isPackaged ? 'idle' : 'dev' }));
-ipcMain.on('update-install', () => {
+ipcMain.handle('update-get-status', (event) => {
+  if (!isMainWindowSender(event)) return { state: 'denied' };
+  return autoUpdater ? updateStatus : { state: app.isPackaged ? 'idle' : 'dev' };
+});
+ipcMain.on('update-install', (event) => {
+  if (!isMainWindowSender(event)) return;
   if (!autoUpdater) return;
   // close→tray davranışı quitAndInstall'un pencereyi kapatmasını engellemesin.
   isQuitting = true;
@@ -995,18 +1080,27 @@ ipcMain.handle('get-sources', async (event) => {
     return [];
   }
 });
-ipcMain.on('start-discovery', (event, { peerId, name, room }) => {
+ipcMain.on('start-discovery', (event, payload = {}) => {
+  if (!isMainWindowSender(event)) return;
+  const peerId = boundedString(payload.peerId, 128);
+  const name = boundedString(payload.name, 120);
+  const room = boundedString(payload.room, 128);
+  if (!peerId || !name || !room) return;
   currentRoom = room;
   currentName = name;
   startDiscovery(peerId, name);
 });
 
-ipcMain.on('stop-discovery', () => {
+ipcMain.on('stop-discovery', (event) => {
+  if (!isMainWindowSender(event)) return;
   if (discoveryInterval) { clearInterval(discoveryInterval); discoveryInterval = null; }
   if (discoverySocket) { try { discoverySocket.close(); } catch (e) {} discoverySocket = null; }
 });
 
-ipcMain.on('send-udp-signal', (event, { ip, signal }) => {
+ipcMain.on('send-udp-signal', (event, payload = {}) => {
+  if (!isMainWindowSender(event)) return;
+  const { ip, signal } = payload;
+  if (!validIPv4(ip) || !signal || typeof signal !== 'object' || Array.isArray(signal)) return;
   if (!discoverySocket || !myPeerId) return;
   const msg = Buffer.from(JSON.stringify({
     id: myPeerId,
@@ -1015,12 +1109,14 @@ ipcMain.on('send-udp-signal', (event, { ip, signal }) => {
     type: 'signal',
     signal: signal
   }));
+  if (msg.length > 60 * 1024) return;
   try {
     discoverySocket.send(msg, 0, msg.length, DISCOVERY_PORT, ip);
   } catch (e) {}
 });
 
 ipcMain.on('direct-connect', (event, ip) => {
+  if (!isMainWindowSender(event) || !validIPv4(ip)) return;
   if (!discoverySocket || !myPeerId) return;
   const msg = Buffer.from(JSON.stringify({
     id: myPeerId,
@@ -1037,6 +1133,7 @@ ipcMain.on('direct-connect', (event, ip) => {
 });
 
 ipcMain.on('register-ptt', (event, key) => {
+  if (!isMainWindowSender(event) || typeof key !== 'string' || key.length > 64) return;
   globalShortcut.unregisterAll();
   // Tuş artık kullanıcı tarafından yeniden atanabiliyor (Ayarlar → Kısayollar).
   // Geçersiz/başka uygulamaca kapılmış bir accelerator gelirse register() atar
@@ -1063,13 +1160,18 @@ ipcMain.on('register-ptt', (event, key) => {
   // unregisterAll kill-switch'i de sildiği için geri yükle
   syncControlKillSwitch();
 });
-ipcMain.on('unregister-ptt', () => {
+ipcMain.on('unregister-ptt', (event) => {
+  if (!isMainWindowSender(event)) return;
   globalShortcut.unregisterAll();
   // unregisterAll kill-switch'i de sildiği için geri yükle
   syncControlKillSwitch();
 });
 
-ipcMain.on('notify', (event, { title, body }) => {
+ipcMain.on('notify', (event, payload = {}) => {
+  if (!isMainWindowSender(event)) return;
+  const title = boundedString(payload.title, 200);
+  const body = boundedString(payload.body, 2_000);
+  if (!title || !body) return;
   try {
     if (notificationWindow && !notificationWindow.isDestroyed()) {
       notificationWindow.showInactive();
@@ -1151,6 +1253,8 @@ ipcMain.handle('set-control-owner', (event, requestedOwner) => {
 ipcMain.on('remote-input', (event, data) => {
   if (!isMainWindowSender(event) || !data || typeof data !== 'object') return;
   if (!remoteControlActive || remoteControlOwner !== 'remote') return;
+  data = sanitizeRemoteInput(data);
+  if (!data) return;
 
   if (!robot) {
     // Fallback to Electron's native webContents.sendInputEvent if robotjs is missing

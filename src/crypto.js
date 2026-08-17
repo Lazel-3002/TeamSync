@@ -10,7 +10,7 @@ const ALGO_AES = 'AES-GCM';
 let myKeyPair = null;
 
 // Karşı tarafın gönderdiği public key ile oluşturulan ortak (shared) şifreleme anahtarı
-let sharedAesKey = null;
+const sharedAesKeys = new Map();
 
 /**
  * 1. ADIM: Kendi Public (Genel) ve Private (Gizli) anahtar çiftimizi üretir.
@@ -66,12 +66,12 @@ export async function importPeerPublicKey(base64Key) {
  * Bu sayede internette hiçbir şifre iletilmez, matematiksel olarak 
  * iki bilgisayar aynı şifreyi kendi içlerinde bulur!
  */
-export async function deriveSharedKey(peerPublicKeyBase64) {
+export async function deriveSharedKey(peerId, peerPublicKeyBase64) {
   if (!myKeyPair) await generateKeyPair();
   
   const peerPublicKey = await importPeerPublicKey(peerPublicKeyBase64);
   
-  sharedAesKey = await window.crypto.subtle.deriveKey(
+  const sharedAesKey = await window.crypto.subtle.deriveKey(
     {
       name: 'ECDH',
       public: peerPublicKey
@@ -86,13 +86,15 @@ export async function deriveSharedKey(peerPublicKeyBase64) {
   );
   
   console.log('🔐 ECDH Ortak Güvenlik Anahtarı (Shared Secret) Başarıyla Türetildi!');
+  sharedAesKeys.set(peerId, sharedAesKey);
   return sharedAesKey;
 }
 
 /**
  * 5. ADIM: Türetilen ortak AES anahtarı ile JSON verilerini şifreler.
  */
-export async function encryptMessage(data) {
+export async function encryptMessage(data, peerId) {
+  const sharedAesKey = sharedAesKeys.get(peerId);
   if (!sharedAesKey) throw new Error('Ortak güvenlik anahtarı (Shared Key) henüz oluşturulmadı! Önce el sıkışma (Handshake) yapılmalı.');
   
   const encoder = new TextEncoder();
@@ -120,7 +122,8 @@ export async function encryptMessage(data) {
 /**
  * 6. ADIM: Şifrelenmiş veriyi ortak AES anahtarıyla çözer.
  */
-export async function decryptMessage(encryptedBase64) {
+export async function decryptMessage(encryptedBase64, peerId) {
+  const sharedAesKey = sharedAesKeys.get(peerId);
   if (!sharedAesKey) throw new Error('Ortak güvenlik anahtarı (Shared Key) henüz oluşturulmadı!');
   
   try {

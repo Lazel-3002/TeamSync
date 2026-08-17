@@ -53,13 +53,14 @@ if (window.mqtt && window.CryptoJS) {
 // Initialize Supabase
 let supabaseClient = null;
 if (window.supabase && window.electronAPI) {
-  const envVars = window.electronAPI.getEnv();
-  if (envVars.SUPABASE_URL && envVars.SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && envVars.SUPABASE_ANON_KEY) {
-    supabaseClient = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
-    console.log('Supabase initialized successfully.');
-  } else {
-    console.warn('Supabase URL or Key missing in .env file');
-  }
+  window.electronAPI.getEnv().then((envVars) => {
+    if (envVars && envVars.SUPABASE_URL && envVars.SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && envVars.SUPABASE_ANON_KEY) {
+      supabaseClient = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
+      console.log('Supabase initialized successfully.');
+    } else {
+      console.warn('Supabase URL or Key missing in .env file');
+    }
+  }).catch(() => {});
 }
 
 const state = window.state;
@@ -292,23 +293,32 @@ async function loadAIFilter() {
 }
 
 async function checkAvatar(base64Str) {
-  if (!state.sfwMode || !state.aiModel || !base64Str) return base64Str;
+  const safeAvatar = safeAvatarUrl(base64Str);
+  if (!safeAvatar || !state.sfwMode || !state.aiModel) return safeAvatar;
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = async () => {
       try {
         const preds = await state.aiModel.classify(img);
         const bad = preds.some(p => (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') && p.probability > 0.6);
-        resolve(bad ? null : base64Str);
-      } catch(e) { resolve(base64Str); }
+        resolve(bad ? null : safeAvatar);
+      } catch(e) { resolve(safeAvatar); }
     };
-    img.onerror = () => resolve(base64Str);
-    img.src = base64Str;
+    img.onerror = () => resolve(safeAvatar);
+    img.src = safeAvatar;
   });
 }
 
 const CHUNK_SIZE = 64 * 1024;
 const MAX_DM_FILE_SIZE = 20 * 1024 * 1024;
+// Room transfers are chunked and streamed from File.slice(), so the sender
+// does not load the whole file at once. Receivers keep chunks in memory until
+// the final Blob is created; keep a conservative aggregate cap for that peak.
+const MAX_ROOM_FILE_SIZE = 250 * 1024 * 1024;
+const MAX_PENDING_ROOM_BYTES = 300 * 1024 * 1024;
+const MAX_PENDING_ROOM_FILES = 4;
+const MAX_PENDING_DM_BYTES = 40 * 1024 * 1024;
+const MAX_CONTROL_MESSAGE_SIZE = 512 * 1024;
 const fileBuffer = new Map();
 // Sohbette paylaşılan dosyaların blob URL'leri: revoke edilmezse dosyanın
 // tüm içeriği uygulama kapanana kadar bellekte kalır (sohbet DOM'u
@@ -329,8 +339,8 @@ function releaseChatBlobUrls() {
 // sayılıp MOR .text-dl (yuvarlak kare) butonuyla gösteriliyordu; yuvarlak cam
 // .dl-btn yerine. Bu yüzden MIME yetersizse dosya adı uzantısına da bakarız.
 function isImageFile(name, mime) {
-  if (mime && mime.toLowerCase().startsWith('image/')) return true;
-  return /\.(png|jpe?g|jfif|gif|webp|bmp|avif|svg|ico|heic|heif|tiff?)$/i.test(name || '');
+  if (mime && /^image\/(?!svg\+xml\b)/i.test(mime)) return true;
+  return /\.(png|jpe?g|jfif|gif|webp|bmp|avif|ico|heic|heif|tiff?)$/i.test(name || '');
 }
 
 function isVideoFile(name, mime) {
@@ -453,6 +463,7 @@ function setupInternetSignaling(roomId, myId, myName) {
     client.on('message', async (topic, message) => {
     if (mqttClient !== client) return; // bayat broker'dan gelen mesajları yut
     try {
+      if (!message || message.length > MAX_CONTROL_MESSAGE_SIZE + CHUNK_SIZE) return;
       if (topic.endsWith('/file')) {
         const buf = new Uint8Array(message);
         let pipeIdx = -1;
@@ -468,9 +479,10 @@ function setupInternetSignaling(roomId, myId, myName) {
           try {
             const header = JSON.parse(headerStr);
             const f = fileBuffer.get(header.id);
-            if (f) {
+            if (f && header.fromId === f.peerId && chunk.length <= CHUNK_SIZE && f.received + chunk.length <= f.meta.size) {
               f.chunks.push(chunk);
               f.received += chunk.length;
+              f.lastChunkAt = Date.now();
               const prog = document.getElementById(`prog-${header.id}`);
               if (prog) prog.style.width = (f.received / f.meta.size * 100) + '%';
             }
@@ -480,6 +492,8 @@ function setupInternetSignaling(roomId, myId, myName) {
       }
 
       const data = JSON.parse(message.toString());
+      if (!data || typeof data !== 'object' || Array.isArray(data) || typeof data.type !== 'string' || data.type.length > 64) return;
+      if (typeof data.id !== 'string' || !isValidPeerId(data.id)) return;
       if (data.id === myId) return;
       
       if (data.type === 'hello') {
@@ -497,14 +511,14 @@ function setupInternetSignaling(roomId, myId, myName) {
           if (Number.isFinite(data.sfwChatBanThreshold)) {
             state.sfwChatBanThreshold = Math.max(1, Math.min(100, Math.floor(data.sfwChatBanThreshold)));
           }
-          if (Array.isArray(data.chatBannedIds)) state.chatBannedIds = new Set(data.chatBannedIds);
+          if (Array.isArray(data.chatBannedIds)) state.chatBannedIds = new Set(data.chatBannedIds.filter(isValidPeerId).slice(0, 200));
           if (!state.isRoomFounder && data.roomName && state.roomName !== data.roomName) {
             state.roomName = state.sfwMode ? censorProfaneText(data.roomName) : data.roomName;
             const titleEl = document.getElementById('room-title');
             if (titleEl) titleEl.textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
           }
           if (Array.isArray(data.moderators)) {
-            const incoming = new Set(data.moderators);
+            const incoming = new Set(data.moderators.filter(isValidPeerId).slice(0, 200));
             const changed = incoming.size !== state.moderators.size || [...incoming].some(id => !state.moderators.has(id));
             if (changed) {
               const affected = new Set([...incoming, ...state.moderators]);
@@ -516,7 +530,7 @@ function setupInternetSignaling(roomId, myId, myName) {
           // Yasak listesi (item 3) ve susturulanlar (item 5): kurucu otoritesiyle
           // eşitlenir. Yasaklıysam anında düşürülürüm.
           if (Array.isArray(data.bannedIds)) {
-            state.bannedIds = new Set(data.bannedIds);
+            state.bannedIds = new Set(data.bannedIds.filter(isValidPeerId).slice(0, 200));
             if (state.bannedIds.has(state.myId)) {
               disconnectApp();
               document.getElementById('error-text').textContent = "Bu sunucudan kalıcı olarak yasaklandınız.";
@@ -524,7 +538,7 @@ function setupInternetSignaling(roomId, myId, myName) {
             }
           }
           if (Array.isArray(data.serverMutedIds)) {
-            state.serverMutedIds = new Set(data.serverMutedIds);
+            state.serverMutedIds = new Set(data.serverMutedIds.filter(isValidPeerId).slice(0, 200));
             const iAmMuted = state.serverMutedIds.has(state.myId);
             // Kurucu susturması değiştiyse efektif durumu güncelle; kendi
             // tercihim (selfMicOn) korunur, susturma kalkınca geri uygulanır.
@@ -552,7 +566,9 @@ function setupInternetSignaling(roomId, myId, myName) {
           peer.lastSeen = Date.now();
           handleSignal(data.id, 'internet', data.signal);
         }
-      } else if (data.type === 'room-broadcast') {
+      } else if (data.type === 'room-broadcast' || data.type === 'room-private') {
+        if (!data.payload || typeof data.payload !== 'object' || Array.isArray(data.payload)
+          || (data.type === 'room-private' && data.target !== myId)) return;
         console.log('📥 MQTT Broadcast alındı:', data.id, data.payload.type, data.payload);
         const peer = state.peers.get(data.id);
         if (peer) peer.lastSeen = Date.now();
@@ -623,6 +639,11 @@ function isJunkIceCandidate(cand) {
 }
 
 async function processSignal(id, ip, signal) {
+  if (!isValidPeerId(id) || !signal || typeof signal !== 'object' || Array.isArray(signal)
+      || typeof signal.type !== 'string' || signal.type.length > 32
+      || !['offer', 'answer', 'ice', 'restart-req'].includes(signal.type)) return;
+  if ((signal.sdp && (typeof signal.sdp !== 'object' || typeof signal.sdp.sdp !== 'string' || signal.sdp.sdp.length > 1_000_000))
+      || (signal.candidate && JSON.stringify(signal.candidate).length > 100_000)) return;
   const peer = state.peers.get(id);
   if (!peer || !peer.pc) return;
   peer.lastSeen = Date.now();
@@ -803,7 +824,7 @@ window.deleteAccount = async function(id) {
 window.loginWithAccount = function(acc) {
   state.myName = acc.name;
   state.friendId = acc.id;
-  state.myAvatar = acc.avatar || null;
+  state.myAvatar = safeAvatarUrl(acc.avatar);
   state.myAvatarHash = acc.avatarHash || null;
   state.friends = acc.friends || {};
   state.friendRequests = acc.requests || [];
@@ -860,8 +881,9 @@ window.renderAccountsList = async function() {
     row.className = 'account-row';
     
     let avatarHtml = `<div class="account-row-avatar">👤</div>`;
-    if (acc.avatar) {
-      avatarHtml = `<img class="account-row-avatar" src="${acc.avatar}" />`;
+    const safeAccountAvatar = safeAvatarUrl(acc.avatar);
+    if (safeAccountAvatar) {
+      avatarHtml = `<img class="account-row-avatar" src="${escapeHtml(safeAccountAvatar)}" />`;
     }
     
     row.innerHTML = `
@@ -1063,17 +1085,19 @@ function renderFriends() {
       // Oda bilgisi son presence paketinden kalmış olabilir. Çevrimdışı bir
       // arkadaş hiçbir zaman "Sunucuda" veya katılınabilir gösterilmemeli.
       const inRoom = Boolean(f.online && f.room);
-      const avatarHtml = f.avatar 
-        ? `<img src="${escapeHtml(f.avatar)}" class="friend-avatar" />`
+      const safeFriendAvatar = safeAvatarUrl(f.avatar);
+      const friendArg = safeInlineArg(fId);
+      const avatarHtml = safeFriendAvatar
+        ? `<img src="${escapeHtml(safeFriendAvatar)}" class="friend-avatar" />`
         : `<div class="friend-avatar" style="background: rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:16px;">👤</div>`;
 
       const li = document.createElement('li');
       li.className = 'friend-item';
       li.innerHTML = `
-        <div class="friend-info" onclick="showFriendProfile('${fId}')" style="cursor:pointer;" title="Profili Görüntüle">
+        <div class="friend-info" onclick="showFriendProfile(${friendArg})" style="cursor:pointer;" title="Profili Görüntüle">
           <div style="position:relative;">
             ${avatarHtml}
-            <div class="friend-status ${isOnline}" id="status-${fId}" style="position:absolute; bottom:0; right:6px; border:2px solid #1e1e24; margin:0;"></div>
+            <div class="friend-status ${isOnline}" id="${safeDomId('status-', fId)}" style="position:absolute; bottom:0; right:6px; border:2px solid #1e1e24; margin:0;"></div>
           </div>
           <div class="friend-copy">
             <b class="friend-name">${escapeHtml(f.name)}</b>
@@ -1081,18 +1105,18 @@ function renderFriends() {
           </div>
         </div>
         <div class="friend-actions">
-          <button class="icon-btn sm friend-action-chat" style="display: flex; align-items: center; justify-content: center;" onclick="openDM('${fId}')" title="Mesaj Gönder">
+          <button class="icon-btn sm friend-action-chat" style="display: flex; align-items: center; justify-content: center;" onclick="openDM(${friendArg})" title="Mesaj Gönder">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           </button>
-          ${inRoom ? `<button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom('${fId}')" title="Sunucusuna Katıl">
+          ${inRoom ? `<button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom(${friendArg})" title="Sunucusuna Katıl">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h4"></path><path d="M8 10v4"></path><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line></svg>
           </button>` : ''}
-          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: ${f.isMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'}; color: ${f.isMuted ? '#fca5a5' : '#9ca3af'}; border-color: ${f.isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(107, 114, 128, 0.3)'};" onclick="toggleMuteFriend('${fId}')" title="${f.isMuted ? 'Sesi Aç' : 'Sessize Al / Engelle'}">
+          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: ${f.isMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'}; color: ${f.isMuted ? '#fca5a5' : '#9ca3af'}; border-color: ${f.isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(107, 114, 128, 0.3)'};" onclick="toggleMuteFriend(${friendArg})" title="${f.isMuted ? 'Sesi Aç' : 'Sessize Al / Engelle'}">
             ${f.isMuted 
               ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>` 
               : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`}
           </button>
-          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);" onclick="removeFriend('${fId}')" title="Arkadaşlıktan Çıkar">
+          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);" onclick="removeFriend(${friendArg})" title="Arkadaşlıktan Çıkar">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="23" y1="11" x2="17" y2="11"></line></svg>
           </button>
         </div>
@@ -1132,6 +1156,18 @@ window.toggleMuteFriend = (fId) => {
 // çevrimdışıysa QoS-0 broker'da istek sessizce kaybolur, "bekleniyor" toast'ı
 // sonsuza dek askıda kalmasın. Yanıt (kabul/ret) gelince zamanlayıcı iptal edilir.
 let joinReqAnswerTimer = null;
+let joinReqRetryTimer = null;
+
+function publishJoinEvent(targetId, payload) {
+  if (!isPersistentFriendId(targetId) || !state.globalMqtt || !state.globalMqtt.connected) return false;
+  try {
+    state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify(payload), { qos: 1 });
+    return true;
+  } catch (error) {
+    console.warn('Join event publish failed:', error && error.message ? error.message : error);
+    return false;
+  }
+}
 
 // Eski sürümlerde odada eklenen arkadaşlıklar kalıcı kimlik (KNK-...) yerine
 // oturumluk oda UUID'siyle kaydedilebiliyordu. O konuya yapılan yayın karşıya
@@ -1153,14 +1189,25 @@ function warnStaleFriendEntry(fId) {
 window.requestJoinRoom = (fId) => {
   if (!isPersistentFriendId(fId)) { warnStaleFriendEntry(fId); return; }
   if (state.globalMqtt && state.globalMqtt.connected) {
-    state.globalMqtt.publish(`teamsync/user/${fId}/events`, JSON.stringify({
+    const request = {
       type: 'room_join_request',
       id: state.friendId,
       name: state.myName
-    }));
+    };
+    clearInterval(joinReqRetryTimer);
+    let attempts = 0;
+    const publishRequest = () => {
+      if (attempts++ >= 8 || !publishJoinEvent(fId, request)) {
+        if (attempts >= 8) clearInterval(joinReqRetryTimer);
+        return;
+      }
+    };
+    publishRequest();
+    joinReqRetryTimer = setInterval(publishRequest, 1500);
     showToast("Katılma isteği gönderildi, bekleniyor...", "info");
     clearTimeout(joinReqAnswerTimer);
     joinReqAnswerTimer = setTimeout(() => {
+      clearInterval(joinReqRetryTimer);
       showToast("Katılma isteğine yanıt gelmedi; arkadaşın çevrimdışı olabilir.", "warn");
     }, 40000);
   } else {
@@ -1192,11 +1239,11 @@ function showJoinRequestNote(id, name) {
   clearTimeout(joinReqTimer);
   joinReqTimer = setTimeout(() => {
     if (state.pendingJoinReq && state.globalMqtt) {
-      state.globalMqtt.publish(`teamsync/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
+      publishJoinEvent(state.pendingJoinReq.id, {
         type: 'room_join_declined',
         id: state.friendId,
         name: state.myName
-      }));
+      });
     }
     closeJoinRequestNote();
   }, JOIN_REQ_TIMEOUT_MS);
@@ -1308,8 +1355,9 @@ window.showProfileModal = ({ name, avatar, idLabel, badges = [], actions = [] })
 
   const imgEl = document.getElementById('profile-view-avatar-img');
   const defEl = document.getElementById('profile-view-avatar-default');
-  if (avatar) {
-    imgEl.src = avatar;
+  const safeProfileAvatar = safeAvatarUrl(avatar);
+  if (safeProfileAvatar) {
+    imgEl.src = safeProfileAvatar;
     imgEl.style.display = 'block';
     defEl.style.display = 'none';
   } else {
@@ -1914,9 +1962,12 @@ function connectGlobalBroker(idx, session) {
               type: 'room_join_declined',
               id: state.friendId,
               name: state.myName
-            }));
+            }), { qos: 1 });
           }
         } else if (data.type === 'room_join_accepted') {
+          if (state.joinAcceptanceRoom === data.roomId) return;
+          state.joinAcceptanceRoom = data.roomId;
+          clearInterval(joinReqRetryTimer);
           clearTimeout(joinReqAnswerTimer);
           showToast(`${data.name} isteğini kabul etti, bağlanılıyor...`, 'ok');
           document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
@@ -1924,11 +1975,16 @@ function connectGlobalBroker(idx, session) {
           const joinPwInput = document.getElementById('join-password');
           const btnJoin = document.getElementById('btn-join');
           if(joinIdInput && btnJoin) {
+             // Route broker-driven joins through the same visible form state
+             // as a manual join. This avoids starting getUserMedia and the
+             // room operation while the action screen is still mounted.
+             document.getElementById('step-join')?.classList.remove('hidden');
              joinIdInput.value = data.roomId;
              if(joinPwInput) joinPwInput.value = data.password || '';
-             btnJoin.click();
+             setTimeout(() => btnJoin.click(), 0);
           }
         } else if (data.type === 'room_join_declined') {
+          clearInterval(joinReqRetryTimer);
           clearTimeout(joinReqAnswerTimer);
           showToast(`${data.name} katılma isteğini reddetti veya bir sunucuda değil.`, 'warn');
         } else if (data.type === 'server_invite_received') {
@@ -1989,6 +2045,12 @@ setInterval(() => {
       showToast(`${senderName} bir dosya/GIF gönderdi ama transfer tamamlanamadı (bağlantı kopması). Tekrar göndermesini isteyebilirsin.`, 'warn');
       delete state.incomingDMFiles[fileId];
     }
+  });
+
+  // Oda dosya transferleri de bağlantı kopunca alınan Uint8Array parçalarını
+  // bellekte tutmamalı. Aktif olmayan transferleri süre aşımında düşür.
+  fileBuffer.forEach((f, fileId) => {
+    if (f && now - (f.lastChunkAt || 0) > 120000) fileBuffer.delete(fileId);
   });
 }, 10000);
 
@@ -2362,8 +2424,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   try {
     const verEl = document.getElementById('app-version');
     if (verEl && window.electronAPI && window.electronAPI.getAppVersion) {
-      const v = window.electronAPI.getAppVersion();
-      if (v) verEl.textContent = 'v' + v;
+      Promise.resolve(window.electronAPI.getAppVersion()).then((v) => {
+        if (v) verEl.textContent = 'v' + v;
+      }).catch(() => {});
     }
   } catch (e) { /* sürüm alınamazsa statik metin kalır */ }
 
@@ -2690,8 +2753,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     list.forEach(acc => {
       const row = document.createElement('div');
       row.className = 'account-row';
-      const avatarHtml = acc.avatar
-        ? `<img class="account-row-avatar" src="${acc.avatar}" />`
+      const safeAccountAvatar = safeAvatarUrl(acc.avatar);
+      const avatarHtml = safeAccountAvatar
+        ? `<img class="account-row-avatar" src="${escapeHtml(safeAccountAvatar)}" />`
         : `<div class="account-row-avatar">👤</div>`;
       const defaultRef = acc.accountType === 'device' ? { type: 'device', slot: acc.slot } : { type: 'legacy', id: acc.id };
       const isDefaultAccount = acc.accountType === 'device'
@@ -2856,7 +2920,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   function loginWithProfileData(profile) {
     state.myName = profile.name;
     state.friendId = profile.friend_id;
-    state.myAvatar = profile.avatar || null;
+    state.myAvatar = safeAvatarUrl(profile.avatar);
     state.myAvatarHash = null;
     state.friends = profile.friends || {};
     state.friendRequests = profile.requests || [];
@@ -3076,13 +3140,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (joinReqAcceptBtn) {
     joinReqAcceptBtn.addEventListener('click', () => {
       if (state.pendingJoinReq && state.room && state.globalMqtt) {
-        state.globalMqtt.publish(`teamsync/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
+        const targetId = state.pendingJoinReq.id;
+        const response = {
           type: 'room_join_accepted',
           id: state.friendId,
           name: state.myName,
           roomId: state.room,
           password: state.password || ''
-        }));
+        };
+        publishJoinEvent(targetId, response);
+        [500, 1500].forEach(delay => setTimeout(() => publishJoinEvent(targetId, response), delay));
       }
       closeJoinRequestNote();
     });
@@ -3090,12 +3157,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   if (joinReqDenyBtn) {
     joinReqDenyBtn.addEventListener('click', () => {
+      clearInterval(joinReqRetryTimer);
       if (state.pendingJoinReq && state.globalMqtt) {
         state.globalMqtt.publish(`teamsync/user/${state.pendingJoinReq.id}/events`, JSON.stringify({
           type: 'room_join_declined',
           id: state.friendId,
           name: state.myName
-        }));
+        }), { qos: 1 });
       }
       closeJoinRequestNote();
     });
@@ -3144,13 +3212,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       const li = document.createElement('li');
       li.className = 'friend-item';
+      const friendArg = safeInlineArg(fId);
       li.innerHTML = `
         <div class="friend-info">
           <div class="friend-status online"></div>
           <div><b>${escapeHtml(f.name)}</b></div>
         </div>
         <div class="friend-actions">
-          <button class="btn-pri btn-sm" style="padding: 6px 12px; border-radius: 6px; cursor:pointer;" onclick="sendServerInvite('${fId}')">Davet Et</button>
+          <button class="btn-pri btn-sm" style="padding: 6px 12px; border-radius: 6px; cursor:pointer;" onclick="sendServerInvite(${friendArg})">Davet Et</button>
         </div>
       `;
       list.appendChild(li);
@@ -3850,7 +3919,10 @@ async function setupDeviceList() {
 }
 
 async function handlePeerDiscovered(peer) {
-  if (!peer || !peer.id || peer.id === state.myId) return;
+  if (!peer || !isValidPeerId(peer.id) || peer.id === state.myId) return;
+  peer.name = typeof peer.name === 'string' ? peer.name.slice(0, 120) : 'Bilinmeyen';
+  peer.avatar = safeAvatarUrl(peer.avatar);
+  if (peer.friendId && !isValidPeerId(peer.friendId)) peer.friendId = null;
 
   // Kalıcı yasak kontrolü (item 3): yasaklı biri odaya giremez. Kurucu ayrıca
   // yasaklıyı aktif olarak atar (kick), diğer istemciler sadece bağlantı kurmaz.
@@ -4823,12 +4895,14 @@ function setupDataChannel(peerId, dc) {
   };
   dc.onmessage = async (e) => {
     if (typeof e.data === 'string') {
+      if (e.data.length > MAX_CONTROL_MESSAGE_SIZE) return;
       try {
         const msg = JSON.parse(e.data);
         console.log('📥 DC Mesajı alındı:', peerId, msg.type, msg);
         handleDataMessage(peerId, msg);
       } catch (err) {}
     } else {
+      if (!(e.data instanceof ArrayBuffer) || e.data.byteLength > CHUNK_SIZE + 160) return;
       const buf = new Uint8Array(e.data);
       let pipeIdx = -1;
       for (let i=0; i<100; i++) { if(buf[i]===124) { pipeIdx=i; break; } } // '|'
@@ -4837,10 +4911,12 @@ function setupDataChannel(peerId, dc) {
         const chunk = buf.slice(pipeIdx + 1);
         try {
           const header = JSON.parse(headerStr);
-          const f = fileBuffer.get(header.id);
-          if (f) {
-            f.chunks.push(chunk);
+           const f = fileBuffer.get(header.id);
+           if (f && header.fromId === peerId && f.peerId === peerId
+               && chunk.length <= CHUNK_SIZE && f.received + chunk.length <= f.meta.size) {
+              f.chunks.push(chunk);
             f.received += chunk.length;
+            f.lastChunkAt = Date.now();
             const prog = document.getElementById(`prog-${header.id}`);
             if (prog) prog.style.width = (f.received / f.meta.size * 100) + '%';
           }
@@ -4852,7 +4928,10 @@ function setupDataChannel(peerId, dc) {
 
 const processedMessages = new Set();
 async function handleDataMessage(peerId, msg) {
-  if (msg && msg._mid) {
+  if (!isValidPeerId(peerId) || !msg || typeof msg !== 'object' || Array.isArray(msg)
+      || typeof msg.type !== 'string' || msg.type.length > 64) return;
+  if (msg._mid) {
+    if (typeof msg._mid !== 'string' || msg._mid.length > 128) return;
     if (processedMessages.has(msg._mid)) return;
     processedMessages.add(msg._mid);
     if (processedMessages.size > 500) {
@@ -5260,11 +5339,29 @@ async function handleDataMessage(peerId, msg) {
       appendChat(peerId, peer.name, '🔒 [Kilitli Mesaj]');
     }
   } else if (msg.type === 'file-meta') {
-    fileBuffer.set(msg.id, { meta: msg, chunks: [], received: 0 });
-    appendFileMsg(msg.id, msg.name, msg.size, true);
+    const validId = typeof msg.id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(msg.id);
+    const validName = typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 255;
+    const validSize = Number.isInteger(msg.size) && msg.size > 0 && msg.size <= MAX_ROOM_FILE_SIZE;
+    const validMime = typeof msg.mime === 'string' && msg.mime.length <= 128;
+    const pendingRoomBytes = Array.from(fileBuffer.values()).reduce((sum, entry) => sum + (entry.meta?.size || 0), 0);
+    if (!validId || !validName || !validSize || !validMime || fileBuffer.has(msg.id) || fileBuffer.size >= MAX_PENDING_ROOM_FILES
+      || pendingRoomBytes + msg.size > MAX_PENDING_ROOM_BYTES) return;
+    fileBuffer.set(msg.id, {
+      meta: { ...msg, name: safeFileName(msg.name), mime: msg.mime },
+      peerId,
+      chunks: [],
+      received: 0,
+      lastChunkAt: Date.now()
+    });
+    appendFileMsg(msg.id, safeFileName(msg.name), msg.size, true);
   } else if (msg.type === 'file-done') {
     const f = fileBuffer.get(msg.id);
-    if (f) {
+    if (f && f.peerId !== peerId) return;
+    if (f && f.received !== f.meta.size) {
+      fileBuffer.delete(msg.id);
+      return;
+    }
+    if (f && f.received === f.meta.size) {
       const blob = new Blob(f.chunks, { type: f.meta.mime });
       const url = URL.createObjectURL(blob);
       chatBlobUrls.push(url);
@@ -5295,7 +5392,7 @@ async function handleDataMessage(peerId, msg) {
           
           const aDl = document.createElement('a');
           aDl.href = url;
-          aDl.download = f.meta.name;
+          aDl.download = safeFileName(f.meta.name);
           aDl.className = 'text-dl';
           aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> İndir`;
           btnGroup.appendChild(aDl);
@@ -6428,7 +6525,7 @@ function showInactiveOverlay(cardId, title, onJoin) {
     
     const btn = document.createElement('button');
     btn.className = 'btn-pri';
-    btn.innerHTML = `<span style="font-size:24px; font-weight:bold;">+</span><br/>Katıl: ${title}`;
+    btn.innerHTML = `<span style="font-size:24px; font-weight:bold;">+</span><br/>Katıl: ${escapeHtml(title)}`;
     btn.style.cssText = 'padding: 10px 20px; border-radius: 12px; display:flex; flex-direction:column; align-items:center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: pointer; border: none; background: var(--acc); color: white;';
     
     btn.onclick = (e) => {
@@ -6696,6 +6793,8 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
     return;
   }
 
+  if (!state.peers.has(peer.id) && state.peers.size >= 100) return;
+
   const res = await checkTextWithAI(rawText);
   let textToSend = res.ok ? rawText : (res.text || '');
   let isCensored = !res.ok;
@@ -6856,6 +6955,39 @@ function broadcast(msg) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function isValidPeerId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
+function safeInlineArg(value) {
+  return escapeHtml(JSON.stringify(String(value)));
+}
+
+function safeDomId(prefix, value) {
+  return `${prefix}${String(value).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 128)}`;
+}
+
+function safeAvatarUrl(value) {
+  if (typeof value !== 'string' || value.length > 2 * 1024 * 1024) return '';
+  if (/^https:\/\//i.test(value)) return value;
+  if (/^data:image\/(?!svg\+xml\b)[a-z0-9.+-]+;base64,/i.test(value)) return value;
+  return '';
+}
+
+function safeFileName(value) {
+  return String(value || 'dosya').replace(/[\u0000-\u001f\\/:*?"<>|]/g, '_').slice(0, 255) || 'dosya';
+}
+
+function safeMediaUrl(value, type) {
+  if (typeof value !== 'string' || value.length > 30 * 1024 * 1024) return '';
+  if (type === 'image' && /^data:image\/svg\+xml/i.test(value)) return '';
+  if (/^blob:/i.test(value)) return value;
+  const prefix = type === 'image' ? 'data:image/' : type === 'video' ? 'data:video/' : 'data:';
+  if (!value.toLowerCase().startsWith(prefix)) return '';
+  if (type === 'file' && /^data:(?:text\/html|text\/javascript|application\/javascript|image\/svg\+xml)/i.test(value)) return '';
+  return value;
 }
 
 const USER_LANGUAGE_KEY = 'teamsync_language';
@@ -7776,6 +7908,19 @@ Object.assign(LEGACY_TEXT_EN, {
 // Keep these in the same source dictionary so every locale catalog is audited
 // against them and dynamic cards cannot silently remain in Turkish.
 Object.assign(LEGACY_TEXT_EN, {
+  'Botu Kaldır': 'Remove Bot',
+  'Savaş formatı': 'Battle format',
+  'Kurucu seçer': 'Chosen by the host',
+  'Rastgele Pokémon (AÇIK)': 'Random Pokémon (ON)',
+  'Manuel Takım Seçimi (KAPALI)': 'Manual Team Selection (OFF)',
+  'OYUNCU 1': 'PLAYER 1',
+  'OYUNCU 2': 'PLAYER 2',
+  'Pokémon Değiştir': 'Switch Pokémon',
+  'Bir Pokémon seç — bu tur saldırı yerine değiştirirsin': 'Choose a Pokémon — you will switch instead of attacking this turn',
+  'Takımı Confirm': 'Confirm Team',
+  'Takımı Onayla': 'Confirm Team',
+  'Seçtiğin saldırılar': 'Selected attacks',
+  'Henüz seçilmedi': 'Not selected yet',
   'SUNUCU ID:': 'SERVER ID:',
   '32 kbps (Düşük)': '32 kbps (Low)',
   '64 kbps': '64 kbps',
@@ -7925,12 +8070,13 @@ function translateLegacyValue(value, dictionary) {
   const candidates = Object.entries(dictionary)
     .filter(([source, target]) => source.length > 1 && source !== target)
     .sort(([a], [b]) => b.length - a.length);
+  const hasDynamicNumericContext = /\d/.test(embeddedValue);
   for (const [source, target] of candidates) {
       if (!embeddedValue.includes(source)) continue;
       // A short label embedded in a whole sentence is usually dynamic game or
       // user content. Translating just that label produced mixed strings such
       // as "Your secret role: Büyücü". Keep the original coherent instead.
-      if (source.length / Math.max(embeddedValue.length, 1) < 0.45) continue;
+      if (source.length / Math.max(embeddedValue.length, 1) < 0.45 && !hasDynamicNumericContext) continue;
       // Do not turn a short standalone word such as "oy" (vote) into the
       // middle of a longer Turkish word such as "oyuncu" (player).
       if (/^[\p{L}\p{N}]+$/u.test(source)) {
@@ -7942,7 +8088,6 @@ function translateLegacyValue(value, dictionary) {
         embeddedValue = embeddedValue.split(source).join(target);
       }
       embeddedChanged = true;
-      break;
   }
   return embeddedChanged ? embeddedValue : null;
 }
@@ -7953,7 +8098,7 @@ function translateLegacyStaticUI(language, root = document.body) {
   // receives the complete English safety net so a language switch cannot
   // produce a mixed Turkish interface.
   const dictionary = LEGACY_TEXT_BY_LOCALE[language] || LEGACY_TEXT_EN;
-  const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, #img-lightbox, .chat-msg, .dm-message, .uname-text, .vtitle';
+  const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], [data-i18n-ignore], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, #img-lightbox, .chat-msg, .dm-message, .uname-text, .vtitle, .vv-bot-memory';
   const visitText = node => {
     const parent = node.parentElement;
     if (!parent || parent.closest(excludedSelector)) return;
@@ -10248,6 +10393,8 @@ function disconnectApp() {
   document.getElementById('msgs').innerHTML = '';
   lastChatEntry = null;
   releaseChatBlobUrls();
+  fileBuffer.clear();
+  state.incomingDMFiles = {};
   
   const grid = document.getElementById('grid');
   // Beyaz Tahta da kapanır ve içeriği silinir: eskiden açık bırakılıyordu ve
@@ -10281,6 +10428,8 @@ function disconnectApp() {
   // kaldırılsın (boştayken pil/CPU tüketimini artırmasın).
   setVoiceSessionActive(false);
   state.pendingJoinReq = null;
+  state.joinAcceptanceRoom = null;
+  clearInterval(joinReqRetryTimer);
   state.moderators = new Set();
   state.serverMutedIds = new Set();
   state.bannedIds = new Set();
@@ -10342,6 +10491,10 @@ function appendFileMsg(fileId, name, size, incoming) {
 }
 
 async function sendFile(file) {
+  if (!file || file.size > MAX_ROOM_FILE_SIZE) {
+    showToast('Dosya boyutu izin verilen sınırı aşıyor.', 'warn');
+    return;
+  }
   const fileId = crypto.randomUUID();
   appendFileMsg(fileId, file.name, file.size, false);
 
@@ -10358,7 +10511,7 @@ async function sendFile(file) {
     while (offset < file.size) {
       const slice = file.slice(offset, offset + CHUNK_SIZE);
       const chunk = new Uint8Array(await slice.arrayBuffer());
-      const header = new TextEncoder().encode(JSON.stringify({ id: fileId }) + '|');
+      const header = new TextEncoder().encode(JSON.stringify({ id: fileId, fromId: state.myId }) + '|');
       const msgBuf = new Uint8Array(header.length + chunk.length);
       msgBuf.set(header);
       msgBuf.set(chunk, header.length);
@@ -10392,7 +10545,7 @@ async function sendFile(file) {
     while (offset < file.size) {
       const slice = file.slice(offset, offset + CHUNK_SIZE);
       const chunk = new Uint8Array(await slice.arrayBuffer());
-      const header = new TextEncoder().encode(JSON.stringify({ id: fileId }) + '|');
+      const header = new TextEncoder().encode(JSON.stringify({ id: fileId, fromId: state.myId }) + '|');
       const msgBuf = new Uint8Array(header.length + chunk.length);
       msgBuf.set(header);
       msgBuf.set(chunk, header.length);
@@ -10513,6 +10666,8 @@ window.renderDMs = () => {
   const html = messages.map(m => {
     const cls = m.sender === 'me' ? 'sent' : 'recv';
     let contentHtml = escapeHtml(m.content || '');
+    const originalContent = m.content;
+    const originalFileName = m.fileName;
     
     if (m.isCensored) {
        contentHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
@@ -10520,14 +10675,22 @@ window.renderDMs = () => {
       // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
       contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
     } else if (m.type === 'image') {
+      m.content = escapeHtml(safeMediaUrl(m.content, 'image'));
+      m.fileName = escapeHtml(safeFileName(m.fileName || 'Gorsel'));
       // data-media-name: "Koleksiyona ekle" dosyayı özgün adıyla kaydetsin.
       contentHtml = `<img src="${m.content}" alt="${escapeHtml(m.fileName || 'Görsel')}" data-media-name="${escapeHtml(m.fileName || '')}" />`;
     } else if (m.type === 'video') {
+      m.content = escapeHtml(safeMediaUrl(m.content, 'video'));
+      m.fileName = escapeHtml(safeFileName(m.fileName || 'Video'));
       contentHtml = `<video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}" data-media-name="${escapeHtml(m.fileName || '')}"></video>`;
     } else if (m.type === 'file') {
+      m.content = escapeHtml(safeMediaUrl(m.content, 'file'));
+      m.fileName = escapeHtml(safeFileName(m.fileName || 'dosya'));
       contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
     }
 
+    m.content = originalContent;
+    m.fileName = originalFileName;
     if (m.isCensored) contentHtml = censoredTextHtml(m.content);
     if (m.count > 1) {
       contentHtml += `<span class="msg-repeat-badge">×${m.count}</span>`;
@@ -10711,6 +10874,7 @@ window.sendDMFile = async (file) => {
 state.incomingDMFiles = {};
 
 window.receiveDM = async (fromId, data) => {
+  if (typeof fromId !== 'string' || fromId.length > 128 || !data || typeof data !== 'object') return;
   if (!state.dms[fromId]) state.dms[fromId] = [];
 
   // Sunucudan (arkadaş olmayan birinden) gelen DM: gönderen listede yoksa
@@ -10722,6 +10886,7 @@ window.receiveDM = async (fromId, data) => {
   }
 
   if (data.type === 'dm_msg') {
+    if (!['text', 'image', 'video', 'file'].includes(data.msgType) || typeof data.content !== 'string' || data.content.length > (data.msgType === 'text' ? 20_000 : 30 * 1024 * 1024)) return;
     let isCensored = data.isCensored || false;
     let safeContent = data.content;
     if (!isCensored && data.content) {
@@ -10753,23 +10918,38 @@ window.receiveDM = async (fromId, data) => {
         if (error) console.error('Supabase DM receive error:', error);
       });
     }
-  } 
+  }
   else if (data.type === 'dm_file_start') {
+    const maxChunks = Math.ceil(MAX_DM_FILE_SIZE * 1.4 / 60000);
+    const pendingDmBytes = Object.values(state.incomingDMFiles).reduce((sum, file) =>
+      sum + (file.totalChunks || 0) * 60000, 0);
+    if (typeof data.fileId !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(data.fileId)
+      || data.fromId !== fromId || !['image', 'video', 'file'].includes(data.msgType)
+      || typeof data.fileName !== 'string' || data.fileName.length === 0 || data.fileName.length > 255
+      || !Number.isInteger(data.totalChunks) || data.totalChunks < 1 || data.totalChunks > maxChunks
+      || Object.keys(state.incomingDMFiles).length >= 4
+      || pendingDmBytes + data.totalChunks * 60000 > MAX_PENDING_DM_BYTES) return;
     state.incomingDMFiles[data.fileId] = {
       fromId: data.fromId,
       msgType: data.msgType,
-      fileName: data.fileName,
+      fileName: safeFileName(data.fileName),
       totalChunks: data.totalChunks,
       chunks: [],
+      receivedChunks: 0,
       lastChunkAt: Date.now()
     };
   }
   else if (data.type === 'dm_file_chunk') {
     const fileData = state.incomingDMFiles[data.fileId];
-    if (fileData) {
+    if (fileData && data.fromId === fromId && Number.isInteger(data.chunkIndex)
+      && data.chunkIndex >= 0 && data.chunkIndex < fileData.totalChunks
+      && typeof data.data === 'string' && data.data.length > 0 && data.data.length <= 90_000) {
       fileData.lastChunkAt = Date.now();
-      fileData.chunks[data.chunkIndex] = data.data;
-      if (fileData.chunks.filter(c => c).length === fileData.totalChunks) {
+      if (!fileData.chunks[data.chunkIndex]) {
+        fileData.chunks[data.chunkIndex] = data.data;
+        fileData.receivedChunks++;
+      }
+      if (fileData.receivedChunks === fileData.totalChunks) {
         const fullBase64 = fileData.chunks.join('');
         state.dms[fromId].push({ sender: 'them', type: fileData.msgType, content: fullBase64, fileName: fileData.fileName, timestamp: Date.now() });
         saveDMs();

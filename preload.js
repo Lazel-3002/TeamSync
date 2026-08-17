@@ -27,10 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveAccounts: (accounts) => ipcRenderer.invoke('save-accounts', accounts),
   isSecondInstance: () => ipcRenderer.invoke('is-second-instance'),
   getDeviceCredentials: (slot) => ipcRenderer.invoke('get-device-credentials', slot),
-  getEnv: () => ({
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY
-  }),
+  getEnv: () => ipcRenderer.invoke('get-env'),
   windowMin: () => ipcRenderer.send('window-min'),
   windowMax: () => ipcRenderer.send('window-max'),
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
@@ -45,7 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setVoiceSession: (active) => ipcRenderer.send('set-voice-session', active),
   appQuitForce: () => ipcRenderer.send('app-quit-force'),
   // Uygulama sürümü (package.json'dan). Başlangıç menüsünde gösterilir.
-  getAppVersion: () => { try { return require('./package.json').version; } catch (e) { return null; } },
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   // Donanım hızlandırma tercihi (buzlu cam / performans). Yeniden başlatınca etkin.
   getHardwareAcceleration: () => ipcRenderer.invoke('get-hardware-acceleration'),
   getEffectiveHardwareAcceleration: () => ipcRenderer.invoke('get-effective-hardware-acceleration'),

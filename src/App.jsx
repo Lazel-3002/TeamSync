@@ -28,7 +28,7 @@ function App() {
       }
 
       // Kendi rastgele ID'mizi oluştur
-      const newMyId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const newMyId = `TS-${crypto.randomUUID()}`;
       setMyId(newMyId);
       
       setStatus('Sinyalizasyon Ağına Bağlanılıyor...');

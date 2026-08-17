@@ -695,7 +695,20 @@
     "Seçimi döndürmek için sürükle": "Сонголтыг эргүүлэхийн тулд чирнэ үү",
     "Fotoğraf Ekle": "Зураг нэмэх",
     "Fotoğraf çok büyük": "Зураг хэт том байна",
-    "Fotoğraf yüklenemedi": "Зургийг ачаалж чадсангүй"
+    "Fotoğraf yüklenemedi": "Зургийг ачаалж чадсангүй",
+    "Bir Pokémon seç — bu tur saldırı yerine değiştirirsin": "Choose a Pokémon — you will switch instead of attacking this turn",
+    "Botu Kaldır": "Remove Bot",
+    "Henüz seçilmedi": "Not selected yet",
+    "Kurucu seçer": "Chosen by the host",
+    "Manuel Takım Seçimi (KAPALI)": "Manual Team Selection (OFF)",
+    "OYUNCU 1": "PLAYER 1",
+    "OYUNCU 2": "PLAYER 2",
+    "Pokémon Değiştir": "Switch Pokémon",
+    "Rastgele Pokémon (AÇIK)": "Random Pokémon (ON)",
+    "Savaş formatı": "Battle format",
+    "Seçtiğin saldırılar": "Selected attacks",
+    "Takımı Confirm": "Confirm Team",
+    "Takımı Onayla": "Confirm Team"
   },
   "machineDraft": {
     "provider": "Google Translate via deep-translator",

@@ -695,6 +695,19 @@
     "Seçimi döndürmek için sürükle": "Drag to rotate the selection",
     "Fotoğraf Ekle": "Add Photo",
     "Fotoğraf çok büyük": "Photo is too large",
-    "Fotoğraf yüklenemedi": "Photo could not be loaded"
+    "Fotoğraf yüklenemedi": "Photo could not be loaded",
+    "Botu Kaldır": "Remove Bot",
+    "Savaş formatı": "Battle format",
+    "Kurucu seçer": "Chosen by the host",
+    "Rastgele Pokémon (AÇIK)": "Random Pokémon (ON)",
+    "Manuel Takım Seçimi (KAPALI)": "Manual Team Selection (OFF)",
+    "OYUNCU 1": "PLAYER 1",
+    "OYUNCU 2": "PLAYER 2",
+    "Pokémon Değiştir": "Switch Pokémon",
+    "Bir Pokémon seç — bu tur saldırı yerine değiştirirsin": "Choose a Pokémon — you will switch instead of attacking this turn",
+    "Takımı Confirm": "Confirm Team",
+    "Seçtiğin saldırılar": "Selected attacks",
+    "Henüz seçilmedi": "Not selected yet",
+    "Takımı Onayla": "Confirm Team"
   }
 }

@@ -215,6 +215,7 @@ export default function WebRTC({ currentUserId, targetUserId, isHandshakeComplet
   const setupDataChannel = (dc) => {
     dataChannelRef.current = dc;
     dc.onmessage = (event) => {
+      if (typeof event.data !== 'string' || event.data.length > 512 * 1024) return;
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'remote-input' && window.electronAPI) {
