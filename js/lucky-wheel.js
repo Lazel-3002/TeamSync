@@ -10,6 +10,7 @@ function initLuckyWheel() {
     if (act === 'poll') openCardFocused('poll-card');
     if (act === 'lvs') openCardFocused('lvs-card');
     if (act === 'wheel') openCardFocused('wheel-card');
+    if (act === 'namecity' && window.openNameCityActivity) window.openNameCityActivity(false);
   };
 
   const setActivity = (act) => {
@@ -975,7 +976,9 @@ function initLuckyWheel() {
         if (data.activity === 'poll') openCardFocused('poll-card');
         if (data.activity === 'lvs') openCardFocused('lvs-card');
         if (data.activity === 'wheel') openCardFocused('wheel-card');
+        if (data.activity === 'namecity' && window.openNameCityActivity) window.openNameCityActivity(false);
       }
+      if (data.type.startsWith('namecity-') && window.nameCityHandleMessage) window.nameCityHandleMessage(data);
       if (data.type === 'poll_start') handlePollStart(data, false);
       if (data.type === 'poll_vote') applyPollVote(data);
       if (data.type === 'poll_end') handlePollEnd(data);

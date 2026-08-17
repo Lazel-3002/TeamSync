@@ -1063,6 +1063,9 @@
             </div>
           </div>
         </div>
+        <div id="namecity-card" class="vcard hidden namecity-card" aria-label="İsim-Şehir etkinliği">
+          <div id="namecity-root"></div>
+        </div>
       </div>
     
       
@@ -1880,6 +1883,7 @@
         <button id="act-lvs" style="display:none;"></button>
         <button id="act-wheel" style="display:none;"></button>
         <button id="act-vampire" style="display:none;"></button>
+        <button id="act-namecity" style="display:none;"></button>
 
         <div class="activity-picker-scroll">
           <section class="activity-quick-section" aria-labelledby="activity-quick-title">
@@ -1905,7 +1909,7 @@
 
           <div class="activity-section-label">
             <span>Etkinlikler</span>
-            <span class="activity-section-hint">7 etkinlik</span>
+            <span class="activity-section-hint">8 etkinlik</span>
           </div>
 
           <div class="sources activity-grid">
@@ -2008,6 +2012,25 @@
                 <div class="act-arrow-btn" id="arrow-act-vampire"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
               </div>
             </div>
+
+            <div class="src act-src card-act-btn namecity-activity-card" id="card-act-namecity" role="button" tabindex="0" data-search="isim şehir isim şehir kelime kategori harf oylama puan">
+              <div class="activity-cover activity-cover-namecity">
+                <span class="activity-cover-badge" data-namecity-label="voteBadge">OYLA</span>
+                <div class="namecity-cover-art" aria-hidden="true">
+                  <span class="namecity-cover-letter">A</span>
+                  <span class="namecity-cover-city">ANKARA</span>
+                  <span class="namecity-cover-word">KELİME</span>
+                  <i class="namecity-cover-dot namecity-cover-dot-one"></i>
+                  <i class="namecity-cover-dot namecity-cover-dot-two"></i>
+                </div>
+              </div>
+              <div class="activity-card-footer">
+                <div class="activity-icon activity-icon-namecity" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M8 5v14M4 19h8M13 19h7M16 5v14"></path></svg></div>
+                <div class="activity-copy"><div class="activity-name" data-namecity-label="title">İsim-Şehir</div><p data-namecity-label="cardDesc">Harf seç, cevapla, birlikte oyla</p></div>
+                <span class="act-count-badge hidden" id="act-namecity-count">0</span>
+                <div class="act-arrow-btn" id="arrow-act-namecity"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+              </div>
+            </div>
           </div>
           <div id="activity-empty" class="activity-empty hidden">
             <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
@@ -2035,6 +2058,7 @@
           <button id="act-lobby-close" class="btn-sec" style="flex: 1;">Kapat</button>
         </div>
       </div>
+
     </div>
 
     <div id="leave-modal" class="modal hidden">

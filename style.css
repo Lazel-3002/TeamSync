@@ -9334,3 +9334,80 @@ body.no-hw-accel .media-collect-btn {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+/* ===== İSİM-ŞEHİR ETKİNLİĞİ ================================================ */
+.activity-cover-namecity {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 18%, rgba(255,255,255,.22), transparent 24%),
+    linear-gradient(135deg, #0b6b66 0%, #0e9f91 45%, #193f68 100%);
+}
+.activity-cover-namecity::before,
+.activity-cover-namecity::after {
+  content: '';
+  position: absolute;
+  border: 1px solid rgba(255,255,255,.18);
+  transform: rotate(18deg);
+}
+.activity-cover-namecity::before { width: 210px; height: 120px; right: -42px; top: -54px; border-radius: 28px; }
+.activity-cover-namecity::after { width: 155px; height: 92px; left: -42px; bottom: -52px; border-radius: 22px; }
+.namecity-cover-art { position: absolute; inset: 0; color: #fff; font-weight: 900; letter-spacing: .04em; }
+.namecity-cover-letter { position: absolute; left: 25px; top: 18px; font-size: 84px; line-height: .9; color: #ffd166; text-shadow: 3px 4px 0 rgba(5,34,48,.3); }
+.namecity-cover-city, .namecity-cover-word { position: absolute; right: 24px; font-size: 15px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.38); border-radius: 8px; background: rgba(5,31,48,.28); transform: rotate(-6deg); }
+.namecity-cover-city { top: 35px; }
+.namecity-cover-word { top: 82px; right: 42px; transform: rotate(5deg); color: #b9f3e7; }
+.namecity-cover-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ff7aa2; box-shadow: 0 0 0 5px rgba(255,122,162,.14); }
+.namecity-cover-dot-one { right: 38px; bottom: 28px; }
+.namecity-cover-dot-two { left: 112px; bottom: 24px; background: #7be0d1; box-shadow: 0 0 0 5px rgba(123,224,209,.14); }
+.activity-icon-namecity { background: linear-gradient(135deg, #0ea5a0, #2563eb); color: #fff; }
+.namecity-card { background: radial-gradient(circle at 90% 0%, rgba(20,184,166,.14), transparent 32%), #0b1324; color: #edf7ff; display: flex; flex-direction: column; overflow: auto; min-height: 480px; }
+.namecity-shell { width: 100%; max-width: 1120px; margin: 0 auto; padding: 24px; box-sizing: border-box; }
+.namecity-header { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding-top: 38px; }
+.namecity-exit { position: absolute; top: 0; left: 0; border: 1px solid rgba(125,211,252,.32); border-radius: 9px; padding: 7px 11px; color: #cbeaff; background: rgba(30,64,96,.62); cursor: pointer; font-size: 12px; font-weight: 800; }
+.namecity-exit:hover { border-color: rgba(114,241,217,.8); background: rgba(20,184,166,.2); }
+.namecity-kicker { color: #76e4d2; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.namecity-header h2 { margin: 5px 0 6px; font-size: clamp(23px, 3vw, 34px); }
+.namecity-header p { margin: 0; color: #9eb0c8; }
+.namecity-players { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.namecity-player-pill, .namecity-chip { border: 1px solid rgba(125,211,252,.24); background: rgba(30,64,96,.55); border-radius: 999px; padding: 6px 10px; font-size: 12px; color: #cbeaff; }
+.namecity-panel { border: 1px solid rgba(125,211,252,.16); background: rgba(15,29,50,.84); border-radius: 18px; padding: 20px; box-shadow: 0 18px 40px rgba(0,0,0,.16); }
+.namecity-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.namecity-field { display: flex; flex-direction: column; gap: 7px; color: #b6c8dd; font-size: 12px; font-weight: 700; }
+.namecity-field select, .namecity-field input { width: 100%; box-sizing: border-box; border: 1px solid rgba(148,163,184,.25); border-radius: 10px; color: #f7fbff; background: #14243b; padding: 10px 11px; }
+.namecity-category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; margin: 16px 0; }
+.namecity-category { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(148,163,184,.16); background: rgba(30,41,59,.55); border-radius: 10px; padding: 10px; color: #dce8f6; font-size: 13px; }
+.namecity-primary { border: 0; border-radius: 11px; color: #062b35; background: linear-gradient(135deg,#72f1d9,#5bb8ff); padding: 11px 17px; font-weight: 900; cursor: pointer; }
+.namecity-secondary { border: 1px solid rgba(148,163,184,.3); border-radius: 11px; color: #dbeafe; background: rgba(30,41,59,.7); padding: 10px 15px; font-weight: 800; cursor: pointer; }
+.namecity-primary:disabled, .namecity-secondary:disabled { opacity: .45; cursor: default; }
+.namecity-roundbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.namecity-letter { display: grid; place-items: center; width: 76px; height: 76px; border-radius: 18px; color: #062b35; background: linear-gradient(145deg,#ffe083,#ffae70); font-size: 44px; font-weight: 950; box-shadow: 0 10px 25px rgba(255,174,112,.18); }
+.namecity-timer { color: #d9faff; font-size: 20px; font-variant-numeric: tabular-nums; }
+.namecity-timer strong { color: #72f1d9; }
+.namecity-answer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.namecity-answer-grid label { display: flex; flex-direction: column; gap: 7px; color: #b9cbe0; font-size: 12px; font-weight: 800; }
+.namecity-answer-grid input { border: 1px solid rgba(148,163,184,.24); border-radius: 10px; background: #14243b; color: #fff; padding: 11px; }
+.namecity-review-list { display: grid; gap: 10px; }
+.namecity-review-row { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(150px, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid rgba(148,163,184,.15); border-radius: 12px; background: rgba(30,41,59,.42); }
+.namecity-review-answer { color: #fff; font-weight: 800; overflow-wrap: anywhere; }
+.namecity-review-meta { color: #95abc3; font-size: 12px; }
+.namecity-vote-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.namecity-vote-actions button { border: 1px solid rgba(148,163,184,.3); border-radius: 8px; padding: 7px 9px; color: #dbeafe; background: rgba(15,23,42,.7); cursor: pointer; font-size: 12px; font-weight: 800; }
+.namecity-vote-actions button.accept { border-color: rgba(52,211,153,.45); color: #8ff5cd; }
+.namecity-vote-actions button.reject { border-color: rgba(251,113,133,.45); color: #ffabb9; }
+.namecity-vote-actions button.selected { box-shadow: 0 0 0 2px rgba(255,255,255,.24) inset; background: rgba(255,255,255,.12); }
+.namecity-score-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.namecity-score-table th, .namecity-score-table td { padding: 10px; border-bottom: 1px solid rgba(148,163,184,.14); text-align: left; }
+.namecity-score-table th { color: #8fa7c1; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.namecity-score-table td:last-child { color: #78f0d2; font-weight: 900; text-align: right; }
+.namecity-muted { color: #8fa7c1; font-size: 13px; }
+.namecity-player-rule { margin: 14px 0; color: #b7cbe0; font-size: 13px; }
+.namecity-player-rule strong { color: #72f1d9; }
+.namecity-error { color: #ff9cad; margin-top: 10px; font-size: 13px; }
+@media (max-width: 720px) {
+  .namecity-form-grid { grid-template-columns: 1fr; }
+  .namecity-header { flex-direction: column; }
+  .namecity-players { justify-content: flex-start; }
+  .namecity-review-row { grid-template-columns: 1fr; }
+  .namecity-vote-actions { justify-content: flex-start; }
+}

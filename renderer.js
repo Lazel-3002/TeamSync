@@ -4794,6 +4794,7 @@ function getActiveActivity() {
   if (!document.getElementById('poll-card').classList.contains('hidden')) return 'poll';
   if (!document.getElementById('lvs-card').classList.contains('hidden')) return 'lvs';
   if (!document.getElementById('wheel-card').classList.contains('hidden')) return 'wheel';
+  if (!document.getElementById('namecity-card').classList.contains('hidden')) return 'namecity';
   if (!document.getElementById('wb-card').classList.contains('hidden')) return 'wb';
   return null;
 }
@@ -5225,6 +5226,7 @@ async function handleDataMessage(peerId, msg) {
                         msg.type.startsWith('uno-') ||
                         msg.type.startsWith('vv-') ||
                         msg.type.startsWith('sb-') ||
+                        msg.type.startsWith('namecity-') ||
                         ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
 
   if (isActivityMsg) {
@@ -5532,7 +5534,7 @@ async function handleDataMessage(peerId, msg) {
     if (window.vampireVillagerHandler) window.vampireVillagerHandler(msg, peerId);
   } else if (msg.type.startsWith('sb-')) {
     handleSBMessage(peerId, msg);
-  } else if (['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
+  } else if (msg.type.startsWith('namecity-') || ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
     if (window.activityHandler) window.activityHandler(msg);
   }
 }
@@ -6210,6 +6212,7 @@ const FOCUS_CARD_TITLES = {
   'poll-card': 'Anket',
   'lvs-card': 'Film Gecesi',
   'wheel-card': 'Şans Çarkı',
+  'namecity-card': 'İsim-Şehir',
 };
 
 // Odaklı kartın kutusunu yer tutucununkine eşitler. Kart #grid'in çocuğu ama
@@ -8376,6 +8379,7 @@ function applyUserLanguage(language, persist = true) {
     }
   });
   translateLegacyStaticUI(lang);
+  if (typeof window.refreshNameCityLocale === 'function') window.refreshNameCityLocale();
   // Focus controls are moved in and out of the DOM, so refresh their titles
   // after every locale change instead of leaving the previous locale behind.
   if (typeof updateFocusLockBtn === 'function') updateFocusLockBtn();
@@ -10257,7 +10261,7 @@ function closeAllCards(leaveLobby = false, except = null) {
     try { document.activeElement.blur(); } catch(e){}
   }
 
-  ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card'].forEach(id => {
+  ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card', 'namecity-card'].forEach(id => {
     if (id === except) return;
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
@@ -11143,7 +11147,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- LOBBY SYSTEM UI BINDINGS ---
-  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'vampire'];
+  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'vampire', 'namecity'];
   const activitySearch = document.getElementById('activity-search');
   if (activitySearch) {
     activitySearch.addEventListener('input', () => filterActivityCards(activitySearch.value));
@@ -11165,8 +11169,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü' };
-        document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü', namecity: window.nameCityText ? window.nameCityText('title') : 'İsim-Şehir' };
+        document.getElementById('act-lobby-title').textContent = act === 'namecity' && window.nameCityText ? window.nameCityText('lobbies') : `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
       });
@@ -11188,8 +11192,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü' };
-        document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü', namecity: window.nameCityText ? window.nameCityText('title') : 'İsim-Şehir' };
+        document.getElementById('act-lobby-title').textContent = act === 'namecity' && window.nameCityText ? window.nameCityText('lobbies') : `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
       });
@@ -11217,13 +11221,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!act) return;
     
     // Create new lobby
-    const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü' };
+    const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü', namecity: window.nameCityText ? window.nameCityText('title') : 'İsim-Şehir' };
     const newLobby = {
       id: `LOB-${crypto.randomUUID()}`,
       activity: act,
-      name: state.sfwMode
-        ? censorProfaneText(`${state.myName}'in ${names[act]} Lobisi`)
-        : `${state.myName}'in ${names[act]} Lobisi`,
+      name: act === 'namecity' && window.nameCityText
+        ? window.nameCityText('lobbyName', { name: state.myName })
+        : state.sfwMode ? censorProfaneText(`${state.myName}'in ${names[act]} Lobisi`) : `${state.myName}'in ${names[act]} Lobisi`,
       hostId: state.myId,
       hostName: state.myName,
       players: [{ id: state.myId, name: state.myName }],
@@ -11273,7 +11277,8 @@ window.updateActivityCounts = function() {
     poll: { l: 0, p: 0 },
     lvs: { l: 0, p: 0 },
     wheel: { l: 0, p: 0 },
-    vampire: { l: 0, p: 0 }
+    vampire: { l: 0, p: 0 },
+    namecity: { l: 0, p: 0 }
   };
   
   state.lobbies.forEach(lob => {
@@ -11940,7 +11945,7 @@ const SHORTCUT_SUPPRESSION_EXEMPT = new Set(['ptt']);
 // tetiklenmez; modüller kendi klavye girdilerini kullanıyor.
 const ACTIVITY_CARD_IDS = [
   'wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card',
-  'lvs-card', 'wheel-card', 'vampire-card'
+  'lvs-card', 'wheel-card', 'vampire-card', 'namecity-card'
 ];
 
 const SHORTCUT_DEFS = [
@@ -12408,3 +12413,390 @@ window.isShortcutSuppressed = isShortcutSuppressed;
 window.getPttAccelerator = getPttAccelerator;
 window.matchesPttReleaseKey = matchesPttReleaseKey;
 window.renderShortcutSettings = renderShortcutSettings;
+
+/* --------------------------------------------------------------------------
+ * İSİM-ŞEHİR — gerçek etkinlik modalı için ortak oyun akışı
+ * -------------------------------------------------------------------------- */
+(function initNameCityModule() {
+  const catalogs = {
+    tr: { locale: 'tr-TR', name: 'Türkçe', letters: 'ABCÇDEFGHIİJKLMNOÖPRSŞTUÜVYZ'.split(''), categories: [['name','İsim'],['city','Şehir'],['animal','Hayvan'],['food','Yemek'],['object','Eşya'],['country','Ülke']] },
+    en: { locale: 'en-US', name: 'English', letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), categories: [['name','Name'],['city','City'],['animal','Animal'],['food','Food'],['object','Object'],['country','Country']] },
+    de: { locale: 'de-DE', name: 'Deutsch', letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), categories: [['name','Name'],['city','Stadt'],['animal','Tier'],['food','Essen'],['object','Gegenstand'],['country','Land']] },
+    es: { locale: 'es-ES', name: 'Español', letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), categories: [['name','Nombre'],['city','Ciudad'],['animal','Animal'],['food','Comida'],['object','Objeto'],['country','País']] },
+    fr: { locale: 'fr-FR', name: 'Français', letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), categories: [['name','Prénom'],['city','Ville'],['animal','Animal'],['food','Nourriture'],['object','Objet'],['country','Pays']] },
+    it: { locale: 'it-IT', name: 'Italiano', letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), categories: [['name','Nome'],['city','Città'],['animal','Animale'],['food','Cibo'],['object','Oggetto'],['country','Paese']] }
+  };
+  const NC_UI = {
+    en: { voteBadge: 'VOTE', title: 'Name City', cardDesc: 'Pick a letter, answer, vote together', lobbies: 'Name City Lobbies', exit: '← Leave room', setupKicker: 'VOTE · WORD GAME', intro: 'Every answer is accepted or rejected by the room vote.', host: 'You are the host', waiting: 'Waiting for the host', language: 'Language', rounds: 'Rounds', duration: 'Answer time', players: 'Players', minimum: 'Minimum 2', recommended: 'Recommended 3+', start: 'Start game', needPlayers: 'At least 2 players required', rule: 'Use the same letter. Empty, duplicate or wrong-letter answers score zero.', round: 'ROUND {round} / {total}', timeLeft: 'Time left:', lockHelp: 'Lock your answers while the timer is running.', lock: 'Lock answers', locked: 'Answers locked', reviewKicker: 'REVIEW ANSWERS', reviewTitle: 'Vote on every answer', reviewDeadline: 'Voting ends in: {seconds}s · Ties reject the answer.', duplicate: '{count} duplicate answers were automatically excluded.', noAnswers: 'There are no answers to vote on.', accept: 'Accept', reject: 'Reject', accepted: 'Accepted by vote', rejected: 'Rejected by vote', gameOver: 'GAME OVER', result: 'ROUND {round} RESULT', winner: 'The winner is decided', roundLabel: 'Round', totalLabel: 'Total', next: 'Next round', showResults: 'Show results', waitingNext: 'Waiting for the host to open the next round.', lobbyName: "{name}'s Name City lobby", hostLabel: 'Host:', playersLabel: 'Players:', spectators: 'Spectators', preparing: 'Preparing lobby…' },
+    tr: { voteBadge: 'OYLA', title: 'İsim-Şehir', cardDesc: 'Harf seç, cevapla, birlikte oyla', lobbies: 'İsim-Şehir Lobileri', exit: '← Odadan çık', setupKicker: 'OYLA · KELİME OYUNU', intro: 'Her cevap odadaki oylamayla kabul edilir veya reddedilir.', host: 'Kurucu sensin', waiting: 'Kurucu bekleniyor', language: 'Dil', rounds: 'Tur sayısı', duration: 'Cevap süresi', players: 'Oyuncular', minimum: 'Minimum 2', recommended: 'Önerilen 3+', start: 'Oyunu başlat', needPlayers: 'En az 2 oyuncu gerekli', rule: 'Aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.', round: 'TUR {round} / {total}', timeLeft: 'Kalan süre:', lockHelp: 'Cevaplarını süre bitmeden kilitle.', lock: 'Cevapları kilitle', locked: 'Cevaplar kilitlendi', reviewKicker: 'CEVAPLARI DEĞERLENDİR', reviewTitle: 'Her cevap için oy ver', reviewDeadline: 'Oylama bitişi: {seconds}s · Eşitlikte cevap reddedilir.', duplicate: '{count} tekrar cevap otomatik olarak puan dışı bırakıldı.', noAnswers: 'Oylanacak dolu cevap yok.', accept: 'Kabul', reject: 'Ret', accepted: 'Oylamayla kabul', rejected: 'Oylamayla reddedildi', gameOver: 'OYUN BİTTİ', result: 'TUR {round} SONUCU', winner: 'Kazanan belli oldu', roundLabel: 'Tur', totalLabel: 'Toplam', next: 'Sonraki tur', showResults: 'Sonuçları göster', waitingNext: 'Kurucunun sonraki turu açması bekleniyor.', lobbyName: "{name}'in İsim-Şehir Lobisi", hostLabel: 'Kurucu:', playersLabel: 'Oyuncular:', spectators: 'İzleyici', preparing: 'Lobi hazırlanıyor…' },
+    de: { voteBadge: 'ABSTIMMEN', title: 'Stadt-Land-Fluss', cardDesc: 'Buchstabe wählen, antworten und abstimmen', lobbies: 'Stadt-Land-Fluss-Lobbys', exit: '← Raum verlassen', setupKicker: 'ABSTIMMEN · WORTSPIEL', intro: 'Jede Antwort wird durch die Abstimmung des Raums angenommen oder abgelehnt.', host: 'Du bist der Host', waiting: 'Warten auf den Host', language: 'Sprache', rounds: 'Runden', duration: 'Antwortzeit', players: 'Spieler', minimum: 'Mindestens 2', recommended: 'Empfohlen: 3+', start: 'Spiel starten', needPlayers: 'Mindestens 2 Spieler erforderlich', rule: 'Mit demselben Buchstaben antworten. Leere, doppelte oder falsche Antworten geben keine Punkte.', round: 'RUNDE {round} / {total}', timeLeft: 'Verbleibende Zeit:', lockHelp: 'Antworten vor Ablauf der Zeit sperren.', lock: 'Antworten sperren', locked: 'Antworten gesperrt', reviewKicker: 'ANTWORTEN PRÜFEN', reviewTitle: 'Über jede Antwort abstimmen', reviewDeadline: 'Abstimmung endet in: {seconds}s · Bei Gleichstand wird abgelehnt.', duplicate: '{count} doppelte Antworten wurden ausgeschlossen.', noAnswers: 'Keine Antworten zum Abstimmen.', accept: 'Annehmen', reject: 'Ablehnen', accepted: 'Angenommen', rejected: 'Abgelehnt', gameOver: 'SPIEL VORBEI', result: 'ERGEBNIS RUNDE {round}', winner: 'Der Gewinner steht fest', roundLabel: 'Runde', totalLabel: 'Gesamt', next: 'Nächste Runde', showResults: 'Ergebnisse anzeigen', waitingNext: 'Warten auf den Host für die nächste Runde.', lobbyName: 'Stadt-Land-Fluss-Lobby von {name}', hostLabel: 'Host:', playersLabel: 'Spieler:', spectators: 'Zuschauer', preparing: 'Lobby wird vorbereitet…' },
+    es: { voteBadge: 'VOTAR', title: 'Nombre-Ciudad', cardDesc: 'Elige una letra, responde y votad juntos', lobbies: 'Salas de Nombre-Ciudad', exit: '← Salir de la sala', setupKicker: 'VOTA · JUEGO DE PALABRAS', intro: 'Cada respuesta se acepta o rechaza mediante la votación de la sala.', host: 'Eres el anfitrión', waiting: 'Esperando al anfitrión', language: 'Idioma', rounds: 'Rondas', duration: 'Tiempo de respuesta', players: 'Jugadores', minimum: 'Mínimo 2', recommended: 'Recomendado: 3+', start: 'Iniciar partida', needPlayers: 'Se necesitan al menos 2 jugadores', rule: 'Responde con la misma letra. Las respuestas vacías, repetidas o con otra letra no puntúan.', round: 'RONDA {round} / {total}', timeLeft: 'Tiempo restante:', lockHelp: 'Bloquea tus respuestas antes de que termine el tiempo.', lock: 'Bloquear respuestas', locked: 'Respuestas bloqueadas', reviewKicker: 'REVISAR RESPUESTAS', reviewTitle: 'Vota cada respuesta', reviewDeadline: 'La votación termina en: {seconds}s · Los empates se rechazan.', duplicate: 'Se excluyeron {count} respuestas repetidas.', noAnswers: 'No hay respuestas para votar.', accept: 'Aceptar', reject: 'Rechazar', accepted: 'Aceptada por votación', rejected: 'Rechazada por votación', gameOver: 'PARTIDA TERMINADA', result: 'RESULTADO DE LA RONDA {round}', winner: 'Ya hay ganador', roundLabel: 'Ronda', totalLabel: 'Total', next: 'Siguiente ronda', showResults: 'Ver resultados', waitingNext: 'Esperando al anfitrión para abrir la siguiente ronda.', lobbyName: 'Sala de Nombre-Ciudad de {name}', hostLabel: 'Anfitrión:', playersLabel: 'Jugadores:', spectators: 'Espectadores', preparing: 'Preparando la sala…' },
+    fr: { voteBadge: 'VOTE', title: 'Petit Bac', cardDesc: 'Choisissez une lettre, répondez et votez ensemble', lobbies: 'Salons de Petit Bac', exit: '← Quitter la salle', setupKicker: 'VOTE · JEU DE MOTS', intro: 'Chaque réponse est acceptée ou refusée par le vote du salon.', host: 'Vous êtes l’hôte', waiting: 'En attente de l’hôte', language: 'Langue', rounds: 'Manches', duration: 'Temps de réponse', players: 'Joueurs', minimum: 'Minimum 2', recommended: 'Recommandé : 3+', start: 'Démarrer la partie', needPlayers: 'Au moins 2 joueurs sont nécessaires', rule: 'Répondez avec la même lettre. Les réponses vides, répétées ou avec une autre lettre ne rapportent aucun point.', round: 'MANCHE {round} / {total}', timeLeft: 'Temps restant :', lockHelp: 'Verrouillez vos réponses avant la fin du temps.', lock: 'Verrouiller les réponses', locked: 'Réponses verrouillées', reviewKicker: 'VÉRIFIER LES RÉPONSES', reviewTitle: 'Votez pour chaque réponse', reviewDeadline: 'Fin du vote dans : {seconds}s · En cas d’égalité, la réponse est refusée.', duplicate: '{count} réponses en double ont été exclues.', noAnswers: 'Aucune réponse à voter.', accept: 'Accepter', reject: 'Refuser', accepted: 'Acceptée par vote', rejected: 'Refusée par vote', gameOver: 'PARTIE TERMINÉE', result: 'RÉSULTAT DE LA MANCHE {round}', winner: 'Le gagnant est connu', roundLabel: 'Manche', totalLabel: 'Total', next: 'Manche suivante', showResults: 'Voir les résultats', waitingNext: 'En attente de l’hôte pour ouvrir la prochaine manche.', lobbyName: 'Salon de Petit Bac de {name}', hostLabel: 'Hôte :', playersLabel: 'Joueurs :', spectators: 'Spectateurs', preparing: 'Préparation du salon…' },
+    it: { voteBadge: 'VOTA', title: 'Nomi e Città', cardDesc: 'Scegli una lettera, rispondi e votate insieme', lobbies: 'Lobby di Nomi e Città', exit: '← Esci dalla stanza', setupKicker: 'VOTA · GIOCO DI PAROLE', intro: 'Ogni risposta viene accettata o rifiutata dal voto della stanza.', host: 'Sei il coordinatore', waiting: 'In attesa del coordinatore', language: 'Lingua', rounds: 'Round', duration: 'Tempo per rispondere', players: 'Giocatori', minimum: 'Minimo 2', recommended: 'Consigliati: 3+', start: 'Avvia partita', needPlayers: 'Servono almeno 2 giocatori', rule: 'Rispondi con la stessa lettera. Risposte vuote, duplicate o con una lettera diversa non fanno punti.', round: 'ROUND {round} / {total}', timeLeft: 'Tempo rimasto:', lockHelp: 'Blocca le risposte prima della fine del tempo.', lock: 'Blocca risposte', locked: 'Risposte bloccate', reviewKicker: 'REVISIONE RISPOSTE', reviewTitle: 'Vota ogni risposta', reviewDeadline: 'Voto termina tra: {seconds}s · In caso di parità la risposta è rifiutata.', duplicate: '{count} risposte duplicate escluse.', noAnswers: 'Nessuna risposta da votare.', accept: 'Accetta', reject: 'Rifiuta', accepted: 'Accettata dal voto', rejected: 'Rifiutata dal voto', gameOver: 'PARTITA FINITA', result: 'RISULTATO ROUND {round}', winner: 'Il vincitore è deciso', roundLabel: 'Round', totalLabel: 'Totale', next: 'Round successivo', showResults: 'Mostra risultati', waitingNext: 'In attesa del coordinatore per il prossimo round.', lobbyName: 'Lobby Nomi e Città di {name}', hostLabel: 'Coordinatore:', playersLabel: 'Giocatori:', spectators: 'Spettatori', preparing: 'Preparazione lobby…' }
+  };
+  const nc = { game: null, draft: {}, timer: null };
+  const languageKey = () => typeof getUserLanguage === 'function' ? getUserLanguage() : 'en';
+  const ui = () => NC_UI[languageKey()] || NC_UI.en;
+  const text = (key, vars = {}) => Object.entries(vars).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), ui()[key] || NC_UI.en[key] || key);
+  const unitText = (kind, number) => {
+    const n = Number(number);
+    const language = languageKey();
+    if (language === 'tr') return kind === 'round' ? `${n} tur` : `${n} saniye`;
+    if (language === 'de') return kind === 'round' ? `${n} Runde${n === 1 ? '' : 'n'}` : `${n} Sekunde${n === 1 ? '' : 'n'}`;
+    if (language === 'es') return kind === 'round' ? `${n} ronda${n === 1 ? '' : 's'}` : `${n} segundo${n === 1 ? '' : 's'}`;
+    if (language === 'fr') return kind === 'round' ? `${n} manche${n === 1 ? '' : 's'}` : `${n} seconde${n === 1 ? '' : 's'}`;
+    if (language === 'it') return kind === 'round' ? `${n} round` : `${n} second${n === 1 ? 'o' : 'i'}`;
+    return kind === 'round' ? `${n} round${n === 1 ? '' : 's'}` : `${n} second${n === 1 ? '' : 's'}`;
+  };
+  window.nameCityText = (key, vars) => text(key, vars);
+  const root = () => document.getElementById('namecity-root');
+  const esc = value => typeof escapeHtml === 'function' ? escapeHtml(String(value ?? '')) : String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+  const id = (prefix = 'nc') => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const catalog = game => catalogs[game?.language] || catalogs.tr;
+  const upper = (value, game) => String(value || '').trim().toLocaleUpperCase(catalog(game).locale);
+  const norm = (value, game) => upper(value, game).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const startsWithLetter = (value, letter, game) => upper(value, game).startsWith(upper(letter, game));
+  const localPlayerId = () => state.myId;
+  const playerName = pid => {
+    if (pid === state.myId) return state.myName || 'Sen';
+    const peer = state.peers?.get(pid);
+    return peer?.name || nc.game?.players?.find(p => p.id === pid)?.name || 'Oyuncu';
+  };
+  const players = game => Array.isArray(game?.players) ? game.players : [{ id: state.myId, name: state.myName || 'Sen' }];
+  const randomLetter = game => {
+    const letters = catalog(game).letters;
+    return letters[Math.floor(Math.random() * letters.length)];
+  };
+  const emptyScores = game => Object.fromEntries(players(game).map(p => [p.id, 0]));
+  const copyScores = scores => Object.fromEntries(Object.entries(scores || {}));
+
+  function challengeEntries(game) {
+    return Object.values(game?.challenges || {});
+  }
+
+  function makeChallenges(game, submissions) {
+    const challenges = {};
+    const duplicates = {};
+    for (const category of game.categories) {
+      const seen = new Map();
+      for (const p of players(game)) {
+        const answer = String(submissions?.[p.id]?.[category] || '').trim();
+        if (!answer) continue;
+        const key = norm(answer, game);
+        if (seen.has(key)) {
+          duplicates[`${p.id}:${category}`] = true;
+          continue;
+        }
+        seen.set(key, p.id);
+        const challengeId = `${game.round}:${category}:${p.id}`;
+        challenges[challengeId] = { id: challengeId, category, ownerId: p.id, answer, votes: {}, resolved: false, accepted: false };
+      }
+    }
+    return { challenges, duplicates };
+  }
+
+  function apply(event) {
+    if (!event || typeof event !== 'object') return;
+    if (event.type === 'namecity-start') {
+      nc.game = event.game;
+      nc.draft = {};
+      openNameCityActivity(false);
+    } else if (!nc.game) {
+      return;
+    } else if (event.type === 'namecity-submit' && event.round === nc.game.round) {
+      nc.game.submissions = nc.game.submissions || {};
+      nc.game.submissions[event.playerId] = event.answers || {};
+    } else if (event.type === 'namecity-reveal' && event.round === nc.game.round) {
+      nc.game.submissions = event.submissions || {};
+      nc.game.challenges = event.challenges || {};
+      nc.game.duplicates = event.duplicates || {};
+      nc.game.votingDeadlineAt = event.votingDeadlineAt;
+      nc.game.phase = 'review';
+    } else if (event.type === 'namecity-vote' && event.round === nc.game.round) {
+      const challenge = nc.game.challenges?.[event.challengeId];
+      if (challenge && !challenge.resolved) challenge.votes[event.voterId] = Boolean(event.accept);
+    } else if (event.type === 'namecity-resolve' && event.round === nc.game.round) {
+      const challenge = nc.game.challenges?.[event.challengeId];
+      if (challenge) { challenge.resolved = true; challenge.accepted = Boolean(event.accepted); }
+    } else if (event.type === 'namecity-round-result' && event.round === nc.game.round) {
+      nc.game.roundScores = event.roundScores || {};
+      nc.game.scores = event.scores || nc.game.scores;
+      nc.game.phase = 'result';
+    } else if (event.type === 'namecity-next') {
+      nc.game = event.game;
+      nc.draft = {};
+    } else if (event.type === 'namecity-finish') {
+      nc.game.scores = event.scores || nc.game.scores;
+      nc.game.phase = 'finished';
+    }
+    renderNameCity();
+  }
+
+  function emit(type, payload) {
+    const event = { type, ...payload };
+    apply(event);
+    broadcast(event);
+  }
+
+  function gamePlayersForStart() {
+    const list = [{ id: state.myId, name: state.myName || 'Sen' }];
+    state.peers?.forEach((peer, peerId) => {
+      if (peerId !== state.myId) list.push({ id: peerId, name: peer.name || `Oyuncu ${peerId.slice(0, 4)}` });
+    });
+    return list;
+  }
+
+  function startGame() {
+    if (!state.isLobbyHost) return;
+    const lobbyPlayers = gamePlayersForStart();
+    if (lobbyPlayers.length < 2) {
+      showToast(`${text('needPlayers')} · ${text('recommended')}`, 'info');
+      updateSetupPlayerGate();
+      return;
+    }
+    const language = document.getElementById('nc-language')?.value || 'tr';
+    const selected = [...document.querySelectorAll('#namecity-root input[name="nc-category"]:checked')].map(input => input.value);
+    const rounds = Math.max(1, Math.min(10, Number(document.getElementById('nc-rounds')?.value) || 3));
+    const seconds = Math.max(30, Math.min(180, Number(document.getElementById('nc-seconds')?.value) || 90));
+    const fallback = catalogs[language].categories.slice(0, 4).map(item => item[0]);
+    const game = {
+      id: id('namecity-game'), hostId: state.myId, language, rounds, seconds,
+      categories: selected.length ? selected : fallback, round: 1,
+      letter: randomLetter({ language }), phase: 'writing',
+      deadlineAt: Date.now() + seconds * 1000, submissions: {}, challenges: {}, duplicates: {},
+      scores: {}, roundScores: {}, players: lobbyPlayers
+    };
+    game.scores = emptyScores(game);
+    emit('namecity-start', { game });
+  }
+
+  function submitAnswers() {
+    if (!nc.game || nc.game.phase !== 'writing') return;
+    const answers = {};
+    for (const category of nc.game.categories) answers[category] = nc.draft[category] || '';
+    emit('namecity-submit', { round: nc.game.round, playerId: state.myId, answers });
+    const button = document.getElementById('nc-submit');
+    if (button) { button.disabled = true; button.textContent = 'Cevapların kilitlendi'; }
+  }
+
+  function revealRound() {
+    if (!nc.game || nc.game.phase !== 'writing' || nc.game.hostId !== state.myId) return;
+    const submissions = { ...(nc.game.submissions || {}) };
+    for (const p of players(nc.game)) submissions[p.id] = submissions[p.id] || {};
+    const built = makeChallenges(nc.game, submissions);
+    emit('namecity-reveal', { round: nc.game.round, submissions, challenges: built.challenges, duplicates: built.duplicates, votingDeadlineAt: Date.now() + 30000 });
+    if (!Object.keys(built.challenges).length) finishRound();
+  }
+
+  function allPlayersVoted(challenge) {
+    return players(nc.game).every(p => Object.prototype.hasOwnProperty.call(challenge.votes || {}, p.id));
+  }
+
+  function resolveChallenge(challenge) {
+    if (!nc.game || challenge.resolved || nc.game.hostId !== state.myId) return;
+    const values = Object.values(challenge.votes || {});
+    const yes = values.filter(Boolean).length;
+    const no = values.length - yes;
+    emit('namecity-resolve', { round: nc.game.round, challengeId: challenge.id, accepted: yes > no });
+  }
+
+  function calculateRoundScores() {
+    const result = emptyScores(nc.game);
+    for (const challenge of challengeEntries(nc.game)) {
+      if (challenge.resolved && challenge.accepted && startsWithLetter(challenge.answer, nc.game.letter, nc.game)) result[challenge.ownerId] = (result[challenge.ownerId] || 0) + 1;
+    }
+    return result;
+  }
+
+  function finishRound() {
+    if (!nc.game || nc.game.hostId !== state.myId || nc.game.phase === 'result' || nc.game.phase === 'finished') return;
+    const roundScores = calculateRoundScores();
+    const scores = copyScores(nc.game.scores);
+    for (const [pid, points] of Object.entries(roundScores)) scores[pid] = (scores[pid] || 0) + points;
+    emit('namecity-round-result', { round: nc.game.round, roundScores, scores });
+  }
+
+  function nextRound() {
+    if (!nc.game || nc.game.hostId !== state.myId || nc.game.phase !== 'result') return;
+    if (nc.game.round >= nc.game.rounds) {
+      emit('namecity-finish', { scores: nc.game.scores });
+      return;
+    }
+    const next = { ...nc.game, round: nc.game.round + 1, letter: randomLetter(nc.game), phase: 'writing', deadlineAt: Date.now() + nc.game.seconds * 1000, submissions: {}, challenges: {}, duplicates: {}, roundScores: {} };
+    emit('namecity-next', { game: next });
+  }
+
+  function tick() {
+    if (!nc.game) {
+      updateSetupPlayerGate();
+      return;
+    }
+    if (nc.game.phase === 'writing') {
+      const submitted = players(nc.game).every(p => nc.game.submissions?.[p.id]);
+      if (nc.game.hostId === state.myId && (submitted || Date.now() >= nc.game.deadlineAt)) revealRound();
+      updateTimer();
+    } else if (nc.game.phase === 'review' && nc.game.hostId === state.myId) {
+      const timedOut = Date.now() >= nc.game.votingDeadlineAt;
+      challengeEntries(nc.game).forEach(challenge => { if (!challenge.resolved && (timedOut || allPlayersVoted(challenge))) resolveChallenge(challenge); });
+      if (challengeEntries(nc.game).length && challengeEntries(nc.game).every(challenge => challenge.resolved)) finishRound();
+      updateTimer();
+    }
+  }
+
+  function updateTimer() {
+    const element = document.getElementById('nc-timer-value');
+    if (!element || !nc.game) return;
+    const deadline = nc.game.phase === 'review' ? nc.game.votingDeadlineAt : nc.game.deadlineAt;
+    const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    element.textContent = `${left}s`;
+  }
+
+  function updateSetupPlayerGate() {
+    if (nc.game) return;
+    const count = gamePlayersForStart().length;
+    const countEl = document.getElementById('nc-player-count');
+    const button = document.getElementById('nc-start');
+    if (countEl) countEl.textContent = String(count);
+    if (!button) return;
+    const canStart = state.isLobbyHost && count >= 2;
+    button.disabled = !canStart;
+    button.textContent = !state.isLobbyHost
+      ? text('waiting')
+      : count < 2 ? text('needPlayers') : text('start');
+  }
+
+  function bindCloseButton() {
+    document.getElementById('nc-close-top')?.addEventListener('click', closeNameCity);
+  }
+
+  function renderHeader(game) {
+    return `<header class="namecity-header"><button id="nc-close-top" class="namecity-exit" type="button">← Odadan çık</button><div><span class="namecity-kicker">TEAMSYNC · ${esc(catalog(game).name.toUpperCase())}</span><h2>İsim-Şehir</h2><p>Harf aynı, cevaplar farklı. Geçerli olup olmadığına oda karar verir.</p></div><div class="namecity-players">${players(game).map(p => `<span class="namecity-player-pill">${esc(p.name)}</span>`).join('')}</div></header>`;
+  }
+
+  function renderSetup() {
+    const language = languageKey();
+    const current = catalogs[language] ? language : 'en';
+    const categories = catalogs[current].categories;
+    root().innerHTML = `<div class="namecity-shell"><header class="namecity-header"><button id="nc-close-top" class="namecity-exit" type="button">← Odadan çık</button><div><span class="namecity-kicker">OYLA · KELİME OYUNU</span><h2>İsim-Şehir</h2><p>Bir kelimeyi kabul etmek veya reddetmek odadaki oyuncuların oyuyla belirlenir.</p></div><span class="namecity-chip">${state.isLobbyHost ? 'Kurucu sensin' : 'Kurucu bekleniyor'}</span></header><section class="namecity-panel"><div class="namecity-form-grid"><label class="namecity-field">Dil<select id="nc-language">${Object.entries(catalogs).map(([key, value]) => `<option value="${key}" ${key === current ? 'selected' : ''}>${esc(value.name)}</option>`).join('')}</select></label><label class="namecity-field">Tur sayısı<select id="nc-rounds"><option value="1">1 tur</option><option value="3" selected>3 tur</option><option value="5">5 tur</option><option value="10">10 tur</option></select></label><label class="namecity-field">Cevap süresi<select id="nc-seconds"><option value="45">45 saniye</option><option value="90" selected>90 saniye</option><option value="120">120 saniye</option></select></label></div><div class="namecity-category-grid">${categories.map(([key, label], index) => `<label class="namecity-category"><input type="checkbox" name="nc-category" value="${key}" ${index < 4 ? 'checked' : ''}> ${esc(label)}</label>`).join('')}</div><p class="namecity-player-rule">Oyuncular: <strong id="nc-player-count">1</strong> · Minimum 2 · Önerilen 3+</p><button id="nc-start" class="namecity-primary">Oyunu başlat</button><p class="namecity-muted">Her turda aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.</p></section></div>`;
+    document.getElementById('nc-start')?.addEventListener('click', startGame);
+    bindCloseButton();
+    updateSetupPlayerGate();
+  }
+
+  function renderWriting(game) {
+    const labels = Object.fromEntries(catalog(game).categories);
+    root().innerHTML = `<div class="namecity-shell">${renderHeader(game)}<section class="namecity-panel"><div class="namecity-roundbar"><div><span class="namecity-kicker">TUR ${game.round} / ${game.rounds}</span><div class="namecity-timer">Kalan süre: <strong id="nc-timer-value">--</strong></div></div><div class="namecity-letter">${esc(game.letter)}</div></div><div class="namecity-answer-grid">${game.categories.map(category => `<label>${esc(labels[category] || category)}<input data-nc-category="${category}" maxlength="40" autocomplete="off" value="${esc(nc.draft[category] || '')}" placeholder="${esc(game.letter)} ile başlayan cevap"></label>`).join('')}</div><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px"><span class="namecity-muted">Cevaplarını kilitledikten sonra diğer oyuncuların gönderimleri beklenir.</span><button id="nc-submit" class="namecity-primary">Cevapları kilitle</button></div></section></div>`;
+    root().querySelectorAll('[data-nc-category]').forEach(input => input.addEventListener('input', event => { nc.draft[event.target.dataset.ncCategory] = event.target.value; }));
+    document.getElementById('nc-submit')?.addEventListener('click', submitAnswers);
+    bindCloseButton();
+    updateTimer();
+  }
+
+  function renderReview(game) {
+    const labels = Object.fromEntries(catalog(game).categories);
+    const rows = challengeEntries(game).map(challenge => {
+      const values = Object.values(challenge.votes || {});
+      const yes = values.filter(Boolean).length;
+      const no = values.length - yes;
+      const ownVote = challenge.votes?.[state.myId];
+      return `<div class="namecity-review-row"><div><div class="namecity-review-answer">${esc(challenge.answer)}</div><div class="namecity-review-meta">${esc(labels[challenge.category] || challenge.category)} · ${esc(playerName(challenge.ownerId))}</div></div><div class="namecity-review-meta">Kabul: ${yes} · Ret: ${no} ${challenge.accepted ? '· Geçti' : challenge.resolved ? '· Reddedildi' : ''}</div><div class="namecity-vote-actions"><button class="accept ${ownVote === true ? 'selected' : ''}" data-nc-vote="yes" data-nc-challenge="${esc(challenge.id)}" ${challenge.resolved ? 'disabled' : ''}>Kabul</button><button class="reject ${ownVote === false ? 'selected' : ''}" data-nc-vote="no" data-nc-challenge="${esc(challenge.id)}" ${challenge.resolved ? 'disabled' : ''}>Ret</button></div></div>`;
+    }).join('');
+    const duplicates = Object.keys(game.duplicates || {}).length;
+    root().innerHTML = `<div class="namecity-shell">${renderHeader(game)}<section class="namecity-panel"><div class="namecity-roundbar"><div><span class="namecity-kicker">CEVAPLARI DEĞERLENDİR</span><h3 style="margin:5px 0">Her cevap için oy ver</h3><span class="namecity-muted">Oylama bitişi: <strong id="nc-timer-value">--</strong> · Eşitlikte cevap reddedilir.</span></div><div class="namecity-letter">${esc(game.letter)}</div></div>${duplicates ? `<p class="namecity-muted">${duplicates} tekrar cevap otomatik olarak puan dışı bırakıldı.</p>` : ''}<div class="namecity-review-list">${rows || '<p class="namecity-muted">Oylanacak dolu cevap yok.</p>'}</div></section></div>`;
+    root().querySelectorAll('[data-nc-vote]').forEach(button => button.addEventListener('click', () => emit('namecity-vote', { round: game.round, challengeId: button.dataset.ncChallenge, voterId: state.myId, accept: button.dataset.ncVote === 'yes' })));
+    bindCloseButton();
+    updateTimer();
+  }
+
+  function renderResult(game, finished = false) {
+    const scoreRows = [...players(game)].sort((a, b) => (game.scores[b.id] || 0) - (game.scores[a.id] || 0)).map((p, index) => `<tr><td>${index + 1}. ${esc(p.name)}</td><td>+${game.roundScores?.[p.id] || 0}</td><td>${game.scores?.[p.id] || 0}</td></tr>`).join('');
+    root().innerHTML = `<div class="namecity-shell">${renderHeader(game)}<section class="namecity-panel"><span class="namecity-kicker">${finished ? 'OYUN BİTTİ' : `TUR ${game.round} SONUCU`}</span><h3>${finished ? 'Kazanan belli oldu' : 'Bu turun puanları'}</h3><table class="namecity-score-table"><thead><tr><th>Oyuncu</th><th>Tur</th><th>Toplam</th></tr></thead><tbody>${scoreRows}</tbody></table><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px"><button id="nc-close" class="namecity-secondary">Odadan çık</button>${!finished && game.hostId === state.myId ? `<button id="nc-next" class="namecity-primary">${game.round >= game.rounds ? 'Sonuçları göster' : 'Sonraki tur'}</button>` : ''}</div></section></div>`;
+    document.getElementById('nc-next')?.addEventListener('click', nextRound);
+    document.getElementById('nc-close')?.addEventListener('click', closeNameCity);
+    bindCloseButton();
+  }
+
+  function localizeNameCityDom() {
+    const container = root();
+    if (!container) return;
+    const exact = new Map([
+      ['İsim-Şehir', text('title')], ['← Odadan çık', text('exit')], ['OYLA · KELİME OYUNU', text('setupKicker')],
+      ['Bir kelimeyi kabul etmek veya reddetmek odadaki oyuncuların oyuyla belirlenir.', text('intro')],
+      ['Kurucu sensin', text('host')], ['Kurucu bekleniyor', text('waiting')], ['Dil', text('language')], ['Tur sayısı', text('rounds')], ['Cevap süresi', text('duration')],
+      ['Oyunu başlat', text('start')], ['En az 2 oyuncu gerekli', text('needPlayers')], ['Her turda aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.', text('rule')],
+      ['Harf aynı, cevaplar farklı. Geçerli olup olmadığına oda karar verir.', text('intro')], ['Cevaplarını süre bitmeden kilitle.', text('lockHelp')], ['Cevapları kilitle', text('lock')], ['Cevaplar kilitlendi', text('locked')],
+      ['CEVAPLARI DEĞERLENDİR', text('reviewKicker')], ['Her cevap için oy ver', text('reviewTitle')], ['Oylanacak dolu cevap yok.', text('noAnswers')], ['Kabul', text('accept')], ['Ret', text('reject')],
+      ['OYUN BİTTİ', text('gameOver')], ['Kazanan belli oldu', text('winner')], ['Tur', text('roundLabel')], ['Toplam', text('totalLabel')], ['Sonraki tur', text('next')], ['Sonuçları göster', text('showResults')],
+      ['Odadan çık', text('exit')], ['Oylamayla kabul', text('accepted')], ['Oylamayla reddedildi', text('rejected')]
+    ]);
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      let value = node.nodeValue;
+      if (!value.trim()) return;
+      const trimmed = value.trim();
+      if (exact.has(trimmed)) {
+        node.nodeValue = value.replace(trimmed, exact.get(trimmed));
+        return;
+      }
+      value = value.replace(/^TUR (\d+) \/ (\d+)$/, (_, round, total) => text('round', { round, total }));
+      value = value.replace(/^Kalan süre:\s*/, `${text('timeLeft')} `);
+      value = value.replace(/^(\d+) saniye$/, (_, seconds) => unitText('second', seconds));
+      value = value.replace(/^(\d+) tur$/, (_, rounds) => unitText('round', rounds));
+      value = value.replace(/^(\d+) tekrar cevap otomatik olarak puan dışı bırakıldı\.$/, (_, count) => text('duplicate', { count }));
+      value = value.replace(/^Oylama bitişi: (\d+)s · Eşitlikte cevap reddedilir\.$/, (_, seconds) => text('reviewDeadline', { seconds }));
+      value = value.replace(/^Kabul:\s*/, `${text('accept')}: `).replace(/^Ret:\s*/, `${text('reject')}: `);
+      if (value !== node.nodeValue) node.nodeValue = value;
+    });
+    const playerRule = container.querySelector('.namecity-player-rule');
+    const playerCount = container.querySelector('#nc-player-count');
+    if (playerRule && playerCount) {
+      playerRule.innerHTML = `${esc(text('players'))}: <strong id="nc-player-count">${esc(playerCount.textContent)}</strong> · ${esc(text('minimum'))} · ${esc(text('recommended'))}`;
+    }
+  }
+
+  function renderNameCity() {
+    if (!root()) return;
+    if (!nc.game) renderSetup();
+    else if (nc.game.phase === 'writing') renderWriting(nc.game);
+    else if (nc.game.phase === 'review') renderReview(nc.game);
+    else renderResult(nc.game, nc.game.phase === 'finished');
+    localizeNameCityDom();
+  }
+
+  function openNameCityActivity(shouldBroadcast = true) {
+    closeAllCards(false, 'namecity-card');
+    document.getElementById('activities-modal')?.classList.add('hidden');
+    openCardFocused('namecity-card');
+    renderNameCity();
+    if (shouldBroadcast) broadcast({ type: 'activity_change', activity: 'namecity' });
+  }
+
+  function closeNameCity() {
+    closeAllCards(true);
+    broadcast({ type: 'activity_change', activity: 'none' });
+    nc.game = null;
+    nc.draft = {};
+  }
+
+  window.nameCityHandleMessage = message => apply(message);
+  window.openNameCityActivity = openNameCityActivity;
+  window.refreshNameCityLocale = () => {
+    document.querySelectorAll('[data-namecity-label]').forEach(element => {
+      element.textContent = text(element.dataset.namecityLabel);
+    });
+    if (state.selectedLobbyActivity === 'namecity') {
+      const lobbyTitle = document.getElementById('act-lobby-title');
+      if (lobbyTitle) lobbyTitle.textContent = text('lobbies');
+    }
+    if (document.getElementById('namecity-card') && !document.getElementById('namecity-card').classList.contains('hidden')) renderNameCity();
+  };
+
+  function initNameCity() {
+    document.getElementById('act-namecity')?.addEventListener('click', () => openNameCityActivity(true));
+    setInterval(tick, 250);
+    renderNameCity();
+  }
+  document.addEventListener('DOMContentLoaded', initNameCity);
+})();
