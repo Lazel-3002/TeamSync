@@ -92,7 +92,11 @@ module.exports = async function run() {
           type: items[0].type,
           blobSize: items[0].blob.size,
           cardName: card?.querySelector('.media-library-info strong')?.textContent,
+          // GIF önizlemesi artık varsayılan olarak donuk bir canvas kare gösterir;
+          // gerçek oynayan <img> yalnızca fare üzerine gelince eklenir (performans).
           previewTag: card?.querySelector('.media-library-media')?.tagName,
+          previewHasCanvas: !!card?.querySelector('.media-gif-hover canvas'),
+          previewHasLiveImgBeforeHover: !!card?.querySelector('.media-gif-live'),
           stat: document.getElementById('settings-media-count').textContent
         };
       })()`,
@@ -103,8 +107,27 @@ module.exports = async function run() {
     assert.strictEqual(libraryState.type, 'image/gif', JSON.stringify(libraryState, null, 2));
     assert.ok(libraryState.blobSize > 0, JSON.stringify(libraryState, null, 2));
     assert.strictEqual(libraryState.cardName, 'spark.gif', JSON.stringify(libraryState, null, 2));
-    assert.strictEqual(libraryState.previewTag, 'IMG', JSON.stringify(libraryState, null, 2));
+    assert.strictEqual(libraryState.previewTag, 'SPAN', JSON.stringify(libraryState, null, 2));
+    assert.strictEqual(libraryState.previewHasCanvas, true, JSON.stringify(libraryState, null, 2));
+    assert.strictEqual(libraryState.previewHasLiveImgBeforeHover, false, JSON.stringify(libraryState, null, 2));
     assert.strictEqual(libraryState.stat, '1', JSON.stringify(libraryState, null, 2));
+
+    const hoverState = await evalJS(
+      peer.client,
+      `(async () => {
+        const preview = document.querySelector('#settings-media-grid .media-library-card .media-gif-hover');
+        preview.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const hasLiveWhileHovering = !!preview.querySelector('.media-gif-live');
+        preview.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const hasLiveAfterLeave = !!preview.querySelector('.media-gif-live');
+        return { hasLiveWhileHovering, hasLiveAfterLeave };
+      })()`,
+      true
+    );
+    assert.strictEqual(hoverState.hasLiveWhileHovering, true, JSON.stringify(hoverState, null, 2));
+    assert.strictEqual(hoverState.hasLiveAfterLeave, false, JSON.stringify(hoverState, null, 2));
 
     await peer.client.send('Page.enable');
     const settingsShot = await peer.client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });

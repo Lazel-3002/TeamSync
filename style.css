@@ -2373,6 +2373,8 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   display: block;
   object-fit: cover;
 }
+.media-gif-hover { position: relative; }
+.media-gif-live { position: absolute; inset: 0; }
 .media-kind-badge {
   position: absolute;
   left: 8px;
@@ -6052,6 +6054,37 @@ body.no-hw-accel .dl-btn:hover {
   background: #3b82f6;
   transform: none;
 }
+.account-row-star-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+/* #accounts-list ile özgüllüğü .login-card button kuralının üstüne çıkarıyoruz;
+   aksi halde giriş ekranının varsayılan mor buton stili bunu eziyordu. */
+#accounts-list .account-row-star-btn {
+  background: transparent;
+  border: var(--border);
+  color: var(--txt-mut);
+}
+#accounts-list .account-row-star-btn:hover {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+#accounts-list .account-row-star-btn.is-default {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+}
+#accounts-list .account-row-star-btn .star-icon {
+  display: block;
+}
 .trash-icon {
   width: 18px;
   height: 18px;
@@ -8144,34 +8177,34 @@ input:checked + .slider:before {
   min-width: 0;
   max-width: none;
   padding: 24px;
-  color: #f2f3f5;
-  background: #313338;
-  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--txt-main);
+  background: var(--bg-card);
+  border: var(--border);
   border-radius: 16px;
 }
 
 #activities-modal #act-lobby-back {
-  color: #dbdee1 !important;
-  background: #2b2d31 !important;
+  color: var(--txt-main) !important;
+  background: var(--bg-hover) !important;
 }
 
 #activities-modal #act-lobby-back:hover {
-  background: #3f4147 !important;
+  background: color-mix(in srgb, var(--bg-hover) 75%, var(--txt-main) 12%) !important;
 }
 
 #activities-modal #act-lobby-stats {
-  color: #b5bac1 !important;
-  background: #2b2d31 !important;
+  color: var(--ok) !important;
+  background: color-mix(in srgb, var(--ok) 12%, transparent) !important;
 }
 
 #activities-modal .lobby-row {
-  background: #2b2d31 !important;
-  border-color: rgba(255,255,255,0.06) !important;
+  background: var(--bg-panel) !important;
+  border: var(--border) !important;
 }
 
 #activities-modal .lobby-row:hover {
-  background: #35373c !important;
-  border-color: rgba(255,255,255,0.11) !important;
+  background: var(--bg-hover) !important;
+  border-color: color-mix(in srgb, var(--acc) 25%, transparent) !important;
 }
 
 @media (max-width: 680px) {

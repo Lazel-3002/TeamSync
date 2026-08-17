@@ -30,6 +30,7 @@
   let detailResolve = null;
 
   let contextTarget = null;
+  let pickerSearchTimer = null;
 
   function text(key, fallback) {
     return typeof window.t === 'function' ? window.t(key) : fallback;
@@ -266,28 +267,83 @@
     bucket.clear();
   }
 
-  function createMediaPreview(item, bucket, className) {
+  // Bir ızgaradaki her GIF/video aynı anda oynarsa (özellikle kaydırılabilir
+  // bir listede) CPU/GPU yükü katlanır ve menü "laglı" hissettirir. hoverTarget
+  // verildiğinde kart varsayılan olarak durgun bir kare gösterir, yalnızca fare
+  // üzerine gelince oynatılır. hoverTarget verilmediğinde (tekil detay
+  // önizlemesi gibi zaten tek öğe gösterilen yerlerde) eskisi gibi doğrudan oynar.
+  function createMediaPreview(item, bucket, className, hoverTarget) {
     const url = URL.createObjectURL(item.blob);
     bucket.add(url);
-    let element;
+
     if (item.kind === 'video') {
-      element = document.createElement('video');
-      element.src = url;
-      element.muted = true;
-      element.loop = true;
-      element.autoplay = true;
-      element.playsInline = true;
-      element.preload = 'metadata';
-      element.setAttribute('aria-label', item.name);
-    } else {
-      element = document.createElement('img');
-      element.src = url;
-      element.alt = item.name;
-      element.loading = 'lazy';
-      element.decoding = 'async';
+      const video = document.createElement('video');
+      video.src = url;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.setAttribute('aria-label', item.name);
+      video.className = className;
+      if (hoverTarget) {
+        hoverTarget.addEventListener('mouseenter', () => { video.play().catch(() => {}); });
+        hoverTarget.addEventListener('mouseleave', () => { video.pause(); });
+      } else {
+        video.autoplay = true;
+      }
+      return video;
     }
-    element.className = className;
-    return element;
+
+    if (item.kind === 'gif' && hoverTarget) {
+      return createHoverGifPreview(item, url, className, hoverTarget);
+    }
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = item.name;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.className = className;
+    return img;
+  }
+
+  // Varsayılan olarak GIF'in ilk karesini bir canvas'a çizip durağan gösterir;
+  // <img> animasyonu JS'ten duraklatılamadığı için gerçek oynatan <img>
+  // yalnızca hover sırasında DOM'a eklenir, ayrılınca kaldırılır.
+  function createHoverGifPreview(item, url, className, hoverTarget) {
+    const wrap = document.createElement('span');
+    wrap.className = `${className} media-gif-hover`;
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', item.name);
+
+    const canvas = document.createElement('canvas');
+    canvas.className = className;
+    canvas.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(canvas);
+
+    const freeze = new Image();
+    freeze.onload = () => {
+      canvas.width = freeze.naturalWidth || 1;
+      canvas.height = freeze.naturalHeight || 1;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.drawImage(freeze, 0, 0);
+    };
+    freeze.src = url;
+
+    let liveImg = null;
+    hoverTarget.addEventListener('mouseenter', () => {
+      if (liveImg) return;
+      liveImg = document.createElement('img');
+      liveImg.src = url;
+      liveImg.alt = item.name;
+      liveImg.className = `${className} media-gif-live`;
+      wrap.appendChild(liveImg);
+    });
+    hoverTarget.addEventListener('mouseleave', () => {
+      if (liveImg) { liveImg.remove(); liveImg = null; }
+    });
+
+    return wrap;
   }
 
   function matchesFilter(item, filter) {
@@ -354,7 +410,7 @@
 
     const preview = document.createElement('div');
     preview.className = 'media-library-preview';
-    preview.appendChild(createMediaPreview(item, settingsObjectUrls, 'media-library-media'));
+    preview.appendChild(createMediaPreview(item, settingsObjectUrls, 'media-library-media', preview));
 
     const badge = document.createElement('span');
     badge.className = `media-kind-badge ${item.kind}`;
@@ -452,7 +508,7 @@
 
     const preview = document.createElement('span');
     preview.className = 'media-picker-preview';
-    preview.appendChild(createMediaPreview(item, pickerObjectUrls, 'media-picker-media'));
+    preview.appendChild(createMediaPreview(item, pickerObjectUrls, 'media-picker-media', preview));
     const badge = document.createElement('span');
     badge.className = `media-kind-badge ${item.kind}`;
     badge.textContent = mediaBadge(item);
@@ -967,9 +1023,10 @@
       await renderPicker();
     });
 
-    document.getElementById('media-picker-search')?.addEventListener('input', async event => {
+    document.getElementById('media-picker-search')?.addEventListener('input', event => {
       pickerQuery = event.target.value;
-      await renderPicker();
+      clearTimeout(pickerSearchTimer);
+      pickerSearchTimer = setTimeout(() => { renderPicker(); }, 150);
     });
     document.getElementById('media-picker-close')?.addEventListener('click', closePicker);
     document.getElementById('media-picker-modal')?.addEventListener('click', event => {

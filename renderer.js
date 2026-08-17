@@ -790,6 +790,14 @@ window.deleteAccount = async function(id) {
       }
     } catch(e){}
   }
+
+  // Silinen hesap "ana hesap" olarak sabitlenmişse pini de temizle.
+  try {
+    const pinned = JSON.parse(localStorage.getItem('teamsync_default_account'));
+    if (pinned && pinned.type === 'legacy' && pinned.id === id) {
+      localStorage.removeItem('teamsync_default_account');
+    }
+  } catch (e) {}
 };
 
 window.loginWithAccount = function(acc) {
@@ -1720,6 +1728,12 @@ function trashIconSvg() {
   </svg>`;
 }
 
+function starIconSvg(filled) {
+  return `<svg class="star-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="12 2.5 15.1 8.85 22 9.85 17 14.75 18.18 21.65 12 18.35 5.82 21.65 7 14.75 2 9.85 8.9 8.85" />
+  </svg>`;
+}
+
 // Kendi çevrimiçi durumumu (ad, oda, avatar URL) arkadaşlara yayınlar.
 function publishPresence() {
   if (state.globalMqtt && state.globalMqtt.connected) {
@@ -2535,6 +2549,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // bilgileri her zaman main sürecinden türetilir.
   const DEVICE_ACCOUNTS_KEY = 'teamsync_device_accounts';
   const ACTIVE_SLOT_KEY = 'teamsync_active_slot';
+  const DEFAULT_ACCOUNT_KEY = 'teamsync_default_account';
 
   function getDeviceAccounts() {
     try { return JSON.parse(localStorage.getItem(DEVICE_ACCOUNTS_KEY)) || []; } catch (e) { return []; }
@@ -2562,11 +2577,35 @@ window.addEventListener('DOMContentLoaded', async () => {
         localStorage.removeItem(ACTIVE_SLOT_KEY);
       }
     }
+    if (isDefaultAccountRef({ type: 'device', slot })) localStorage.removeItem(DEFAULT_ACCOUNT_KEY);
     await renderDeviceAccounts();
   }
   function getActiveSlot() {
     const s = parseInt(localStorage.getItem(ACTIVE_SLOT_KEY), 10);
     return Number.isInteger(s) && s >= 0 ? s : 0;
+  }
+  // "Ana hesap": uygulama açılışında otomatik giriş yapılacak sabitlenmiş hesap.
+  // Cihaz hesabı ({type:'device', slot}) ya da eski profil ({type:'legacy', id}) olabilir.
+  // Ayarlanmamışsa cihaz hesapları için son kullanılan hesaba (getActiveSlot) düşülür.
+  function getDefaultAccount() {
+    try {
+      const v = JSON.parse(localStorage.getItem(DEFAULT_ACCOUNT_KEY));
+      if (v && v.type === 'device' && Number.isInteger(v.slot) && v.slot >= 0) return v;
+      if (v && v.type === 'legacy' && v.id) return v;
+    } catch (e) {}
+    return null;
+  }
+  function isDefaultAccountRef(ref) {
+    const current = getDefaultAccount();
+    if (!current || current.type !== ref.type) return false;
+    return ref.type === 'device' ? current.slot === ref.slot : current.id === ref.id;
+  }
+  function setDefaultAccount(ref) {
+    if (isDefaultAccountRef(ref)) {
+      localStorage.removeItem(DEFAULT_ACCOUNT_KEY);
+    } else {
+      localStorage.setItem(DEFAULT_ACCOUNT_KEY, JSON.stringify(ref));
+    }
   }
   function upsertDeviceAccount(slot, patch) {
     const list = getDeviceAccounts();
@@ -2581,7 +2620,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   };
 
   async function deviceLogin(slot) {
-    if (!Number.isInteger(slot) || slot < 0) slot = getActiveSlot();
+    if (!Number.isInteger(slot) || slot < 0) {
+      const defaultAccount = getDefaultAccount();
+      slot = (defaultAccount && defaultAccount.type === 'device') ? defaultAccount.slot : getActiveSlot();
+    }
     document.getElementById('step-accounts').classList.add('hidden');
     document.getElementById('step-name').classList.add('hidden');
     document.getElementById('step-auth').classList.remove('hidden');
@@ -2644,30 +2686,50 @@ window.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     const activeSlot = getActiveSlot();
+    const defaultAccount = getDefaultAccount();
     list.forEach(acc => {
       const row = document.createElement('div');
       row.className = 'account-row';
       const avatarHtml = acc.avatar
         ? `<img class="account-row-avatar" src="${acc.avatar}" />`
         : `<div class="account-row-avatar">👤</div>`;
+      const defaultRef = acc.accountType === 'device' ? { type: 'device', slot: acc.slot } : { type: 'legacy', id: acc.id };
+      const isDefaultAccount = acc.accountType === 'device'
+        ? (defaultAccount && defaultAccount.type === 'device' && defaultAccount.slot === acc.slot)
+        : (defaultAccount && defaultAccount.type === 'legacy' && defaultAccount.id === acc.id);
+      const idSuffixParts = [];
+      if (acc.accountType === 'device' && acc.slot === activeSlot) idSuffixParts.push('son kullanılan');
+      if (isDefaultAccount) idSuffixParts.push('ana hesap');
+      const idSuffix = idSuffixParts.length ? ` · ${idSuffixParts.join(' · ')}` : '';
       row.innerHTML = `
         ${avatarHtml}
         <div class="account-row-info">
           <div class="account-row-name">${escapeHtml(acc.name || 'Anonim')}</div>
-          <div class="account-row-id">Bu cihazın kimliği · Hesap #${acc.slot + 1}${acc.slot === activeSlot ? ' · son kullanılan' : ''}</div>
+          <div class="account-row-id">Bu cihazın kimliği · Hesap #${acc.slot + 1}${idSuffix}</div>
         </div>
         <div class="account-row-actions">
+          <button class="account-row-star-btn${isDefaultAccount ? ' is-default' : ''}" type="button" title="${isDefaultAccount ? 'Ana hesap (kaldırmak için tıkla)' : 'Ana hesap yap'}" aria-label="Ana hesap yap"></button>
           <button class="account-row-delete-btn" type="button" title="Hesabı Sil" aria-label="Hesabı Sil">🗑️</button>
         </div>
       `;
       const deviceTrashButton = row.querySelector('.account-row-delete-btn');
       if (deviceTrashButton) deviceTrashButton.innerHTML = trashIconSvg();
+      const starButtonEl = row.querySelector('.account-row-star-btn');
+      if (starButtonEl) starButtonEl.innerHTML = starIconSvg(isDefaultAccount);
       if (acc.accountType === 'legacy') {
         const idEl = row.querySelector('.account-row-id');
-        if (idEl) idEl.textContent = `Eski profil · ${acc.id}`;
+        if (idEl) idEl.textContent = `Eski profil · ${acc.id}${idSuffix}`;
       }
       if (acc.accountType === 'device' && acc.slot === activeSlot) {
         row.style.border = '1px solid var(--acc)';
+      }
+      if (starButtonEl) {
+        starButtonEl.onclick = async event => {
+          event.preventDefault();
+          event.stopPropagation();
+          setDefaultAccount(defaultRef);
+          await renderDeviceAccounts();
+        };
       }
       const deleteButton = row.querySelector('.account-row-delete-btn');
       deleteButton.onclick = async event => {
@@ -2691,6 +2753,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function checkSession() {
+    const defaultAccount = getDefaultAccount();
+    if (defaultAccount && defaultAccount.type === 'legacy') {
+      const accounts = await getAccounts();
+      const acc = accounts.find(a => a.id === defaultAccount.id);
+      if (acc) {
+        loginWithAccount(acc);
+        return;
+      }
+      // Sabitlenmiş eski profil artık yok — bayat pini temizle, normal akışa düş.
+      localStorage.removeItem(DEFAULT_ACCOUNT_KEY);
+    }
     if (!supabaseClient) {
       console.warn("Supabase client is not initialized.");
       document.getElementById('step-auth').classList.remove('hidden');
@@ -11044,7 +11117,7 @@ window.renderLobbiesList = function(activity) {
   list.forEach(lob => {
     const row = document.createElement('div');
     row.className = 'lobby-row';
-    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.08);';
+    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:8px;';
     
     const maxPlayers = 10;
     const playerCount = lob.players.length;
@@ -11058,7 +11131,7 @@ window.renderLobbiesList = function(activity) {
 
     row.innerHTML = `
       <div>
-        <div style="font-weight:bold; color:#fff;">${escapeHtml(lobbyName)}</div>
+        <div style="font-weight:bold; color:var(--txt-main);">${escapeHtml(lobbyName)}</div>
         <div style="font-size:11px; color:var(--txt-mut); margin-top:2px;">${infoText}</div>
         <div style="font-size:10px; font-weight:bold; color:${statusColor}; margin-top:4px;">${statusText}</div>
       </div>
