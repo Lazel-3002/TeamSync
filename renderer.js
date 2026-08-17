@@ -311,10 +311,12 @@ async function checkAvatar(base64Str) {
 
 const CHUNK_SIZE = 64 * 1024;
 const MAX_DM_FILE_SIZE = 20 * 1024 * 1024;
-// Room transfers are chunked and streamed from File.slice(), so the sender
-// does not load the whole file at once. Receivers keep chunks in memory until
-// the final Blob is created; keep a conservative aggregate cap for that peak.
-const MAX_ROOM_FILE_SIZE = 250 * 1024 * 1024;
+// Room transfers have no hard size cap anymore (sender is warned instead, see
+// sendFile/LARGE_ROOM_FILE_WARN_THRESHOLD). Receivers keep chunks in memory
+// until the final Blob is created, so MAX_PENDING_ROOM_BYTES/FILES remain as
+// the real memory-safety net regardless of any single file's size.
+const LARGE_ROOM_FILE_WARN_THRESHOLD = 250 * 1024 * 1024;
+const ROOM_FILE_WARN_SKIP_KEY = 'teamsync_skip_large_file_warning';
 const MAX_PENDING_ROOM_BYTES = 300 * 1024 * 1024;
 const MAX_PENDING_ROOM_FILES = 4;
 const MAX_PENDING_DM_BYTES = 40 * 1024 * 1024;
@@ -5341,7 +5343,7 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'file-meta') {
     const validId = typeof msg.id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(msg.id);
     const validName = typeof msg.name === 'string' && msg.name.length > 0 && msg.name.length <= 255;
-    const validSize = Number.isInteger(msg.size) && msg.size > 0 && msg.size <= MAX_ROOM_FILE_SIZE;
+    const validSize = Number.isInteger(msg.size) && msg.size > 0;
     const validMime = typeof msg.mime === 'string' && msg.mime.length <= 128;
     const pendingRoomBytes = Array.from(fileBuffer.values()).reduce((sum, entry) => sum + (entry.meta?.size || 0), 0);
     if (!validId || !validName || !validSize || !validMime || fileBuffer.has(msg.id) || fileBuffer.size >= MAX_PENDING_ROOM_FILES
@@ -10490,10 +10492,68 @@ function appendFileMsg(fileId, name, size, incoming) {
   wrap.scrollTop = wrap.scrollHeight;
 }
 
+// Büyük dosyalarda göndermeyi engellemek yerine kullanıcıyı uyarıp onayına
+// bırakır. "Bir daha gösterme" işaretlenirse tercih localStorage'da kalıcı
+// olarak saklanır ve bir sonraki büyük dosyada uyarı tekrar gösterilmez.
+function confirmLargeFileSend(file) {
+  return new Promise((resolve) => {
+    if (localStorage.getItem(ROOM_FILE_WARN_SKIP_KEY) === '1') { resolve(true); return; }
+
+    let modal = document.getElementById('large-file-warn-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'large-file-warn-modal';
+      modal.className = 'hidden';
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+      modal.innerHTML = `
+        <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 400px; padding: 24px; text-align: center;">
+          <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 20px; color: #f8fafc;">⚠️ Büyük Dosya</h3>
+          <p id="large-file-warn-message" style="margin-bottom: 18px; color: #94a3b8; font-size: 15px; line-height: 1.5;"></p>
+          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px; color: #94a3b8; font-size: 13px; cursor: pointer; justify-content: center;">
+            <input type="checkbox" id="large-file-warn-skip" style="width: 16px; height: 16px; cursor: pointer;" />
+            Bir daha gösterme
+          </label>
+          <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="large-file-warn-yes" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 8px; background: #ef4444; border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">Yine de Gönder</button>
+            <button id="large-file-warn-no" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">İptal</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    document.getElementById('large-file-warn-message').innerText =
+      `"${file.name}" dosyası ${(file.size / 1024 / 1024).toFixed(1)} MB. Büyük dosyalar gönderim ve alım tarafında yavaş olabilir. Yine de göndermek istiyor musunuz?`;
+    const skipBox = document.getElementById('large-file-warn-skip');
+    skipBox.checked = false;
+    modal.classList.remove('hidden');
+
+    const yesBtn = document.getElementById('large-file-warn-yes');
+    const noBtn = document.getElementById('large-file-warn-no');
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+    };
+
+    const onYes = () => {
+      if (skipBox.checked) localStorage.setItem(ROOM_FILE_WARN_SKIP_KEY, '1');
+      cleanup();
+      resolve(true);
+    };
+    const onNo = () => { cleanup(); resolve(false); };
+
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+  });
+}
+
 async function sendFile(file) {
-  if (!file || file.size > MAX_ROOM_FILE_SIZE) {
-    showToast('Dosya boyutu izin verilen sınırı aşıyor.', 'warn');
-    return;
+  if (!file) return;
+  if (file.size > LARGE_ROOM_FILE_WARN_THRESHOLD) {
+    const proceed = await confirmLargeFileSend(file);
+    if (!proceed) return;
   }
   const fileId = crypto.randomUUID();
   appendFileMsg(fileId, file.name, file.size, false);
