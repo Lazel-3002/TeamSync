@@ -4847,8 +4847,6 @@ function setupDataChannel(peerId, dc) {
             if (currentUrl) dc.send(JSON.stringify({ type: 'sb-nav', url: currentUrl, ts: Date.now() }));
           } else if (activeAct === 'uno') {
             if (typeof unoSyncNewPeer === 'function') unoSyncNewPeer(peerId);
-          } else if (activeAct === 'poke' && window.pokeState) {
-            dc.send(JSON.stringify({ type: 'poke_sync', state: window.pokeState }));
           } else if (activeAct === 'poll') {
             if (window.pollState) {
               dc.send(JSON.stringify({ 
@@ -5151,10 +5149,6 @@ async function handleDataMessage(peerId, msg) {
               broadcastTo(msg.peerId, { type: isPlaying ? 'wt-play' : 'wt-pause', time });
             }
           }
-        } else if (lob.activity === 'poke') {
-          if (window.pokeState) {
-            broadcastTo(msg.peerId, { type: 'poke_sync', state: window.pokeState });
-          }
         } else if (lob.activity === 'sb') {
           const currentUrl = document.getElementById('sb-url')?.value || '';
           broadcastTo(msg.peerId, { type: 'sb-start', host: state.myId, interactive: true, startedAt: state.sb.startedAt, url: currentUrl, auth: (state.sb.authorized || []).slice() });
@@ -5231,7 +5225,6 @@ async function handleDataMessage(peerId, msg) {
                         msg.type.startsWith('uno-') ||
                         msg.type.startsWith('vv-') ||
                         msg.type.startsWith('sb-') ||
-                        msg.type.startsWith('poke_') || 
                         ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
 
   if (isActivityMsg) {
@@ -5539,7 +5532,7 @@ async function handleDataMessage(peerId, msg) {
     if (window.vampireVillagerHandler) window.vampireVillagerHandler(msg, peerId);
   } else if (msg.type.startsWith('sb-')) {
     handleSBMessage(peerId, msg);
-  } else if (msg.type.startsWith('poke_') || ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
+  } else if (['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
     if (window.activityHandler) window.activityHandler(msg);
   }
 }
@@ -6217,7 +6210,6 @@ const FOCUS_CARD_TITLES = {
   'poll-card': 'Anket',
   'lvs-card': 'Film Gecesi',
   'wheel-card': 'Şans Çarkı',
-  'poke-card': 'PokeSavaş'
 };
 
 // Odaklı kartın kutusunu yer tutucununkine eşitler. Kart #grid'in çocuğu ama
@@ -6420,7 +6412,7 @@ async function toggleFocusFullscreen() {
 
 // Bir aktivite kartını açar (hidden kaldırır), odaklanabilir yapar ve başka
 // bir kart odakta değilse odağa alır. Aktivite açılış yollarının tamamı bunu
-// kullanmalı — poll/lvs/wheel/poke kartlarının odak/tam ekran/kilit
+// kullanmalı — poll/lvs/wheel kartlarının odak/tam ekran/kilit
 // alamamasının sebebi bu adımların o yollarda hiç yapılmamasıydı.
 function openCardFocused(id) {
   const el = document.getElementById(id);
@@ -7734,8 +7726,6 @@ Object.assign(LEGACY_TEXT_EN, {
   'Gece hayatta kal, gündüz oylayın': 'Survive the night, vote by day',
   'Klasik kart oyunu': 'Classic card game',
   'Element arenası': 'Element arena',
-  'PokeSavaş': 'PokeBattle',
-  '⚔️ PokeSavaş ⚔️': '⚔️ PokeBattle ⚔️',
   'SAVAŞLARI': 'BATTLES',
   'Geri': 'Back',
   'Lobilere Göz At': 'Browse Lobbies',
@@ -7839,8 +7829,6 @@ Object.assign(LEGACY_TEXT_EN, {
   'Çarkı döndür': 'Spin the wheel',
   'Kazanan': 'Winner',
   'Seçenek bekleniyor': 'Waiting for options',
-  'Pokemonunu Seç': 'Choose Your Pokémon',
-  'Savaşmak istediğin türü ve ana Pokemonunu belirle.': 'Choose the type and main Pokémon you want to battle with.',
   'Savaştan Çekil': 'Withdraw from Battle',
   'Arena Bekleme Salonu': 'Arena Waiting Room',
   'Buraya Katıl': 'Join this slot',
@@ -7848,7 +7836,6 @@ Object.assign(LEGACY_TEXT_EN, {
   'Rastgele Yetenekler (AÇIK)': 'Random Abilities (ON)',
   'Savaşı Başlat': 'Start Battle',
   'Savaşı Baslat': 'Start Battle',
-  'POKE SAVAŞLARI': 'POKÉ BATTLES',
   'SEÇ • GELİŞTİR • SAVAŞ': 'CHOOSE • EVOLVE • BATTLE',
   'OYUNCU 1...': 'PLAYER 1...',
   'OYUNCU 2...': 'PLAYER 2...',
@@ -7876,12 +7863,8 @@ Object.assign(LEGACY_TEXT_EN, {
   'Seçtiğin formun gerçek türleri, özellikleri ve öğrenebildiği saldırılar savaşa uygulanır.': 'The selected form’s real types, abilities, and learnable attacks are used in battle.',
   'Rakip Evrimini Seçiyor...': 'Opponent is choosing an evolution...',
   'Saldırılarını Seç': 'Choose your attacks',
-  'Pokemonun için en fazla 4 gerçek saldırı seç. (0/4)': 'Choose up to 4 real attacks for your Pokémon. (0/4)',
-  'Pokemonun için en fazla 4 gerçek saldırı seç. (': 'Choose up to 4 real attacks for your Pokémon. (',
   'Onayla': 'Confirm',
   'Rakip Bekleniyor...': 'Waiting for opponent...',
-  'Pokémon Tür Kılavuzu': 'Pokémon Type Guide',
-  'Pokemonun için en fazla 4 gerçek saldırı seç. (0/4)': 'Choose up to 4 real attacks for your Pokémon. (0/4)',
   'Güç:': 'Power:',
   'Hız:': 'Speed:',
   'Oyuncu 1 Bekleniyor...': 'Waiting for Player 1...',
@@ -7913,12 +7896,9 @@ Object.assign(LEGACY_TEXT_EN, {
   'Botu Kaldır': 'Remove Bot',
   'Savaş formatı': 'Battle format',
   'Kurucu seçer': 'Chosen by the host',
-  'Rastgele Pokémon (AÇIK)': 'Random Pokémon (ON)',
   'Manuel Takım Seçimi (KAPALI)': 'Manual Team Selection (OFF)',
   'OYUNCU 1': 'PLAYER 1',
   'OYUNCU 2': 'PLAYER 2',
-  'Pokémon Değiştir': 'Switch Pokémon',
-  'Bir Pokémon seç — bu tur saldırı yerine değiştirirsin': 'Choose a Pokémon — you will switch instead of attacking this turn',
   'Takımı Confirm': 'Confirm Team',
   'Takımı Onayla': 'Confirm Team',
   'Seçtiğin saldırılar': 'Selected attacks',
@@ -9375,7 +9355,6 @@ function bindUI() {
 
   // Statik aktivite kartlarının tamamı baştan odaklanabilir olsun — hangi
   // yoldan açılırsa açılsın tıkla-büyüt çalışır. Ayrıca hepsi #grid'in İÇİNDE
-  // olmalı: poke-card HTML'de yanlışlıkla .main'in doğrudan çocuğuydu; şerit
   // kuralları uygulanmayınca 620px'lik kart, başka bir kart odaklanınca yer
   // tutucuyu eziyor ve düzeni ekran dışına taşırıyordu. (Kartlar bu aşamada
   // gizli ve iframe'siz — taşımak güvenli.)
@@ -10278,7 +10257,7 @@ function closeAllCards(leaveLobby = false, except = null) {
     try { document.activeElement.blur(); } catch(e){}
   }
 
-  ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card', 'poke-card'].forEach(id => {
+  ['wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card', 'lvs-card', 'wheel-card'].forEach(id => {
     if (id === except) return;
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
@@ -10312,14 +10291,6 @@ function closeAllCards(leaveLobby = false, except = null) {
     const g = document.getElementById('uno-game'); if (g) g.classList.add('hidden');
     const ov = document.getElementById('uno-over'); if (ov) ov.classList.add('hidden');
     const lb = document.getElementById('uno-lobby'); if (lb) lb.classList.remove('hidden');
-  }
-
-  if (window.pokeState && except !== 'poke-card') {
-    window.pokeState = { p1: null, p2: null, spectators: [], round: 0, status: 'waiting' };
-    const pLobby = document.getElementById('poke-lobby-view');
-    if (pLobby) pLobby.classList.remove('hidden');
-    const pGame = document.getElementById('poke-battle-view');
-    if (pGame) pGame.classList.add('hidden');
   }
 
   const empty = document.getElementById('empty-state');
@@ -10680,7 +10651,6 @@ function initActivitiesUI() {
   if (typeof initUno === 'function') initUno();
   if (typeof initVampireVillager === 'function') initVampireVillager();
   if (typeof initLuckyWheel === 'function') initLuckyWheel();
-  if (typeof initPoke === 'function') initPoke();
 }
 
 
@@ -11173,7 +11143,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- LOBBY SYSTEM UI BINDINGS ---
-  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'poke', 'vampire'];
+  const activities = ['wt', 'uno', 'sb', 'poll', 'lvs', 'wheel', 'vampire'];
   const activitySearch = document.getElementById('activity-search');
   if (activitySearch) {
     activitySearch.addEventListener('input', () => filterActivityCards(activitySearch.value));
@@ -11195,7 +11165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş', vampire: 'Vampir Köylü' };
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -11218,7 +11188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('act-lobby-card').classList.remove('hidden');
         
         // Update Title
-        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş', vampire: 'Vampir Köylü' };
+        const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü' };
         document.getElementById('act-lobby-title').textContent = `${names[act]} Lobileri`;
         
         renderLobbiesList(act);
@@ -11247,7 +11217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!act) return;
     
     // Create new lobby
-    const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', poke: 'PokeSavaş', vampire: 'Vampir Köylü' };
+    const names = { uno: 'UNO', sb: 'Ortak Tarayıcı', poll: 'Hızlı Anket', lvs: 'Video Oynatıcı', wheel: 'Şans Çarkı', vampire: 'Vampir Köylü' };
     const newLobby = {
       id: `LOB-${crypto.randomUUID()}`,
       activity: act,
@@ -11303,7 +11273,6 @@ window.updateActivityCounts = function() {
     poll: { l: 0, p: 0 },
     lvs: { l: 0, p: 0 },
     wheel: { l: 0, p: 0 },
-    poke: { l: 0, p: 0 },
     vampire: { l: 0, p: 0 }
   };
   
@@ -11971,7 +11940,7 @@ const SHORTCUT_SUPPRESSION_EXEMPT = new Set(['ptt']);
 // tetiklenmez; modüller kendi klavye girdilerini kullanıyor.
 const ACTIVITY_CARD_IDS = [
   'wb-card', 'wt-card', 'sb-card', 'uno-card', 'poll-card',
-  'lvs-card', 'wheel-card', 'poke-card', 'vampire-card'
+  'lvs-card', 'wheel-card', 'vampire-card'
 ];
 
 const SHORTCUT_DEFS = [

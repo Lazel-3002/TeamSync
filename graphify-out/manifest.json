@@ -1,17 +1,7 @@
 {
   "js/lucky-wheel.js": {
-    "mtime": 1785362046.028911,
-    "ast_hash": "dd0eeecf62c40cd85a4445baa4e0ed3c",
-    "semantic_hash": ""
-  },
-  "js/movesData.js": {
-    "mtime": 1784799866.944294,
-    "ast_hash": "140491d6726bad1a198a099a265de5c0",
-    "semantic_hash": ""
-  },
-  "js/poke.js": {
-    "mtime": 1786921985.992344,
-    "ast_hash": "8be403fb57f92bb774c6ef9029d72784",
+    "mtime": 1786958976.2786436,
+    "ast_hash": "6e39853a3fdccb30eb5e27c9f7a6171d",
     "semantic_hash": ""
   },
   "js/pokeData.js": {
@@ -40,34 +30,34 @@
     "semantic_hash": ""
   },
   "main.js": {
-    "mtime": 1786297520.9139183,
-    "ast_hash": "994285f03a5158c18e6d8b8fb13f2294",
+    "mtime": 1786957601.312364,
+    "ast_hash": "06fb50a5e75deaa221f4b04ffb86ffbf",
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1785333039.9686465,
-    "ast_hash": "9960fed493887624fde7d73f61312c35",
+    "mtime": 1786958320.8857434,
+    "ast_hash": "f3b394734a1e431244ecc83b8d1b7b27",
     "semantic_hash": ""
   },
   "preload.js": {
-    "mtime": 1786297520.9139183,
-    "ast_hash": "cd1bd07cdde4a3e2aa0212aa4c2c1a9f",
+    "mtime": 1786957601.3133686,
+    "ast_hash": "9c9ede08429716854e911a7425567583",
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1786311927.9840682,
-    "ast_hash": "edfca9ea710eb80cd7b5f9ad21847aea",
+    "mtime": 1786989930.1195018,
+    "ast_hash": "7fda75430372bf96181d14d0bf93557a",
     "semantic_hash": ""
   },
   "src/App.jsx": {
-    "mtime": 1783584524.1249459,
-    "ast_hash": "b9e60f68dee32b5b4efdcbeb81a27c24",
-    "semantic_hash": "b9e60f68dee32b5b4efdcbeb81a27c24"
+    "mtime": 1786957835.5876272,
+    "ast_hash": "522cbcfbb76f197c89fbf0b266218b56",
+    "semantic_hash": ""
   },
   "src/components/Activities.jsx": {
-    "mtime": 1784733070.770318,
-    "ast_hash": "52b2b3628fa9c9cebb2a0a5b4de3ac35",
-    "semantic_hash": "52b2b3628fa9c9cebb2a0a5b4de3ac35"
+    "mtime": 1786989804.1176965,
+    "ast_hash": "6f2632b6b5e8484df885e1b6bfed87b1",
+    "semantic_hash": ""
   },
   "src/components/Chat.jsx": {
     "mtime": 1783424457.3110654,
@@ -105,14 +95,14 @@
     "semantic_hash": "0655841e36225a98a6e0530ae5938688"
   },
   "src/components/WebRTC.jsx": {
-    "mtime": 1784747639.969246,
-    "ast_hash": "b87ad203b89aadad17f0ae74ac95b31b",
+    "mtime": 1786957835.5886364,
+    "ast_hash": "6ea71166f88bd9ff65b7d657f28e17fd",
     "semantic_hash": ""
   },
   "src/crypto.js": {
-    "mtime": 1783424457.3171027,
-    "ast_hash": "74ff9cc0c63959c35d18b86a60938fb7",
-    "semantic_hash": "74ff9cc0c63959c35d18b86a60938fb7"
+    "mtime": 1786957864.4275901,
+    "ast_hash": "38326430295115ea3609668211de4d51",
+    "semantic_hash": ""
   },
   "src/main.jsx": {
     "mtime": 1783424457.3181033,
@@ -120,9 +110,9 @@
     "semantic_hash": "006dea78d66478406676acfe0b5f6544"
   },
   "src/signaling.js": {
-    "mtime": 1783424457.3181033,
-    "ast_hash": "f5e0a369c61fd2d7c43d67ee191420bf",
-    "semantic_hash": "f5e0a369c61fd2d7c43d67ee191420bf"
+    "mtime": 1786957869.9171493,
+    "ast_hash": "fce8963312ffc816d5ed24d58418a536",
+    "semantic_hash": ""
   },
   "src/supabaseClient.js": {
     "mtime": 1783424457.3199353,
@@ -140,8 +130,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1786920440.814682,
-    "ast_hash": "76dd5a40ccbc48cc02d44c28d2391c96",
+    "mtime": 1786989804.0903156,
+    "ast_hash": "c08ac8dd0ef6833b81af8aadf672a8b6",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -214,109 +204,19 @@
     "ast_hash": "b2f309f25051c66534c1897dba688090",
     "semantic_hash": ""
   },
-  "tools/data/fetch_pokemon.js": {
-    "mtime": 1784807000.7081103,
-    "ast_hash": "7988a35c59cd968f933c3756ef83dab8",
-    "semantic_hash": ""
-  },
-  "tools/data/inject_megas.js": {
-    "mtime": 1783885771.3796155,
-    "ast_hash": "bf68ad7d5f686929990899f1a8b30e87",
-    "semantic_hash": ""
-  },
   "tools/dev/yapaydenetleyici.js": {
     "mtime": 1784733070.7730315,
     "ast_hash": "67e9df9df364353f0cd8c04641920d7b",
     "semantic_hash": "67e9df9df364353f0cd8c04641920d7b"
-  },
-  "tools/patches/add-audio.js": {
-    "mtime": 1782210035.8932784,
-    "ast_hash": "bb3f7a562c907dc955537dd4ff9e6ef6",
-    "semantic_hash": ""
-  },
-  "tools/patches/add-death-anim.js": {
-    "mtime": 1782210954.9453516,
-    "ast_hash": "f706b59a0b167fcab23fbebf79951b0a",
-    "semantic_hash": ""
-  },
-  "tools/patches/add-guide.js": {
-    "mtime": 1782212669.1606212,
-    "ast_hash": "1f42bcadf9a472188de092ae2725da42",
-    "semantic_hash": ""
   },
   "tools/patches/add-modal.js": {
     "mtime": 1782235947.6403463,
     "ast_hash": "995b5140855e634ae625f9c30f9bcc3b",
     "semantic_hash": ""
   },
-  "tools/patches/add-poke-vol.js": {
-    "mtime": 1782212982.6528692,
-    "ast_hash": "8cc763faa384763362770ab76e39868a",
-    "semantic_hash": ""
-  },
-  "tools/patches/enhance-css.js": {
-    "mtime": 1782209268.8855264,
-    "ast_hash": "2cc013a745a345834f9042504719f270",
-    "semantic_hash": ""
-  },
-  "tools/patches/fix-emojis.js": {
-    "mtime": 1782209230.1079686,
-    "ast_hash": "80c22b4986b0f8bd183572a0ec119d6f",
-    "semantic_hash": ""
-  },
-  "tools/patches/fix-html-2.js": {
-    "mtime": 1782208211.0067842,
-    "ast_hash": "9decbf3f38256da2b79a2e7fce4648ac",
-    "semantic_hash": ""
-  },
-  "tools/patches/fix-html.js": {
-    "mtime": 1782207518.9696465,
-    "ast_hash": "61b7dbf0e509db3db4ab3d1961fec258",
-    "semantic_hash": ""
-  },
-  "tools/patches/fix-poke.js": {
-    "mtime": 1782208275.1046917,
-    "ast_hash": "195f190fe50ddf2dd60aef2212ba354e",
-    "semantic_hash": ""
-  },
-  "tools/patches/fix-typechart.js": {
-    "mtime": 1782211471.4748535,
-    "ast_hash": "411eb0bcbdd8bd8c874b5b5bb8292614",
-    "semantic_hash": ""
-  },
-  "tools/patches/improve-css.js": {
-    "mtime": 1782211891.9842563,
-    "ast_hash": "b6a885104abf49bae0d2b35339ba6f9f",
-    "semantic_hash": ""
-  },
-  "tools/patches/improve-emojis.js": {
-    "mtime": 1782212282.8835094,
-    "ast_hash": "99f4e7774609fd3883a4f54714823ff9",
-    "semantic_hash": ""
-  },
-  "tools/patches/inject-types-css.js": {
-    "mtime": 1782209783.8148851,
-    "ast_hash": "a237ad8532f946a6526fd49e5499753e",
-    "semantic_hash": ""
-  },
-  "tools/patches/inject-types-html.js": {
-    "mtime": 1782209754.592918,
-    "ast_hash": "7c56c4a2c7e0c1f6ee8309810c1e59ba",
-    "semantic_hash": ""
-  },
-  "tools/patches/inject-types-js.js": {
-    "mtime": 1782209702.5552042,
-    "ast_hash": "b720c959aac1a3c4d0a811ff719258bb",
-    "semantic_hash": ""
-  },
   "tools/patches/replace-emojis-css.js": {
     "mtime": 1782212412.428096,
     "ast_hash": "704ab2a25982983427428662368f9616",
-    "semantic_hash": ""
-  },
-  "tools/patches/restore-poke-b64.js": {
-    "mtime": 1782208622.7467763,
-    "ast_hash": "4bb6b9568eb8f8a72397ad743df21cb7",
     "semantic_hash": ""
   },
   "docs/index.html": {
@@ -340,8 +240,8 @@
     "semantic_hash": ""
   },
   "tools/README.md": {
-    "mtime": 1784443531.9360485,
-    "ast_hash": "5d16867ae930b62e4b9ab01a4a0c3101",
+    "mtime": 1786989930.1262808,
+    "ast_hash": "be178d4e310819c2f9cd138ae64171a0",
     "semantic_hash": ""
   },
   "docs/assets/icon.png": {
@@ -363,46 +263,6 @@
     "mtime": 1784641608.9324996,
     "ast_hash": "ebde1c28a14f864aa35897cd61a35967",
     "semantic_hash": ""
-  },
-  "tools/data/generate_smeargle_variants.js": {
-    "mtime": 1784622306.4224997,
-    "ast_hash": "1bf02fb850705b49d26ce9e128fef555",
-    "semantic_hash": ""
-  },
-  "assets/pokemon/smeargle/smeargle-blue.gif": {
-    "mtime": 1784625287.9959774,
-    "ast_hash": "a4cbf71e8296b9ac18be89e86bcaeeb2",
-    "semantic_hash": "a4cbf71e8296b9ac18be89e86bcaeeb2"
-  },
-  "assets/pokemon/smeargle/smeargle-green.gif": {
-    "mtime": 1784625287.9945176,
-    "ast_hash": "5d9c172e392f61f5a73d4030b986aca9",
-    "semantic_hash": "5d9c172e392f61f5a73d4030b986aca9"
-  },
-  "assets/pokemon/smeargle/smeargle-indigo.gif": {
-    "mtime": 1784625287.9971397,
-    "ast_hash": "e18adef1bed69915dfe7c37f3e60d5b0",
-    "semantic_hash": "e18adef1bed69915dfe7c37f3e60d5b0"
-  },
-  "assets/pokemon/smeargle/smeargle-orange.gif": {
-    "mtime": 1784625287.9971397,
-    "ast_hash": "aa788e019b752e003e3102c9a38235cc",
-    "semantic_hash": "aa788e019b752e003e3102c9a38235cc"
-  },
-  "assets/pokemon/smeargle/smeargle-red.gif": {
-    "mtime": 1784625287.9959774,
-    "ast_hash": "6d837870a87cef2cc533930c25191cae",
-    "semantic_hash": "6d837870a87cef2cc533930c25191cae"
-  },
-  "assets/pokemon/smeargle/smeargle-teal.gif": {
-    "mtime": 1784625287.9983814,
-    "ast_hash": "8b00935490641bf1627b5a20de94526e",
-    "semantic_hash": "8b00935490641bf1627b5a20de94526e"
-  },
-  "assets/pokemon/smeargle/smeargle-yellow.gif": {
-    "mtime": 1784625287.9959774,
-    "ast_hash": "b7eebf93d7366349b8104a3f847c6438",
-    "semantic_hash": "b7eebf93d7366349b8104a3f847c6438"
   },
   "js/rnnoise-noise-suppression.js": {
     "mtime": 1784736529.7834918,
@@ -459,31 +319,6 @@
     "ast_hash": "599773e21bf0a577c220de911a260398",
     "semantic_hash": ""
   },
-  "test/e2e/pokemon-evolution-forms.test.js": {
-    "mtime": 1784820722.8974345,
-    "ast_hash": "dca7633e6bbe12e8f900b5a79b70cdbc",
-    "semantic_hash": "dca7633e6bbe12e8f900b5a79b70cdbc"
-  },
-  "test/e2e/pokemon-real-moves.test.js": {
-    "mtime": 1786912521.715384,
-    "ast_hash": "e6b8094d2b4d6c4b5afa9fafa7c47a97",
-    "semantic_hash": ""
-  },
-  "tools/data/fetch_moves.js": {
-    "mtime": 1784799853.5355575,
-    "ast_hash": "9785583ebe812a0f87554ccb86f87426",
-    "semantic_hash": ""
-  },
-  "assets/pokemon/poke-battle-cover.png": {
-    "mtime": 1784793298.273523,
-    "ast_hash": "685a0b893efbbf68517e78e06cc835ed",
-    "semantic_hash": "685a0b893efbbf68517e78e06cc835ed"
-  },
-  "test/e2e/pokemon-battle-balance.test.js": {
-    "mtime": 1784811069.4775016,
-    "ast_hash": "0ecaa736c635336211ca9a3a0d2f5fb8",
-    "semantic_hash": ""
-  },
   ".github/workflows/release.yml": {
     "mtime": 1784812917.9231117,
     "ast_hash": "619d46c7bd8b4bc251ef6b41c2a6ab7a",
@@ -505,8 +340,8 @@
     "semantic_hash": ""
   },
   "js/media-library.js": {
-    "mtime": 1785823499.0221243,
-    "ast_hash": "f519b0a984226ef86baf51d930b86f40",
+    "mtime": 1786988581.7607174,
+    "ast_hash": "2eae8b084d4ae65574344d0cc933d838",
     "semantic_hash": ""
   },
   "js/vampire-villager.js": {
@@ -515,8 +350,8 @@
     "semantic_hash": ""
   },
   "test/e2e/media-library.test.js": {
-    "mtime": 1785823499.0602398,
-    "ast_hash": "47c2555632022a7f5a6e4e981f03caff",
+    "mtime": 1786988581.770798,
+    "ast_hash": "7a824a7969bbd452267b4af5af8faae5",
     "semantic_hash": ""
   },
   "test/e2e/settings-language.test.js": {
@@ -534,11 +369,6 @@
     "ast_hash": "6b258de6adfcd65407ec81750ee7a85a",
     "semantic_hash": ""
   },
-  "assets/pokemon/poke-battle-cover-v2.png": {
-    "mtime": 1785255492.2154882,
-    "ast_hash": "1604a0b35ed6c745319a0186bc4f9cd8",
-    "semantic_hash": ""
-  },
   "assets/vampire-villager-cover-v3.png": {
     "mtime": 1785262590.1196456,
     "ast_hash": "cf765a29bcac0efdea7431e809a275a6",
@@ -550,78 +380,78 @@
     "semantic_hash": ""
   },
   "test/e2e/i18n-coverage.test.js": {
-    "mtime": 1785404411.4313424,
-    "ast_hash": "928d3094728c6c030d2c9189f368c9db",
+    "mtime": 1786989909.1259487,
+    "ast_hash": "682a2442619a98e68a067bf7ef8c81c1",
     "semantic_hash": ""
   },
   "resources/localization/catalogs.bundle.js": {
-    "mtime": 1786297520.9204571,
-    "ast_hash": "e63cd93ca92311cbac966e15be618f47",
+    "mtime": 1786959068.9222724,
+    "ast_hash": "f95a4adfc4e3bb1deaaa3045c61eed60",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ar.json": {
-    "mtime": 1786297520.9214718,
-    "ast_hash": "84892fe541785f15ff029f9192e187c6",
+    "mtime": 1786959068.4062665,
+    "ast_hash": "624b6310fc57cedce58b6b1c2097dd1e",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/de.json": {
-    "mtime": 1786297520.9224763,
-    "ast_hash": "7b78eb16604bd1cdebc44ae4624c4d7d",
+    "mtime": 1786959068.4095812,
+    "ast_hash": "5041a376189ddd0fb171ee60b51e9a70",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/en.json": {
-    "mtime": 1786297520.923473,
-    "ast_hash": "a9cbee54b35fee83d4cc1e7b894e9471",
+    "mtime": 1786959068.3279836,
+    "ast_hash": "4cb5dcceb2b0a65bbc88a6cf6037e7ab",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/es.json": {
-    "mtime": 1786297520.9244764,
-    "ast_hash": "74ee4b777ec5326609441b6a94d11f53",
+    "mtime": 1786959068.4106061,
+    "ast_hash": "e09d62b56205f71657287c0a02006943",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/fr.json": {
-    "mtime": 1786297520.925477,
-    "ast_hash": "f876cd69dd7e1b76f10698dd4d60c888",
+    "mtime": 1786959068.4126058,
+    "ast_hash": "df8aa70c3d88d4c8579ecb430a773c0c",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ja.json": {
-    "mtime": 1786297520.9265656,
-    "ast_hash": "d8adc91923bad055779d47027fe3930c",
+    "mtime": 1786959068.4146366,
+    "ast_hash": "0b20f32f38b18e6002432c3b8bf04f21",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/kk.json": {
-    "mtime": 1786297520.9265656,
-    "ast_hash": "b964384dc181685987aad4d05ad9416d",
+    "mtime": 1786959068.4160314,
+    "ast_hash": "36385e2810948791f9d5cc730f9e75b7",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/mn.json": {
-    "mtime": 1786297520.927809,
-    "ast_hash": "ffc107ba6c6c9ae58f4151f8f3cf1f67",
+    "mtime": 1786959068.4181845,
+    "ast_hash": "ae4b0a9b34e7a7dec36289e912d79fbb",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/pt-BR.json": {
-    "mtime": 1786297520.928823,
-    "ast_hash": "c4897a36b446d29142569cc5976ad0e2",
+    "mtime": 1786959068.4202142,
+    "ast_hash": "9e4e264ada1e3780174530a7e6933f0d",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ru.json": {
-    "mtime": 1786297520.928823,
-    "ast_hash": "4b665f477f5f2f894a1a9b033e720742",
+    "mtime": 1786959068.422239,
+    "ast_hash": "f3445aa5f901809cd6e683543c9cdc9f",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tk.json": {
-    "mtime": 1786297520.9308615,
-    "ast_hash": "88354693aa7234fed690532bf7a7ee62",
+    "mtime": 1786959068.4237454,
+    "ast_hash": "67e2fe4d92482a4a048959de9be66aa2",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tr.json": {
-    "mtime": 1786297520.9308615,
-    "ast_hash": "0971005dfa872ce95b13d6a129b89b06",
+    "mtime": 1786959068.326985,
+    "ast_hash": "8993e9f5d9a764407d39d174880dea7b",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/zh-CN.json": {
-    "mtime": 1786297520.931867,
-    "ast_hash": "ac8bf3fe461244d1259383bc406859e0",
+    "mtime": 1786959068.4267573,
+    "ast_hash": "389908c199bae7b5eb89d05e08c02905",
     "semantic_hash": ""
   },
   "tools/i18n/audit-locales.js": {
@@ -712,16 +542,6 @@
   "test/e2e/sfw-text-filter.test.js": {
     "mtime": 1786311905.0164335,
     "ast_hash": "1958a4ac75ba972ac92570d4fdbee467",
-    "semantic_hash": ""
-  },
-  "test/e2e/pokemon-team-battle.test.js": {
-    "mtime": 1786921993.0375462,
-    "ast_hash": "451c10b3a0a1d49c02baba201141cb11",
-    "semantic_hash": ""
-  },
-  "test/e2e/pokemon-lobby-bots.test.js": {
-    "mtime": 1786920762.9959939,
-    "ast_hash": "7e6d7e3193c2d6e916545b5f8c1aca86",
     "semantic_hash": ""
   }
 }

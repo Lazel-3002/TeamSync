@@ -32,7 +32,6 @@ module.exports = async function run() {
         pollText: visibleText('#poll-card'),
         wheelText: visibleText('#wheel-card'),
         localVideoText: visibleText('#lvs-card'),
-        pokeText: visibleText('#poke-card'),
         inviteText: visibleText('#server-invites-modal'),
         dynamicText: (() => {
           const sample = document.createElement('div');
@@ -79,7 +78,6 @@ module.exports = async function run() {
     assert.match(result.localVideoText, /Only play\/pause\/time is synchronized/, JSON.stringify(result, null, 2));
     assert.match(result.localVideoText, /Please choose the same video file/, JSON.stringify(result, null, 2));
 
-    const keySurfaces = [result.activityText, result.lobbyText, result.pollText, result.wheelText, result.pokeText].join('\n');
     assert.ok(!/[çğıöşüÇĞİÖŞÜ]/.test(keySurfaces), `Turkish text leaked into English activity UI:\n${keySurfaces}`);
 
     const unsupportedLocale = await evalJS(peer.client, `(() => {

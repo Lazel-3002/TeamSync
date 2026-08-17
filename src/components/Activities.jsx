@@ -7,7 +7,6 @@ export default function Activities({ onClose, myId, targetId, isHost, connectedP
     { id: 'browser', name: 'Ortak Tarayıcı', icon: '🌐', color: '#3b82f6' },
     { id: 'wheel', name: 'Şans Çarkı', icon: '🎡', color: '#f59e0b' },
     { id: 'coin', name: 'Yazı Tura', icon: '🪙', color: '#10b981' },
-    { id: 'pokemon', name: 'Pokemon', icon: '🐉', color: '#ec4899' }
   ];
 
   const renderActivityContent = () => {
@@ -16,12 +15,6 @@ export default function Activities({ onClose, myId, targetId, isHost, connectedP
         return (
           <div style={{ width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
             <iframe src="https://duckduckgo.com" style={{ width: '100%', height: '100%', border: 'none' }} title="Ortak Tarayıcı" />
-          </div>
-        );
-      case 'pokemon':
-        return (
-          <div style={{ width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden', background: '#000' }}>
-            <iframe src="https://play.pokemonshowdown.com/" style={{ width: '100%', height: '100%', border: 'none' }} title="Pokemon" />
           </div>
         );
       case 'coin':

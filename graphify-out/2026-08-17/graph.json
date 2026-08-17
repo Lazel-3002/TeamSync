@@ -5876,8 +5876,8 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "renderer_setvoicesessionactive",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "setvoicesessionactive()"
     },
     {
@@ -5986,8 +5986,8 @@
       "source_location": "L238",
       "_origin": "ast",
       "id": "renderer_censoredtexthtml",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "censoredtexthtml()"
     },
     {
@@ -5997,8 +5997,8 @@
       "source_location": "L244",
       "_origin": "ast",
       "id": "renderer_cleantext",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "cleantext()"
     },
     {
@@ -6052,8 +6052,8 @@
       "source_location": "L317",
       "_origin": "ast",
       "id": "renderer_releasechatbloburls",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "releasechatbloburls()"
     },
     {
@@ -6063,8 +6063,8 @@
       "source_location": "L331",
       "_origin": "ast",
       "id": "renderer_isimagefile",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "isimagefile()"
     },
     {
@@ -6173,8 +6173,8 @@
       "source_location": "L729",
       "_origin": "ast",
       "id": "renderer_decryptmsg",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "decryptmsg()"
     },
     {
@@ -6195,8 +6195,8 @@
       "source_location": "L909",
       "_origin": "ast",
       "id": "renderer_saveprofile",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "saveprofile()"
     },
     {
@@ -6239,8 +6239,8 @@
       "source_location": "L1012",
       "_origin": "ast",
       "id": "renderer_renderfriends",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "renderfriends()"
     },
     {
@@ -6272,8 +6272,8 @@
       "source_location": "L1169",
       "_origin": "ast",
       "id": "renderer_showjoinrequestnote",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "showjoinrequestnote()"
     },
     {
@@ -6283,8 +6283,8 @@
       "source_location": "L1197",
       "_origin": "ast",
       "id": "renderer_closejoinrequestnote",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "closejoinrequestnote()"
     },
     {
@@ -6547,8 +6547,8 @@
       "source_location": "L1708",
       "_origin": "ast",
       "id": "renderer_markfriendoffline",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "markfriendoffline()"
     },
     {
@@ -6569,8 +6569,8 @@
       "source_location": "L1724",
       "_origin": "ast",
       "id": "renderer_publishpresence",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "publishpresence()"
     },
     {
@@ -6591,8 +6591,8 @@
       "source_location": "L1752",
       "_origin": "ast",
       "id": "renderer_connectglobalbroker",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "connectglobalbroker()"
     },
     {
@@ -6745,8 +6745,8 @@
       "source_location": "L2290",
       "_origin": "ast",
       "id": "renderer_beginroomoperation",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "beginroomoperation()"
     },
     {
@@ -6756,8 +6756,8 @@
       "source_location": "L2333",
       "_origin": "ast",
       "id": "renderer_finishroomoperation",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "finishroomoperation()"
     },
     {
@@ -6767,8 +6767,8 @@
       "source_location": "L2340",
       "_origin": "ast",
       "id": "renderer_roomoperationwascancelled",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "roomoperationwascancelled()"
     },
     {
@@ -6910,8 +6910,8 @@
       "source_location": "L3288",
       "_origin": "ast",
       "id": "renderer_playnote",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "playnote()"
     },
     {
@@ -6921,8 +6921,8 @@
       "source_location": "L3305",
       "_origin": "ast",
       "id": "renderer_playsound",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "playsound()"
     },
     {
@@ -6976,8 +6976,8 @@
       "source_location": "L3731",
       "_origin": "ast",
       "id": "renderer_applyspeakertoall",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 9,
+      "community_name": "WebRTC ICE & TURN",
       "norm_label": "applyspeakertoall()"
     },
     {
@@ -7009,8 +7009,8 @@
       "source_location": "L3901",
       "_origin": "ast",
       "id": "renderer_removepeer",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "removepeer()"
     },
     {
@@ -7251,8 +7251,8 @@
       "source_location": "L4781",
       "_origin": "ast",
       "id": "renderer_handledatamessage",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "handledatamessage()"
     },
     {
@@ -7339,8 +7339,8 @@
       "source_location": "L5506",
       "_origin": "ast",
       "id": "renderer_roombanskey",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "roombanskey()"
     },
     {
@@ -7350,8 +7350,8 @@
       "source_location": "L5508",
       "_origin": "ast",
       "id": "renderer_loadroombans",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "loadroombans()"
     },
     {
@@ -7361,8 +7361,8 @@
       "source_location": "L5515",
       "_origin": "ast",
       "id": "renderer_saveroombans",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "saveroombans()"
     },
     {
@@ -7416,8 +7416,8 @@
       "source_location": "L5617",
       "_origin": "ast",
       "id": "renderer_ispeerscreenopen",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "ispeerscreenopen()"
     },
     {
@@ -7427,8 +7427,8 @@
       "source_location": "L5627",
       "_origin": "ast",
       "id": "renderer_updatecontrolrequestbutton",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "updatecontrolrequestbutton()"
     },
     {
@@ -7526,8 +7526,8 @@
       "source_location": "L6022",
       "_origin": "ast",
       "id": "renderer_updateemptygrid",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "updateemptygrid()"
     },
     {
@@ -7724,8 +7724,8 @@
       "source_location": "L6342",
       "_origin": "ast",
       "id": "renderer_showinactiveoverlay",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "showinactiveoverlay()"
     },
     {
@@ -7735,8 +7735,8 @@
       "source_location": "L6371",
       "_origin": "ast",
       "id": "renderer_removeinactiveoverlay",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "removeinactiveoverlay()"
     },
     {
@@ -7757,8 +7757,8 @@
       "source_location": "L6431",
       "_origin": "ast",
       "id": "renderer_addvideocard",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "addvideocard()"
     },
     {
@@ -7768,8 +7768,8 @@
       "source_location": "L6523",
       "_origin": "ast",
       "id": "renderer_removevideocard",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "removevideocard()"
     },
     {
@@ -7834,8 +7834,8 @@
       "source_location": "L6645",
       "_origin": "ast",
       "id": "renderer_savechattolocal",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "savechattolocal()"
     },
     {
@@ -7845,8 +7845,8 @@
       "source_location": "L6649",
       "_origin": "ast",
       "id": "renderer_loadlocalchathistory",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "loadlocalchathistory()"
     },
     {
@@ -7856,8 +7856,8 @@
       "source_location": "L6673",
       "_origin": "ast",
       "id": "renderer_texttohtmlescape",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "texttohtmlescape()"
     },
     {
@@ -7867,8 +7867,8 @@
       "source_location": "L6682",
       "_origin": "ast",
       "id": "renderer_appendchat",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "appendchat()"
     },
     {
@@ -7889,8 +7889,8 @@
       "source_location": "L6784",
       "_origin": "ast",
       "id": "renderer_escapehtml",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "escapehtml()"
     },
     {
@@ -8208,8 +8208,8 @@
       "source_location": "L8198",
       "_origin": "ast",
       "id": "renderer_formatusertime",
-      "community": 84,
-      "community_name": "showToast",
+      "community": 60,
+      "community_name": "Cross-Fetch Dependency",
       "norm_label": "formatusertime()"
     },
     {
@@ -8384,8 +8384,8 @@
       "source_location": "L8603",
       "_origin": "ast",
       "id": "renderer_bindui",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 16,
+      "community_name": "E2E Test: RNNoise Toggle",
       "norm_label": "bindui()"
     },
     {
@@ -8395,8 +8395,8 @@
       "source_location": "L9175",
       "_origin": "ast",
       "id": "renderer_applypttmode",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 7,
+      "community_name": "Electron Builder Config",
       "norm_label": "applypttmode()"
     },
     {
@@ -8439,8 +8439,8 @@
       "source_location": "L9242",
       "_origin": "ast",
       "id": "renderer_showsharemodal",
-      "community": 9,
-      "community_name": "WebRTC ICE & TURN",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "showsharemodal()"
     },
     {
@@ -8461,8 +8461,8 @@
       "source_location": "L9311",
       "_origin": "ast",
       "id": "renderer_stopscreenshare",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "stopscreenshare()"
     },
     {
@@ -8483,8 +8483,8 @@
       "source_location": "L9379",
       "_origin": "ast",
       "id": "renderer_stoprecording",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 16,
+      "community_name": "E2E Test: RNNoise Toggle",
       "norm_label": "stoprecording()"
     },
     {
@@ -8494,8 +8494,8 @@
       "source_location": "L9387",
       "_origin": "ast",
       "id": "renderer_requestcontrol",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 84,
+      "community_name": "showToast",
       "norm_label": "requestcontrol()"
     },
     {
@@ -8505,8 +8505,8 @@
       "source_location": "L9402",
       "_origin": "ast",
       "id": "renderer_rejectcontrolrequest",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "rejectcontrolrequest()"
     },
     {
@@ -8516,8 +8516,8 @@
       "source_location": "L9411",
       "_origin": "ast",
       "id": "renderer_showcontrolmodal",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "showcontrolmodal()"
     },
     {
@@ -8527,8 +8527,8 @@
       "source_location": "L9465",
       "_origin": "ast",
       "id": "renderer_grantcontrolto",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "grantcontrolto()"
     },
     {
@@ -8538,8 +8538,8 @@
       "source_location": "L9481",
       "_origin": "ast",
       "id": "renderer_closectrlmodal",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "closectrlmodal()"
     },
     {
@@ -8560,8 +8560,8 @@
       "source_location": "L9527",
       "_origin": "ast",
       "id": "renderer_clearcontroloffer",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "clearcontroloffer()"
     },
     {
@@ -8571,8 +8571,8 @@
       "source_location": "L9533",
       "_origin": "ast",
       "id": "renderer_showcontroloffernote",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "showcontroloffernote()"
     },
     {
@@ -8582,8 +8582,8 @@
       "source_location": "L9560",
       "_origin": "ast",
       "id": "renderer_closectrloffernote",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "closectrloffernote()"
     },
     {
@@ -8615,8 +8615,8 @@
       "source_location": "L9587",
       "_origin": "ast",
       "id": "renderer_updatehostcontrolpill",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "updatehostcontrolpill()"
     },
     {
@@ -8626,8 +8626,8 @@
       "source_location": "L9599",
       "_origin": "ast",
       "id": "renderer_sethostcontrolowner",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "sethostcontrolowner()"
     },
     {
@@ -8637,8 +8637,8 @@
       "source_location": "L9615",
       "_origin": "ast",
       "id": "renderer_stopbeingcontrolled",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "stopbeingcontrolled()"
     },
     {
@@ -8648,8 +8648,8 @@
       "source_location": "L9654",
       "_origin": "ast",
       "id": "renderer_closeactivecontrolsession",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "closeactivecontrolsession()"
     },
     {
@@ -8802,8 +8802,8 @@
       "source_location": "L9707",
       "_origin": "ast",
       "id": "renderer_setremotepointeractive",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "setremotepointeractive()"
     },
     {
@@ -8813,8 +8813,8 @@
       "source_location": "L9734",
       "_origin": "ast",
       "id": "renderer_normalizedpointtooverlay",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "normalizedpointtooverlay()"
     },
     {
@@ -8824,8 +8824,8 @@
       "source_location": "L9749",
       "_origin": "ast",
       "id": "renderer_sethostpassivepointer",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "sethostpassivepointer()"
     },
     {
@@ -8868,8 +8868,8 @@
       "source_location": "L9878",
       "_origin": "ast",
       "id": "renderer_sendctrlevent",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "sendctrlevent()"
     },
     {
@@ -8879,8 +8879,8 @@
       "source_location": "L9883",
       "_origin": "ast",
       "id": "renderer_broadcastto",
-      "community": 5,
-      "community_name": "Audio Bitrate & Mic Controls",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "broadcastto()"
     },
     {
@@ -8901,8 +8901,8 @@
       "source_location": "L9955",
       "_origin": "ast",
       "id": "renderer_showserverinvitenotification",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "showserverinvitenotification()"
     },
     {
@@ -8912,8 +8912,8 @@
       "source_location": "L9996",
       "_origin": "ast",
       "id": "renderer_acceptserverinvite",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "acceptserverinvite()"
     },
     {
@@ -8923,8 +8923,8 @@
       "source_location": "L10015",
       "_origin": "ast",
       "id": "renderer_resetsharedbrowserstate",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "resetsharedbrowserstate()"
     },
     {
@@ -8934,8 +8934,8 @@
       "source_location": "L10052",
       "_origin": "ast",
       "id": "renderer_closeallcards",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "closeallcards()"
     },
     {
@@ -8978,8 +8978,8 @@
       "source_location": "L10141",
       "_origin": "ast",
       "id": "renderer_disconnectapp",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 87,
+      "community_name": "deviceLogin",
       "norm_label": "disconnectapp()"
     },
     {
@@ -8989,8 +8989,8 @@
       "source_location": "L10235",
       "_origin": "ast",
       "id": "renderer_initfiletransfer",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "initfiletransfer()"
     },
     {
@@ -9000,8 +9000,8 @@
       "source_location": "L10254",
       "_origin": "ast",
       "id": "renderer_appendfilemsg",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "appendfilemsg()"
     },
     {
@@ -9011,8 +9011,8 @@
       "source_location": "L10271",
       "_origin": "ast",
       "id": "renderer_sendfile",
-      "community": 2,
-      "community_name": "Chat & Renderer Utilities",
+      "community": 24,
+      "community_name": "NPM Scripts",
       "norm_label": "sendfile()"
     },
     {
@@ -9022,8 +9022,8 @@
       "source_location": "L10390",
       "_origin": "ast",
       "id": "renderer_initactivitiesui",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 16,
+      "community_name": "E2E Test: RNNoise Toggle",
       "norm_label": "initactivitiesui()"
     },
     {
@@ -9121,8 +9121,8 @@
       "source_location": "L11436",
       "_origin": "ast",
       "id": "renderer_lbupdateui",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 66,
+      "community_name": "handlePeerDiscovered",
       "norm_label": "lbupdateui()"
     },
     {
@@ -9209,8 +9209,8 @@
       "source_location": "L11532",
       "_origin": "ast",
       "id": "renderer_lbcopyimage",
-      "community": 60,
-      "community_name": "Cross-Fetch Dependency",
+      "community": 66,
+      "community_name": "handlePeerDiscovered",
       "norm_label": "lbcopyimage()"
     },
     {
@@ -9275,8 +9275,8 @@
       "source_location": "L11659",
       "_origin": "ast",
       "id": "renderer_activity_card_ids",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "activity_card_ids"
     },
     {
@@ -9440,8 +9440,8 @@
       "source_location": "L11824",
       "_origin": "ast",
       "id": "renderer_isshortcuttypingtarget",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isshortcuttypingtarget()"
     },
     {
@@ -9451,8 +9451,8 @@
       "source_location": "L11836",
       "_origin": "ast",
       "id": "renderer_isactivityforeground",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isactivityforeground()"
     },
     {
@@ -9462,8 +9462,8 @@
       "source_location": "L11852",
       "_origin": "ast",
       "id": "renderer_isshortcutoverlayforeground",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isshortcutoverlayforeground()"
     },
     {
@@ -9473,8 +9473,8 @@
       "source_location": "L11859",
       "_origin": "ast",
       "id": "renderer_shortcutsuppressionreason",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "shortcutsuppressionreason()"
     },
     {
@@ -9484,8 +9484,8 @@
       "source_location": "L11868",
       "_origin": "ast",
       "id": "renderer_isshortcutsuppressed",
-      "community": 7,
-      "community_name": "Electron Builder Config",
+      "community": 2,
+      "community_name": "Chat & Renderer Utilities",
       "norm_label": "isshortcutsuppressed()"
     },
     {
@@ -9528,8 +9528,8 @@
       "source_location": "L11921",
       "_origin": "ast",
       "id": "renderer_matchespttreleasekey",
-      "community": 24,
-      "community_name": "NPM Scripts",
+      "community": 7,
+      "community_name": "Electron Builder Config",
       "norm_label": "matchespttreleasekey()"
     },
     {
@@ -10628,8 +10628,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_first_run_mqtt_test",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "first-run-mqtt.test.js"
     },
     {
@@ -10639,8 +10639,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "test_e2e_first_run_mqtt_test_spawnpeer_cleanuppeer_waitfor",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "{ spawnpeer, cleanuppeer, waitfor }"
     },
     {
@@ -10936,8 +10936,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_friend_presence_offline_test",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "friend-presence-offline.test.js"
     },
     {
@@ -10947,8 +10947,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_friend_presence_offline_test_assert",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "assert"
     },
     {
@@ -10958,8 +10958,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_friend_presence_offline_test_spawnpeer_cleanuppeer_evaljs_waitfor",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "{\n  spawnpeer,\n  cleanuppeer,\n  evaljs,\n  waitfor,\n}"
     },
     {
@@ -11002,8 +11002,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_join_request_test",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "join-request.test.js"
     },
     {
@@ -11013,8 +11013,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "test_e2e_join_request_test_spawnpeer_cleanuppeer_waitfor_evaljs_createroom",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "{ spawnpeer, cleanuppeer, waitfor, evaljs, createroom }"
     },
     {
@@ -11145,8 +11145,8 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_waitfor",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "waitfor()"
     },
     {
@@ -11167,8 +11167,8 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_setvaluewhenready",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "setvaluewhenready()"
     },
     {
@@ -11189,8 +11189,8 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "test_e2e_lib_harness_cleanuppeer",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "cleanuppeer()"
     },
     {
@@ -11365,8 +11365,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_media_library_test",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "media-library.test.js"
     },
     {
@@ -11376,8 +11376,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_assert",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "assert"
     },
     {
@@ -11387,8 +11387,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_fs",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "fs"
     },
     {
@@ -11398,8 +11398,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_path",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "path"
     },
     {
@@ -11409,8 +11409,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "test_e2e_media_library_test_spawnpeer_cleanuppeer_evaljs_waitfor",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 5,
+      "community_name": "Audio Bitrate & Mic Controls",
       "norm_label": "{\r\n  spawnpeer,\r\n  cleanuppeer,\r\n  evaljs,\r\n  waitfor,\r\n}"
     },
     {
@@ -11486,8 +11486,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "pokemon-evolution-forms.test.js"
     },
     {
@@ -11497,8 +11497,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_fs",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "fs"
     },
     {
@@ -11508,8 +11508,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_path",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "path"
     },
     {
@@ -11519,8 +11519,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "{\r\n  spawnpeer,\r\n  cleanuppeer,\r\n  createroom,\r\n  evaljs,\r\n  waitfor,\r\n}"
     },
     {
@@ -11530,8 +11530,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_inspectfamily",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "inspectfamily()"
     },
     {
@@ -11541,9 +11541,42 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "test_e2e_pokemon_evolution_forms_test_run",
-      "community": 11,
-      "community_name": "E2E Test Harness",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "run()"
+    },
+    {
+      "label": "pokemon-lobby-bots.test.js",
+      "file_type": "code",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_e2e_pokemon_lobby_bots_test",
+      "community": 81,
+      "community_name": "settings-language.test.js",
+      "norm_label": "pokemon-lobby-bots.test.js"
+    },
+    {
+      "label": "assert",
+      "file_type": "code",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "test_e2e_pokemon_lobby_bots_test_assert",
+      "community": 81,
+      "community_name": "settings-language.test.js",
+      "norm_label": "assert"
+    },
+    {
+      "label": "{ spawnPeer, cleanupPeer, createRoom, evalJS }",
+      "file_type": "code",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "test_e2e_pokemon_lobby_bots_test_spawnpeer_cleanuppeer_createroom_evaljs",
+      "community": 81,
+      "community_name": "settings-language.test.js",
+      "norm_label": "{ spawnpeer, cleanuppeer, createroom, evaljs }"
     },
     {
       "label": "pokemon-real-moves.test.js",
@@ -11607,8 +11640,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_team_battle_test",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "pokemon-team-battle.test.js"
     },
     {
@@ -11618,8 +11651,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_pokemon_team_battle_test_assert",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "assert"
     },
     {
@@ -11629,8 +11662,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_pokemon_team_battle_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
-      "community": 88,
-      "community_name": "disconnectApp",
+      "community": 100,
+      "community_name": "media-collect-resize.test.js",
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, evaljs, waitfor }"
     },
     {
@@ -11948,8 +11981,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_sfw_text_filter_test",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "sfw-text-filter.test.js"
     },
     {
@@ -11959,8 +11992,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_sfw_text_filter_test_assert",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "assert"
     },
     {
@@ -11970,8 +12003,8 @@
       "source_location": "L2",
       "_origin": "ast",
       "id": "test_e2e_sfw_text_filter_test_spawnpeer_cleanuppeer_evaljs",
-      "community": 23,
-      "community_name": "Device Auth & Session",
+      "community": 81,
+      "community_name": "settings-language.test.js",
       "norm_label": "{ spawnpeer, cleanuppeer, evaljs }"
     },
     {
@@ -11981,8 +12014,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "shared-browser.test.js"
     },
     {
@@ -11992,8 +12025,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_assert",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "assert"
     },
     {
@@ -12003,8 +12036,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_http",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "http"
     },
     {
@@ -12014,8 +12047,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_spawnpeer_cleanuppeer_createroom_joinroom_waitforpeerconnected_evaljs_waitfor",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, joinroom, waitforpeerconnected, evaljs, waitfor }"
     },
     {
@@ -12025,8 +12058,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_startlocalsite",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "startlocalsite()"
     },
     {
@@ -12036,8 +12069,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_armnavcounter",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "armnavcounter()"
     },
     {
@@ -12047,8 +12080,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_navigatevia",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "navigatevia()"
     },
     {
@@ -12058,8 +12091,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "test_e2e_shared_browser_test_webviewurlexpr",
-      "community": 69,
-      "community_name": "Poke Feature Init",
+      "community": 11,
+      "community_name": "E2E Test Harness",
       "norm_label": "webviewurlexpr()"
     },
     {
@@ -12069,8 +12102,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "shortcuts-settings.test.js"
     },
     {
@@ -12080,8 +12113,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test_assert",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "assert"
     },
     {
@@ -12091,8 +12124,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test_spawnpeer_cleanuppeer_createroom_evaljs_waitfor",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "{ spawnpeer, cleanuppeer, createroom, evaljs, waitfor }"
     },
     {
@@ -12102,8 +12135,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "test_e2e_shortcuts_settings_test_dispatchkey",
-      "community": 91,
-      "community_name": "shortcuts-settings.test.js",
+      "community": 69,
+      "community_name": "Poke Feature Init",
       "norm_label": "dispatchkey()"
     },
     {
@@ -18180,7 +18213,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "js/poke.js",
-      "source_location": "L601",
+      "source_location": "L617",
       "weight": 1.0,
       "_origin": "ast",
       "source": "js_poke_initpoke",
@@ -18192,7 +18225,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "js/poke.js",
-      "source_location": "L1404",
+      "source_location": "L1443",
       "weight": 1.0,
       "_origin": "ast",
       "source": "js_poke_initpoke",
@@ -44884,6 +44917,18 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_lobby_bots_test",
+      "target": "test_e2e_lib_harness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "test/e2e/pokemon-real-moves.test.js",
       "source_location": "L4",
       "weight": 1.0,
@@ -45251,6 +45296,18 @@
       "_origin": "ast",
       "source": "test_e2e_pokemon_evolution_forms_test_run",
       "target": "test_e2e_lib_harness_evaljs"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_lobby_bots_test",
+      "target": "test_e2e_lib_harness_evaljs",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -46024,6 +46081,18 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_lobby_bots_test",
+      "target": "test_e2e_lib_harness_spawnpeer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "test/e2e/pokemon-real-moves.test.js",
       "source_location": "L4",
       "weight": 1.0,
@@ -46288,6 +46357,18 @@
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_lobby_bots_test",
+      "target": "test_e2e_lib_harness_cleanuppeer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "test/e2e/pokemon-real-moves.test.js",
       "source_location": "L4",
       "weight": 1.0,
@@ -46523,6 +46604,18 @@
       "_origin": "ast",
       "source": "test_e2e_pokemon_evolution_forms_test_run",
       "target": "test_e2e_lib_harness_createroom"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_lobby_bots_test",
+      "target": "test_e2e_lib_harness_createroom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -47027,6 +47120,28 @@
       "_origin": "ast",
       "source": "test_e2e_pokemon_evolution_forms_test_run",
       "target": "test_e2e_pokemon_evolution_forms_test_inspectfamily",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_lobby_bots_test",
+      "target": "test_e2e_pokemon_lobby_bots_test_assert",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test/e2e/pokemon-lobby-bots.test.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "test_e2e_pokemon_lobby_bots_test",
+      "target": "test_e2e_pokemon_lobby_bots_test_spawnpeer_cleanuppeer_createroom_evaljs",
       "confidence_score": 1.0
     },
     {
