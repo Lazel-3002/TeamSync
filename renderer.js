@@ -311,8 +311,12 @@ async function checkAvatar(base64Str) {
 
 const CHUNK_SIZE = 64 * 1024;
 const MAX_DM_FILE_SIZE = 20 * 1024 * 1024;
-const MAX_ROOM_FILE_SIZE = 100 * 1024 * 1024;
-const MAX_PENDING_ROOM_BYTES = 200 * 1024 * 1024;
+// Room transfers are chunked and streamed from File.slice(), so the sender
+// does not load the whole file at once. Receivers keep chunks in memory until
+// the final Blob is created; keep a conservative aggregate cap for that peak.
+const MAX_ROOM_FILE_SIZE = 250 * 1024 * 1024;
+const MAX_PENDING_ROOM_BYTES = 300 * 1024 * 1024;
+const MAX_PENDING_ROOM_FILES = 4;
 const MAX_PENDING_DM_BYTES = 40 * 1024 * 1024;
 const MAX_CONTROL_MESSAGE_SIZE = 512 * 1024;
 const fileBuffer = new Map();
@@ -5267,7 +5271,7 @@ async function handleDataMessage(peerId, msg) {
     const validSize = Number.isInteger(msg.size) && msg.size > 0 && msg.size <= MAX_ROOM_FILE_SIZE;
     const validMime = typeof msg.mime === 'string' && msg.mime.length <= 128;
     const pendingRoomBytes = Array.from(fileBuffer.values()).reduce((sum, entry) => sum + (entry.meta?.size || 0), 0);
-    if (!validId || !validName || !validSize || !validMime || fileBuffer.has(msg.id) || fileBuffer.size >= 8
+    if (!validId || !validName || !validSize || !validMime || fileBuffer.has(msg.id) || fileBuffer.size >= MAX_PENDING_ROOM_FILES
       || pendingRoomBytes + msg.size > MAX_PENDING_ROOM_BYTES) return;
     fileBuffer.set(msg.id, {
       meta: { ...msg, name: safeFileName(msg.name), mime: msg.mime },
