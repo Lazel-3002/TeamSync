@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1787027191.4858744,
-    "ast_hash": "ffb9ebec2c268c928f1375a4f32424f5",
+    "mtime": 1787083871.018569,
+    "ast_hash": "3042d3939413bc5e792a7e4cb687a357",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -542,6 +542,136 @@
   "test/e2e/sfw-text-filter.test.js": {
     "mtime": 1786311905.0164335,
     "ast_hash": "1958a4ac75ba972ac92570d4fdbee467",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\.claude\\settings.local.json": {
+    "mtime": 1786476214.4153671,
+    "ast_hash": "b5b321573a8cd5861c30876f55bbfca0",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\.codex\\hooks.json": {
+    "mtime": 1784407166.1409347,
+    "ast_hash": "f85724275d8efeb6f349b698c9cfa943",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\electron\\main.js": {
+    "mtime": 1786956721.9496043,
+    "ast_hash": "a67ed5434f63ae0a718858dd5757bc9a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\electron\\preload.js": {
+    "mtime": 1783411582.0,
+    "ast_hash": "9a18b8ec2199e6a4532e2054b215daf3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\package.json": {
+    "mtime": 1786956624.785239,
+    "ast_hash": "5198c2b242bfaf519fac296bb2be4eb1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\scripts\\build.mjs": {
+    "mtime": 1785207684.1088746,
+    "ast_hash": "15983c1111e334e85f176554f1126a4c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\scripts\\run-electron.mjs": {
+    "mtime": 1785095048.147594,
+    "ast_hash": "8f0480927bf99f160389c74fe0cfa510",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\App.jsx": {
+    "mtime": 1783411678.0,
+    "ast_hash": "a636ff5404a93959a6016fcfd72d7230",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\Activities.jsx": {
+    "mtime": 1786991682.9985483,
+    "ast_hash": "95e900fc24bb2a6f73a688e0834ea12a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\Chat.jsx": {
+    "mtime": 1783411730.0,
+    "ast_hash": "ff35548a25674f52669a482f8ac07003",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\Dashboard.jsx": {
+    "mtime": 1783411704.0,
+    "ast_hash": "275041c7248b2b35edfe22ffe3c57160",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\ProfileSetup.jsx": {
+    "mtime": 1783411692.0,
+    "ast_hash": "867a5e0078b68ffb2626cac310b956d9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\RemoteControl.jsx": {
+    "mtime": 1783411764.0,
+    "ast_hash": "7f2a855b1a87b9ffec43cca7a87f68da",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\RoomLobby.jsx": {
+    "mtime": 1783411866.0,
+    "ast_hash": "d62b35964890c36f813cf97639833d90",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\Sidebar.jsx": {
+    "mtime": 1783411716.0,
+    "ast_hash": "dfb7f835d8e32bf464fe35ee521f0a5e",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\Titlebar.jsx": {
+    "mtime": 1783411684.0,
+    "ast_hash": "43bf72077e49f0035223269efc62a7cd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\UnoGame.jsx": {
+    "mtime": 1783411856.0,
+    "ast_hash": "22e96d7e5bedd0c165654d4b5d1b9e80",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\components\\WebRTC.jsx": {
+    "mtime": 1783411662.0,
+    "ast_hash": "7d9ab558362cfd248b0cb1386cd232b4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\crypto.js": {
+    "mtime": 1783411600.0,
+    "ast_hash": "c723948bea3976a255d8d499fa71cf49",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\main.jsx": {
+    "mtime": 1783411628.0,
+    "ast_hash": "9ae9dfda4388ae3f416df533131980cd",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\signaling.js": {
+    "mtime": 1785094101.7741103,
+    "ast_hash": "4e462124a07932323a0292e9c6a09be7",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\src\\supabaseClient.js": {
+    "mtime": 1785094101.0434303,
+    "ast_hash": "d5f5790f906cb97672b7a36c70b54751",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\vite.config.js": {
+    "mtime": 1785207684.1088746,
+    "ast_hash": "1b9ac2e7ded96eebf665f184bcfbb9b9",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\AGENTS.md": {
+    "mtime": 1784407166.1372833,
+    "ast_hash": "21ceb6533048be51308e69e7b74a35cf",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\README.md": {
+    "mtime": 1783411966.0,
+    "ast_hash": "4bf139b0b84b40afeacad3aa3ed13660",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\coolturtle\\Desktop\\teamsync\\index.html": {
+    "mtime": 1783411556.0,
+    "ast_hash": "6bd8a0e3cf5bad724b2de42c21e2116e",
     "semantic_hash": ""
   }
 }

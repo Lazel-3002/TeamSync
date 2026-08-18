@@ -485,8 +485,7 @@ function setupInternetSignaling(roomId, myId, myName) {
               f.chunks.push(chunk);
               f.received += chunk.length;
               f.lastChunkAt = Date.now();
-              const prog = document.getElementById(`prog-${header.id}`);
-              if (prog) prog.style.width = (f.received / f.meta.size * 100) + '%';
+              updateFileProgress(header.id, f.received, f.meta.size);
             }
           } catch(err){}
         }
@@ -509,6 +508,7 @@ function setupInternetSignaling(roomId, myId, myName) {
           // Kurucunun otoritesi: oda adı ve yetkili listesi her hello'da
           // senkronize edilir — geç katılanlar da en geç 3 saniyede öğrenir.
           state.founderId = data.id;
+          refreshUserRoleBadge(data.id);
           if (typeof data.sfwChatBanEnabled === 'boolean') state.sfwChatBanEnabled = data.sfwChatBanEnabled;
           if (Number.isFinite(data.sfwChatBanThreshold)) {
             state.sfwChatBanThreshold = Math.max(1, Math.min(100, Math.floor(data.sfwChatBanThreshold)));
@@ -4918,8 +4918,7 @@ function setupDataChannel(peerId, dc) {
               f.chunks.push(chunk);
             f.received += chunk.length;
             f.lastChunkAt = Date.now();
-            const prog = document.getElementById(`prog-${header.id}`);
-            if (prog) prog.style.width = (f.received / f.meta.size * 100) + '%';
+            updateFileProgress(header.id, f.received, f.meta.size);
           }
         } catch(err){}
       }
@@ -5403,7 +5402,9 @@ async function handleDataMessage(peerId, msg) {
             btnGroup.appendChild(aView);
           }
           
-          div.querySelector('.prog-wrap').replaceWith(btnGroup);
+          const progressWrap = div.querySelector('.prog-wrap');
+          if (progressWrap) progressWrap.replaceWith(btnGroup);
+          else div.querySelector('.info')?.appendChild(btnGroup);
         }
       }
       fileBuffer.delete(msg.id);
@@ -5736,9 +5737,20 @@ function handleFounderLeft(prevFounderId) {
   if (prevFounderId) refreshUserRoleBadge(prevFounderId);
 }
 
-// Oda listesindeki bir kullanıcının kurucu (fez) / yetkili (kalkan) rozetini
+// Oda listesindeki bir kullanıcının kurucu (taç) / yetkili (kalkan) rozetini
 // addUser() ile aynı DOM yapısını yeniden kullanarak canlı günceller — sahiplik
 // devri veya yetki verme/alma sonrası tam liste yeniden çizilmeden çalışır.
+const FOUNDER_BADGE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l2 10h14l2-10-5 4-4-7-4 7-5-4z"></path><path d="M5 21h14"></path></svg>';
+
+function createFounderBadge() {
+  const badge = document.createElement('span');
+  badge.className = 'founder-badge';
+  badge.title = 'Founder';
+  badge.setAttribute('aria-label', 'Founder');
+  badge.innerHTML = FOUNDER_BADGE_SVG;
+  return badge;
+}
+
 function refreshUserRoleBadge(id) {
   // Kendi satırımız listede 'self' data-uid'siyle tutuluyor (bkz: addUser
   // çağrısı), state.myId ile değil.
@@ -5748,13 +5760,10 @@ function refreshUserRoleBadge(id) {
   const av = li.querySelector('.av');
   const uname = li.querySelector('.uname');
   if (!av || !uname) return;
-  av.querySelectorAll('.founder-fez, .mod-badge').forEach(el => el.remove());
+  av.querySelectorAll('.founder-badge, .mod-badge').forEach(el => el.remove());
   const isFounder = id === state.founderId;
   if (isFounder) {
-    const img = document.createElement('img');
-    img.src = 'assets/fez.svg';
-    img.className = 'founder-fez';
-    av.prepend(img);
+    av.prepend(createFounderBadge());
     uname.classList.add('founder-name');
   } else {
     uname.classList.remove('founder-name');
@@ -5819,11 +5828,11 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
   const avatarHtml = avatar
     ? `<img src="${escapeHtml(avatar)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
     : name.charAt(0).toUpperCase();
-  const fezHtml = isFounder ? `<img src="assets/fez.svg" class="founder-fez" />` : '';
+  const founderBadgeHtml = isFounder ? `<span class="founder-badge" title="Founder" aria-label="Founder">${FOUNDER_BADGE_SVG}</span>` : '';
   const nameClass = isFounder ? 'founder-name' : '';
   li.innerHTML = `
     <div class="av">
-      ${fezHtml}
+      ${founderBadgeHtml}
       ${avatarHtml}
       <div class="st"></div>
     </div>
@@ -6260,6 +6269,37 @@ function ensureFocusControlsVisible() {
 // Kilit düğmesinin görünümünü state.focusLocked ile eşitler. Kilit,
 // exitFocus gibi düğme dışı yollardan da sıfırlanabildiği için
 // görünüm güncellemesi tek yerden yapılmalı.
+function refreshFocusControlTitles() {
+  const language = typeof getUserLanguage === 'function' ? getUserLanguage() : 'en';
+  const dictionary = typeof LEGACY_TEXT_BY_LOCALE !== 'undefined'
+    ? LEGACY_TEXT_BY_LOCALE[language]
+    : null;
+  const translate = (source, fallback) => language === 'tr'
+    ? source
+    : (dictionary ? (translateLegacyValue(source, dictionary) || fallback) : fallback);
+  const fullscreen = document.getElementById('focus-fullscreen-btn');
+  const exit = document.getElementById('focus-exit-btn');
+  if (fullscreen) {
+    const locked = !!state.focusLocked;
+    const isFullscreen = !!document.fullscreenElement;
+    fullscreen.title = locked
+      ? translate('Tam ekran için önce odak kilidini aç', 'Unlock focus before changing fullscreen')
+      : (isFullscreen
+        ? translate('Tam Ekrandan Çık (F)', 'Exit Fullscreen (F)')
+        : translate('Tam Ekran (F)', 'Fullscreen (F)'));
+    fullscreen.setAttribute('aria-label', fullscreen.title);
+  }
+  if (exit) {
+    const locked = !!state.focusLocked;
+    exit.title = locked
+      ? translate('Boyutu değiştirmek için önce odak kilidini aç', 'Unlock focus before changing the size')
+      : (focusMinimized
+        ? translate('Tekrar Büyüt', 'Restore Focus')
+        : translate('Küçült', 'Minimize'));
+    exit.setAttribute('aria-label', exit.title);
+  }
+}
+
 function updateFocusLockBtn() {
   const btn = document.getElementById('focus-lock-btn');
   if (!btn) return;
@@ -6286,6 +6326,7 @@ function updateFocusFullscreenBtn() {
   btn.disabled = locked;
   btn.setAttribute('aria-disabled', String(locked));
   btn.title = locked ? 'Tam ekran için önce odak kilidini aç' : (fs ? 'Tam Ekrandan Çık (F)' : 'Tam Ekran (F)');
+  refreshFocusControlTitles();
 }
 
 function updateFocusExitBtn() {
@@ -6298,6 +6339,7 @@ function updateFocusExitBtn() {
   btn.disabled = locked;
   btn.setAttribute('aria-disabled', String(locked));
   btn.title = locked ? 'Boyutu değiştirmek için önce odak kilidini aç' : (focusMinimized ? 'Tekrar Büyüt' : 'Küçült');
+  refreshFocusControlTitles();
   btn.setAttribute('aria-label', btn.title);
 }
 
@@ -8083,7 +8125,7 @@ function translateLegacyStaticUI(language, root = document.body) {
   // receives the complete English safety net so a language switch cannot
   // produce a mixed Turkish interface.
   const dictionary = LEGACY_TEXT_BY_LOCALE[language] || LEGACY_TEXT_EN;
-  const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], [data-i18n-ignore], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, #img-lightbox, .chat-msg, .dm-message, .uname-text, .vtitle, .vv-bot-memory';
+  const excludedSelector = '[data-i18n], [data-i18n-title], [data-i18n-placeholder], [data-i18n-ignore], script, style, #chat, #dm-messages, #server-dm-messages, #friends-list, #users, #img-lightbox, .chat-msg, .dm-message, .msg-file .name, .uname-text, .vtitle, .vv-bot-memory';
   const visitText = node => {
     const parent = node.parentElement;
     if (!parent || parent.closest(excludedSelector)) return;
@@ -8551,6 +8593,7 @@ function applyUserLanguage(language, persist = true) {
   if (typeof updateFocusLockBtn === 'function') updateFocusLockBtn();
   if (typeof updateFocusFullscreenBtn === 'function') updateFocusFullscreenBtn();
   if (typeof updateFocusExitBtn === 'function') updateFocusExitBtn();
+  if (typeof refreshFocusControlTitles === 'function') refreshFocusControlTitles();
   const selectedLanguage = document.querySelector(`input[name="settings-language"][value="${lang}"]`);
   if (selectedLanguage) selectedLanguage.checked = true;
   const createName = document.getElementById('create-name');
@@ -10633,6 +10676,18 @@ function appendFileMsg(fileId, name, size, incoming) {
   wrap.scrollTop = wrap.scrollHeight;
 }
 
+function removeFileProgress(fileId) {
+  document.querySelector(`#file-${fileId} .prog-wrap`)?.remove();
+}
+
+function updateFileProgress(fileId, received, total) {
+  const progress = document.getElementById(`prog-${fileId}`);
+  if (!progress || !Number.isFinite(total) || total <= 0) return;
+  const percent = Math.min(100, Math.max(0, received / total * 100));
+  progress.style.width = `${percent}%`;
+  if (percent >= 100) progress.parentElement?.remove();
+}
+
 // Büyük dosyalarda göndermeyi engellemek yerine kullanıcıyı uyarıp onayına
 // bırakır. "Bir daha gösterme" işaretlenirse tercih localStorage'da kalıcı
 // olarak saklanır ve bir sonraki büyük dosyada uyarı tekrar gösterilmez.
@@ -10727,8 +10782,7 @@ async function sendFile(file) {
       }
       
       offset += chunk.length;
-      const prog = document.getElementById(`prog-${fileId}`);
-      if (prog) prog.style.width = (offset / file.size * 100) + '%';
+      updateFileProgress(fileId, offset, file.size);
     }
 
     const doneMsg = JSON.stringify({ type: 'file-done', id: fileId });
@@ -10759,8 +10813,7 @@ async function sendFile(file) {
       }
       
       offset += chunk.length;
-      const prog = document.getElementById(`prog-${fileId}`);
-      if (prog) prog.style.width = (offset / file.size * 100) + '%';
+      updateFileProgress(fileId, offset, file.size);
       
       await new Promise(r => setTimeout(r, 15)); // avoid flooding
     }
@@ -10769,6 +10822,7 @@ async function sendFile(file) {
 
   const div = document.getElementById('file-' + fileId);
   if (div) {
+    removeFileProgress(fileId);
     const url = URL.createObjectURL(file);
     chatBlobUrls.push(url);
     window.registerChatMedia?.(url, file, file.name);
@@ -10807,7 +10861,7 @@ async function sendFile(file) {
         aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> İçine Bak`;
         btnGroup.appendChild(aView);
       }
-      
+      div.appendChild(btnGroup);
     }
   }
 }

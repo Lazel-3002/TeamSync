@@ -407,7 +407,7 @@ body { padding-top: 35px; } /* Prevent overlap */
   border-color: var(--acc); 
   outline: none; 
   background: rgba(15, 23, 42, 0.8);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 20%, transparent);
 }
 .check-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 .check-row label { margin: 0; text-transform: none; font-size: 14px; color: var(--txt-main); font-weight: 500; cursor: pointer; }
@@ -434,19 +434,19 @@ body { padding-top: 35px; } /* Prevent overlap */
   color: white;
   background: var(--acc);
   border-color: transparent;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--acc) 35%, transparent);
   animation: update-pulse 2s ease-in-out infinite;
 }
 #update-btn.update-ready:hover { background: var(--acc-hover); }
 @keyframes update-pulse {
-  0%, 100% { box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35); }
-  50% { box-shadow: 0 4px 18px rgba(99, 102, 241, 0.65); }
+  0%, 100% { box-shadow: 0 4px 12px color-mix(in srgb, var(--acc) 35%, transparent); }
+  50% { box-shadow: 0 4px 18px color-mix(in srgb, var(--acc) 65%, transparent); }
 }
 .login-card button {
   width: 100%;
   padding: 14px;
   margin-top: 28px;
-  background: var(--acc);
+  background: var(--acc-btn, var(--acc));
   border: none;
   border-radius: var(--radius-sm);
   color: white;
@@ -454,12 +454,12 @@ body { padding-top: 35px; } /* Prevent overlap */
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--acc-btn, var(--acc)) 30%, transparent);
 }
 .login-card button:hover { 
-  background: var(--acc-hover); 
+  background: var(--acc-btn-hover, var(--acc-hover));
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--acc-btn-hover, var(--acc-hover)) 40%, transparent);
 }
 /* Ana menü butonları login-card button stilini override etmeli */
 #step-action button {
@@ -469,7 +469,7 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 #step-action .menu-action-btn {
   flex: 1;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--acc-btn, var(--acc)) 30%, transparent);
 }
 #step-action .btn-sec.menu-action-btn {
   background: rgba(255, 255, 255, 0.08);
@@ -668,10 +668,10 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(16, 185, 129, 0.2));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--acc) 20%, transparent), color-mix(in srgb, var(--acc-light) 20%, transparent));
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--acc) 20%, transparent);
 }
 .avatar-edit-overlay {
   position: absolute;
@@ -1026,8 +1026,8 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   text-align: center;
 }
 .action-card.pri {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(16, 185, 129, 0.1));
-  border-color: rgba(99, 102, 241, 0.3);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--acc-btn, var(--acc)) 15%, transparent), color-mix(in srgb, var(--acc-light) 10%, transparent));
+  border-color: color-mix(in srgb, var(--acc-btn, var(--acc)) 30%, transparent);
 }
 .action-card.sec {
   background: rgba(255, 255, 255, 0.05);
@@ -1038,9 +1038,9 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 .action-card.pri:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(16, 185, 129, 0.2));
-  border-color: rgba(99, 102, 241, 0.5);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--acc-btn, var(--acc)) 25%, transparent), color-mix(in srgb, var(--acc-light) 20%, transparent));
+  border-color: color-mix(in srgb, var(--acc-btn, var(--acc)) 50%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--acc-btn, var(--acc)) 20%, transparent);
 }
 .ac-icon {
   font-size: 32px;
@@ -1142,6 +1142,27 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   position: relative;
   box-shadow: var(--shadow-sm);
 }
+.founder-badge,
+.mod-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--bg-dark);
+  border-radius: 50%;
+  box-sizing: border-box;
+  color: #fff7c2;
+  background: linear-gradient(145deg, #f8d66d, #b7791f);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, .35);
+}
+.founder-badge svg { width: 12px; height: 12px; fill: currentColor; stroke: #7a4b00; stroke-width: 1.1; }
+.mod-badge { color: #dbeafe; background: linear-gradient(145deg, #60a5fa, #2563eb); }
+.mod-badge svg { width: 11px; height: 11px; }
+.founder-name { color: var(--acc-light); }
 .st {
   position: absolute;
   bottom: -2px; right: -2px;
@@ -3209,9 +3230,9 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
      kullanılır, görünüm değişmez. */
   background: var(--acc-btn, var(--acc));
   color: white;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--acc-btn, var(--acc)) 30%, transparent);
 }
-.btn-pri:hover { background: var(--acc-btn-hover, var(--acc-hover)); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4); }
+.btn-pri:hover { background: var(--acc-btn-hover, var(--acc-hover)); transform: translateY(-1px); box-shadow: 0 6px 16px color-mix(in srgb, var(--acc-btn-hover, var(--acc-hover)) 40%, transparent); }
 .btn-sec { background: rgba(255,255,255,0.1); color: var(--txt-main); }
 .btn-sec:hover { background: rgba(255,255,255,0.15); }
 
