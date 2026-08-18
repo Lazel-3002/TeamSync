@@ -1924,7 +1924,7 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .settings-theme-heading h3 { margin: 0; font-size: 15px; }
 .settings-theme-heading p { max-width: 480px; margin: 5px 0 0; color: #a3a5ae; font-size: 12px; line-height: 1.5; }
 .settings-theme-device { flex: 0 0 auto; padding: 5px 8px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; color: #b8bac4; font-size: 10px; font-weight: 700; }
-.settings-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.settings-theme-options { display: none; }
 .settings-theme-option {
   position: relative; min-width: 0; display: grid; grid-template-columns: 42px minmax(0, 1fr) 18px; align-items: center; gap: 10px;
   min-height: 68px; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(0,0,0,.16);
@@ -1960,13 +1960,26 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .mini-preview-card { position: absolute; left: 11px; right: 11px; top: 28px; bottom: 11px; border-radius: 9px; background: color-mix(in srgb, var(--custom-bg, #1a1130) 78%, white 12%); border: 1px solid rgba(255,255,255,.08); }
 .mini-preview-accent { position: absolute; left: 19px; bottom: 19px; width: 22px; height: 22px; border-radius: 7px; background: var(--custom-accent, #a855f7); box-shadow: 0 0 0 4px color-mix(in srgb, var(--custom-accent, #a855f7) 28%, transparent); }
 .mini-preview-button { position: absolute; right: 13px; bottom: 15px; width: 34px; height: 14px; border-radius: 6px; background: var(--custom-button, #8b5cf6); box-shadow: 0 2px 6px color-mix(in srgb, var(--custom-button, #8b5cf6) 45%, transparent); }
-.settings-theme-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
-.settings-theme-preset-swatch { display: grid; justify-items: center; gap: 7px; padding: 10px 6px 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.025); cursor: pointer; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
-.settings-theme-preset-swatch:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.06); }
+.settings-theme-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.settings-theme-preset-swatch {
+  min-width: 0; display: grid; justify-items: stretch; gap: 8px; padding: 8px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--txt-main) 10%, transparent);
+  background: color-mix(in srgb, var(--bg-dark) 86%, var(--txt-main) 5%); color: var(--txt-main);
+  cursor: pointer; transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.settings-theme-preset-swatch:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--acc-light) 65%, transparent); background: color-mix(in srgb, var(--bg-dark) 76%, var(--txt-main) 10%); box-shadow: 0 8px 20px rgba(0,0,0,.16); }
+.settings-theme-preset-swatch:focus-visible { outline: 3px solid color-mix(in srgb, var(--acc-light) 55%, transparent); outline-offset: 2px; }
 .settings-theme-preset-swatch.active { border-color: var(--acc-light); background: color-mix(in srgb, var(--acc) 16%, transparent); }
-.settings-theme-preset-dot { width: 30px; height: 30px; border-radius: 50%; box-shadow: inset 0 0 0 3px rgba(255,255,255,.16); }
-.settings-theme-preset-name { font-size: 10px; font-weight: 700; color: var(--txt-mut); text-align: center; line-height: 1.2; }
-@media (max-width: 560px) { .settings-theme-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); } .settings-theme-custom-top { flex-direction: column; align-items: stretch; } .settings-theme-custom-mini-preview { width: 100%; height: 74px; } }
+.settings-theme-preset-dot { width: 100%; height: 38px; border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 4px 10px rgba(0,0,0,.16); }
+.settings-theme-preset-name { min-width: 0; overflow: hidden; font-size: 10px; font-weight: 800; color: var(--txt-main); text-align: left; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 560px) {
+  .settings-theme-presets { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .settings-theme-preset-swatch { padding: 7px; border-radius: 11px; }
+  .settings-theme-preset-dot { height: 34px; }
+  .settings-theme-preset-name { font-size: 9px; }
+  .settings-theme-custom-top { flex-direction: column; align-items: stretch; }
+  .settings-theme-custom-mini-preview { width: 100%; height: 74px; }
+}
 .settings-theme-copy { min-width: 0; display: grid; gap: 2px; }.settings-theme-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }.settings-theme-copy small { overflow: hidden; color: #a9abb5; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .settings-theme-check { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; color: transparent; font-size: 11px; font-weight: 900; transition: .18s ease; }.settings-theme-option:has(input:checked) .settings-theme-check { border-color: #a5b4fc; background: #818cf8; color: #fff; }
 .settings-theme-hint { display: flex; align-items: center; gap: 7px; margin: 14px 0 0; color: #a9abb5; font-size: 11px; }.settings-theme-hint > span:first-child { color: #a5b4fc; font-size: 14px; }
@@ -7920,6 +7933,20 @@ input:checked + .slider:before {
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(90deg, rgba(2,6,13,.22), transparent 58%), linear-gradient(0deg, rgba(2,6,13,.7), transparent 48%);
+}
+.activity-vampire-cover-title {
+  position: absolute;
+  top: 39%;
+  left: 9%;
+  right: 9%;
+  color: #f9eef2;
+  font-size: clamp(17px, 5vw, 28px);
+  line-height: .96;
+  font-weight: 950;
+  letter-spacing: .04em;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 2px 3px 0 #8d1231, 0 3px 12px rgba(0,0,0,.85);
 }
 .activity-vampire-cover-label {
   position: absolute;

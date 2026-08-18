@@ -1456,10 +1456,10 @@
                       <div class="mini-preview-button"></div>
                     </div>
                   </div>
-                  <div>
-                    <p class="settings-help" data-i18n="settings.themeCustomPresets">Hazır presetler:</p>
-                    <div class="settings-theme-presets" id="settings-theme-presets"></div>
-                  </div>
+                </div>
+                <div class="settings-theme-palette-list">
+                  <p class="settings-help" data-i18n="settings.themeCustomPresets">Hazır presetler:</p>
+                  <div class="settings-theme-presets" id="settings-theme-presets"></div>
                 </div>
               </section>
               <div class="settings-card settings-row">
@@ -1952,7 +1952,7 @@
                 <span class="activity-cover-badge">YENİ</span>
                 <div class="activity-poll-art" aria-hidden="true">
                   <span style="--bar:48%"></span><span style="--bar:76%"></span><span style="--bar:61%"></span>
-                  <strong>OYLA!</strong>
+                  <strong data-activity-cover-label="poll">OYLA!</strong>
                 </div>
               </div>
               <div class="activity-card-footer">
@@ -1968,7 +1968,7 @@
                 <span class="activity-cover-badge">SENKRON</span>
                 <div class="activity-video-art" aria-hidden="true">
                   <i></i><span>▶</span><i></i>
-                  <strong>WATCH PARTY</strong>
+                  <strong data-activity-cover-label="watchParty">WATCH PARTY</strong>
                 </div>
               </div>
               <div class="activity-card-footer">
@@ -1985,7 +1985,7 @@
               <div class="activity-cover activity-cover-wheel">
                 <span class="activity-cover-badge">PARTİ</span>
                 <div class="activity-wheel-art" aria-hidden="true">
-                  <i></i><strong>ÇEVİR!</strong>
+                  <i></i><strong data-activity-cover-label="wheel">ÇEVİR!</strong>
                 </div>
               </div>
               <div class="activity-card-footer">
@@ -1999,9 +1999,10 @@
             <div class="src act-src card-act-btn" id="card-act-vampire" role="button" tabindex="0" data-search="vampir köylü kurt adam sosyal çıkarım gece gündüz oylama">
               <div class="activity-cover activity-cover-vampire">
                 <span class="activity-cover-badge">SOSYAL</span>
-                <img class="activity-vampire-cover-image" src="assets/vampire-villager-cover-v3.png" alt="" />
+                <img class="activity-vampire-cover-image" data-activity-cover-image src="assets/vampire-villager-cover-v3.png" alt="" />
                 <div class="activity-vampire-cover-overlay" aria-hidden="true">
-                  <span class="activity-vampire-cover-label">GECE BAŞLAR</span>
+                  <span class="activity-vampire-cover-title" data-activity-cover-label="vampireTitle" hidden>VAMPİR KÖYLÜ</span>
+                  <span class="activity-vampire-cover-label" data-activity-cover-label="vampireNight">GECE BAŞLAR</span>
                   <span class="activity-vampire-cover-moon"></span>
                 </div>
               </div>
@@ -2015,11 +2016,11 @@
 
             <div class="src act-src card-act-btn namecity-activity-card" id="card-act-namecity" role="button" tabindex="0" data-search="isim şehir isim şehir kelime kategori harf oylama puan">
               <div class="activity-cover activity-cover-namecity">
-                <span class="activity-cover-badge" data-namecity-label="voteBadge">OYLA</span>
+                <span class="activity-cover-badge" data-activity-cover-label="nameCityVote">OYLA</span>
                 <div class="namecity-cover-art" aria-hidden="true">
-                  <span class="namecity-cover-letter">A</span>
-                  <span class="namecity-cover-city">ANKARA</span>
-                  <span class="namecity-cover-word">KELİME</span>
+                  <span class="namecity-cover-letter" data-activity-cover-letter>A</span>
+                  <span class="namecity-cover-city" data-activity-cover-label="nameCityCity">ANKARA</span>
+                  <span class="namecity-cover-word" data-activity-cover-label="nameCityWord">KELİME</span>
                   <i class="namecity-cover-dot namecity-cover-dot-one"></i>
                   <i class="namecity-cover-dot namecity-cover-dot-two"></i>
                 </div>

@@ -8119,6 +8119,50 @@ function translateLegacyStaticUI(language, root = document.body) {
   });
 }
 
+// Kapak görsellerindeki metinler normal arayüz metinlerinden ayrı tutulur:
+// bunlar kart çiziminin bir parçası olduğu için legacy çeviri taraması bunları
+// güvenilir biçimde güncelleyemez. Başkent örnekleri, ilgili dilin en yaygın
+// kullanım ülkesinin başkenti olacak şekilde seçilir.
+const ACTIVITY_COVER_LOCALES = {
+  tr: { poll: 'OYLA!', wheel: 'ÇEVİR!', watchParty: 'İZLEME PARTİSİ', vampireTitle: 'VAMPİR KÖYLÜ', vampireNight: 'GECE BAŞLAR', nameCityVote: 'OYLA', nameCityCity: 'ANKARA', nameCityWord: 'KELİME' },
+  en: { poll: 'VOTE!', wheel: 'SPIN!', watchParty: 'WATCH PARTY', vampireTitle: 'VAMPIRE VILLAGER', vampireNight: 'NIGHT BEGINS', nameCityVote: 'VOTE', nameCityCity: 'WASHINGTON, D.C.', nameCityWord: 'WORD' },
+  de: { poll: 'VOTE!', wheel: 'DREH!', watchParty: 'WATCH-PARTY', vampireTitle: 'VAMPIRDORF', vampireNight: 'DIE NACHT BEGINNT', nameCityVote: 'ABSTIMMEN', nameCityCity: 'BERLIN', nameCityWord: 'WORT' },
+  es: { poll: 'VOTA!', wheel: 'GIRA!', watchParty: 'FIESTA DE CINE', vampireTitle: 'VAMPIRO ALDEANO', vampireNight: 'EMPIEZA LA NOCHE', nameCityVote: 'VOTAR', nameCityCity: 'MADRID', nameCityWord: 'PALABRA' },
+  fr: { poll: 'VOTE!', wheel: 'TOURNE!', watchParty: 'SOIRÉE FILM', vampireTitle: 'VILLAGE VAMPIRE', vampireNight: 'LA NUIT COMMENCE', nameCityVote: 'VOTE', nameCityCity: 'PARIS', nameCityWord: 'MOT' },
+  'pt-BR': { poll: 'VOTE!', wheel: 'GIRE!', watchParty: 'SESSÃO EM GRUPO', vampireTitle: 'VILA DOS VAMPIROS', vampireNight: 'A NOITE COMEÇA', nameCityVote: 'VOTE', nameCityCity: 'BRASÍLIA', nameCityWord: 'PALAVRA' },
+  ru: { poll: 'ГОЛОСУЙ!', wheel: 'КРУТИ!', watchParty: 'КИНОВЕЧЕР', vampireTitle: 'ВАМПИРЫ И ЖИТЕЛИ', vampireNight: 'НОЧЬ НАЧИНАЕТСЯ', nameCityVote: 'ГОЛОСУЙ', nameCityCity: 'МОСКВА', nameCityWord: 'СЛОВО' },
+  ar: { poll: 'صَوِّت!', wheel: 'لُفّ!', watchParty: 'حفلة مشاهدة', vampireTitle: 'قرية مصاصي الدماء', vampireNight: 'يبدأ الليل', nameCityVote: 'صَوِّت', nameCityCity: 'القاهرة', nameCityWord: 'كلمة' },
+  kk: { poll: 'ДАУЫС!', wheel: 'АЙНАЛ!', watchParty: 'БІРГЕ КӨРУ', vampireTitle: 'ВАМПИР АУЫЛЫ', vampireNight: 'ТҮН БАСТАЛДЫ', nameCityVote: 'ДӘУІС', nameCityCity: 'АСТАНА', nameCityWord: 'СӨЗ' },
+  tk: { poll: 'SES BER!', wheel: 'ÖWÜR!', watchParty: 'BILELIKDE GÖRÜŞ', vampireTitle: 'WAMPIR OBASY', vampireNight: 'GIJE BAŞLANÝAR', nameCityVote: 'SES BER', nameCityCity: 'AŞGABAT', nameCityWord: 'SÖZ' },
+  mn: { poll: 'САНАЛ!', wheel: 'ЭРГҮҮЛ!', watchParty: 'ХАМТДАА ҮЗЭХ', vampireTitle: 'ЦУС СОРОГЧИЙН ТОСГОН', vampireNight: 'ШӨНӨ ЭХЭЛЛЭЭ', nameCityVote: 'САНАЛ', nameCityCity: 'УЛААНБААТАР', nameCityWord: 'ҮГ' },
+  'zh-CN': { poll: '投票!', wheel: '旋转!', watchParty: '一起看', vampireTitle: '吸血鬼村庄', vampireNight: '夜幕降临', nameCityVote: '投票', nameCityCity: '北京', nameCityWord: '单词' },
+  ja: { poll: '投票!', wheel: '回して!', watchParty: 'ウォッチパーティー', vampireTitle: '吸血鬼の村', vampireNight: '夜が始まる', nameCityVote: '投票', nameCityCity: '東京', nameCityWord: '言葉' }
+};
+
+function refreshActivityCoverLocale() {
+  const language = typeof getUserLanguage === 'function' ? getUserLanguage() : 'en';
+  const labels = ACTIVITY_COVER_LOCALES[language] || ACTIVITY_COVER_LOCALES.en;
+  document.querySelectorAll('[data-activity-cover-label]').forEach(element => {
+    const value = labels[element.dataset.activityCoverLabel];
+    if (value) element.textContent = value;
+  });
+  const city = String(labels.nameCityCity || '').trim();
+  const letter = document.querySelector('[data-activity-cover-letter]');
+  if (letter) letter.textContent = city ? city.slice(0, 1).toLocaleUpperCase(LANGUAGE_META[language]?.locale || 'en-US') : 'A';
+
+  const vampireImage = document.querySelector('[data-activity-cover-image]');
+  if (vampireImage) {
+    const isTurkish = language === 'tr';
+    const source = isTurkish ? 'assets/vampire-villager-cover-v3.png' : 'assets/vampire-villager-cover-v2.png';
+    if (vampireImage.dataset.coverSource !== source) {
+      vampireImage.src = source;
+      vampireImage.dataset.coverSource = source;
+    }
+    const title = document.querySelector('.activity-vampire-cover-title');
+    if (title) title.hidden = isTurkish;
+  }
+}
+
 const APP_THEMES = new Set(['aurora', 'black', 'navy', 'white', 'violet', 'custom']);
 const CUSTOM_BG_KEY = 'teamsync_custom_bg';
 const CUSTOM_ACCENT_KEY = 'teamsync_custom_accent';
@@ -8129,16 +8173,46 @@ const CUSTOM_THEME_DEFAULTS = { bg: '#1a1130', accent: '#a855f7', button: '#8b5c
 // üçlüsü. Presetlerde vurgu ve buton rengi aynı tonda başlar; kullanıcı
 // istediğinde butonu vurgudan bağımsız olarak ayrıca değiştirebilir.
 const CUSTOM_THEME_PRESETS = [
-  { name: 'Mor Gece', bg: '#1b1130', accent: '#a855f7', button: '#a855f7' },
-  { name: 'Kızıl Ateş', bg: '#2b1012', accent: '#f43f5e', button: '#f43f5e' },
-  { name: 'Orman Yeşili', bg: '#0e1f18', accent: '#34d399', button: '#34d399' },
-  { name: 'Gün Batımı', bg: '#2b1608', accent: '#fb923c', button: '#fb923c' },
-  { name: 'Okyanus Mavisi', bg: '#071f2c', accent: '#22d3ee', button: '#22d3ee' },
-  { name: 'Pembe Rüya', bg: '#260f21', accent: '#f472b6', button: '#f472b6' },
-  { name: 'Altın Çöl', bg: '#241c08', accent: '#fbbf24', button: '#fbbf24' },
-  { name: 'Buz Beyazı', bg: '#eef2f7', accent: '#2563eb', button: '#2563eb' },
-  { name: 'Mor & Beyaz', bg: '#f6f4fc', accent: '#8b5cf6', button: '#8b5cf6' }
+  { id: 'blurple', name: 'Blurple', bg: '#1e1f22', accent: '#5865f2', button: '#4752c4' },
+  { id: 'night', name: 'Gece', bg: '#2b2d31', accent: '#7289da', button: '#5865f2' },
+  { id: 'light', name: 'Açık', bg: '#f2f3f5', accent: '#5865f2', button: '#4752c4' },
+  { id: 'violetNeon', name: 'Mor Neon', bg: '#21152f', accent: '#a855f7', button: '#8b5cf6' },
+  { id: 'berry', name: 'Berry Glow', bg: '#2a1628', accent: '#eb459e', button: '#d9428a' },
+  { id: 'ocean', name: 'Okyanus', bg: '#102a43', accent: '#00b0f4', button: '#3ba7ff' },
+  { id: 'mint', name: 'Mint Status', bg: '#102b24', accent: '#23a55a', button: '#1a8a4a' },
+  { id: 'amber', name: 'Amber Club', bg: '#321b12', accent: '#f0a61a', button: '#e87924' },
+  { id: 'rose', name: 'Rose Quartz', bg: '#321720', accent: '#f23f42', button: '#d83b43' },
+  { id: 'graphite', name: 'Grafit', bg: '#18191c', accent: '#b5bac1', button: '#4e5058' },
+  { id: 'lavender', name: 'Lavanta Açık', bg: '#f4f1fb', accent: '#7c5cff', button: '#6c4df6' },
+  { id: 'aqua', name: 'Aqua Glass', bg: '#e9f7f6', accent: '#00a8a8', button: '#0e7490' },
+  { id: 'forest', name: 'Orman Gece', bg: '#0d211c', accent: '#34d399', button: '#059669' },
+  { id: 'sunset', name: 'Sunset Club', bg: '#2b1621', accent: '#ff6b9d', button: '#f97316' }
 ];
+
+const BUILT_IN_THEME_PRESETS = [
+  { id: 'aurora', theme: 'aurora', nameKey: 'settings.themeAurora', bg: '#3d164e', accent: '#cf4fa7', button: '#4f68e8' },
+  { id: 'black', theme: 'black', nameKey: 'settings.themeBlack', bg: '#17171b', accent: '#555764', button: '#26313d' },
+  { id: 'navy', theme: 'navy', nameKey: 'settings.themeNavy', bg: '#14294d', accent: '#2b7bc4', button: '#29428a' },
+  { id: 'white', theme: 'white', nameKey: 'settings.themeWhite', bg: '#e4e9f2', accent: '#2563eb', button: '#2563eb' },
+  { id: 'violet', theme: 'violet', nameKey: 'settings.themeViolet', bg: '#e6dcfa', accent: '#7c3aed', button: '#7c3aed' },
+  { id: 'custom', theme: 'custom', nameKey: 'settings.themeCustom', bg: '#1a1130', accent: '#a855f7', button: '#8b5cf6', editor: true }
+];
+
+const THEME_PRESET_LABELS = {
+  tr: { blurple: 'Blurple', night: 'Gece', light: 'Açık', violetNeon: 'Mor Neon', berry: 'Berry Parıltısı', ocean: 'Okyanus', mint: 'Nane', amber: 'Amber Kulüp', rose: 'Gül Kuvars', graphite: 'Grafit', lavender: 'Açık Lavanta', aqua: 'Aqua Cam', forest: 'Orman Gecesi', sunset: 'Gün Batımı' },
+  en: { blurple: 'Blurple', night: 'Midnight', light: 'Light', violetNeon: 'Neon Violet', berry: 'Berry Glow', ocean: 'Ocean', mint: 'Mint', amber: 'Amber Club', rose: 'Rose Quartz', graphite: 'Graphite', lavender: 'Light Lavender', aqua: 'Aqua Glass', forest: 'Forest Night', sunset: 'Sunset Club' },
+  de: { blurple: 'Blurple', night: 'Nacht', light: 'Hell', violetNeon: 'Neon-Violett', berry: 'Beerenlicht', ocean: 'Ozean', mint: 'Minze', amber: 'Bernstein', rose: 'Rosenquarz', graphite: 'Graphit', lavender: 'Helles Lavendel', aqua: 'Aqua-Glas', forest: 'Waldnacht', sunset: 'Sonnenuntergang' },
+  es: { blurple: 'Blurple', night: 'Noche', light: 'Claro', violetNeon: 'Violeta Neón', berry: 'Brillo Baya', ocean: 'Océano', mint: 'Menta', amber: 'Club Ámbar', rose: 'Cuarzo Rosa', graphite: 'Grafito', lavender: 'Lavanda Clara', aqua: 'Cristal Aqua', forest: 'Noche de Bosque', sunset: 'Atardecer' },
+  fr: { blurple: 'Blurple', night: 'Nuit', light: 'Clair', violetNeon: 'Violet Néon', berry: 'Éclat Baie', ocean: 'Océan', mint: 'Menthe', amber: 'Club Ambre', rose: 'Quartz Rose', graphite: 'Graphite', lavender: 'Lavande Claire', aqua: 'Verre Aqua', forest: 'Nuit Forêt', sunset: 'Coucher de soleil' },
+  'pt-BR': { blurple: 'Blurple', night: 'Noite', light: 'Claro', violetNeon: 'Violeta Neon', berry: 'Brilho de Frutas', ocean: 'Oceano', mint: 'Menta', amber: 'Clube Âmbar', rose: 'Quartzo Rosa', graphite: 'Grafite', lavender: 'Lavanda Clara', aqua: 'Vidro Aqua', forest: 'Noite na Floresta', sunset: 'Pôr do Sol' },
+  ru: { blurple: 'Blurple', night: 'Ночь', light: 'Светлая', violetNeon: 'Неоновый фиолетовый', berry: 'Ягодное сияние', ocean: 'Океан', mint: 'Мята', amber: 'Янтарь', rose: 'Розовый кварц', graphite: 'Графит', lavender: 'Светлая лаванда', aqua: 'Аква-стекло', forest: 'Лесная ночь', sunset: 'Закат' },
+  ar: { blurple: 'Blurple', night: 'ليل', light: 'فاتح', violetNeon: 'بنفسجي نيون', berry: 'توهج التوت', ocean: 'المحيط', mint: 'نعناع', amber: 'عنبر', rose: 'كوارتز وردي', graphite: 'جرافيت', lavender: 'لافندر فاتح', aqua: 'زجاج مائي', forest: 'ليلة الغابة', sunset: 'غروب الشمس' },
+  kk: { blurple: 'Blurple', night: 'Түн', light: 'Ашық', violetNeon: 'Неон күлгін', berry: 'Жидек жарқылы', ocean: 'Мұхит', mint: 'Жалбыз', amber: 'Кәріптас', rose: 'Раушан кварцы', graphite: 'Графит', lavender: 'Ашық лаванда', aqua: 'Аква шыны', forest: 'Орман түні', sunset: 'Күн батуы' },
+  tk: { blurple: 'Blurple', night: 'Gije', light: 'Açyk', violetNeon: 'Neon gyrmyzy', berry: 'Miwe ýalkymy', ocean: 'Okean', mint: 'Nanä', amber: 'Amber', rose: 'Gül kwarsy', graphite: 'Grafit', lavender: 'Açyk lawanda', aqua: 'Aqua aýna', forest: 'Tokaý gijesi', sunset: 'Gün ýaşmagy' },
+  mn: { blurple: 'Blurple', night: 'Шөнө', light: 'Цайвар', violetNeon: 'Неон ягаан', berry: 'Жимсний туяа', ocean: 'Далай', mint: 'Гаа', amber: 'Хув', rose: 'Ягаан кварц', graphite: 'Графит', lavender: 'Цайвар лаванда', aqua: 'Аква шил', forest: 'Ойн шөнө', sunset: 'Нар жаргах' },
+  'zh-CN': { blurple: 'Blurple', night: '夜色', light: '浅色', violetNeon: '霓虹紫', berry: '莓果光', ocean: '海洋', mint: '薄荷', amber: '琥珀', rose: '玫瑰石英', graphite: '石墨', lavender: '浅薰衣草', aqua: '水光玻璃', forest: '森林之夜', sunset: '日落' },
+  ja: { blurple: 'ブループル', night: 'ナイト', light: 'ライト', violetNeon: 'ネオンバイオレット', berry: 'ベリーグロー', ocean: 'オーシャン', mint: 'ミント', amber: 'アンバークラブ', rose: 'ローズクォーツ', graphite: 'グラファイト', lavender: 'ライトラベンダー', aqua: 'アクアグラス', forest: 'フォレストナイト', sunset: 'サンセット' }
+};
 
 function getUserTheme() {
   const saved = localStorage.getItem(USER_THEME_KEY);
@@ -8163,6 +8237,7 @@ function syncThemeSelection(theme = getUserTheme()) {
   const input = document.querySelector(`input[name="settings-theme"][value="${selected}"]`);
   if (input) input.checked = true;
   document.getElementById('settings-theme-custom-editor')?.classList.toggle('hidden', selected !== 'custom');
+  if (typeof markActiveThemePreset === 'function') markActiveThemePreset(selected);
 }
 
 function hexLuminance(hex) {
@@ -8201,29 +8276,75 @@ function applyCustomThemeColors({ bg, accent, button }, persist = false) {
 
 function markActiveCustomPreset(bg) {
   const target = (bg || '').toLowerCase();
-  document.querySelectorAll('.settings-theme-preset-swatch').forEach(btn => {
+  document.querySelectorAll('.settings-theme-preset-swatch[data-preset-kind="custom"]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.presetBg === target);
+  });
+}
+
+function getThemePresetLabel(preset) {
+  if (preset.nameKey) return t(preset.nameKey);
+  const language = getUserLanguage();
+  return THEME_PRESET_LABELS[language]?.[preset.id] || THEME_PRESET_LABELS.en[preset.id] || preset.name;
+}
+
+function getAllThemePresets() {
+  const colors = getCustomThemeColors();
+  return [
+    ...BUILT_IN_THEME_PRESETS.map(preset => preset.id === 'custom' ? { ...preset, ...colors } : preset),
+    ...CUSTOM_THEME_PRESETS
+  ];
+}
+
+function markActiveThemePreset(theme = getUserTheme()) {
+  const colors = getCustomThemeColors();
+  document.querySelectorAll('#settings-theme-presets .settings-theme-preset-swatch').forEach(btn => {
+    const active = btn.dataset.presetKind === 'builtin'
+      ? btn.dataset.presetTheme === theme
+      : theme === 'custom' && btn.dataset.presetBg === colors.bg.toLowerCase();
+    btn.classList.toggle('active', active);
+  });
+}
+
+function refreshCustomThemePresetLabels() {
+  const presets = getAllThemePresets();
+  document.querySelectorAll('#settings-theme-presets .settings-theme-preset-swatch').forEach(btn => {
+    const preset = presets.find(item => item.id === btn.dataset.presetId);
+    if (!preset) return;
+    const label = getThemePresetLabel(preset);
+    const name = btn.querySelector('.settings-theme-preset-name');
+    if (name) name.textContent = label;
+    btn.title = label;
+    btn.setAttribute('aria-label', `${label} renk paletini kullan`);
   });
 }
 
 function renderCustomThemePresets() {
   const wrap = document.getElementById('settings-theme-presets');
-  if (!wrap || wrap.dataset.rendered) return;
-  wrap.dataset.rendered = '1';
-  CUSTOM_THEME_PRESETS.forEach(preset => {
+  if (!wrap) return;
+  wrap.replaceChildren();
+  getAllThemePresets().forEach(preset => {
+    const label = getThemePresetLabel(preset);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'settings-theme-preset-swatch';
-    btn.title = preset.name;
+    btn.title = label;
+    btn.setAttribute('aria-label', `${label} renk paletini kullan`);
+    btn.dataset.presetId = preset.id;
+    btn.dataset.presetKind = preset.theme ? 'builtin' : 'custom';
+    if (preset.theme) btn.dataset.presetTheme = preset.theme;
     btn.dataset.presetBg = preset.bg.toLowerCase();
     const dot = document.createElement('span');
     dot.className = 'settings-theme-preset-dot';
-    dot.style.background = `linear-gradient(135deg, ${preset.bg} 45%, ${preset.accent})`;
+    dot.style.background = `linear-gradient(135deg, ${preset.bg} 0 52%, ${preset.accent} 52% 77%, ${preset.button} 77%)`;
     const name = document.createElement('span');
     name.className = 'settings-theme-preset-name';
-    name.textContent = preset.name;
+    name.textContent = label;
     btn.append(dot, name);
     btn.addEventListener('click', () => {
+      if (preset.theme) {
+        applyUserTheme(preset.theme);
+        return;
+      }
       const bgInput = document.getElementById('settings-custom-bg');
       const accentInput = document.getElementById('settings-custom-accent');
       const buttonInput = document.getElementById('settings-custom-button');
@@ -8242,6 +8363,7 @@ function renderCustomThemePresets() {
     });
     wrap.appendChild(btn);
   });
+  markActiveThemePreset();
 }
 
 function initCustomThemeEditor() {
@@ -8379,6 +8501,8 @@ function applyUserLanguage(language, persist = true) {
     }
   });
   translateLegacyStaticUI(lang);
+  if (typeof refreshCustomThemePresetLabels === 'function') refreshCustomThemePresetLabels();
+  refreshActivityCoverLocale();
   if (typeof window.refreshNameCityLocale === 'function') window.refreshNameCityLocale();
   // Focus controls are moved in and out of the DOM, so refresh their titles
   // after every locale change instead of leaving the previous locale behind.
