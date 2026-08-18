@@ -1419,9 +1419,17 @@
                 </div>
                 <p class="settings-theme-hint"><span aria-hidden="true">✦</span><span data-i18n="settings.themeHint">Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.</span></p>
                 <div class="settings-card settings-theme-custom-editor hidden" id="settings-theme-custom-editor">
+                  <div class="settings-theme-custom-heading">
+                    <div>
+                      <span class="settings-theme-custom-kicker">CUSTOM PALETTE</span>
+                      <strong data-i18n="settings.themeCustom">Kendi Teman</strong>
+                      <p data-i18n="settings.themeCustomDesc">Renkleri sen seç</p>
+                    </div>
+                    <span class="settings-theme-custom-live"><i></i> LIVE</span>
+                  </div>
                   <div class="settings-theme-custom-top">
                     <div class="settings-theme-custom-controls">
-                      <div class="settings-theme-custom-field">
+                      <div class="settings-theme-custom-field" data-custom-color-field="bg">
                         <span class="settings-theme-custom-swatch-wrap">
                           <input type="color" id="settings-custom-bg" value="#1a1130">
                         </span>
@@ -1429,8 +1437,9 @@
                           <label for="settings-custom-bg" data-i18n="settings.themeCustomBg">Arka plan rengi</label>
                           <input type="text" class="settings-theme-hex-input" id="settings-custom-bg-hex" value="#1A1130" maxlength="7" spellcheck="false" autocomplete="off">
                         </div>
+                        <div class="settings-theme-color-swatches" data-custom-swatches-for="bg" aria-label="Arka plan renk seçenekleri"></div>
                       </div>
-                      <div class="settings-theme-custom-field">
+                      <div class="settings-theme-custom-field" data-custom-color-field="accent">
                         <span class="settings-theme-custom-swatch-wrap">
                           <input type="color" id="settings-custom-accent" value="#a855f7">
                         </span>
@@ -1438,8 +1447,9 @@
                           <label for="settings-custom-accent" data-i18n="settings.themeCustomAccent">Vurgu rengi</label>
                           <input type="text" class="settings-theme-hex-input" id="settings-custom-accent-hex" value="#A855F7" maxlength="7" spellcheck="false" autocomplete="off">
                         </div>
+                        <div class="settings-theme-color-swatches" data-custom-swatches-for="accent" aria-label="Vurgu renk seçenekleri"></div>
                       </div>
-                      <div class="settings-theme-custom-field">
+                      <div class="settings-theme-custom-field" data-custom-color-field="button">
                         <span class="settings-theme-custom-swatch-wrap">
                           <input type="color" id="settings-custom-button" value="#8b5cf6">
                         </span>
@@ -1447,13 +1457,24 @@
                           <label for="settings-custom-button" data-i18n="settings.themeCustomButton">Buton rengi</label>
                           <input type="text" class="settings-theme-hex-input" id="settings-custom-button-hex" value="#8B5CF6" maxlength="7" spellcheck="false" autocomplete="off">
                         </div>
+                        <div class="settings-theme-color-swatches" data-custom-swatches-for="button" aria-label="Buton renk seçenekleri"></div>
+                      </div>
+                      <div class="settings-theme-custom-color-strip" aria-hidden="true">
+                        <span data-custom-color-role="bg"></span>
+                        <span data-custom-color-role="accent"></span>
+                        <span data-custom-color-role="button"></span>
                       </div>
                     </div>
                     <div class="settings-theme-custom-mini-preview" id="settings-theme-custom-mini-preview" aria-hidden="true">
-                      <div class="mini-preview-bar"></div>
-                      <div class="mini-preview-card"></div>
-                      <div class="mini-preview-accent"></div>
-                      <div class="mini-preview-button"></div>
+                      <div class="mini-preview-topbar"><span></span><i></i><i></i><i></i></div>
+                      <div class="mini-preview-workspace">
+                        <aside><b></b><i></i><i></i><i></i></aside>
+                        <div class="mini-preview-main">
+                          <div class="mini-preview-title"><b></b><span></span></div>
+                          <div class="mini-preview-card"><i></i><i></i><i></i></div>
+                          <div class="mini-preview-actions"><span></span><button></button></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

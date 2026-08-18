@@ -1,16 +1,16 @@
 # Graph Report - TeamSync  (2026-08-18)
 
 ## Corpus Check
-- 88 files · ~512,549 words
+- 88 files · ~512,736 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1295 nodes · 3074 edges · 82 communities (65 shown, 17 thin omitted)
+- 1298 nodes · 3080 edges · 82 communities (65 shown, 17 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 89 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7debb2fa`
+- Built from commit: `20503bee`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -140,7 +140,7 @@ Nodes (39): App(), Chat(), Dashboard(), accountItemStyle, cardStyle, containerSt
 
 ### Community 2 - "Chat & Renderer Utilities"
 Cohesion: 0.04
-Nodes (37): ACTIVITY_COVER_LOCALES, AUDIO_CHANNEL_FIELDS, badWordsList, BUILT_IN_THEME_PRESETS, chatBlobUrls, ctrlOfferAcceptBtn, ctrlOfferDenyBtn, CUSTOM_THEME_DEFAULTS (+29 more)
+Nodes (38): ACTIVITY_COVER_LOCALES, AUDIO_CHANNEL_FIELDS, badWordsList, BUILT_IN_THEME_PRESETS, chatBlobUrls, ctrlOfferAcceptBtn, ctrlOfferDenyBtn, CUSTOM_COLOR_SWATCHES (+30 more)
 
 ### Community 3 - "Electron Main Process"
 Cohesion: 0.06
@@ -164,8 +164,8 @@ Cohesion: 0.15
 Nodes (10): catalogDir, EXPECTED_LOCALES, fs, path, renderer, report, requiredLegacy, requiredStructured (+2 more)
 
 ### Community 7 - "Electron Builder Config"
-Cohesion: 0.14
-Nodes (27): applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), getShortcutsMasterEnabled(), handleShortcutGateKeydown(), initShortcutSettings() (+19 more)
+Cohesion: 0.17
+Nodes (23): applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), handleShortcutGateKeydown(), initShortcutSettings(), LEGACY_SHORTCUT_CODES (+15 more)
 
 ### Community 8 - "Sidebar UI Components"
 Cohesion: 0.10
@@ -232,8 +232,8 @@ Cohesion: 0.29
 Nodes (8): censorProfaneText(), checkTextWithAI(), filterProjection(), isProfaneText(), isSubsequence(), levenshteinDistance(), maskCensoredSegment(), normalizeFilterText()
 
 ### Community 24 - "NPM Scripts"
-Cohesion: 0.26
-Nodes (17): applyUserLanguage(), clearFocusInlineLayout(), ensureFocusControlsVisible(), enterFocus(), exitFocus(), makeCardFocusable(), minimizeFocus(), openCardFocused() (+9 more)
+Cohesion: 0.11
+Nodes (40): applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), applyUserLanguage(), bindUI(), broadcast(), canManageRoom(), canModerateTarget() (+32 more)
 
 ### Community 25 - "RNNoise Noise Suppression"
 Cohesion: 0.43
@@ -280,12 +280,12 @@ Nodes (5): assert, fs, inspectAtWidth(), path, {
 }
 
 ### Community 32 - "appendChat"
-Cohesion: 0.33
-Nodes (7): appendChat(), censoredTextHtml(), cleanText(), formatUserTime(), loadLocalChatHistory(), saveChatToLocal(), textToHtmlEscape()
+Cohesion: 0.24
+Nodes (15): APP_THEMES, applyCustomThemeColors(), applyUserTheme(), getAllThemePresets(), getCustomThemeColors(), getThemePresetLabel(), hexLuminance(), initCustomThemeEditor() (+7 more)
 
 ### Community 33 - "shortcutSuppressionReason"
-Cohesion: 0.33
-Nodes (6): ACTIVITY_CARD_IDS, isActivityForeground(), isShortcutOverlayForeground(), isShortcutSuppressed(), isShortcutTypingTarget(), shortcutSuppressionReason()
+Cohesion: 0.20
+Nodes (11): ACTIVITY_CARD_IDS, getShortcutsMasterEnabled(), isActivityForeground(), isRemoteControlEngaged(), isShortcutOverlayForeground(), isShortcutSuppressed(), isShortcutTypingTarget(), SHORTCUT_SUPPRESSION_EXEMPT (+3 more)
 
 ### Community 34 - "Pokemon Sprite Assets"
 Cohesion: 0.50
@@ -328,20 +328,20 @@ Cohesion: 0.67
 Nodes (3): loadRoomBans(), roomBansKey(), saveRoomBans()
 
 ### Community 44 - "releaseSpeakingNode"
-Cohesion: 1.00
-Nodes (3): releaseSpeakingNode(), runSpeakingDetection(), setupSpeakingDetection()
+Cohesion: 0.67
+Nodes (4): releaseSpeakingNode(), runSpeakingDetection(), setupSpeakingDetection(), updateUserUI()
 
 ### Community 50 - "Whiteboard Feature"
 Cohesion: 0.12
 Nodes (57): addDetailTags(), addFiles(), advanceDetail(), bindContextMenu(), bindDetailModal(), bindDropzone(), bindFilterGroup(), cleanTag() (+49 more)
 
 ### Community 60 - "Cross-Fetch Dependency"
-Cohesion: 0.11
-Nodes (42): APP_THEMES, applyCustomThemeColors(), applyMicrophoneVolume(), applyRoomNoiseSuppression(), applySimpleUi(), applySpeakerVolume(), applyUserTheme(), fillAudioDeviceSelect() (+34 more)
+Cohesion: 0.14
+Nodes (32): applyMicrophoneVolume(), applyRoomNoiseSuppression(), applySimpleUi(), applySpeakerVolume(), fillAudioDeviceSelect(), getSimpleUiEnabled(), getUserLanguage(), getUserTheme() (+24 more)
 
 ### Community 66 - "handlePeerDiscovered"
-Cohesion: 0.25
-Nodes (16): lbApply(), lbClamp(), lbClose(), lbComputeFitScale(), lbEnsure(), lbFit(), lbKeyHandler(), lbRotate() (+8 more)
+Cohesion: 0.23
+Nodes (17): lbApply(), lbClamp(), lbClose(), lbComputeFitScale(), lbEnsure(), lbFit(), lbKeyHandler(), lbRotate() (+9 more)
 
 ### Community 68 - "Lucky Wheel Feature"
 Cohesion: 0.06
@@ -390,8 +390,8 @@ Cohesion: 0.25
 Nodes (7): author, description, license, main, name, releaseName, version
 
 ### Community 84 - "showToast"
-Cohesion: 0.07
-Nodes (69): addUser(), applyAudioBitrateToPeers(), applyMicState(), applyPttMode(), bindUI(), broadcast(), broadcastTo(), canManageRoom() (+61 more)
+Cohesion: 0.11
+Nodes (40): addUser(), addVideoCard(), broadcastTo(), clearControlOffer(), closeActiveControlSession(), closeCtrlModal(), closeCtrlOfferNote(), decryptMsg() (+32 more)
 
 ### Community 85 - "enterFocus"
 Cohesion: 0.33
@@ -408,8 +408,8 @@ Nodes (4): assert, fs, path, {
 }
 
 ### Community 87 - "deviceLogin"
-Cohesion: 0.12
-Nodes (21): acceptServerInvite(), addVideoCard(), beginRoomOperation(), connectGlobalBroker(), disconnectApp(), escapeHtml(), finishRoomOperation(), markFriendOffline() (+13 more)
+Cohesion: 0.10
+Nodes (28): acceptServerInvite(), appendChat(), beginRoomOperation(), censoredTextHtml(), checkAvatar(), cleanText(), connectGlobalBroker(), disconnectApp() (+20 more)
 
 ### Community 89 - "seed_machine_draft.py"
 Cohesion: 0.60
@@ -428,7 +428,7 @@ Nodes (4): assert, fs, path, { spawnPeer, cleanupPeer, evalJS, waitFor }
   index.html · relation: calls
 
 ## Knowledge Gaps
-- **303 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+298 more)
+- **304 isolated node(s):** `fs`, `path`, `crypto`, `{ contextBridge, ipcRenderer }`, `{ contextBridge, ipcRenderer }` (+299 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -437,15 +437,15 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `window.handlePokeImgError() sprite fallback chain` and `PokeAPI (pokeapi.co)`?**
   _Edge tagged AMBIGUOUS (relation: calls) - confidence is low._
-- **Why does `handleSignal()` connect `WebRTC ICE & TURN` to `App Shell & Pokedex Data`, `Chat & Renderer Utilities`, `showToast`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
+- **Why does `handleSignal()` connect `WebRTC ICE & TURN` to `NPM Scripts`, `App Shell & Pokedex Data`, `Chat & Renderer Utilities`, `deviceLogin`?**
+  _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **Why does `WebRTC()` connect `App Shell & Pokedex Data` to `WebRTC ICE & TURN`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
+  _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **Why does `evalJS()` connect `Poke Feature Init` to `media-collect-resize.test.js`, `Audio Bitrate & Mic Controls`, `HTML Patch Tool v1`, `E2E Test Harness`, `E2E Test: Scroll/Download`, `nsis`, `settings-language.test.js`, `broadcast`, `Smeargle Sprite Generator`, `E2E Test: Lucky Wheel`, `E2E Test: Quick Poll`, `E2E Test: Focus Minimize`, `E2E Test: Friend List`?**
-  _High betweenness centrality (0.004) - this node is a cross-community bridge._
+  _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `render()` (e.g. with `addBot()` and `continueAfterVoteResult()`) actually correct?**
   _`render()` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
-  _303 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _304 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `UNO Card Game` be split into smaller, more focused modules?**
   _Cohesion score 0.10206240084611316 - nodes in this community are weakly interconnected._

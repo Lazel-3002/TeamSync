@@ -8254,6 +8254,46 @@ function getCustomThemeColors() {
   return { bg, accent, button };
 }
 
+const CUSTOM_COLOR_SWATCHES = {
+  bg: ['#071f1a', '#0b2a23', '#102b24', '#143b32', '#1a1130', '#21152f', '#2b1621', '#f2f3f5'],
+  accent: ['#10b981', '#14b8a6', '#22c55e', '#34d399', '#06b6d4', '#3b82f6', '#a855f7', '#eb459e'],
+  button: ['#059669', '#0d9488', '#16a34a', '#0f766e', '#0891b2', '#2563eb', '#8b5cf6', '#d946ef']
+};
+
+function syncCustomColorSwatchState(colors = getCustomThemeColors()) {
+  document.querySelectorAll('[data-custom-swatches-for]').forEach(wrap => {
+    const value = String(colors[wrap.dataset.customSwatchesFor] || '').toLowerCase();
+    wrap.querySelectorAll('.settings-theme-color-swatch').forEach(swatch => {
+      swatch.classList.toggle('active', swatch.dataset.color.toLowerCase() === value);
+    });
+  });
+}
+
+function renderCustomColorSwatches() {
+  document.querySelectorAll('[data-custom-swatches-for]').forEach(wrap => {
+    const role = wrap.dataset.customSwatchesFor;
+    const colors = CUSTOM_COLOR_SWATCHES[role] || [];
+    wrap.replaceChildren();
+    colors.forEach(color => {
+      const swatch = document.createElement('button');
+      swatch.type = 'button';
+      swatch.className = 'settings-theme-color-swatch';
+      swatch.dataset.color = color;
+      swatch.style.backgroundColor = color;
+      swatch.title = color.toUpperCase();
+      swatch.setAttribute('aria-label', color.toUpperCase());
+      swatch.addEventListener('click', () => {
+        const input = document.getElementById(`settings-custom-${role}`);
+        if (!input) return;
+        input.value = color;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      wrap.appendChild(swatch);
+    });
+  });
+  syncCustomColorSwatchState();
+}
+
 // Renkleri :root'a canlı olarak uygular (önizleme dahil); persist=true iken
 // localStorage'a yazar. Metin rengi arka planın luminansına göre otomatik
 // seçilir, böylece açık bir arka plan seçilse bile yazılar okunaklı kalır.
@@ -8267,6 +8307,7 @@ function applyCustomThemeColors({ bg, accent, button }, persist = false) {
   const isLight = hexLuminance(bg) > 0.5;
   root.setProperty('--custom-text-main', isLight ? '#172033' : '#f5f5f5');
   root.setProperty('--custom-text-mut', isLight ? '#5b6472' : '#b7b2c4');
+  syncCustomColorSwatchState({ bg, accent, button });
   if (persist) {
     localStorage.setItem(CUSTOM_BG_KEY, bg);
     localStorage.setItem(CUSTOM_ACCENT_KEY, accent);
@@ -8368,6 +8409,7 @@ function renderCustomThemePresets() {
 
 function initCustomThemeEditor() {
   renderCustomThemePresets();
+  renderCustomColorSwatches();
   const { bg, accent, button } = getCustomThemeColors();
   const bgInput = document.getElementById('settings-custom-bg');
   const accentInput = document.getElementById('settings-custom-accent');
