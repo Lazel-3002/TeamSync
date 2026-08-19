@@ -1185,7 +1185,7 @@ function isPersistentFriendId(id) {
 }
 function warnStaleFriendEntry(fId) {
   const f = state.friends[fId];
-  showToast(`"${(f && f.name) || fId}" kaydı eski sürümden kalma, istek karşıya ulaşamıyor. Arkadaşlıktan çıkarıp yeniden ekleyin.`, 'warn');
+  showToast(`"${(f && f.name) || fId}" ${t('toast.staleFriendRequest')}`, 'warn');
 }
 
 window.requestJoinRoom = (fId) => {
@@ -1206,14 +1206,14 @@ window.requestJoinRoom = (fId) => {
     };
     publishRequest();
     joinReqRetryTimer = setInterval(publishRequest, 1500);
-    showToast("Katılma isteği gönderildi, bekleniyor...", "info");
+    showToast(t('toast.joinRequestSent'), "info");
     clearTimeout(joinReqAnswerTimer);
     joinReqAnswerTimer = setTimeout(() => {
       clearInterval(joinReqRetryTimer);
-      showToast("Katılma isteğine yanıt gelmedi; arkadaşın çevrimdışı olabilir.", "warn");
+      showToast(t('toast.joinRequestNoResponse'), "warn");
     }, 40000);
   } else {
-    showToast("Bağlantı bekleniyor...", "warn");
+    showToast(t('toast.waitingForConnection'), "warn");
   }
 };
 
@@ -1273,7 +1273,7 @@ window.acceptInvite = (idx) => {
     }));
     state.globalMqtt.subscribe(`teamsync/user/${req.id}/presence`);
   }
-  showToast(`${req.name} ile arkadaş oldunuz!`, 'ok');
+  showToast(`${req.name} ${t('toast.becameFriends')}`, 'ok');
 };
 
 window.rejectInvite = (idx) => {
@@ -1941,7 +1941,7 @@ function connectGlobalBroker(idx, session) {
           if (!state.friends[data.id] && !state.friendRequests.find(r => r.id === data.id)) {
             state.friendRequests.push({ id: data.id, name: data.name });
             saveProfile();
-            showToast(`${data.name} sana arkadaşlık isteği gönderdi!`, 'info');
+            showToast(`${data.name} ${t('toast.friendRequestReceived')}`, 'info');
             if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify('Arkadaşlık İsteği', `${data.name} sana arkadaşlık isteği gönderdi!`);
             renderFriends();
           }
@@ -1949,7 +1949,7 @@ function connectGlobalBroker(idx, session) {
           if (!state.friends[data.id]) {
             state.friends[data.id] = { name: data.name, online: false };
             saveProfile();
-            showToast(`${data.name} arkadaşlık isteğini kabul etti!`, 'ok');
+            showToast(`${data.name} ${t('toast.friendRequestAccepted')}`, 'ok');
             if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify('İstek Kabul Edildi', `${data.name} arkadaşlık isteğini kabul etti!`);
             state.globalMqtt.subscribe(`teamsync/user/${data.id}/presence`);
             renderFriends();
@@ -1971,7 +1971,7 @@ function connectGlobalBroker(idx, session) {
           state.joinAcceptanceRoom = data.roomId;
           clearInterval(joinReqRetryTimer);
           clearTimeout(joinReqAnswerTimer);
-          showToast(`${data.name} isteğini kabul etti, bağlanılıyor...`, 'ok');
+          showToast(`${data.name} ${t('toast.requestAcceptedConnecting')}`, 'ok');
           document.getElementById('step-action').classList.add('hidden'); document.querySelector('.login-card').classList.remove('expanded');
           const joinIdInput = document.getElementById('join-id');
           const joinPwInput = document.getElementById('join-password');
@@ -1988,7 +1988,7 @@ function connectGlobalBroker(idx, session) {
         } else if (data.type === 'room_join_declined') {
           clearInterval(joinReqRetryTimer);
           clearTimeout(joinReqAnswerTimer);
-          showToast(`${data.name} katılma isteğini reddetti veya bir sunucuda değil.`, 'warn');
+          showToast(`${data.name} ${t('toast.joinRequestDeclined')}`, 'warn');
         } else if (data.type === 'server_invite_received') {
           // Davet spamı koruması: aynı kişiden 5 sn içinde gelen tekrar davetleri yok say
           const inviteNow = Date.now();
@@ -2044,7 +2044,7 @@ setInterval(() => {
       // Önceden tamamen sessizdi: chunk kaybı yüzünden yarım kalan bir GIF/dosya
       // hiçbir iz bırakmadan yok oluyordu. En azından alıcıya bildiriyoruz.
       const senderName = state.friends[f.fromId]?.name || 'Biri';
-      showToast(`${senderName} bir dosya/GIF gönderdi ama transfer tamamlanamadı (bağlantı kopması). Tekrar göndermesini isteyebilirsin.`, 'warn');
+      showToast(`${senderName} ${t('toast.transferFailed')}`, 'warn');
       delete state.incomingDMFiles[fileId];
     }
   });
@@ -2247,7 +2247,7 @@ async function refreshDynamicTurn() {
     }
   } catch (e) {
     console.warn('TURN API isteği başarısız:', e && e.message ? e.message : e);
-    showToast('TURN API adresinden sunucu listesi alınamadı, ayarları kontrol edin.', 'warn');
+    showToast(t('toast.turnApiFailed'), 'warn');
   }
 }
 
@@ -2284,7 +2284,7 @@ function applySharedTurn(turnList) {
   state.sharedTurn = clean;
   state.sharedTurnSerialized = serialized;
   console.log('🔁 Odadan TURN yapılandırması alındı:', clean.map(s => s.urls).join(', '));
-  showToast('Odadan TURN sunucu bilgisi alındı, bağlantılar güçlendiriliyor...', 'info');
+  showToast(t('toast.turnInfoReceived'), 'info');
   // Paylaşılan sunucu adlarını da DoH ile çöz; tamamlanınca bağlanamayan
   // peer'lara IP varyantlarını da içeren güncel yapılandırma uygulanır.
   resolveTurnHostsViaDoH().then(() => {
@@ -2332,8 +2332,8 @@ async function detectTunnelInterference() {
     console.warn('🛡️ Cloudflare WARP algılandı (warp=' + warp + ') — doğrudan P2P büyük olasılıkla çalışmaz, TURN yolları önceliklendirilecek');
     const hasTurn = getIceServers().some(s => typeof s.urls === 'string' && /^turns?:/.test(s.urls) && s.username);
     showToast(hasTurn
-      ? '🛡️ Cloudflare WARP algılandı — bağlantı TURN üzerinden kurulacak, sorun olursa otomatik onarılır'
-      : '🛡️ Cloudflare WARP algılandı — sesli bağlantı için Ayarlar > TURN bölümüne bir TURN hesabı girin (odada tek kişinin girmesi yeterli)', 'warn');
+      ? t('toast.warpDetectedWithTurn')
+      : t('toast.warpDetectedNoTurn'), 'warn');
   } catch (e) {}
 }
 
@@ -2350,15 +2350,15 @@ async function diagnoseIceFailure(peerId) {
     console.log('🩺 ICE tanı — yerel aday türleri:', [...types].join(', ') || 'yok');
     const hasTurnConfigured = getIceServers().some(s => typeof s.urls === 'string' && s.urls.startsWith('turn'));
     if (!types.has('srflx') && !types.has('relay')) {
-      showToast('Ağınız STUN/UDP trafiğini engelliyor görünüyor (güvenlik duvarı/okul-iş ağı). TURN sunucusu şart.', 'danger');
+      showToast(t('toast.stunBlocked'), 'danger');
     } else if (!hasTurnConfigured) {
       showToast(state.warpDetected
-        ? 'WARP açıkken doğrudan P2P kurulamaz; Ayarlar > TURN bölümüne bir TURN hesabı girin (tek kişinin girmesi yeterli, odaya otomatik paylaşılır).'
-        : 'Doğrudan P2P kurulamadı: muhtemelen iki taraf da kısıtlı NAT/CGNAT arkasında. Ayarlar > TURN bölümüne ücretsiz bir TURN hesabı girin (tek kişinin girmesi yeterli, odaya otomatik paylaşılır).', 'danger');
+        ? t('toast.p2pFailedWarp')
+        : t('toast.p2pFailedNoWarp'), 'danger');
     } else if (!types.has('relay')) {
       showToast(state.warpDetected
-        ? 'TURN sunucusuna WARP tüneli üzerinden ulaşılamadı. Tüm taşıma varyantları (UDP/TCP/TLS + IP) denenmeye devam ediyor; düzelmezse WARP\'ı kapatın.'
-        : 'TURN sunucunuza bağlanılamadı. VPN/WARP/DPI aracı (ör. Cloudflare WARP) kullanıyorsanız kapatıp tekrar deneyin; yoksa TURN bilgilerini kontrol edin.', 'danger');
+        ? t('toast.turnUnreachableWarp')
+        : t('toast.turnUnreachable'), 'danger');
     }
   } catch (e) {}
 }
@@ -2485,7 +2485,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (window.electronAPI && window.electronAPI.onDownloadDone) {
     window.electronAPI.onDownloadDone((info) => {
       const container = document.getElementById('toast-container');
-      if (!info || !info.ok) { showToast('İndirme tamamlanamadı', 'danger'); return; }
+      if (!info || !info.ok) { showToast(t('toast.downloadFailed'), 'danger'); return; }
       if (!container) return;
       const toast = document.createElement('div');
       toast.className = 'toast toast-ok toast-download';
@@ -2913,7 +2913,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (e) {
       console.error("Load profile error:", e);
-      showToast("Profil yüklenirken hata oluştu: " + e.message, "danger");
+      showToast(t('toast.profileLoadError') + e.message, "danger");
       document.getElementById('step-auth').classList.remove('hidden');
       setAuthStatus('Profil yüklenemedi: ' + e.message, true);
     }
@@ -3051,13 +3051,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('my-friend-id').addEventListener('click', () => {
     navigator.clipboard.writeText(state.friendId).then(() => {
-      showToast('ID kopyalandı!', 'ok');
+      showToast(t('toast.idCopied'), 'ok');
     });
   });
 
   document.getElementById('btn-copy-friend-id').addEventListener('click', () => {
     navigator.clipboard.writeText(state.friendId).then(() => {
-      showToast('ID kopyalandı!', 'ok');
+      showToast(t('toast.idCopied'), 'ok');
     });
   });
 
@@ -3077,7 +3077,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       state.myName = newName;
       document.getElementById('display-name').textContent = state.myName;
       saveProfile();
-      showToast('Adınız güncellendi!', 'ok');
+      showToast(t('toast.nameUpdated'), 'ok');
       document.getElementById('edit-name-modal').classList.add('hidden');
     }
   });
@@ -3107,12 +3107,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         id: state.friendId,
         name: state.myName
       }));
-      showToast("Arkadaşlık isteği gönderildi!", "ok");
+      showToast(t('toast.friendRequestSent'), "ok");
       document.getElementById('friend-id-input').value = '';
       document.getElementById('step-add-friend').classList.add('hidden');
       document.getElementById('step-action').classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
     } else {
-      showToast("Bağlantı bekleniyor...", "warn");
+      showToast(t('toast.waitingForConnection'), "warn");
     }
   });
 
@@ -3178,7 +3178,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const now = Date.now();
     const remaining = 5000 - (now - lastServerInviteSentAt);
     if (remaining > 0) {
-      showToast(`Çok hızlısın! ${Math.ceil(remaining / 1000)} sn sonra tekrar davet atabilirsin.`, "warn");
+      showToast(`${t('toast.inviteRateLimitedPrefix')} ${Math.ceil(remaining / 1000)} ${t('toast.inviteRateLimitedSuffix')}`, "warn");
       return;
     }
     if (state.globalMqtt && state.globalMqtt.connected) {
@@ -3190,9 +3190,9 @@ window.addEventListener('DOMContentLoaded', async () => {
         roomId: state.room,
         password: state.password
       }));
-      showToast("Davet gönderildi!", "ok");
+      showToast(t('toast.inviteSent'), "ok");
     } else {
-      showToast("Bağlantı sorunu.", "warn");
+      showToast(t('toast.connectionIssue'), "warn");
     }
   };
 
@@ -3255,7 +3255,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       const hasCustomTurn = turnUrl.startsWith('http') || (turnUrl && localStorage.getItem('teamsync_turn_user') && localStorage.getItem('teamsync_turn_pass'));
       if (!hasCustomTurn) {
         state.useRelay = false;
-        showToast('Relay (TURN) modu için ayarlardan kendi TURN sunucu bilgilerinizi girmelisiniz. Normal modda devam ediliyor.', 'warn');
+        showToast(t('toast.relayModeNeedsTurn'), 'warn');
       }
     }
     state.sfwMode = useSFW;
@@ -3265,7 +3265,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.chatViolationCounts = new Map();
     state.gameMode = useGameMode;
     if (useSFW) {
-       showToast("Yapay zeka modelleri yükleniyor (3MB), Lütfen bekleyin...", "info");
+       showToast(t('toast.aiModelsLoading'), "info");
        await loadAIFilter();
        if (roomOperationWasCancelled(roomOperation)) return false;
     }
@@ -3401,7 +3401,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     const useSFW = document.getElementById('create-useSFW').checked;
     if (useSFW && isProfaneText(sName)) {
-      showToast('Aile Dostu Yapay Zeka açıkken parti adı küfür veya uygunsuz ifade içeremez.', 'danger');
+      showToast(t('toast.familyFriendlyPartyName'), 'danger');
       return;
     }
     const useGameMode = document.getElementById('create-gameMode') ? document.getElementById('create-gameMode').checked : false;
@@ -3419,7 +3419,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-copy-id').addEventListener('click', () => {
     const idText = document.getElementById('display-server-id').textContent;
     navigator.clipboard.writeText(idText).then(() => {
-      showToast('ID Kopyalandı: ' + idText, 'ok');
+      showToast(t('toast.idCopiedWithValue') + idText, 'ok');
     });
   });
 });
@@ -3516,7 +3516,7 @@ async function setupLocalAudio(options = {}) {
     state.rnnoiseStatus = 'fallback';
     if (!state.rnnoiseFallbackNotified) {
       state.rnnoiseFallbackNotified = true;
-      showToast('RNNoise desteklenmiyor; sistem gürültü engelleme etkinleştirildi', 'warn');
+      showToast(t('toast.rnnoiseUnsupported'), 'warn');
     }
   }
 
@@ -3591,7 +3591,7 @@ async function setupLocalAudio(options = {}) {
           if (generation !== state.audioSetupGeneration) return;
           if (state.rnnoiseStatus !== 'active' && state.rnnoiseStatus !== 'loading') return;
           state.rnnoiseStatus = 'fallback';
-          showToast('RNNoise durdu; ses kesilmeden sistem filtresine geçiliyor', 'warn');
+          showToast(t('toast.rnnoiseStopped'), 'warn');
           setTimeout(() => {
             if (generation === state.audioSetupGeneration) {
               setupLocalAudio({ forceSystemSuppression: true }).catch(console.error);
@@ -3617,7 +3617,7 @@ async function setupLocalAudio(options = {}) {
       state.rnnoiseStatus = 'fallback';
       if (!state.rnnoiseFallbackNotified) {
         state.rnnoiseFallbackNotified = true;
-        showToast('RNNoise başlatılamadı; sistem gürültü engelleme etkinleştirildi', 'warn');
+        showToast(t('toast.rnnoiseStartFailed'), 'warn');
       }
       if (generation === state.audioSetupGeneration) {
         return setupLocalAudio({ forceSystemSuppression: true });
@@ -3867,7 +3867,7 @@ function applySpeakerTo(el) {
     if (id) {
       localStorage.removeItem('teamsync_speaker_id');
       el.setSinkId('').catch(() => {});
-      showToast('Kayıtlı ses çıkış cihazı bulunamadı, varsayılan hoparlöre dönüldü', 'warn');
+      showToast(t('toast.audioDeviceNotFound'), 'warn');
     }
   });
 }
@@ -4024,7 +4024,7 @@ async function handlePeerDiscovered(peer) {
   const created = state.peers.get(peer.id);
   if (created && peer.friendId) created.friendId = peer.friendId;
   if (created && typeof peer.joinedAt === 'number' && peer.joinedAt > 0) created.joinedAt = peer.joinedAt;
-  showToast(displayName(peer.id, peer.name) + ' bulundu', 'info');
+  showToast(displayName(peer.id, peer.name) + ' ' + t('toast.peerFound'), 'info');
 }
 
 setInterval(() => {
@@ -4091,7 +4091,7 @@ function removePeer(peerId) {
   // Bekleyen denetim teklifleri (her iki yön) peer gidince düşer.
   if (state.pendingControlOffer && state.pendingControlOffer.peerId === peerId) clearControlOffer();
   if (state.incomingControlOffer && state.incomingControlOffer.peerId === peerId) closeCtrlOfferNote();
-  showToast(displayName(peerId, peer.name) + ' ayrıldı', 'warn');
+  showToast(displayName(peerId, peer.name) + ' ' + t('toast.peerLeft'), 'warn');
   updateEmptyGrid();
 
   // Lobby cleanup on peer disconnect
@@ -4463,7 +4463,7 @@ async function logVoicePathReport(peerId, tag) {
         !intendedPeerVolumeIsZero(peerId) &&
         (el.paused || el.muted || el.volume === 0 || !el.srcObject)) {
       console.warn(`🔈 [${peer.name}] ses verisi geliyor ama oynatıcı çalmıyordu — oynatma yeniden başlatılıyor`);
-      showToast(`${displayName(peerId, peer.name)} sesi oynatılamıyordu, oynatıcı yeniden başlatıldı`, 'warn');
+      showToast(`${displayName(peerId, peer.name)} ${t('toast.peerAudioRestarted')}`, 'warn');
       try {
         if (!el.srcObject && track) el.srcObject = new MediaStream([track]);
         applyPeerVolume(peerId); // 1.0'a sabitleme yerine kayıtlı ayarı uygula
@@ -4589,7 +4589,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
       removePeer(peerId);
     } else if (pc.iceConnectionState === 'failed') {
       console.warn(`⚠️ WebRTC connection failed to ${peerName}, ICE restart deneniyor...`);
-      showToast(`${peerName} ile sesli/görüntülü bağlantı kurulamadı, yeniden deneniyor...`, 'warn');
+      showToast(`${peerName} ${t('toast.peerConnectionFailedRetrying')}`, 'warn');
       diagnoseIceFailure(peerId);
       attemptIceRestart(peerId);
     } else if (pc.iceConnectionState === 'disconnected') {
@@ -4745,7 +4745,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
           if (pp.audioStallTicks >= 2 && (pp.audioStallRestarts || 0) < 3) {
             console.warn(`🔇 ${peerName} bağlı görünüyor ama ses akmıyor (${bytes} bayt), relay-zorunlu ICE restart deneniyor...`);
             if ((pp.audioStallRestarts || 0) === 0) {
-              showToast(`${peerName} tarafından ses alınamıyor, bağlantı relay üzerinden onarılıyor...`, 'warn');
+              showToast(`${peerName} ${t('toast.peerAudioRepairing')}`, 'warn');
             }
             pp.audioStallTicks = 0;
             pp.audioStallRestarts = (pp.audioStallRestarts || 0) + 1;
@@ -4764,7 +4764,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
           if (bytes > (pp.lastAudioBytes || 0)) {
             if (pp.audioStallRestarts) {
               console.log(`🔊 ${peerName} tarafından ses tekrar akıyor (onarım başarılı)`);
-              showToast(`${peerName} ile ses bağlantısı onarıldı`, 'info');
+              showToast(`${peerName} ${t('toast.peerAudioRepaired')}`, 'info');
             }
             pp.audioStallRestarts = 0;
             pp.forceRelayNext = false;
@@ -4971,12 +4971,12 @@ async function handleDataMessage(peerId, msg) {
     if (msg.banned) {
       state.chatBannedIds.add(msg.targetId);
       const peer = state.peers.get(msg.targetId);
-      if (peer) showToast(`${peer.name || 'Oyuncu'} sohbetten yasaklandı.`, 'danger');
+      if (peer) showToast(`${peer.name || t('toast.defaultPlayerName')} ${t('toast.chatBannedSuffix')}`, 'danger');
     } else {
       state.chatBannedIds.delete(msg.targetId);
       if (state.chatViolationCounts) state.chatViolationCounts.delete(msg.targetId);
       const peer = state.peers.get(msg.targetId);
-      if (peer) showToast(`${peer.name || 'Oyuncu'} için sohbet yasağı kaldırıldı.`, 'ok');
+      if (peer) showToast(`${peer.name || t('toast.defaultPlayerName')} ${t('toast.chatBanRemovedSuffix')}`, 'ok');
     }
     return;
   } else if (msg.type === 'check_friend') {
@@ -5018,7 +5018,7 @@ async function handleDataMessage(peerId, msg) {
       // güncelle. Susturma kalkınca kendi tercihin geri gelecek.
       state.serverMuted = true;
       applyMicState();
-      showToast('Kurucu tarafından susturuldunuz!', 'danger');
+      showToast(t('toast.mutedByFounder'), 'danger');
     }
     return;
   } else if (msg.type === 'force_unmute') {
@@ -5031,7 +5031,7 @@ async function handleDataMessage(peerId, msg) {
       // Susturulmadan önce mikrofonun açıksa açılır, kendin kapattıysan kapalı kalır.
       state.serverMuted = false;
       applyMicState();
-      showToast('Susturmanız kaldırıldı.', 'ok');
+      showToast(t('toast.unmuted'), 'ok');
     }
     return;
   } else if (msg.type === 'ban_peer') {
@@ -5065,7 +5065,7 @@ async function handleDataMessage(peerId, msg) {
     refreshUserRoleBadge(msg.targetId);
     if (msg.targetId === state.myId) {
       updateFounderMenuVisibility();
-      showToast(msg.value ? 'Kurucu sana yetki verdi! Artık oyuncuları susturup atabilirsin.' : 'Yetkin alındı.', msg.value ? 'ok' : 'info');
+      showToast(msg.value ? t('toast.moderatorGranted') : t('toast.moderatorRevoked'), msg.value ? 'ok' : 'info');
     }
     return;
   } else if (msg.type === 'transfer_ownership') {
@@ -5080,7 +5080,7 @@ async function handleDataMessage(peerId, msg) {
       if (state.serverMutedIds) state.serverMutedIds.delete(state.myId);
       if (state.serverMuted) { state.serverMuted = false; applyMicState(); }
       updateFounderMenuVisibility();
-      showToast('Sunucunun yeni sahibi sen oldun!', 'ok');
+      showToast(t('toast.becameOwner'), 'ok');
     }
     refreshUserRoleBadge(msg.targetId);
     if (msg.fromId) refreshUserRoleBadge(msg.fromId);
@@ -5291,7 +5291,7 @@ async function handleDataMessage(peerId, msg) {
       removeVideoCard(peerId, true);
       if (state.activeControl && state.activeControl.hostId === peerId) {
         closeActiveControlSession(false);
-        showToast('Ekran paylaşımı bittiği için denetim izni kapatıldı.', 'info');
+        showToast(t('toast.controlRevokedShareEnded'), 'info');
       }
     }
     updateUserUI(peerId);
@@ -5385,23 +5385,23 @@ async function handleDataMessage(peerId, msg) {
           btnGroup.style.display = 'flex';
           btnGroup.style.gap = '8px';
           btnGroup.style.marginTop = '8px';
-          
+
           const aDl = document.createElement('a');
           aDl.href = url;
           aDl.download = safeFileName(f.meta.name);
           aDl.className = 'text-dl';
-          aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> İndir`;
+          aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${t('viewer.download')}`;
           btnGroup.appendChild(aDl);
-          
+
           if (f.meta.mime.startsWith('text/') || f.meta.mime === 'application/pdf') {
             const aView = document.createElement('a');
             aView.href = url;
             aView.target = '_blank';
             aView.className = 'text-dl view-btn';
-            aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> İçine Bak`;
+            aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}`;
             btnGroup.appendChild(aView);
           }
-          
+
           const progressWrap = div.querySelector('.prog-wrap');
           if (progressWrap) progressWrap.replaceWith(btnGroup);
           else div.querySelector('.info')?.appendChild(btnGroup);
@@ -5420,7 +5420,7 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'ctrl-res') {
     if (msg.accepted) {
       if (!peer.sharing) {
-        showToast('Ekran paylaşılmadığı için denetim izni başlatılamadı.', 'warn');
+        showToast(t('toast.controlStartFailedNoShare'), 'warn');
         return;
       }
       state.activeControl = { hostId: peerId, hostName: displayName(peerId, peer.name) };
@@ -5437,10 +5437,10 @@ async function handleDataMessage(peerId, msg) {
       updateControlRequestButton(peerId); // karttaki düğme "Denetimde" olur
     } else {
       const reasonText = msg.reason === 'not-sharing'
-        ? 'Ekran paylaşılmadığı için denetim isteği gönderilemedi.'
+        ? t('toast.controlReqFailedNoShare')
         : msg.reason === 'busy'
-          ? 'Denetim izni şu anda başka bir kullanıcıda.'
-          : 'Kontrol isteği reddedildi.';
+          ? t('toast.controlReqFailedBusy')
+          : t('toast.controlReqRejected');
       showToast(reasonText, 'warn');
     }
   } else if (msg.type === 'ctrl-revoke') {
@@ -5448,11 +5448,11 @@ async function handleDataMessage(peerId, msg) {
     // kontrol EDİLEN durdurdu → kontrol eden taraf pencereyi kapatır.
     if (state.controlledBy === peerId) {
       stopBeingControlled(false);
-      showToast('Uzaktan kontrol sonlandırıldı.', 'info');
+      showToast(t('toast.remoteControlEnded'), 'info');
     }
     if (state.activeControl && state.activeControl.hostId === peerId) {
       closeActiveControlSession(false);
-      showToast('Uzaktan kontrol izni kaldırıldı.', 'info');
+      showToast(t('toast.remoteControlPermissionRemoved'), 'info');
     }
   } else if (msg.type === 'ctrl-pointer') {
     if (state.controlledBy === peerId && msg.point) {
@@ -5496,7 +5496,7 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'ctrl-offer-cancel') {
     if (state.incomingControlOffer && state.incomingControlOffer.peerId === peerId) {
       closeCtrlOfferNote();
-      showToast('Denetim teklifi geri çekildi.', 'info');
+      showToast(t('toast.controlOfferWithdrawn'), 'info');
     }
   } else if (msg.type === 'ctrl-offer-res') {
     // Paylaşan taraf: teklif ettiğim kişi yanıtladı.
@@ -5504,8 +5504,8 @@ async function handleDataMessage(peerId, msg) {
     clearControlOffer();
     if (!msg.accepted) {
       showToast(msg.reason === 'busy'
-        ? 'Kullanıcı şu anda başka bir denetim oturumunda.'
-        : 'Denetim teklifi reddedildi.', 'warn');
+        ? t('toast.controlOfferBusy')
+        : t('toast.controlOfferRejected'), 'warn');
       return;
     }
     if (!state.isSharing) {
@@ -5731,7 +5731,7 @@ function handleFounderLeft(prevFounderId) {
     if (state.serverMutedIds) state.serverMutedIds.delete(state.myId);
     if (state.serverMuted) { state.serverMuted = false; applyMicState(); }
     updateFounderMenuVisibility();
-    showToast('Kurucu ayrıldı — sunucunun yeni sahibi sen oldun!', 'ok');
+    showToast(t('toast.founderLeftBecameOwner'), 'ok');
   }
   refreshUserRoleBadge(newFounderId);
   if (prevFounderId) refreshUserRoleBadge(prevFounderId);
@@ -5881,7 +5881,7 @@ function resolvePeerFriendId(targetId) {
 function openServerDM(targetId, targetName) {
   const friendId = resolvePeerFriendId(targetId);
   if (!friendId) {
-    showToast('Kullanıcının kimliği henüz alınamadı, birkaç saniye sonra tekrar deneyin.', 'warn');
+    showToast(t('toast.userIdNotReady'), 'warn');
     return;
   }
   if (!state.friends[friendId]) {
@@ -5894,7 +5894,7 @@ function openServerDM(targetId, targetName) {
 function sendRoomFriendRequest(targetId) {
   const friendId = resolvePeerFriendId(targetId);
   if (!friendId) {
-    showToast('Kullanıcının kimliği henüz alınamadı, birkaç saniye sonra tekrar deneyin.', 'warn');
+    showToast(t('toast.userIdNotReady'), 'warn');
     return;
   }
   if (state.globalMqtt && state.globalMqtt.connected) {
@@ -5903,9 +5903,9 @@ function sendRoomFriendRequest(targetId) {
       id: state.friendId,
       name: state.myName
     }));
-    showToast('Arkadaşlık isteği gönderildi!', 'ok');
+    showToast(t('toast.friendRequestSent'), 'ok');
   } else {
-    showToast('Hata: Bağlantı hazır değil.', 'warn');
+    showToast(t('toast.connectionNotReady'), 'warn');
   }
 }
 
@@ -6081,7 +6081,7 @@ function showUserContextMenu(e, targetId, targetName) {
     if (result === null) return; // iptal edildi
     setNickname(targetId, result);
     const newNick = getNickname(targetId);
-    showToast(newNick ? `Lakap kaydedildi: ${newNick}` : 'Lakap kaldırıldı', 'ok');
+    showToast(newNick ? `${t('toast.nicknameSavedPrefix')} ${newNick}` : t('toast.nicknameRemoved'), 'ok');
   });
   menu.appendChild(nickBtn);
 
@@ -6094,7 +6094,7 @@ function showUserContextMenu(e, targetId, targetName) {
     friendBtn.addEventListener('click', async () => {
       if (await window.showConfirm('⚠️ Arkadaşı Sil', `"${targetName}" arkadaşını silmek istediğinize emin misiniz?`)) {
         removeFriend(resolvedFriendId);
-        showToast('Arkadaş silindi', 'info');
+        showToast(t('toast.friendRemoved'), 'info');
       }
       menu.remove();
     });
@@ -6134,7 +6134,7 @@ function showUserContextMenu(e, targetId, targetName) {
       grantBtn.innerHTML = '⛔ Denetimi Geri Al';
       grantBtn.addEventListener('click', () => {
         stopBeingControlled(true);
-        showToast('Denetim geri alındı.', 'info');
+        showToast(t('toast.controlRevoked'), 'info');
         menu.remove();
       });
     } else {
@@ -6441,7 +6441,7 @@ function toggleFocus(card) {
 async function toggleFocusFullscreen() {
   if (!focusedCard) return;
   if (state.focusLocked) {
-    showToast('Odak kilitli — tam ekranı değiştirmek için önce kilidi aç', 'info');
+    showToast(t('toast.focusLockedFullscreen'), 'info');
     return;
   }
   try {
@@ -6498,7 +6498,7 @@ function makeCardFocusable(card) {
     // overlay'i, odak denetimleri).
     if (e.target.closest('#focus-controls, .card-actions, .inactive-overlay')) return;
     if (state.focusLocked && focusedCard) {
-      showToast('Odak kilitli — geçiş için önce kilidi aç', 'info');
+      showToast(t('toast.focusLockedSwitch'), 'info');
       return;
     }
     enterFocus(card);
@@ -6769,7 +6769,7 @@ function registerSfwChatViolation(peerId) {
   if (count < getSfwChatBanThreshold()) return false;
   setChatBan(peerId, true);
   const peer = state.peers.get(peerId);
-  showToast(`${peer?.name || 'Oyuncu'} argo kullanım sınırını aştığı için sohbetten yasaklandı.`, 'danger');
+  showToast(`${peer?.name || t('toast.defaultPlayerName')} ${t('toast.chatBannedProfanityLimit')}`, 'danger');
   return true;
 }
 
@@ -6777,7 +6777,7 @@ async function checkTextWithAI(text) {
   if (typeof text !== 'string') text = String(text || '');
   if (!state.sfwMode || !text) return { ok: true, text: text };
   
-  const warning = "Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.";
+  const warning = t('toast.aiContentBlocked');
 
   if (isProfaneText(text)) {
     return { ok: false, warning: warning, text: censorProfaneText(text) };
@@ -6827,12 +6827,10 @@ document.getElementById('cform').addEventListener('submit', async (e) => {
   const rawText = input.value.trim();
   if (!rawText) return;
   if (isChatBanned(state.myId)) {
-    showToast('Sohbetten yasaklandığınız için mesaj gönderemezsiniz.', 'danger');
+    showToast(t('toast.chatBannedCannotSend'), 'danger');
     input.value = '';
     return;
   }
-
-  if (!state.peers.has(peer.id) && state.peers.size >= 100) return;
 
   const res = await checkTextWithAI(rawText);
   let textToSend = res.ok ? rawText : (res.text || '');
@@ -7113,6 +7111,7 @@ const I18N = {
     // Sohbet/DM görsel önizleme (lightbox) katmanı
     'viewer.title': 'Görsel Önizleme',
     'viewer.download': 'İndir',
+    'viewer.preview': 'Önizle',
     'viewer.copy': 'Panoya Kopyala',
     'viewer.copied': 'Görsel panoya kopyalandı.',
     'viewer.copyFailed': 'Görsel panoya kopyalanamadı.',
@@ -7328,6 +7327,7 @@ const I18N = {
     // Chat/DM image preview (lightbox) layer
     'viewer.title': 'Image Preview',
     'viewer.download': 'Download',
+    'viewer.preview': 'Preview',
     'viewer.copy': 'Copy to Clipboard',
     'viewer.copied': 'Image copied to the clipboard.',
     'viewer.copyFailed': 'The image could not be copied.',
@@ -9039,8 +9039,8 @@ function bindUI() {
       state.echoShield = echoShield.checked;
       localStorage.setItem('teamsync_echo_shield', state.echoShield ? '1' : '0');
       showToast(state.echoShield
-        ? 'Yankı Kalkanı açık: karşı taraf konuşurken mikrofonun kısılır'
-        : 'Yankı Kalkanı kapalı', 'info');
+        ? t('toast.echoShieldOn')
+        : t('toast.echoShieldOff'), 'info');
     };
   }
 
@@ -9054,10 +9054,10 @@ function bindUI() {
         broadcast({ type: 'force_unmute', targetId: state.myId });
         applyMicState();
         playSound('on');
-        showToast('Kendi susturmanı kaldırdın.', 'ok');
+        showToast(t('toast.selfUnmuted'), 'ok');
         return;
       }
-      showToast('Kurucu tarafından susturuldunuz. Sesinizi açamazsınız!', 'danger');
+      showToast(t('toast.mutedByFounderCannotUnmute'), 'danger');
       return;
     }
 
@@ -9149,7 +9149,7 @@ function bindUI() {
   if (hwAccelEl && window.electronAPI && window.electronAPI.setHardwareAcceleration) {
     hwAccelEl.addEventListener('change', (e) => {
       window.electronAPI.setHardwareAcceleration(e.target.checked);
-      showToast('Donanım hızlandırma tercihi kaydedildi. Uygulamayı yeniden başlatınca etkin olacak.', 'info');
+      showToast(t('settings.hwSaved'), 'info');
     });
   }
 
@@ -9228,12 +9228,12 @@ function bindUI() {
           if (isMuted) {
             broadcast({ type: 'force_unmute', targetId: peerId });
             if (state.serverMutedIds) state.serverMutedIds.delete(peerId);
-            showToast(`${peer.name} susturması kaldırıldı.`, 'info');
+            showToast(`${peer.name} ${t('toast.peerUnmutedByFounder')}`, 'info');
           } else {
             broadcast({ type: 'force_mute', targetId: peerId });
             if (!state.serverMutedIds) state.serverMutedIds = new Set();
             state.serverMutedIds.add(peerId);
-            showToast(`${peer.name} susturuldu.`, 'info');
+            showToast(`${peer.name} ${t('toast.peerMutedByFounder')}`, 'info');
           }
           // Butonu güncellemek için paneli tazele.
           document.getElementById('founder-settings').dispatchEvent(new Event('click'));
@@ -9249,7 +9249,7 @@ function bindUI() {
         kickBtn.onclick = async () => {
           if (!(await window.showConfirm('⚠️ Oyuncuyu At', `"${peer.name}" sunucudan atılsın mı?`))) return;
           broadcast({ type: 'kick_peer', targetId: peerId });
-          showToast(`${peer.name} atıldı.`, 'info');
+          showToast(`${peer.name} ${t('toast.peerKicked')}`, 'info');
         };
 
         // Moderatörler kurucuyu veya başka moderatörü susturup atamaz —
@@ -9282,7 +9282,7 @@ function bindUI() {
             if (nowMod) state.moderators.delete(peerId); else state.moderators.add(peerId);
             broadcast({ type: 'set_moderator', targetId: peerId, value: !nowMod });
             refreshUserRoleBadge(peerId);
-            showToast(nowMod ? `${peer.name} adlı kişinin yetkisi alındı.` : `${peer.name} adlı kişiye yetki verildi.`, 'info');
+            showToast(nowMod ? `${peer.name} ${t('toast.moderatorRevokedName')}` : `${peer.name} ${t('toast.moderatorGrantedName')}`, 'info');
             // Listeyi tazele
             document.getElementById('founder-settings').dispatchEvent(new Event('click'));
           };
@@ -9305,7 +9305,7 @@ function bindUI() {
             refreshUserRoleBadge(peerId);
             updateFounderMenuVisibility();
             document.getElementById('founder-settings-modal').classList.add('hidden');
-            showToast(`Sunucu sahipliği ${peer.name} adlı kişiye devredildi.`, 'info');
+            showToast(`${t('toast.ownershipTransferredPrefix')} ${peer.name} ${t('toast.ownershipTransferredSuffix')}`, 'info');
           };
 
           // Kalıcı yasak butonu (yalnızca kurucu). Yasaklanan kişi bu odaya bir
@@ -9324,7 +9324,7 @@ function bindUI() {
             if (state.room) saveRoomBans(state.room);
             broadcast({ type: 'ban_peer', targetId: peerId });
             removePeer(peerId);
-            showToast(`${peer.name} kalıcı olarak yasaklandı.`, 'info');
+            showToast(`${peer.name} ${t('toast.peerBannedPermanently')}`, 'info');
             document.getElementById('founder-settings').dispatchEvent(new Event('click'));
           };
 
@@ -9340,7 +9340,7 @@ function bindUI() {
             const action = chatBanned ? 'sohbet yasağı kaldırılsın mı?' : 'sohbetten yasaklansın mı?';
             if (!(await window.showConfirm('💬 Sohbet Moderasyonu', `"${peer.name}" ${action}`))) return;
             setChatBan(peerId, !chatBanned);
-            showToast(chatBanned ? `${peer.name} için sohbet yasağı kaldırıldı.` : `${peer.name} sohbetten yasaklandı.`, 'info');
+            showToast(chatBanned ? `${peer.name} ${t('toast.chatBanRemovedSuffix')}` : `${peer.name} ${t('toast.chatBannedSuffix')}`, 'info');
             document.getElementById('founder-settings').dispatchEvent(new Event('click'));
           };
 
@@ -9364,7 +9364,7 @@ function bindUI() {
   document.getElementById('founder-friends-only').addEventListener('change', (e) => {
     state.friendsOnlyMode = e.target.checked;
     broadcast({ type: 'founder_settings_update', friendsOnlyMode: state.friendsOnlyMode });
-    showToast(state.friendsOnlyMode ? 'Sadece arkadaşlar modu aktif!' : 'Sadece arkadaşlar modu kapatıldı.', 'info');
+    showToast(state.friendsOnlyMode ? t('toast.friendsOnlyOn') : t('toast.friendsOnlyOff'), 'info');
   });
 
   document.getElementById('founder-sfw-mode').addEventListener('change', (e) => {
@@ -9386,14 +9386,14 @@ function bindUI() {
       sfwChatBanEnabled: !!state.sfwChatBanEnabled,
       sfwChatBanThreshold: getSfwChatBanThreshold()
     });
-    showToast(state.sfwMode ? 'Yapay Zeka Koruması aktif!' : 'Yapay Zeka Koruması kapatıldı.', 'info');
+    showToast(state.sfwMode ? t('toast.aiProtectionOn') : t('toast.aiProtectionOff'), 'info');
   });
 
   document.getElementById('founder-sfw-chat-ban')?.addEventListener('change', (e) => {
     if (!state.isRoomFounder) return;
     state.sfwChatBanEnabled = !!e.target.checked;
     broadcast({ type: 'founder_settings_update', sfwChatBanEnabled: state.sfwChatBanEnabled });
-    showToast(state.sfwChatBanEnabled ? 'Otomatik sohbet yasağı aktif.' : 'Otomatik sohbet yasağı kapatıldı.', 'info');
+    showToast(state.sfwChatBanEnabled ? t('toast.autoChatBanOn') : t('toast.autoChatBanOff'), 'info');
   });
 
   document.getElementById('founder-sfw-chat-ban-threshold')?.addEventListener('change', (e) => {
@@ -9417,7 +9417,7 @@ function bindUI() {
   document.getElementById('founder-game-mode').addEventListener('change', (e) => {
     state.gameMode = e.target.checked;
     broadcast({ type: 'founder_settings_update', gameMode: state.gameMode });
-    showToast(state.gameMode ? 'Oyun Modu aktif (15FPS/Düşük İşlemci)!' : 'Oyun Modu kapatıldı.', 'info');
+    showToast(state.gameMode ? t('toast.gameModeOn') : t('toast.gameModeOff'), 'info');
   });
 
   document.getElementById('founder-noise-suppression').addEventListener('change', async (e) => {
@@ -9431,13 +9431,13 @@ function bindUI() {
     try {
       await applyRoomNoiseSuppression(enabled);
       showToast(enabled
-        ? 'RNNoise gürültü engelleme tüm katılımcılar için açıldı.'
-        : 'RNNoise gürültü engelleme tüm katılımcılar için kapatıldı.', 'ok');
+        ? t('toast.roomRnnoiseOn')
+        : t('toast.roomRnnoiseOff'), 'ok');
     } catch (error) {
       console.error('RNNoise sunucu ayarı uygulanamadı:', error);
       e.target.checked = !enabled;
       await applyRoomNoiseSuppression(!enabled).catch(console.error);
-      showToast('RNNoise ayarı değiştirilemedi.', 'error');
+      showToast(t('toast.rnnoiseSettingFailed'), 'error');
     } finally {
       e.target.disabled = false;
     }
@@ -9452,7 +9452,7 @@ function bindUI() {
       state.audioBitrate = kbps;
       applyAudioBitrateToPeers();
       broadcast({ type: 'set_bitrate', value: kbps });
-      showToast(`Ses kalitesi ${kbps} kbps olarak ayarlandı.`, 'ok');
+      showToast(`${t('toast.audioQualitySetPrefix')} ${kbps} ${t('toast.audioQualitySetSuffix')}`, 'ok');
     });
   }
   
@@ -9464,7 +9464,7 @@ function bindUI() {
     localStorage.setItem('teamsync_ptt_enabled', pttEnabled ? '1' : '0');
     // Odadaysak canlı uygula: bir sonraki sunucuya katılmayı beklemeye gerek yok
     if (state.room) applyPttMode(pttEnabled);
-    showToast('Ayarlar kaydedildi!', 'ok');
+    showToast(t('settings.saved'), 'ok');
     document.getElementById('settings-modal').classList.add('hidden');
   });
   document.getElementById('settings-close').addEventListener('click', () => {
@@ -9502,7 +9502,7 @@ function bindUI() {
     if (e.code === 'Escape' && focusedCard && !document.fullscreenElement) {
       if (document.querySelector('.modal:not(.hidden)')) return;
       if (state.focusLocked) {
-        showToast('Odak kilitli — çıkmak için önce kilidi aç', 'info');
+        showToast(t('toast.focusLockedExit'), 'info');
         return;
       }
       exitFocus();
@@ -9530,7 +9530,7 @@ function bindUI() {
     if (e.detail > 1) return;
     state.focusLocked = !state.focusLocked;
     updateFocusLockBtn();
-    showToast(state.focusLocked ? 'Odak kilitlendi — tıklamalar odağı değiştirmez' : 'Odak kilidi açıldı', 'info');
+    showToast(state.focusLocked ? t('toast.focusLockedOn') : t('toast.focusLockedOff'), 'info');
   });
 
   document.getElementById('focus-fullscreen-btn').addEventListener('click', (e) => {
@@ -9543,7 +9543,7 @@ function bindUI() {
     e.stopPropagation();
     if (e.detail > 1) return;
     if (state.focusLocked) {
-      showToast('Odak kilitli — çıkmak için önce kilidi aç', 'info');
+      showToast(t('toast.focusLockedExit'), 'info');
       return;
     }
     if (focusMinimized) restoreFocus();
@@ -9799,15 +9799,15 @@ function stopRecording() {
 function requestControl(peerId) {
   const peer = state.peers.get(peerId);
   if (!peer || !peer.sharing) {
-    showToast('Denetim izni yalnızca ekran paylaşılırken istenebilir.', 'warn');
+    showToast(t('toast.controlOnlyWhileSharing'), 'warn');
     return false;
   }
   if (!isPeerScreenOpen(peerId)) {
-    showToast('Kontrol isteği göndermek için önce ekran paylaşımını açın.', 'warn');
+    showToast(t('toast.controlReqNeedsShare'), 'warn');
     return false;
   }
   broadcastTo(peerId, { type: 'ctrl-req', reqId: 'req-' + Date.now() });
-  showToast('Kontrol isteği gönderildi.', 'info');
+  showToast(t('toast.controlReqSent'), 'info');
   return true;
 }
 
@@ -9910,27 +9910,27 @@ function offerControl(peerId) {
   const peer = state.peers.get(peerId);
   if (!peer) return false;
   if (!state.isSharing) {
-    showToast('Denetim vermek için önce ekranınızı paylaşın.', 'warn');
+    showToast(t('toast.controlGrantNeedsShare'), 'warn');
     return false;
   }
   if (state.controlledBy) {
-    showToast('Denetim şu anda başka bir kullanıcıda.', 'warn');
+    showToast(t('toast.controlInUse'), 'warn');
     return false;
   }
   if (state.pendingControlOffer) {
-    showToast('Bekleyen bir denetim teklifiniz var.', 'warn');
+    showToast(t('toast.controlOfferPending'), 'warn');
     return false;
   }
   const reqId = 'offer-' + Date.now();
   state.pendingControlOffer = { peerId, reqId };
   broadcastTo(peerId, { type: 'ctrl-offer', reqId });
-  showToast(`${displayName(peerId, peer.name)} kişisine denetim teklif edildi.`, 'info');
+  showToast(`${displayName(peerId, peer.name)} ${t('toast.controlOfferedTo')}`, 'info');
   clearTimeout(ctrlOfferTimer);
   ctrlOfferTimer = setTimeout(() => {
     if (state.pendingControlOffer && state.pendingControlOffer.reqId === reqId) {
       broadcastTo(peerId, { type: 'ctrl-offer-cancel', reqId });
       clearControlOffer();
-      showToast('Denetim teklifi yanıtlanmadı.', 'warn');
+      showToast(t('toast.controlOfferNoResponse'), 'warn');
     }
   }, CTRL_REQ_TIMEOUT_MS);
   return true;
@@ -10045,7 +10045,7 @@ if (window.electronAPI.onRemoteControlKilled) {
   window.electronAPI.onRemoteControlKilled(() => {
     if (state.controlledBy) {
       stopBeingControlled(true);
-      showToast('Denetim, güvenlik kısayoluyla (Ctrl+X ×2) kapatıldı.', 'info');
+      showToast(t('toast.controlEndedShortcut'), 'info');
     }
   });
 }
@@ -10792,7 +10792,7 @@ async function sendFile(file) {
   } else if (mqttClient && mqttClient.connected && state.room) {
     // Fallback to MQTT (safe for small files, warning printed for larger files)
     if (file.size > 2 * 1024 * 1024) {
-      showToast("Büyük dosyaları MQTT üzerinden göndermek yavaştır ve kopabilir. WebRTC bağlantısı kurulmasını bekleyin.", "warn");
+      showToast(t('toast.largeFileMqttWarning'), "warn");
     }
     broadcast({ type: 'file-meta', id: fileId, name: file.name, size: file.size, mime: file.type });
 
@@ -10845,20 +10845,20 @@ async function sendFile(file) {
       btnGroup.style.display = 'flex';
       btnGroup.style.gap = '8px';
       btnGroup.style.marginTop = '8px';
-      
+
       const aDl = document.createElement('a');
       aDl.href = url;
       aDl.download = file.name;
       aDl.className = 'text-dl';
-      aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> İndir`;
+      aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${t('viewer.download')}`;
       btnGroup.appendChild(aDl);
-      
+
       if (file.type.startsWith('text/') || file.type === 'application/pdf') {
         const aView = document.createElement('a');
         aView.href = url;
         aView.target = '_blank';
         aView.className = 'text-dl view-btn';
-        aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> İçine Bak`;
+        aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}`;
         btnGroup.appendChild(aView);
       }
       div.appendChild(btnGroup);
@@ -11154,7 +11154,7 @@ window.receiveDM = async (fromId, data) => {
     pushDmMessage(fromId, { sender: 'them', type: data.msgType, content: safeContent, isCensored: isCensored, timestamp: Date.now() });
     saveDMs();
     if (state.activeDM === fromId) renderDMs();
-    else showToast(`${state.friends[fromId]?.name || 'Biri'} sana mesaj gönderdi.`, 'info');
+    else showToast(`${state.friends[fromId]?.name || t('toast.defaultSomeone')} ${t('toast.friendSentMessage')}`, 'info');
 
     // Supabase Kayıt (Gelen DM)
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
@@ -11210,7 +11210,7 @@ window.receiveDM = async (fromId, data) => {
         delete state.incomingDMFiles[data.fileId];
         
         if (state.activeDM === fromId) renderDMs();
-        else showToast(`${state.friends[fromId]?.name || 'Biri'} sana bir dosya gönderdi.`, 'info');
+        else showToast(`${state.friends[fromId]?.name || t('toast.defaultSomeone')} ${t('toast.friendSentFile')}`, 'info');
 
         // Gelen medya da bulut veritabanına kopyalanmaz; yalnızca bu cihazdaki
         // sohbet durumu ve yerel kütüphane kullanılır.
@@ -11310,7 +11310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.sfwMode && state.aiModel) {
           const checked = await checkAvatar(dataUrl);
           if (!checked) {
-             showToast("Üzgünüm, belirlediğim güvenlik protokolleri gereği bu tür içerikler (küfür, argo veya +18) oluşturamıyorum. Daha nazik veya farklı bir konuda yardımcı olabilirim.", "danger");
+             showToast(t('toast.aiContentBlocked'), "danger");
              return;
           }
         }
