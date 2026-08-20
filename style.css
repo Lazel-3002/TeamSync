@@ -3816,12 +3816,17 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .drop-overlay h2 { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
 
 /* ===== FILE TRANSFER ===== */
-.msg-file { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-top: 4px; border: 1px solid rgba(255,255,255,0.05); }
-.msg-file .icon { font-size: 24px; }
+/* Kalın çerçeveli, yuvarlak "dosya kartı" şekli: ikon kutulu üst satır +
+   tam genişlik aksiyon satırı (bkz. file-card mockup). flex-wrap sayesinde
+   .file-actions kendi satırına düşer, HTML yapısı değişmeden. */
+.msg-file { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: rgba(0,0,0,0.22); padding: 14px; border-radius: 20px; margin-top: 4px; border: 2px solid rgba(255,255,255,0.14); }
+.msg-file .icon { flex: none; width: 40px; height: 40px; color: var(--txt-main); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.16); border-radius: 11px; background: rgba(255,255,255,0.04); }
+.msg-file .icon svg { width: 20px; height: 20px; display: block; }
 .msg-file .info { flex: 1; min-width: 0; }
 .msg-file .name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .msg-file .prog-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .msg-file .prog { height: 100%; width: 0%; background: var(--acc); transition: width 0.2s; }
+.msg-file .file-actions { flex-basis: 100%; width: 100%; display: flex; gap: 10px; margin-top: 2px; }
 
 /* Referanstaki gibi görsel sınırı cam butonu kırpar; ayrı bir isolation/background
    katmanı kullanılmaz, böylece GPU açıkken backdrop-filter görseli örnekler. */
@@ -3881,14 +3886,15 @@ body.no-hw-accel .dl-btn:hover {
 }
 
 .text-dl {
-  position: static; display: inline-block; margin-top: 8px;
+  position: static; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  flex: 1; margin-top: 0; font-family: inherit; cursor: pointer;
   /* Nötr koyu (eski mor var(--acc) değil): indirme butonu artık hiçbir yerde mor değil. */
-  background: #2a3350; padding: 4px 12px; border-radius: 6px;
-  color: white; text-decoration: none; font-size: 12px; opacity: 1; border: 1px solid rgba(255,255,255,0.12);
+  background: #2a3350; padding: 9px 14px; border-radius: 14px;
+  color: white; text-decoration: none; font-size: 12px; font-weight: 600; opacity: 1; border: 2px solid rgba(255,255,255,0.16);
+  transition: background 0.15s ease, transform 0.15s cubic-bezier(0.2, 0.9, 0.25, 1), border-color 0.15s ease;
 }
-.text-dl:hover { background: #37436a; }
-.msg-file a { background: #2a3350; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.12); }
-.msg-file a:hover { background: #37436a; }
+.text-dl:hover { background: #37436a; border-color: rgba(255,255,255,0.28); transform: translateY(-2px); }
+.text-dl:active { transform: translateY(0) scale(0.97); }
 
 /* ===== ACTIVITIES ===== */
 #act-btn .icon { font-size: 22px; }
@@ -3907,12 +3913,17 @@ body.no-hw-accel .dl-btn:hover {
 .drop-overlay h2 { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
 
 /* ===== FILE TRANSFER ===== */
-.msg-file { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-top: 4px; border: 1px solid rgba(255,255,255,0.05); }
-.msg-file .icon { font-size: 24px; }
+/* Kalın çerçeveli, yuvarlak "dosya kartı" şekli: ikon kutulu üst satır +
+   tam genişlik aksiyon satırı (bkz. file-card mockup). flex-wrap sayesinde
+   .file-actions kendi satırına düşer, HTML yapısı değişmeden. */
+.msg-file { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: rgba(0,0,0,0.22); padding: 14px; border-radius: 20px; margin-top: 4px; border: 2px solid rgba(255,255,255,0.14); }
+.msg-file .icon { flex: none; width: 40px; height: 40px; color: var(--txt-main); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.16); border-radius: 11px; background: rgba(255,255,255,0.04); }
+.msg-file .icon svg { width: 20px; height: 20px; display: block; }
 .msg-file .info { flex: 1; min-width: 0; }
 .msg-file .name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .msg-file .prog-wrap { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .msg-file .prog { height: 100%; width: 0%; background: var(--acc); transition: width 0.2s; }
+.msg-file .file-actions { flex-basis: 100%; width: 100%; display: flex; gap: 10px; margin-top: 2px; }
 
 /* Referanstaki gibi görsel sınırı cam butonu kırpar; ayrı bir isolation/background
    katmanı kullanılmaz, böylece GPU açıkken backdrop-filter görseli örnekler. */
@@ -3972,14 +3983,15 @@ body.no-hw-accel .dl-btn:hover {
 }
 
 .text-dl {
-  position: static; display: inline-block; margin-top: 8px;
+  position: static; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  flex: 1; margin-top: 0; font-family: inherit; cursor: pointer;
   /* Nötr koyu (eski mor var(--acc) değil): indirme butonu artık hiçbir yerde mor değil. */
-  background: #2a3350; padding: 4px 12px; border-radius: 6px;
-  color: white; text-decoration: none; font-size: 12px; opacity: 1; border: 1px solid rgba(255,255,255,0.12);
+  background: #2a3350; padding: 9px 14px; border-radius: 14px;
+  color: white; text-decoration: none; font-size: 12px; font-weight: 600; opacity: 1; border: 2px solid rgba(255,255,255,0.16);
+  transition: background 0.15s ease, transform 0.15s cubic-bezier(0.2, 0.9, 0.25, 1), border-color 0.15s ease;
 }
-.text-dl:hover { background: #37436a; }
-.msg-file a { background: #2a3350; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.12); }
-.msg-file a:hover { background: #37436a; }
+.text-dl:hover { background: #37436a; border-color: rgba(255,255,255,0.28); transform: translateY(-2px); }
+.text-dl:active { transform: translateY(0) scale(0.97); }
 
 /* ===== ACTIVITIES ===== */
 #act-btn .icon { font-size: 22px; }
@@ -9085,6 +9097,7 @@ body.no-hw-accel .ilb-nav {
 .ilb-btn:hover {
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.28);
+  transform: scale(1.08);
 }
 .ilb-btn:hover .dl-arrow { transform: translateY(2px); }
 .ilb-btn:active { transform: scale(0.92); }
@@ -9495,3 +9508,55 @@ body.no-hw-accel .media-collect-btn {
   .namecity-review-row { grid-template-columns: 1fr; }
   .namecity-vote-actions { justify-content: flex-start; }
 }
+
+/* ===== FILE PREVIEW MODAL ===== */
+/* Metin/PDF dosyaları için uygulama içi önizleme (harici pencere açmaz).
+   .modal'ın temel z-index'i (1000) sunucu içi "Mesajlar" penceresinin
+   (.modal.server-dm-modal, 10000) altında kalıyordu; arkadaş sohbetindeyken
+   dosya önizlemesi görsel izleyiciyle (.img-lightbox, 99000) aynı üst
+   katmana çıkarılır. */
+.file-preview-modal { z-index: 99000; }
+.file-preview-modal .fp-card { display: flex; flex-direction: column; width: min(900px, 92vw); height: min(720px, 86vh); padding: 0; overflow: hidden; }
+.fp-head { flex: none; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: var(--border); flex-wrap: wrap; }
+.fp-name { flex: 1 1 auto; min-width: 80px; font-size: 14px; font-weight: 600; color: var(--txt-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-head-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.fp-head-actions .ilb-btn { color: var(--txt-main); }
+.fp-head-actions .ilb-btn:hover { background: var(--bg-hover); border-color: rgba(255,255,255,0.16); }
+.fp-body { flex: 1; min-height: 0; position: relative; }
+.fp-text { margin: 0; height: 100%; padding: 18px 20px; overflow: auto; box-sizing: border-box; background: rgba(0,0,0,0.18); color: var(--txt-main); font: 12.5px/1.6 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.fp-frame { width: 100%; height: 100%; border: none; background: #fff; }
+.fp-video { background: #000; object-fit: contain; }
+
+/* Metin önizlemesinde kelime arama çubuğu (bir editördeki Ctrl+F gibi). */
+/* flex:1 ile büyütülünce başlıktaki boş alanın tamamını kaplayıp "a" ile
+   sayaç arasında kocaman bir boşluk bırakıyordu; sabit, kompakt bir genişliğe
+   sabitlendi (gerekirse daralır, asla büyümez). */
+.fp-search { flex: 0 1 240px; width: 240px; min-width: 160px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0 6px 0 10px; height: 32px; }
+.fp-search-icon { flex: none; width: 13px; height: 13px; color: var(--txt-mut); }
+/* .mcard input[type=text] (bkz. satır ~1774) sınıf+öznitelik seçicisiyle
+   (0,2,1) buradaki tek sınıfı (0,1,0) eziyor; input kendi koyu/kenarlıklı
+   kutusuna kavuşup dış pilin dışına taşıyordu. #id (1,0,0) her zaman kazanır. */
+#fp-search-input.fp-search-input {
+  flex: 1; width: 0; min-width: 0; height: 100%;
+  background: transparent; border: none; padding: 0; margin: 0; border-radius: 0;
+  outline: none; color: var(--txt-main); font-size: 12.5px; font-family: inherit;
+}
+#fp-search-input.fp-search-input:focus { background: transparent; border: none; box-shadow: none; }
+.fp-search-input::placeholder { color: var(--txt-mut); }
+.fp-search-count { flex: none; font-size: 11px; color: var(--txt-mut); font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 2px; }
+.fp-search-nav { width: 24px; height: 24px; color: var(--txt-main); }
+.fp-search-nav svg { width: 13px; height: 13px; }
+/* BÜYÜK/küçük harf duyarlılığını aç/kapa düğmesi ("Aa"), bir editördeki
+   "Match Case" düğmesi gibi basılıyken vurgulanır. */
+.fp-search-case {
+  flex: none; width: 24px; height: 24px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 700; line-height: 1; font-family: inherit;
+  color: var(--txt-mut); background: transparent; border: 1px solid transparent; border-radius: 6px;
+  cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.fp-search-case:hover { background: rgba(255,255,255,0.08); transform: scale(1.06); }
+.fp-search-case[aria-pressed="true"] { color: var(--acc-light, var(--acc)); background: color-mix(in srgb, var(--acc) 22%, transparent); border-color: color-mix(in srgb, var(--acc) 45%, transparent); }
+.fp-search-case:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 55%, transparent); }
+.fp-hit { background: rgba(250, 204, 21, 0.45); color: inherit; border-radius: 2px; }
+.fp-hit-active { background: #facc15; color: #1a1400; }

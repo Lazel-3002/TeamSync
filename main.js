@@ -557,7 +557,10 @@ function createWindow() {
       autoplayPolicy: 'no-user-gesture-required',
       // Pencere arka planda/simge durumundayken zamanlayıcılar kısılırsa
       // ses kapısı ve sinyalleşme aksar; sesli sohbet uygulaması için kapalı olmalı.
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      // Sohbetteki dosya önizleme modalı PDF'leri bir <iframe> içinde gösterir;
+      // Chromium'un yerleşik PDF eklentisi plugins:true olmadan sessizce boş kalır.
+      plugins: true
     },
     backgroundColor: (() => {
       const s = readSettings();

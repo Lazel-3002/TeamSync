@@ -350,6 +350,38 @@ function isVideoFile(name, mime) {
   return /\.(mp4|webm|mov|m4v|ogv)$/i.test(name || '');
 }
 
+// isImageFile ile aynı sebepten: Windows'ta dosya seçicisinden gelen
+// PDF/metin dosyalarının .type'ı bazen boş gelir, bu yüzden uzantıya da bakılır.
+function isPdfFile(name, mime) {
+  if (mime && mime.toLowerCase() === 'application/pdf') return true;
+  return /\.pdf$/i.test(name || '');
+}
+
+function isPreviewableFile(name, mime) {
+  if (isPdfFile(name, mime)) return true;
+  if (isVideoFile(name, mime)) return true;
+  if (mime && /^text\//i.test(mime)) return true;
+  return /\.(txt|md|markdown|csv|json|log|xml|ini|cfg|conf|ya?ml|js|mjs|ts|css|html?)$/i.test(name || '');
+}
+
+// Dosya kartındaki ikon: emoji yerine uygulamanın geri kalanıyla aynı
+// tek renkli (stroke=currentColor) SVG dilini kullanır. Ofis türleri (pdf/
+// doc/xls/ppt/metin) renksiz olduğu için ayrı ayrı ayırt edilemez; bu yüzden
+// belirgin biçimi olan video/ses/arşiv ayrılır, geri kalanı tek bir "belge"
+// ikonuna düşer.
+function fileCardIcon(name, mime) {
+  if (isVideoFile(name, mime)) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="3"></rect><polygon points="10 8.5 16.5 12 10 15.5 10 8.5" fill="currentColor" stroke="none"></polygon></svg>';
+  }
+  if ((mime && mime.toLowerCase().startsWith('audio/')) || /\.(mp3|wav|flac|ogg|m4a|aac)$/i.test(name || '')) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
+  }
+  if (/\.(zip|rar|7z|tar|gz)$/i.test(name || '')) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="14" rx="2"></rect><path d="M3 7l3-4h5l1 2h6l3 4"></path><line x1="12" y1="7" x2="12" y2="21"></line></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="13" y2="17"></line></svg>';
+}
+
 let mqttClient = null;
 let internetAnnounceInterval = null;
 
@@ -5349,7 +5381,7 @@ async function handleDataMessage(peerId, msg) {
       received: 0,
       lastChunkAt: Date.now()
     });
-    appendFileMsg(msg.id, safeFileName(msg.name), msg.size, true);
+    appendFileMsg(msg.id, safeFileName(msg.name), msg.size, true, msg.mime);
   } else if (msg.type === 'file-done') {
     const f = fileBuffer.get(msg.id);
     if (f && f.peerId !== peerId) return;
@@ -5382,9 +5414,16 @@ async function handleDataMessage(peerId, msg) {
           div.appendChild(imgWrap);
         } else {
           const btnGroup = document.createElement('div');
-          btnGroup.style.display = 'flex';
-          btnGroup.style.gap = '8px';
-          btnGroup.style.marginTop = '8px';
+          btnGroup.className = 'file-actions';
+
+          if (isPreviewableFile(f.meta.name, f.meta.mime)) {
+            const aView = document.createElement('button');
+            aView.type = 'button';
+            aView.className = 'text-dl view-btn';
+            aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}`;
+            aView.addEventListener('click', () => openFilePreview(blob, safeFileName(f.meta.name)));
+            btnGroup.appendChild(aView);
+          }
 
           const aDl = document.createElement('a');
           aDl.href = url;
@@ -5393,18 +5432,8 @@ async function handleDataMessage(peerId, msg) {
           aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${t('viewer.download')}`;
           btnGroup.appendChild(aDl);
 
-          if (f.meta.mime.startsWith('text/') || f.meta.mime === 'application/pdf') {
-            const aView = document.createElement('a');
-            aView.href = url;
-            aView.target = '_blank';
-            aView.className = 'text-dl view-btn';
-            aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}`;
-            btnGroup.appendChild(aView);
-          }
-
-          const progressWrap = div.querySelector('.prog-wrap');
-          if (progressWrap) progressWrap.replaceWith(btnGroup);
-          else div.querySelector('.info')?.appendChild(btnGroup);
+          div.querySelector('.prog-wrap')?.remove();
+          div.appendChild(btnGroup);
         }
       }
       fileBuffer.delete(msg.id);
@@ -6992,6 +7021,37 @@ function broadcast(msg) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// DM dosya balonları data: URL olarak saklanır (bkz. sendDMFile). Önizleme
+// modalı bir Blob bekliyor; CSP connect-src blob: içermediği için fetch()
+// yerine base64'ü elle çözeriz (aynı yaklaşım js/media-collect.js'te de var).
+function dataUrlToBlob(dataUrl) {
+  const match = /^data:([^,;]*)(;base64)?,([\s\S]*)$/.exec(dataUrl || '');
+  if (!match) return null;
+  const mime = match[1] || 'application/octet-stream';
+  try {
+    const raw = match[2] ? atob(match[3]) : decodeURIComponent(match[3]);
+    const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+    return new Blob([bytes], { type: mime });
+  } catch (e) {
+    return null;
+  }
+}
+
+function dataUrlByteSize(dataUrl) {
+  const comma = (dataUrl || '').indexOf(',');
+  if (comma === -1) return 0;
+  const data = dataUrl.slice(comma + 1);
+  const padding = data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.round((data.length * 3) / 4) - padding);
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function isValidPeerId(value) {
@@ -9012,6 +9072,10 @@ window.applyUserLanguage = applyUserLanguage;
 window.formatUserTime = formatUserTime;
 window.openUserSettings = openUserSettings;
 document.addEventListener('DOMContentLoaded', initUserSettings);
+// Oda dosya kartlarına bağlıydı ama DM önizlemesi (sohbete hiç katılmadan
+// arkadaşa dosya göndermek) de aynı modalı kullanıyor; bu yüzden odadan
+// bağımsız, uygulama açılışında bir kez kurulur.
+document.addEventListener('DOMContentLoaded', initFilePreviewModal);
 
 function bindUI() {
   const mic = document.getElementById('mic');
@@ -10659,13 +10723,205 @@ function initFileTransfer() {
   });
 }
 
-function appendFileMsg(fileId, name, size, incoming) {
+// Sohbetteki "Önizle" butonu için uygulama içi modal: paylaşılan .txt/.pdf
+// dosyasını yeni bir pencere açmadan aynı ekranda gösterir.
+// NOT: CSP connect-src blob: içermediği için fetch(blobUrl) çalışmaz
+// (bkz. js/media-collect.js) — Blob/File nesnesi doğrudan alınır, .text()
+// ile okunur ve önizleme için kendi blob URL'i burada üretilir.
+let fpRawText = '';
+let fpHits = [];
+let fpHitIndex = -1;
+let fpSearchDebounce = 0;
+let fpCaseSensitive = false;
+
+// "aaaa...a" gibi milyonlarca eşleşmesi olan bir dosyada tüm eşleşmeleri
+// <mark> ile sarmak yüz binlerce DOM elemanı üretip arayüzü kilitliyordu.
+// İlk N eşleşme vurgulanır, geri kalan metin düz kalır ama görünür/kaydırılabilir
+// olmaya devam eder.
+const FP_MAX_HIGHLIGHTS = 500;
+// Çok büyük bir metin dosyasının tamamını .textContent'e basmak da (yükleme
+// anında, arama olmadan bile) donmaya sebep olabiliyordu; önizleme belli bir
+// boyuttan sonra kesilir, tam içerik için indirme kullanılır.
+const FP_MAX_PREVIEW_BYTES = 4 * 1024 * 1024;
+
+function fpEscapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// Metin önizlemesinde arama: eşleşmeleri <mark> ile sarar, escapeHtml() ile
+// XSS'e kapalı tutar (bkz. satır ~7004).
+function fpRenderHighlights(query) {
+  const textEl = document.getElementById('fp-text');
+  const countEl = document.getElementById('fp-search-count');
+  fpHits = [];
+  fpHitIndex = -1;
+  if (!query) {
+    textEl.textContent = fpRawText;
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+  const re = new RegExp(fpEscapeRegExp(query), fpCaseSensitive ? 'g' : 'gi');
+  let html = '';
+  let lastIndex = 0;
+  let match;
+  let n = 0;
+  let truncated = false;
+  while ((match = re.exec(fpRawText)) !== null) {
+    if (n >= FP_MAX_HIGHLIGHTS) { truncated = true; break; }
+    html += escapeHtml(fpRawText.slice(lastIndex, match.index));
+    html += `<mark class="fp-hit" data-hit="${n}">${escapeHtml(match[0])}</mark>`;
+    lastIndex = match.index + match[0].length;
+    n++;
+    if (match[0].length === 0) re.lastIndex++;
+  }
+  html += escapeHtml(fpRawText.slice(lastIndex));
+  textEl.innerHTML = html;
+  fpHits = Array.from(textEl.querySelectorAll('.fp-hit'));
+  if (countEl) countEl.textContent = fpHits.length ? `0/${fpHits.length}${truncated ? '+' : ''}` : '0/0';
+  if (fpHits.length) fpGoToHit(0);
+}
+
+function fpGoToHit(index) {
+  if (!fpHits.length) return;
+  if (fpHitIndex >= 0 && fpHits[fpHitIndex]) fpHits[fpHitIndex].classList.remove('fp-hit-active');
+  fpHitIndex = ((index % fpHits.length) + fpHits.length) % fpHits.length;
+  const hit = fpHits[fpHitIndex];
+  hit.classList.add('fp-hit-active');
+  hit.scrollIntoView({ block: 'center' });
+  const countEl = document.getElementById('fp-search-count');
+  if (countEl) countEl.textContent = `${fpHitIndex + 1}/${fpHits.length}`;
+}
+
+function openFilePreview(blob, name) {
+  const modal = document.getElementById('file-preview-modal');
+  if (!modal) return;
+
+  const previewUrl = URL.createObjectURL(blob);
+  modal.dataset.previewUrl = previewUrl;
+
+  document.getElementById('fp-name').textContent = name;
+  const dl = document.getElementById('fp-download');
+  dl.href = previewUrl;
+  dl.download = name;
+
+  const textEl = document.getElementById('fp-text');
+  const frameEl = document.getElementById('fp-frame');
+  const videoEl = document.getElementById('fp-video');
+  const searchBar = document.getElementById('fp-search');
+  const searchInput = document.getElementById('fp-search-input');
+  textEl.classList.add('hidden');
+  frameEl.classList.add('hidden');
+  videoEl.classList.add('hidden');
+  textEl.textContent = '';
+  frameEl.removeAttribute('src');
+  videoEl.pause();
+  videoEl.removeAttribute('src');
+  videoEl.load();
+  searchBar.classList.add('hidden');
+  searchInput.value = '';
+  window.clearTimeout(fpSearchDebounce);
+  fpRawText = ''; fpHits = []; fpHitIndex = -1;
+  fpCaseSensitive = false;
+  document.getElementById('fp-search-case')?.setAttribute('aria-pressed', 'false');
+
+  if (isVideoFile(name, blob.type)) {
+    videoEl.src = previewUrl;
+    videoEl.classList.remove('hidden');
+  } else if (isPdfFile(name, blob.type)) {
+    frameEl.src = previewUrl;
+    frameEl.classList.remove('hidden');
+  } else {
+    searchBar.classList.remove('hidden');
+    textEl.classList.remove('hidden');
+    const isTruncated = blob.size > FP_MAX_PREVIEW_BYTES;
+    const readTarget = isTruncated ? blob.slice(0, FP_MAX_PREVIEW_BYTES) : blob;
+    readTarget.text().then(txt => {
+      fpRawText = txt;
+      textEl.textContent = txt;
+      if (isTruncated) {
+        showToast(`Dosya büyük, yalnızca ilk ${formatFileSize(FP_MAX_PREVIEW_BYTES)} gösteriliyor. Tamamı için indir.`, 'info');
+      }
+    }).catch(() => {});
+  }
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeFilePreview() {
+  const modal = document.getElementById('file-preview-modal');
+  if (!modal || modal.classList.contains('hidden')) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  document.getElementById('fp-frame')?.removeAttribute('src');
+  const videoEl = document.getElementById('fp-video');
+  if (videoEl) { videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); }
+  if (modal.dataset.previewUrl) {
+    URL.revokeObjectURL(modal.dataset.previewUrl);
+    delete modal.dataset.previewUrl;
+  }
+  fpRawText = ''; fpHits = []; fpHitIndex = -1;
+  window.clearTimeout(fpSearchDebounce);
+}
+
+function initFilePreviewModal() {
+  const modal = document.getElementById('file-preview-modal');
+  if (!modal) return;
+  document.getElementById('fp-close').addEventListener('click', closeFilePreview);
+
+  // DM dosya balonları renderDMs() ile her mesajda yeniden çiziliyor, bu yüzden
+  // doğrudan addEventListener yerine delegasyon kullanılır.
+  document.addEventListener('click', (e) => {
+    const btn = e.target instanceof Element ? e.target.closest('[data-dm-preview]') : null;
+    if (!btn) return;
+    const blob = dataUrlToBlob(btn.dataset.dmPreview);
+    if (blob) openFilePreview(blob, btn.dataset.dmPreviewName || 'dosya');
+  });
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeFilePreview(); });
+
+  const searchInput = document.getElementById('fp-search-input');
+  searchInput.addEventListener('input', (e) => {
+    // Büyük dosyalarda her tuşta yeniden vurgulamak gereksiz iş demek;
+    // yazma bitene kadar kısa bir gecikmeyle ertelenir.
+    const value = e.target.value;
+    window.clearTimeout(fpSearchDebounce);
+    fpSearchDebounce = window.setTimeout(() => fpRenderHighlights(value), 150);
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      window.clearTimeout(fpSearchDebounce);
+      fpRenderHighlights(searchInput.value);
+      fpGoToHit(fpHitIndex + (e.shiftKey ? -1 : 1));
+    } else if (e.key === 'Escape') { e.stopPropagation(); searchInput.blur(); }
+  });
+  document.getElementById('fp-search-next').addEventListener('click', () => fpGoToHit(fpHitIndex + 1));
+  document.getElementById('fp-search-prev').addEventListener('click', () => fpGoToHit(fpHitIndex - 1));
+
+  const caseBtn = document.getElementById('fp-search-case');
+  caseBtn.addEventListener('click', () => {
+    fpCaseSensitive = !fpCaseSensitive;
+    caseBtn.setAttribute('aria-pressed', String(fpCaseSensitive));
+    fpRenderHighlights(searchInput.value);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (modal.classList.contains('hidden')) return;
+    if (e.key === 'Escape') { closeFilePreview(); return; }
+    // Metin önizlemesindeyken Ctrl/Cmd+F tarayıcı aramasını değil, kendi arama kutumuzu açsın.
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !document.getElementById('fp-search').classList.contains('hidden')) {
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+}
+
+function appendFileMsg(fileId, name, size, incoming, mime) {
   const wrap = document.getElementById('msgs');
   const div = document.createElement('div');
   div.className = 'msg-file';
   div.id = 'file-' + fileId;
   div.innerHTML = `
-    <div class="icon">📄</div>
+    <div class="icon">${fileCardIcon(name, mime)}</div>
     <div class="info">
       <div class="name">${escapeHtml(name)}</div>
       <div class="muted">${(size/1024/1024).toFixed(2)} MB</div>
@@ -10752,7 +11008,7 @@ async function sendFile(file) {
     if (!proceed) return;
   }
   const fileId = crypto.randomUUID();
-  appendFileMsg(fileId, file.name, file.size, false);
+  appendFileMsg(fileId, file.name, file.size, false, file.type);
 
   const activePeers = Array.from(state.peers.values()).filter(p => p.dc && p.dc.readyState === 'open');
   
@@ -10842,9 +11098,16 @@ async function sendFile(file) {
       div.appendChild(imgWrap);
     } else {
       const btnGroup = document.createElement('div');
-      btnGroup.style.display = 'flex';
-      btnGroup.style.gap = '8px';
-      btnGroup.style.marginTop = '8px';
+      btnGroup.className = 'file-actions';
+
+      if (isPreviewableFile(file.name, file.type)) {
+        const aView = document.createElement('button');
+        aView.type = 'button';
+        aView.className = 'text-dl view-btn';
+        aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}`;
+        aView.addEventListener('click', () => openFilePreview(file, file.name));
+        btnGroup.appendChild(aView);
+      }
 
       const aDl = document.createElement('a');
       aDl.href = url;
@@ -10853,14 +11116,6 @@ async function sendFile(file) {
       aDl.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${t('viewer.download')}`;
       btnGroup.appendChild(aDl);
 
-      if (file.type.startsWith('text/') || file.type === 'application/pdf') {
-        const aView = document.createElement('a');
-        aView.href = url;
-        aView.target = '_blank';
-        aView.className = 'text-dl view-btn';
-        aView.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}`;
-        btnGroup.appendChild(aView);
-      }
       div.appendChild(btnGroup);
     }
   }
@@ -10932,15 +11187,38 @@ window.renderDMs = () => {
       m.content = escapeHtml(safeMediaUrl(m.content, 'image'));
       m.fileName = escapeHtml(safeFileName(m.fileName || 'Gorsel'));
       // data-media-name: "Koleksiyona ekle" dosyayı özgün adıyla kaydetsin.
-      contentHtml = `<img src="${m.content}" alt="${escapeHtml(m.fileName || 'Görsel')}" data-media-name="${escapeHtml(m.fileName || '')}" />`;
+      contentHtml = `
+        <div class="img-wrap">
+          <img src="${m.content}" class="chat-img" alt="${escapeHtml(m.fileName || 'Görsel')}" data-media-name="${escapeHtml(m.fileName || '')}" />
+          <a href="${m.content}" download="${m.fileName || 'gorsel'}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
+        </div>`;
     } else if (m.type === 'video') {
       m.content = escapeHtml(safeMediaUrl(m.content, 'video'));
       m.fileName = escapeHtml(safeFileName(m.fileName || 'Video'));
-      contentHtml = `<video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}" data-media-name="${escapeHtml(m.fileName || '')}"></video>`;
+      contentHtml = `
+        <div class="img-wrap">
+          <video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}" data-media-name="${escapeHtml(m.fileName || '')}"></video>
+          <a href="${m.content}" download="${m.fileName || 'video'}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
+        </div>`;
     } else if (m.type === 'file') {
-      m.content = escapeHtml(safeMediaUrl(m.content, 'file'));
-      m.fileName = escapeHtml(safeFileName(m.fileName || 'dosya'));
-      contentHtml = `<a href="${m.content}" download="${m.fileName || 'dosya'}" style="color: #60a5fa; text-decoration: underline;">📁 ${escapeHtml(m.fileName || 'Dosya')} İndir</a>`;
+      const rawDataUrl = safeMediaUrl(originalContent, 'file');
+      const safeName = safeFileName(m.fileName || 'dosya');
+      m.content = escapeHtml(rawDataUrl);
+      m.fileName = escapeHtml(safeName);
+      const sizeLabel = formatFileSize(dataUrlByteSize(rawDataUrl));
+      const previewable = isPreviewableFile(safeName, '');
+      contentHtml = `
+        <div class="msg-file">
+          <div class="icon">${fileCardIcon(safeName, '')}</div>
+          <div class="info">
+            <div class="name">${escapeHtml(safeName)}</div>
+            <div class="muted">${sizeLabel}</div>
+          </div>
+          <div class="file-actions">
+            ${previewable ? `<button type="button" class="text-dl view-btn" data-dm-preview="${escapeHtml(rawDataUrl)}" data-dm-preview-name="${escapeHtml(safeName)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}</button>` : ''}
+            <a href="${m.content}" download="${safeName}" class="text-dl"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${t('viewer.download')}</a>
+          </div>
+        </div>`;
     }
 
     m.content = originalContent;

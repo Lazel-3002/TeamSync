@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.youtube.com https://s.ytimg.com; connect-src 'self' wss://broker.emqx.io:8084 https://s3.amazonaws.com https://unpkg.com https://cdn.jsdelivr.net https://1.1.1.1 https://8.8.8.8 https://*.metered.live https://zperyrjpfumtblossyod.supabase.co wss://zperyrjpfumtblossyod.supabase.co http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob: https://*; frame-src 'self' https://www.youtube.com; worker-src 'self' blob:; object-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.youtube.com https://s.ytimg.com; connect-src 'self' wss://broker.emqx.io:8084 https://s3.amazonaws.com https://unpkg.com https://cdn.jsdelivr.net https://1.1.1.1 https://8.8.8.8 https://*.metered.live https://zperyrjpfumtblossyod.supabase.co wss://zperyrjpfumtblossyod.supabase.co http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob: https://*; frame-src 'self' blob: https://www.youtube.com; worker-src 'self' blob:; object-src 'none';">
   <meta name="referrer" content="no-referrer" />
   <title>TeamSync</title>
   <link rel="stylesheet" href="style.css?v=20" />
@@ -2274,6 +2274,31 @@
       <span class="ilb-sep" aria-hidden="true"></span>
       <button id="ilb-rotate-left" class="ilb-btn" type="button" data-i18n-title="viewer.rotateLeft" title="Sola Döndür"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg></button>
       <button id="ilb-rotate-right" class="ilb-btn" type="button" data-i18n-title="viewer.rotateRight" title="Sağa Döndür"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button>
+    </div>
+  </div>
+
+  <div id="file-preview-modal" class="modal file-preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="fp-name">
+    <div class="mcard wide fp-card">
+      <div class="fp-head">
+        <span id="fp-name" class="fp-name"></span>
+        <div id="fp-search" class="fp-search hidden">
+          <svg class="fp-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="fp-search-input" class="fp-search-input" type="text" placeholder="Metinde ara…" autocomplete="off" spellcheck="false" />
+          <span id="fp-search-count" class="fp-search-count"></span>
+          <button id="fp-search-case" class="fp-search-case" type="button" title="BÜYÜK/küçük harf duyarlı ara" aria-label="BÜYÜK/küçük harf duyarlı ara" aria-pressed="false">Aa</button>
+          <button id="fp-search-prev" class="ilb-btn fp-search-nav" type="button" title="Önceki eşleşme" aria-label="Önceki eşleşme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+          <button id="fp-search-next" class="ilb-btn fp-search-nav" type="button" title="Sonraki eşleşme" aria-label="Sonraki eşleşme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+        </div>
+        <div class="fp-head-actions">
+          <a id="fp-download" class="ilb-btn" download href="#" data-i18n-title="viewer.download" title="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
+          <button id="fp-close" class="ilb-btn ilb-btn-close" type="button" data-i18n-title="common.close" title="Kapat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+      </div>
+      <div id="fp-body" class="fp-body">
+        <pre id="fp-text" class="fp-text hidden"></pre>
+        <iframe id="fp-frame" class="fp-frame hidden" title="Dosya önizleme"></iframe>
+        <video id="fp-video" class="fp-frame fp-video hidden" controls playsinline></video>
+      </div>
     </div>
   </div>
 

@@ -19,8 +19,13 @@
       selector: '.chat',
       min: 160,
       // Kenar çubuğunun üstündeki blok (kullanıcı listesi + ses testi + eşik)
-      // ezilmesin diye ayrılan pay; sohbet bunun ötesine büyüyemez.
+      // ezilmesin diye ayrılan pay; sohbet bunun ötesine büyüyemez. Sabit bir
+      // sayı kullanıcı sayısına/eklenen yeni satırlara göre yanlış çıkabildiği
+      // için (üst blok büyüyünce mesaj gönderme kutusu görünür alanın dışına
+      // itiliyordu) gerçek yükseklik aşağıda DOM'dan ölçülür; bu sadece o
+      // ölçüm mümkün olmadığında kullanılan bir yedek değerdir.
       reserve: 320,
+      dynamicReserve: true,
       fallback: 280
     },
     server: {
@@ -41,8 +46,24 @@
     }
   };
 
+  // .chat'in üstündeki kardeş elemanların (kullanıcı listesi, ses testi,
+  // eşik/yankı satırları, "SOHBET" etiketi...) o an kapladığı gerçek
+  // yüksekliği ölçer. Sabit bir "reserve" sayısı yerine bunu kullanmak,
+  // kullanıcı listesi büyüdüğünde/yeni bir satır eklendiğinde kelepçenin
+  // yanlış hesaplanıp mesaj gönderme kutusunu görünür alanın dışına
+  // itmesini önler.
+  function measuredReserve(panel) {
+    const target = document.querySelector(panel.selector);
+    if (!target || !target.parentElement) return panel.reserve;
+    const siblings = Array.from(target.parentElement.children).filter(el => el !== target);
+    if (!siblings.length) return panel.reserve;
+    const used = siblings.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
+    return used > 0 ? used + 12 : panel.reserve;
+  }
+
   function limitFor(panel) {
-    return Math.max(panel.min, window.innerHeight - panel.reserve);
+    const reserve = panel.dynamicReserve ? measuredReserve(panel) : panel.reserve;
+    return Math.max(panel.min, window.innerHeight - reserve);
   }
 
   function clamp(panel, height) {
