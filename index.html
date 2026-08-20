@@ -9,8 +9,31 @@
   <link rel="stylesheet" href="style.css?v=20" />
   <script>
     try {
-      document.documentElement.dataset.theme = localStorage.getItem('teamsync_theme') || 'aurora';
+      var _theme = localStorage.getItem('teamsync_theme') || 'aurora';
+      document.documentElement.dataset.theme = _theme;
       document.documentElement.dataset.simpleUi = localStorage.getItem('teamsync_simple_ui') === '0' ? '0' : '1';
+      // Custom tema, --custom-bg/--custom-accent/--custom-button CSS
+      // değişkenlerine bağlı; bunlar sadece JS init'inde (initCustomThemeEditor)
+      // geç ayarlanıyordu, o yüzden ilk karede CSS'teki mor fallback renkler
+      // görünüyor, ardından gerçek renklere geçiyordu. İlk boyamadan önce
+      // burada da uygulayarak bu "mor çakma" (flash) önlenir.
+      if (_theme === 'custom') {
+        var _bg = localStorage.getItem('teamsync_custom_bg') || '#1a1130';
+        var _accent = localStorage.getItem('teamsync_custom_accent') || '#a855f7';
+        var _button = localStorage.getItem('teamsync_custom_button') || _accent;
+        var _root = document.documentElement.style;
+        _root.setProperty('--custom-bg', _bg);
+        _root.setProperty('--custom-accent', _accent);
+        _root.setProperty('--custom-button', _button);
+        var _hex = (_bg || '').replace('#', '');
+        if (_hex.length === 6) {
+          var _chan = function (v) { var x = parseInt(v, 16) / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+          var _lum = 0.2126 * _chan(_hex.slice(0, 2)) + 0.7152 * _chan(_hex.slice(2, 4)) + 0.0722 * _chan(_hex.slice(4, 6));
+          var _isLight = _lum > 0.5;
+          _root.setProperty('--custom-text-main', _isLight ? '#172033' : '#f5f5f5');
+          _root.setProperty('--custom-text-mut', _isLight ? '#5b6472' : '#b7b2c4');
+        }
+      }
     } catch (_) {
       document.documentElement.dataset.simpleUi = '1';
     }
@@ -52,8 +75,8 @@
             <span class="auth-ring auth-ring-2"></span>
             <svg class="auth-fp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"></path><path d="M14 13.12c0 2.38 0 6.38-1 8.88"></path><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"></path><path d="M2 12a10 10 0 0 1 18-6"></path><path d="M2 16h.01"></path><path d="M21.8 16c.2-2 .131-5.354 0-6"></path><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"></path><path d="M8.65 22c.21-.66.45-1.32.57-2"></path><path d="M9 6.8a6 6 0 0 1 9 5.2v2"></path></svg>
           </div>
-          <p id="auth-status-text" class="muted" style="margin: 0 0 16px;">Cihaz kimliği doğrulanıyor...</p>
-          <button id="btn-retry-auth" class="hidden" style="padding: 8px 22px;">Tekrar Dene</button>
+          <p id="auth-status-text" class="muted" style="margin: 0 0 16px;" data-i18n="auth.verifyingDevice">Cihaz kimliği doğrulanıyor...</p>
+          <button id="btn-retry-auth" class="hidden" style="padding: 8px 22px;" data-i18n="auth.retry">Tekrar Dene</button>
         </div>
       </div>
 

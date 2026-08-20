@@ -887,11 +887,12 @@ window.loginWithAccount = function(acc) {
     document.getElementById('my-avatar-default').style.display = 'flex';
   }
   
+  document.getElementById('step-auth').classList.add('hidden');
   document.getElementById('step-accounts').classList.add('hidden');
   document.getElementById('step-name').classList.add('hidden');
   document.getElementById('step-action').classList.remove('hidden');
   document.querySelector('.login-card').classList.add('expanded');
-  
+
   renderFriends();
   setupGlobalMQTT();
 };
@@ -2725,14 +2726,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('step-name').classList.add('hidden');
     document.getElementById('step-auth').classList.remove('hidden');
     if (!supabaseClient) {
-      setAuthStatus('Sunucu yapılandırması eksik (.env dosyasını kontrol edin).', true);
+      setAuthStatus(t('auth.serverConfigMissing'), true);
       return;
     }
     if (!window.electronAPI || !window.electronAPI.getDeviceCredentials) {
-      setAuthStatus('Cihaz kimliği API bulunamadı (preload güncel değil).', true);
+      setAuthStatus(t('auth.deviceApiMissing'), true);
       return;
     }
-    setAuthStatus('Cihaz kimliği doğrulanıyor...');
+    setAuthStatus(t('auth.verifyingDevice'));
     try {
       const creds = await window.electronAPI.getDeviceCredentials(slot);
       let { data, error } = await supabaseClient.auth.signInWithPassword({
@@ -2741,7 +2742,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       });
       if (error) {
         // Bu slotun hesabı henüz yok — bir kez oluşturulur.
-        setAuthStatus('Bu cihaz için yeni hesap oluşturuluyor...');
+        setAuthStatus(t('auth.creatingAccount'));
         const signUpRes = await supabaseClient.auth.signUp({
           email: creds.email,
           password: creds.password,
@@ -2750,14 +2751,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (signUpRes.error) throw signUpRes.error;
         data = signUpRes.data;
         if (!data.session) {
-          throw new Error('Sunucu e-posta onayı bekliyor; Supabase panelinden "Confirm email" kapatılmalı.');
+          throw new Error(t('auth.emailConfirmationPending'));
         }
       }
       localStorage.setItem(ACTIVE_SLOT_KEY, String(slot));
       await loadSupabaseProfile(data.user.id);
     } catch (e) {
       console.error('Device login error:', e);
-      setAuthStatus('Giriş yapılamadı: ' + (e.message || e), true);
+      setAuthStatus(t('auth.loginFailed') + (e.message || e), true);
     }
   }
 
@@ -2865,7 +2866,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!supabaseClient) {
       console.warn("Supabase client is not initialized.");
       document.getElementById('step-auth').classList.remove('hidden');
-      setAuthStatus('Sunucu yapılandırması eksik (.env dosyasını kontrol edin).', true);
+      setAuthStatus(t('auth.serverConfigMissing'), true);
       return;
     }
     try {
@@ -2947,7 +2948,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       console.error("Load profile error:", e);
       showToast(t('toast.profileLoadError') + e.message, "danger");
       document.getElementById('step-auth').classList.remove('hidden');
-      setAuthStatus('Profil yüklenemedi: ' + e.message, true);
+      setAuthStatus(t('auth.profileLoadFailed') + e.message, true);
     }
   }
 
@@ -7135,6 +7136,14 @@ const I18N = {
     'common.optional': '(opsiyonel)',
     'common.you': 'sen',
     'common.messagePlaceholder': 'Mesaj yaz...',
+    'auth.verifyingDevice': 'Cihaz kimliği doğrulanıyor...',
+    'auth.retry': 'Tekrar Dene',
+    'auth.serverConfigMissing': 'Sunucu yapılandırması eksik (.env dosyasını kontrol edin).',
+    'auth.deviceApiMissing': 'Cihaz kimliği API bulunamadı (preload güncel değil).',
+    'auth.creatingAccount': 'Bu cihaz için yeni hesap oluşturuluyor...',
+    'auth.emailConfirmationPending': 'Sunucu e-posta onayı bekliyor; Supabase panelinden "Confirm email" kapatılmalı.',
+    'auth.loginFailed': 'Giriş yapılamadı: ',
+    'auth.profileLoadFailed': 'Profil yüklenemedi: ',
     'menu.join': 'Sunucuya Katıl',
     'menu.joinDesc': 'Bir odaya giriş yap',
     'menu.create': 'Sunucu Oluştur',
@@ -7351,6 +7360,14 @@ const I18N = {
     'common.optional': '(optional)',
     'common.you': 'you',
     'common.messagePlaceholder': 'Write a message...',
+    'auth.verifyingDevice': 'Verifying device identity...',
+    'auth.retry': 'Retry',
+    'auth.serverConfigMissing': 'Server configuration is missing (check the .env file).',
+    'auth.deviceApiMissing': 'Device identity API not found (preload is outdated).',
+    'auth.creatingAccount': 'Creating a new account for this device...',
+    'auth.emailConfirmationPending': 'The server is waiting for email confirmation; disable "Confirm email" in the Supabase dashboard.',
+    'auth.loginFailed': 'Login failed: ',
+    'auth.profileLoadFailed': 'Failed to load profile: ',
     'menu.join': 'Join a Server',
     'menu.joinDesc': 'Enter an existing room',
     'menu.create': 'Create a Server',
