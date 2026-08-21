@@ -1159,6 +1159,50 @@ function renderFriends() {
       flist.appendChild(li);
     });
   }
+  updateFriendsListCap();
+}
+
+// Arkadaş listesi sabit bir max-height'e kilitliyken, panelde bol yer olsa
+// bile ikinci kart ortadan kesiliyordu. Kapak artık kartların gerçek
+// yüksekliğinden hesaplanıyor: FRIENDS_VISIBLE_MAX karta kadar liste büyür,
+// daha fazlasında kaydırmaya geçer. Kart yüksekliği sabit değil (çevrimdışı /
+// "Sunucuda" satırı, dar panelde alta inen aksiyon butonları) — bu yüzden
+// ilk kartların gerçek ölçüsü toplanıyor.
+const FRIENDS_VISIBLE_MAX = 6;
+let friendsPanelObserver = null;
+let friendsPanelWidth = 0;
+
+function updateFriendsListCap() {
+  const list = document.getElementById('friends-list');
+  if (!list) return;
+  const items = Array.from(list.querySelectorAll('.friend-item'));
+  if (!items.length) {
+    list.style.removeProperty('--friends-list-cap');
+    return;
+  }
+  const total = items.slice(0, FRIENDS_VISIBLE_MAX).reduce((sum, item) => {
+    const gap = parseFloat(getComputedStyle(item).marginBottom) || 0;
+    return sum + item.getBoundingClientRect().height + gap;
+  }, 0);
+  if (!total) return;
+  const next = `${Math.ceil(total)}px`;
+  if (list.style.getPropertyValue('--friends-list-cap') !== next) {
+    list.style.setProperty('--friends-list-cap', next);
+  }
+  // Panel daralınca kartlar iki satıra iniyor (container query) ve kapak
+  // eskiyor. Yalnızca genişlik değişimini dinliyoruz; yüksekliği dinlemek
+  // kendi yazdığımız kapakla ResizeObserver döngüsü yaratırdı.
+  if (!friendsPanelObserver && typeof ResizeObserver === 'function') {
+    const section = list.closest('.menu-friends-section');
+    if (!section) return;
+    friendsPanelObserver = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect.width || 0;
+      if (Math.abs(width - friendsPanelWidth) < 1) return;
+      friendsPanelWidth = width;
+      updateFriendsListCap();
+    });
+    friendsPanelObserver.observe(section);
+  }
 }
 
 window.showFriendProfile = (fId) => {

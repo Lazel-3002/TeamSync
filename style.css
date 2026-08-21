@@ -972,7 +972,15 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 160px;
+  /* Sabit 160px'lik kapak, panelde bol yer varken ikinci kartı bile ortadan
+     kesiyordu. Liste artık doğal boyunda duruyor; --friends-list-cap
+     (renderer.js, ilk 6 kartın gerçek yüksekliği) veya panelin kalan
+     yüksekliği aşıldığında kaydırmaya geçiyor. flex: 0 1 auto + min-height: 0
+     ikilisi, DM açıkken panel kısaldığında listenin taşmadan küçülmesini
+     sağlıyor. */
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: var(--friends-list-cap, 420px);
   overflow-y: auto;
   overflow-x: hidden;
   font-size: 13px;
@@ -1264,11 +1272,24 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .msg .n { font-weight: 600; color: var(--acc-light); }
 .msg .t { color: var(--txt-mut); font-size: 11px; margin-left: 8px; }
 .msg div { margin-top: 4px; line-height: 1.4; }
+/* "×N" tekrar rozeti hem oda sohbetinde (koyu balon) hem DM'de gönderilen
+   balonun içinde (vurgu rengiyle dolu zemin, beyaz metin) görünüyor. Sabit
+   var(--txt-mut) + 0.5 opaklık, vurgu rengi değiştirilince balonun içinde
+   kayboluyordu. Artık bulunduğu balonun metin rengini miras alıyor ve nötr
+   koyu bir çip zemini alıyor; böylece her palette okunur kalıyor. */
 .msg-repeat-badge {
-  color: var(--txt-mut);
-  opacity: 0.5;
+  display: inline-block;
+  color: inherit;
+  opacity: 0.85;
+  /* Nötr koyu bir zemin: vurgu rengi ne olursa olsun (yeşil, sarı, açık ton)
+     balonun o bölgesini koyultup miras alınan metin rengini öne çıkarır. */
+  background: rgba(0, 0, 0, 0.18);
+  padding: 0 6px;
+  border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.55;
+  vertical-align: baseline;
   margin-left: 6px;
 }
 
