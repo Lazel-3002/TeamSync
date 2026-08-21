@@ -231,6 +231,33 @@ function unoRenderPile(hideTop) {
   return topOuter;
 }
 
+// Yön değişti (Ters kart): masanın ortasında oyunun GÜNCEL yönünü gösteren
+// büyük ↻/↺ işareti belirip büyüyerek kaybolur (aynı glif, küçük yön
+// göstergesiyle aynı — yön karışıklığı olmasın diye).
+function unoDirectionEffect() {
+  const center = document.querySelector('#uno-game .u-center');
+  if (!center) return;
+  const fx = document.createElement('div');
+  fx.className = 'u-dir-fx';
+  fx.textContent = state.uno.dir === 1 ? '↻' : '↺';
+  center.appendChild(fx);
+  setTimeout(() => { try { fx.remove(); } catch (e) {} }, 900);
+}
+
+// Engel (⊘) kartıyla bloklanan oyuncunun üstüne kısa süreli "BLOK!" damgası +
+// sallanma efekti bindir.
+function unoBlockEffect(pid) {
+  const el = unoActorEl(pid);
+  if (!el) return;
+  el.classList.remove('u-blocked-shake'); void el.offsetWidth; el.classList.add('u-blocked-shake');
+  const stamp = document.createElement('div');
+  stamp.className = 'u-block-stamp';
+  stamp.textContent = 'BLOK!';
+  el.appendChild(stamp);
+  setTimeout(() => { try { stamp.remove(); } catch (e) {} }, 850);
+  setTimeout(() => { try { el.classList.remove('u-blocked-shake'); } catch (e) {} }, 500);
+}
+
 function unoRenderGame() {
   unoShowView('uno-game');
 
@@ -305,6 +332,11 @@ function unoRenderGame() {
       dirEl.classList.remove('u-spin'); void dirEl.offsetWidth; dirEl.classList.add('u-spin');
     }
   }
+
+  // Ters kart → yön değişti: dönen ok halkası efekti.
+  if (events.some(e => e.kind === 'reverse')) unoDirectionEffect();
+  // Engel kartı (ya da 2 kişide Ters) → bloklanan oyuncuya damga + sallanma.
+  events.filter(e => e.kind === 'skip').forEach(e => unoBlockEffect(e.actorId));
 
   const deckEl = document.getElementById('uno-deck');
   if (deckEl) {
@@ -689,12 +721,23 @@ function unoHostApplyPlay(pid, card, chosenColor) {
 
   switch (played.value) {
     case 'reverse':
-      if (n === 2) { unoHostAdvance(2); }           // 2 kişide ters = engel
-      else { state.uno.dir *= -1; unoHostAdvance(1); }
+      if (n === 2) {
+        // 2 kişide ters = engel: yön hiç değişmez.
+        const victim = state.uno.players[unoPlayerIndexAt(1)];
+        state.uno.events.push({ kind: 'skip', actorId: victim.id });
+        unoHostAdvance(2);
+      } else {
+        state.uno.dir *= -1;
+        unoHostAdvance(1);
+      }
+      state.uno.events.push({ kind: 'reverse' });
       break;
-    case 'skip':
+    case 'skip': {
+      const victim = state.uno.players[unoPlayerIndexAt(1)];
+      state.uno.events.push({ kind: 'skip', actorId: victim.id });
       unoHostAdvance(2);
       break;
+    }
     case 'draw2': {
       if (unoPenaltyIsPending()) {
         // Kombo/blok açık: kurban hemen çekmez; yanıt hakkıyla sırayı devralır.

@@ -7414,7 +7414,7 @@ input:checked + .slider:before {
 /* --- Masa --- */
 #uno-game { padding: 12px; }
 .u-opponents { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; padding: 8px; min-height: 80px; }
-.u-opp { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 14px; transition: background 0.25s ease, box-shadow 0.25s ease; animation: uChip 0.3s ease backwards; }
+.u-opp { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 14px; transition: background 0.25s ease, box-shadow 0.25s ease; animation: uChip 0.3s ease backwards; }
 .u-opp.turn { background: rgba(245,197,24,0.14); animation: uTurnPulse 1.5s ease-in-out infinite; }
 .u-opp-fan { display: flex; height: 24px; align-items: flex-start; }
 .u-mini-back { width: 15px; height: 22px; margin-left: -8px; border-radius: 3px; background: linear-gradient(135deg, #26365a, #0f1830); border: 1px solid rgba(255,255,255,0.45); box-shadow: 0 2px 3px rgba(0,0,0,0.4); }
@@ -7431,6 +7431,34 @@ input:checked + .slider:before {
 .u-turn.me { color: #0a1120; background: linear-gradient(135deg, #fde047, #f59e0b); font-weight: 900; animation: uMePulse 1.2s ease-in-out infinite; }
 .u-dir { font-size: 26px; opacity: 0.9; display: inline-block; }
 .u-dir.u-spin { animation: uSpin 0.6s ease; }
+
+/* --- Yön değişimi (Ters) efekti: küçük yön rozetiyle AYNI glif, büyük --- */
+.u-dir-fx { position: absolute; left: 50%; top: 50%; pointer-events: none; z-index: 260; font-size: 150px; font-weight: 900; line-height: 1; color: #f5c518; text-shadow: 0 0 6px #fff, 0 0 26px rgba(245,197,24,0.95), 0 0 55px rgba(245,197,24,0.6), 0 3px 8px rgba(0,0,0,0.6); animation: uDirBig 0.9s cubic-bezier(0.2,0.9,0.3,1) forwards; }
+@keyframes uDirBig {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.3); }
+  30%  { opacity: 1; transform: translate(-50%,-50%) scale(1.15); }
+  50%  { transform: translate(-50%,-50%) scale(1); }
+  80%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(1.3); }
+}
+
+/* --- Engel (⊘) blok efekti: sallanma + kırmızı damga --- */
+.u-blocked-shake { animation: uBlockShake 0.5s ease; }
+.u-block-stamp { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) rotate(-14deg) scale(0.4); z-index: 270; padding: 4px 14px; border: 3px solid #e4322b; border-radius: 8px; color: #e4322b; font-size: 18px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; background: rgba(10,17,32,0.55); pointer-events: none; animation: uBlockStamp 0.85s cubic-bezier(0.3,1.4,0.4,1) forwards; }
+@keyframes uBlockStamp {
+  0%   { opacity: 0; transform: translate(-50%,-50%) rotate(-14deg) scale(0.4); }
+  30%  { opacity: 1; transform: translate(-50%,-50%) rotate(-14deg) scale(1.15); }
+  45%  { transform: translate(-50%,-50%) rotate(-14deg) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%,-50%) rotate(-14deg) scale(1); }
+}
+@keyframes uBlockShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px) rotate(-2deg); }
+  40% { transform: translateX(6px) rotate(2deg); }
+  60% { transform: translateX(-5px) rotate(-1deg); }
+  80% { transform: translateX(4px) rotate(1deg); }
+}
 .u-color-badge { padding: 4px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #111; transition: background 0.35s ease; }
 .u-color-badge.red { background: #d9282f; color: #fff; }
 .u-color-badge.yellow { background: #f4b41a; }
@@ -7464,7 +7492,7 @@ input:checked + .slider:before {
 .u-pile-card > .u-card.wild, .u-pile-card > .u-card.back { box-shadow: 0 5px 12px rgba(0,0,0,0.6); }
 .u-pile-hidden { visibility: hidden; }
 
-.u-hand { display: flex; justify-content: center; align-items: flex-end; padding: 20px 10px 8px; overflow-x: auto; overflow-y: visible; min-height: 150px; }
+.u-hand { position: relative; display: flex; justify-content: center; align-items: flex-end; padding: 20px 10px 8px; overflow-x: auto; overflow-y: visible; min-height: 150px; }
 .u-hand .u-card { margin-left: -20px; cursor: pointer; }
 .u-hand .u-card:first-child { margin-left: 0; }
 .u-hand .u-card.playable { box-shadow: 0 6px 14px rgba(0,0,0,0.5), inset 0 0 0 4px #fff, 0 0 0 3px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.3); }
@@ -7520,8 +7548,9 @@ input:checked + .slider:before {
   .u-hand { min-height: 120px; padding-top: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .u-deal-in, .u-slam, .u-start, .u-opp.turn, .u-turn.me, .u-card.back.u-actionable, .u-over-trophy, .u-confetti { animation: none !important; }
+  .u-deal-in, .u-slam, .u-start, .u-opp.turn, .u-turn.me, .u-card.back.u-actionable, .u-over-trophy, .u-confetti, .u-dir-fx, .u-blocked-shake, .u-block-stamp { animation: none !important; }
   .u-fly { transition: none !important; }
+  .u-dir-fx, .u-block-stamp { display: none !important; }
 }
 
 
