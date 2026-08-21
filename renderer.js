@@ -8496,11 +8496,27 @@ function applyCustomThemeColors({ bg, accent, button }, persist = false) {
   }
 }
 
-function markActiveCustomPreset(bg) {
-  const target = (bg || '').toLowerCase();
-  document.querySelectorAll('.settings-theme-preset-swatch[data-preset-kind="custom"], .settings-theme-preset-swatch[data-preset-kind="saved"]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.presetBg === target);
-  });
+// Önizleme sırasında tema henüz localStorage'a yazılmamış olabilir; seçili
+// kartı işaretlerken kaydedilmiş değeri değil, o an ekranda uygulanan temayı
+// esas al.
+function getActiveTheme() {
+  const live = document.documentElement.dataset.theme;
+  return APP_THEMES.has(live) ? live : getUserTheme();
+}
+
+// Aynı şekilde renkler de kaydedilmeden önce sadece editördeki inputlarda
+// durur; kart eşleştirmesi bu canlı değerlerle yapılmalı.
+function getEditorColors() {
+  const stored = getCustomThemeColors();
+  const read = (id, fallback) => {
+    const value = document.getElementById(id)?.value;
+    return PALETTE_HEX_RE.test(value || '') ? value.toLowerCase() : fallback.toLowerCase();
+  };
+  return {
+    bg: read('settings-custom-bg', stored.bg),
+    accent: read('settings-custom-accent', stored.accent),
+    button: read('settings-custom-button', stored.button)
+  };
 }
 
 function getThemePresetLabel(preset) {
@@ -8621,17 +8637,27 @@ function applyPaletteToEditor({ bg, accent, button }) {
   setValue('settings-custom-accent-hex', accent.toUpperCase());
   setValue('settings-custom-button-hex', button.toUpperCase());
   applyCustomThemeColors({ bg, accent, button });
-  markActiveCustomPreset(bg);
   applyUserTheme('custom');
 }
 
-function markActiveThemePreset(theme = getUserTheme()) {
-  const colors = getCustomThemeColors();
-  document.querySelectorAll('#settings-theme-presets .settings-theme-preset-swatch, #settings-saved-palettes .settings-theme-preset-swatch').forEach(btn => {
-    const active = btn.dataset.presetKind === 'builtin'
-      ? btn.dataset.presetTheme === theme
-      : theme === 'custom' && btn.dataset.presetBg === colors.bg.toLowerCase();
-    btn.classList.toggle('active', active);
+// Hazır preset / kayıtlı palet kartlarına basınca tema "custom"a geçtiği için
+// eskiden "Kendi Temam" kartı seçili görünüyordu. Doğrusu: özel temadayken
+// renkleri birebir tutan palet kartı seçili olsun; hiçbiri tutmuyorsa (kullanıcı
+// renkleri elle değiştirmişse) seçim "Kendi Temam" kartına düşsün.
+function markActiveThemePreset(theme = getActiveTheme()) {
+  const colors = getEditorColors();
+  const cards = Array.from(document.querySelectorAll('#settings-theme-presets .settings-theme-preset-swatch, #settings-saved-palettes .settings-theme-preset-swatch'));
+  const matchesColors = card => card.dataset.presetBg === colors.bg
+    && card.dataset.presetAccent === colors.accent
+    && card.dataset.presetButton === colors.button;
+  const paletteMatch = theme === 'custom'
+    ? cards.find(card => card.dataset.presetKind !== 'builtin' && matchesColors(card))
+    : null;
+  cards.forEach(card => {
+    const active = card.dataset.presetKind === 'builtin'
+      ? card.dataset.presetTheme === theme && (theme !== 'custom' || !paletteMatch)
+      : card === paletteMatch;
+    card.classList.toggle('active', active);
   });
 }
 
@@ -8678,6 +8704,8 @@ function createPaletteCard(preset, kind) {
   btn.dataset.presetKind = kind;
   if (preset.theme) btn.dataset.presetTheme = preset.theme;
   btn.dataset.presetBg = preset.bg.toLowerCase();
+  btn.dataset.presetAccent = preset.accent.toLowerCase();
+  btn.dataset.presetButton = preset.button.toLowerCase();
 
   const dot = document.createElement('span');
   dot.className = 'settings-theme-preset-dot';
@@ -8753,14 +8781,14 @@ function initCustomThemeEditor() {
   if (accentHex) accentHex.value = accent.toUpperCase();
   if (buttonHex) buttonHex.value = button.toUpperCase();
   applyCustomThemeColors({ bg, accent, button });
-  markActiveCustomPreset(bg);
+  markActiveThemePreset();
 
   const HEX_RE = /^#[0-9a-f]{6}$/i;
   const sync = () => {
     const colors = { bg: bgInput?.value || bg, accent: accentInput?.value || accent, button: buttonInput?.value || button };
     applyCustomThemeColors(colors);
-    markActiveCustomPreset(colors.bg);
     if (getUserTheme() === 'custom' || document.documentElement.dataset.theme === 'custom') applyUserTheme('custom');
+    else markActiveThemePreset();
   };
   bgInput?.addEventListener('input', () => { if (bgHex) bgHex.value = bgInput.value.toUpperCase(); sync(); });
   accentInput?.addEventListener('input', () => { if (accentHex) accentHex.value = accentInput.value.toUpperCase(); sync(); });
