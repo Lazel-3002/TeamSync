@@ -2012,6 +2012,7 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .mini-preview-actions button { width: 44px; height: 15px; border: 0; border-radius: 5px; background: var(--custom-button, #8b5cf6); box-shadow: 0 3px 8px color-mix(in srgb, var(--custom-button, #8b5cf6) 45%, transparent); }
 .settings-theme-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
 .settings-theme-preset-swatch {
+  position: relative;
   min-width: 0; display: grid; justify-items: stretch; gap: 8px; padding: 8px; border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--txt-main) 10%, transparent);
   background: color-mix(in srgb, var(--bg-dark) 86%, var(--txt-main) 5%); color: var(--txt-main);
@@ -2021,7 +2022,59 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .settings-theme-preset-swatch:focus-visible { outline: 3px solid color-mix(in srgb, var(--acc-light) 55%, transparent); outline-offset: 2px; }
 .settings-theme-preset-swatch.active { border-color: var(--acc-light); background: color-mix(in srgb, var(--acc) 16%, transparent); }
 .settings-theme-preset-dot { width: 100%; height: 38px; border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 4px 10px rgba(0,0,0,.16); }
-.settings-theme-preset-name { min-width: 0; overflow: hidden; font-size: 10px; font-weight: 800; color: var(--txt-main); text-align: left; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.settings-theme-preset-name { min-width: 0; padding-right: 20px; overflow: hidden; font-size: 10px; font-weight: 800; color: var(--txt-main); text-align: left; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Kart rozetleri: sağ altta favori yıldızı, sağ üstte (yalnız kayıtlı
+   paletlerde) silme çarpısı. Kartın kendisi <button> olduğundan bunlar
+   span + role="button"; tıklama kartın "paleti uygula" davranışına düşmez. */
+.settings-theme-preset-star, .settings-theme-preset-del {
+  position: absolute; display: grid; place-items: center;
+  width: 19px; height: 19px; border-radius: 50%;
+  cursor: pointer; line-height: 1; user-select: none;
+  transition: color .15s ease, background .15s ease, transform .15s ease, opacity .15s ease;
+}
+.settings-theme-preset-star {
+  right: 5px; bottom: 5px; font-size: 12px;
+  color: color-mix(in srgb, var(--txt-main) 42%, transparent);
+}
+.settings-theme-preset-swatch:hover .settings-theme-preset-star { color: color-mix(in srgb, var(--txt-main) 68%, transparent); }
+.settings-theme-preset-star:hover { transform: scale(1.18); background: color-mix(in srgb, var(--txt-main) 12%, transparent); color: #fbbf24; }
+.settings-theme-preset-star.active, .settings-theme-preset-swatch:hover .settings-theme-preset-star.active {
+  color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, .55);
+}
+.settings-theme-preset-star:focus-visible, .settings-theme-preset-del:focus-visible { outline: 2px solid var(--acc-light); outline-offset: 1px; }
+.settings-theme-preset-del {
+  right: 5px; top: 5px; font-size: 10px; opacity: 0;
+  color: var(--txt-mut); background: color-mix(in srgb, var(--bg-dark) 78%, transparent);
+}
+.settings-theme-preset-swatch:hover .settings-theme-preset-del,
+.settings-theme-preset-swatch:focus-within .settings-theme-preset-del { opacity: 1; }
+.settings-theme-preset-del:hover { color: #fff; background: var(--danger); transform: scale(1.12); }
+
+/* Güncel renkleri isimlendirip kaydetme satırı. */
+.settings-theme-save-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.settings-theme-palette-name {
+  flex: 1; min-width: 0; padding: 9px 11px; border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--txt-main) 14%, transparent);
+  background: color-mix(in srgb, var(--txt-main) 5%, transparent);
+  color: var(--txt-main); font-size: 12px; font-family: inherit;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.settings-theme-palette-name::placeholder { color: var(--txt-mut); }
+.settings-theme-palette-name:focus { outline: none; border-color: var(--acc-light); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 24%, transparent); }
+.settings-theme-save-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 14px; border-radius: 9px; border: 0; cursor: pointer;
+  background: linear-gradient(135deg, var(--acc), var(--acc-hover));
+  color: #fff; font-size: 12px; font-weight: 800; font-family: inherit;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--acc) 32%, transparent);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.settings-theme-save-btn span:first-child { font-size: 13px; line-height: 1; }
+.settings-theme-save-btn:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 9px 22px color-mix(in srgb, var(--acc) 40%, transparent); }
+.settings-theme-save-btn:active { transform: translateY(0); }
+.settings-theme-save-btn:focus-visible { outline: 3px solid color-mix(in srgb, var(--acc-light) 55%, transparent); outline-offset: 2px; }
+
 @media (max-width: 560px) {
   .settings-theme-presets { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .settings-theme-preset-swatch { padding: 7px; border-radius: 11px; }
@@ -8242,6 +8295,8 @@ input:checked + .slider:before {
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-custom-swatch-wrap, :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-custom-mini-preview { border-color: rgba(31,41,55,.14); }
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-preset-swatch { border-color: rgba(31,41,55,.1); background: rgba(255,255,255,.55); }
 :root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-preset-swatch:hover { border-color: rgba(31,41,55,.25); background: #fff; }
+:root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-palette-name { color: #172033; background: #fff; border-color: #d9dfeb; }
+:root:is([data-theme="white"],[data-theme="violet"]) .settings-theme-preset-del { background: rgba(255,255,255,.9); border: 1px solid rgba(31,41,55,.14); }
 /* Ana menü: koyu temalar için düşünülmüş yarı saydam beyaz kaplamalar (rgba
    255,255,255,.0X) beyaz temada görünmez/kontrastsız kalıyordu — butonların
    ve panellerin kenarlığı seçilemiyordu. Beyaz temaya özgü koyu-tonlu karşılıkları. */

@@ -1502,6 +1502,16 @@
                   </div>
                 </div>
                 <div class="settings-theme-palette-list">
+                  <div class="settings-theme-save-row">
+                    <input type="text" id="settings-palette-name" class="settings-theme-palette-name" maxlength="24" spellcheck="false" autocomplete="off" placeholder="Palet adı" data-i18n-placeholder="settings.themePaletteName" data-i18n-title="settings.themePaletteName">
+                    <button type="button" id="settings-palette-save" class="settings-theme-save-btn">
+                      <span aria-hidden="true">★</span><span data-i18n="settings.themeSavePalette">Paleti kaydet</span>
+                    </button>
+                  </div>
+                  <div id="settings-saved-block" hidden>
+                    <p class="settings-help" data-i18n="settings.themeSavedPalettes">Kaydedilmiş paletlerim:</p>
+                    <div class="settings-theme-presets" id="settings-saved-palettes"></div>
+                  </div>
                   <p class="settings-help" data-i18n="settings.themeCustomPresets">Hazır presetler:</p>
                   <div class="settings-theme-presets" id="settings-theme-presets"></div>
                 </div>
@@ -2347,6 +2357,7 @@
   <script src="js/media-library.js"></script>
   <script src="js/media-collect.js"></script>
   <script src="js/dm-resize.js"></script>
+  <script src="js/color-picker.js"></script>
   <script src="js/whiteboard.js"></script>
   <script src="js/watch-together.js"></script>
   <script src="js/shared-browser.js"></script>
