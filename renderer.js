@@ -1162,6 +1162,50 @@ function renderFriends() {
       flist.appendChild(li);
     });
   }
+  updateFriendsListCap();
+}
+
+// Arkadaş listesi sabit bir max-height'e kilitliyken, panelde bol yer olsa
+// bile ikinci kart ortadan kesiliyordu. Kapak artık kartların gerçek
+// yüksekliğinden hesaplanıyor: FRIENDS_VISIBLE_MAX karta kadar liste büyür,
+// daha fazlasında kaydırmaya geçer. Kart yüksekliği sabit değil (çevrimdışı /
+// "Sunucuda" satırı, dar panelde alta inen aksiyon butonları) — bu yüzden
+// ilk kartların gerçek ölçüsü toplanıyor.
+const FRIENDS_VISIBLE_MAX = 6;
+let friendsPanelObserver = null;
+let friendsPanelWidth = 0;
+
+function updateFriendsListCap() {
+  const list = document.getElementById('friends-list');
+  if (!list) return;
+  const items = Array.from(list.querySelectorAll('.friend-item'));
+  if (!items.length) {
+    list.style.removeProperty('--friends-list-cap');
+    return;
+  }
+  const total = items.slice(0, FRIENDS_VISIBLE_MAX).reduce((sum, item) => {
+    const gap = parseFloat(getComputedStyle(item).marginBottom) || 0;
+    return sum + item.getBoundingClientRect().height + gap;
+  }, 0);
+  if (!total) return;
+  const next = `${Math.ceil(total)}px`;
+  if (list.style.getPropertyValue('--friends-list-cap') !== next) {
+    list.style.setProperty('--friends-list-cap', next);
+  }
+  // Panel daralınca kartlar iki satıra iniyor (container query) ve kapak
+  // eskiyor. Yalnızca genişlik değişimini dinliyoruz; yüksekliği dinlemek
+  // kendi yazdığımız kapakla ResizeObserver döngüsü yaratırdı.
+  if (!friendsPanelObserver && typeof ResizeObserver === 'function') {
+    const section = list.closest('.menu-friends-section');
+    if (!section) return;
+    friendsPanelObserver = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect.width || 0;
+      if (Math.abs(width - friendsPanelWidth) < 1) return;
+      friendsPanelWidth = width;
+      updateFriendsListCap();
+    });
+    friendsPanelObserver.observe(section);
+  }
 }
 
 window.showFriendProfile = (fId) => {
@@ -7256,6 +7300,15 @@ const I18N = {
     'settings.themeCustomAccent': 'Vurgu rengi',
     'settings.themeCustomButton': 'Buton rengi',
     'settings.themeCustomPresets': 'Hazır presetler:',
+    'settings.themeSavedPalettes': 'Kaydedilmiş paletlerim:',
+    'settings.themeSavePalette': 'Paleti kaydet',
+    'settings.themePaletteName': 'Palet adı',
+    'settings.themePaletteSaved': 'kaydedildi',
+    'settings.themePaletteFallback': 'Palet',
+    'settings.themeFavorite': 'Favorilere ekle',
+    'settings.themeUnfavorite': 'Favorilerden çıkar',
+    'settings.themeDeletePalette': 'Paleti sil',
+    'settings.themeUsePalette': 'renk paletini kullan',
     'settings.themeHint': 'Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.',
     'settings.voice': 'Ses ve Görüntü',
     'settings.voiceLead': 'Mikrofon ve hoparlör cihazlarını, ses seviyelerini ve konuşma biçimini ayarla.',
@@ -7486,6 +7539,15 @@ const I18N = {
     'settings.themeCustomAccent': 'Accent color',
     'settings.themeCustomButton': 'Button color',
     'settings.themeCustomPresets': 'Ready-made presets:',
+    'settings.themeSavedPalettes': 'My saved palettes:',
+    'settings.themeSavePalette': 'Save palette',
+    'settings.themePaletteName': 'Palette name',
+    'settings.themePaletteSaved': 'saved',
+    'settings.themePaletteFallback': 'Palette',
+    'settings.themeFavorite': 'Add to favorites',
+    'settings.themeUnfavorite': 'Remove from favorites',
+    'settings.themeDeletePalette': 'Delete palette',
+    'settings.themeUsePalette': 'color palette, apply',
     'settings.themeHint': 'Preview your choice, then select Save to keep it.',
     'settings.voice': 'Voice & Video',
     'settings.voiceLead': 'Choose microphone and speaker devices, volume levels, and voice behavior.',
@@ -8469,11 +8531,27 @@ function applyCustomThemeColors({ bg, accent, button }, persist = false) {
   }
 }
 
-function markActiveCustomPreset(bg) {
-  const target = (bg || '').toLowerCase();
-  document.querySelectorAll('.settings-theme-preset-swatch[data-preset-kind="custom"]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.presetBg === target);
-  });
+// Önizleme sırasında tema henüz localStorage'a yazılmamış olabilir; seçili
+// kartı işaretlerken kaydedilmiş değeri değil, o an ekranda uygulanan temayı
+// esas al.
+function getActiveTheme() {
+  const live = document.documentElement.dataset.theme;
+  return APP_THEMES.has(live) ? live : getUserTheme();
+}
+
+// Aynı şekilde renkler de kaydedilmeden önce sadece editördeki inputlarda
+// durur; kart eşleştirmesi bu canlı değerlerle yapılmalı.
+function getEditorColors() {
+  const stored = getCustomThemeColors();
+  const read = (id, fallback) => {
+    const value = document.getElementById(id)?.value;
+    return PALETTE_HEX_RE.test(value || '') ? value.toLowerCase() : fallback.toLowerCase();
+  };
+  return {
+    bg: read('settings-custom-bg', stored.bg),
+    accent: read('settings-custom-accent', stored.accent),
+    button: read('settings-custom-button', stored.button)
+  };
 }
 
 function getThemePresetLabel(preset) {
@@ -8490,79 +8568,239 @@ function getAllThemePresets() {
   ];
 }
 
-function markActiveThemePreset(theme = getUserTheme()) {
-  const colors = getCustomThemeColors();
-  document.querySelectorAll('#settings-theme-presets .settings-theme-preset-swatch').forEach(btn => {
-    const active = btn.dataset.presetKind === 'builtin'
-      ? btn.dataset.presetTheme === theme
-      : theme === 'custom' && btn.dataset.presetBg === colors.bg.toLowerCase();
-    btn.classList.toggle('active', active);
+// Kullanıcının kendi kaydettiği paletler ve favoriye alınan palet kimlikleri.
+// Favoriler hem hazır preset ızgarasında hem de kayıtlı paletlerde en öne alınır.
+const SAVED_PALETTES_KEY = 'teamsync_saved_palettes';
+const FAVORITE_PALETTES_KEY = 'teamsync_favorite_palettes';
+const SAVED_PALETTES_MAX = 60;
+const PALETTE_HEX_RE = /^#[0-9a-f]{6}$/i;
+
+function readStoredList(key) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function writeStoredList(key, list) {
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch { /* kota dolabilir, sessiz geç */ }
+}
+
+function getSavedPalettes() {
+  return readStoredList(SAVED_PALETTES_KEY).filter(palette => palette
+    && typeof palette.id === 'string'
+    && PALETTE_HEX_RE.test(palette.bg || '')
+    && PALETTE_HEX_RE.test(palette.accent || '')
+    && PALETTE_HEX_RE.test(palette.button || ''));
+}
+
+function getFavoritePalettes() {
+  return readStoredList(FAVORITE_PALETTES_KEY).filter(id => typeof id === 'string');
+}
+
+function isFavoritePalette(id) {
+  return getFavoritePalettes().includes(id);
+}
+
+// Favori dizisinin kendi sırası korunur: en son favorilenen en başa geçer,
+// favori olmayanlar kendi aralarındaki özgün sırayla arkada kalır.
+function sortPalettesByFavorite(list) {
+  const favorites = getFavoritePalettes();
+  const rank = id => {
+    const index = favorites.indexOf(id);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  return list
+    .map((preset, index) => ({ preset, index }))
+    .sort((a, b) => rank(a.preset.id) - rank(b.preset.id) || a.index - b.index)
+    .map(item => item.preset);
+}
+
+function toggleFavoritePalette(id) {
+  // Kartlar baştan kurulduğu için klavyeyle yıldızlayan kullanıcının odağı
+  // kaybolmasın: aynı paletin yıldızına geri veriyoruz.
+  const active = document.activeElement;
+  const keepFocus = active?.classList.contains('settings-theme-preset-star')
+    && active.closest('.settings-theme-preset-swatch')?.dataset.presetId === id;
+  const favorites = getFavoritePalettes();
+  writeStoredList(FAVORITE_PALETTES_KEY, favorites.includes(id)
+    ? favorites.filter(item => item !== id)
+    : [id, ...favorites]);
+  renderSavedPalettes();
+  renderCustomThemePresets();
+  if (keepFocus) {
+    document.querySelector(`.settings-theme-preset-swatch[data-preset-id="${CSS.escape(id)}"] .settings-theme-preset-star`)?.focus();
+  }
+}
+
+// Düzenleyicideki güncel renkleri isimlendirilmiş bir palet olarak saklar.
+function saveCurrentPalette(rawName) {
+  const current = getCustomThemeColors();
+  const colors = {
+    bg: document.getElementById('settings-custom-bg')?.value || current.bg,
+    accent: document.getElementById('settings-custom-accent')?.value || current.accent,
+    button: document.getElementById('settings-custom-button')?.value || current.button
+  };
+  const list = getSavedPalettes();
+  const name = String(rawName || '').trim().slice(0, 24) || `${t('settings.themePaletteFallback')} ${list.length + 1}`;
+  const palette = {
+    id: `saved-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    ...colors,
+    savedAt: Date.now()
+  };
+  writeStoredList(SAVED_PALETTES_KEY, [palette, ...list].slice(0, SAVED_PALETTES_MAX));
+  renderSavedPalettes();
+  return palette;
+}
+
+function deleteSavedPalette(id) {
+  writeStoredList(SAVED_PALETTES_KEY, getSavedPalettes().filter(palette => palette.id !== id));
+  const favorites = getFavoritePalettes();
+  if (favorites.includes(id)) writeStoredList(FAVORITE_PALETTES_KEY, favorites.filter(item => item !== id));
+  renderSavedPalettes();
+  renderCustomThemePresets();
+}
+
+// Bir paleti düzenleyiciye yazar, canlı uygular ve özel temaya geçer.
+function applyPaletteToEditor({ bg, accent, button }) {
+  const setValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+  setValue('settings-custom-bg', bg);
+  setValue('settings-custom-accent', accent);
+  setValue('settings-custom-button', button);
+  setValue('settings-custom-bg-hex', bg.toUpperCase());
+  setValue('settings-custom-accent-hex', accent.toUpperCase());
+  setValue('settings-custom-button-hex', button.toUpperCase());
+  applyCustomThemeColors({ bg, accent, button });
+  applyUserTheme('custom');
+}
+
+// Hazır preset / kayıtlı palet kartlarına basınca tema "custom"a geçtiği için
+// eskiden "Kendi Temam" kartı seçili görünüyordu. Doğrusu: özel temadayken
+// renkleri birebir tutan palet kartı seçili olsun; hiçbiri tutmuyorsa (kullanıcı
+// renkleri elle değiştirmişse) seçim "Kendi Temam" kartına düşsün.
+function markActiveThemePreset(theme = getActiveTheme()) {
+  const colors = getEditorColors();
+  const cards = Array.from(document.querySelectorAll('#settings-theme-presets .settings-theme-preset-swatch, #settings-saved-palettes .settings-theme-preset-swatch'));
+  const matchesColors = card => card.dataset.presetBg === colors.bg
+    && card.dataset.presetAccent === colors.accent
+    && card.dataset.presetButton === colors.button;
+  const paletteMatch = theme === 'custom'
+    ? cards.find(card => card.dataset.presetKind !== 'builtin' && matchesColors(card))
+    : null;
+  cards.forEach(card => {
+    const active = card.dataset.presetKind === 'builtin'
+      ? card.dataset.presetTheme === theme && (theme !== 'custom' || !paletteMatch)
+      : card === paletteMatch;
+    card.classList.toggle('active', active);
   });
 }
 
+// Dil değişince preset adları, yıldız ve silme rozetlerinin ipuçları da
+// yeniden çevrilmeli; kartları baştan kurmak tek elden en tutarlısı.
 function refreshCustomThemePresetLabels() {
-  const presets = getAllThemePresets();
-  document.querySelectorAll('#settings-theme-presets .settings-theme-preset-swatch').forEach(btn => {
-    const preset = presets.find(item => item.id === btn.dataset.presetId);
-    if (!preset) return;
-    const label = getThemePresetLabel(preset);
-    const name = btn.querySelector('.settings-theme-preset-name');
-    if (name) name.textContent = label;
-    btn.title = label;
-    btn.setAttribute('aria-label', `${label} renk paletini kullan`);
+  renderCustomThemePresets();
+  renderSavedPalettes();
+}
+
+// Kart içindeki rozetler (yıldız, çöp kutusu) <button> içinde yer aldığı için
+// span + role="button" olarak kuruluyor; iç içe <button> geçersiz olurdu.
+function createPaletteBadge({ className, glyph, label, pressed, onActivate }) {
+  const badge = document.createElement('span');
+  badge.className = className;
+  badge.textContent = glyph;
+  badge.setAttribute('role', 'button');
+  badge.tabIndex = 0;
+  badge.title = label;
+  badge.setAttribute('aria-label', label);
+  if (pressed !== undefined) badge.setAttribute('aria-pressed', String(pressed));
+  const activate = event => {
+    event.preventDefault();
+    event.stopPropagation();   // kartın "paleti uygula" tıklaması tetiklenmesin
+    onActivate();
+  };
+  badge.addEventListener('click', activate);
+  badge.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') activate(event);
   });
+  return badge;
+}
+
+// Hazır presetler, yerleşik temalar ve kullanıcının kaydettiği paletler aynı
+// kartı paylaşır; tek fark kaydedilmiş paletlerin silme rozeti olması.
+function createPaletteCard(preset, kind) {
+  const label = kind === 'saved' ? preset.name : getThemePresetLabel(preset);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'settings-theme-preset-swatch';
+  btn.title = label;
+  btn.setAttribute('aria-label', `${label} ${t('settings.themeUsePalette')}`);
+  btn.dataset.presetId = preset.id;
+  btn.dataset.presetKind = kind;
+  if (preset.theme) btn.dataset.presetTheme = preset.theme;
+  btn.dataset.presetBg = preset.bg.toLowerCase();
+  btn.dataset.presetAccent = preset.accent.toLowerCase();
+  btn.dataset.presetButton = preset.button.toLowerCase();
+
+  const dot = document.createElement('span');
+  dot.className = 'settings-theme-preset-dot';
+  dot.style.background = `linear-gradient(135deg, ${preset.bg} 0 52%, ${preset.accent} 52% 77%, ${preset.button} 77%)`;
+
+  const name = document.createElement('span');
+  name.className = 'settings-theme-preset-name';
+  name.textContent = label;
+
+  const favorite = isFavoritePalette(preset.id);
+  const star = createPaletteBadge({
+    className: `settings-theme-preset-star${favorite ? ' active' : ''}`,
+    glyph: favorite ? '★' : '☆',
+    label: t(favorite ? 'settings.themeUnfavorite' : 'settings.themeFavorite'),
+    pressed: favorite,
+    onActivate: () => toggleFavoritePalette(preset.id)
+  });
+
+  btn.append(dot, name, star);
+
+  if (kind === 'saved') {
+    btn.append(createPaletteBadge({
+      className: 'settings-theme-preset-del',
+      glyph: '✕',
+      label: t('settings.themeDeletePalette'),
+      onActivate: () => deleteSavedPalette(preset.id)
+    }));
+  }
+
+  btn.addEventListener('click', () => {
+    if (preset.theme) {
+      applyUserTheme(preset.theme);
+      return;
+    }
+    applyPaletteToEditor({ bg: preset.bg, accent: preset.accent, button: preset.button });
+  });
+  return btn;
 }
 
 function renderCustomThemePresets() {
   const wrap = document.getElementById('settings-theme-presets');
   if (!wrap) return;
-  wrap.replaceChildren();
-  getAllThemePresets().forEach(preset => {
-    const label = getThemePresetLabel(preset);
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'settings-theme-preset-swatch';
-    btn.title = label;
-    btn.setAttribute('aria-label', `${label} renk paletini kullan`);
-    btn.dataset.presetId = preset.id;
-    btn.dataset.presetKind = preset.theme ? 'builtin' : 'custom';
-    if (preset.theme) btn.dataset.presetTheme = preset.theme;
-    btn.dataset.presetBg = preset.bg.toLowerCase();
-    const dot = document.createElement('span');
-    dot.className = 'settings-theme-preset-dot';
-    dot.style.background = `linear-gradient(135deg, ${preset.bg} 0 52%, ${preset.accent} 52% 77%, ${preset.button} 77%)`;
-    const name = document.createElement('span');
-    name.className = 'settings-theme-preset-name';
-    name.textContent = label;
-    btn.append(dot, name);
-    btn.addEventListener('click', () => {
-      if (preset.theme) {
-        applyUserTheme(preset.theme);
-        return;
-      }
-      const bgInput = document.getElementById('settings-custom-bg');
-      const accentInput = document.getElementById('settings-custom-accent');
-      const buttonInput = document.getElementById('settings-custom-button');
-      const bgHex = document.getElementById('settings-custom-bg-hex');
-      const accentHex = document.getElementById('settings-custom-accent-hex');
-      const buttonHex = document.getElementById('settings-custom-button-hex');
-      if (bgInput) bgInput.value = preset.bg;
-      if (accentInput) accentInput.value = preset.accent;
-      if (buttonInput) buttonInput.value = preset.button;
-      if (bgHex) bgHex.value = preset.bg.toUpperCase();
-      if (accentHex) accentHex.value = preset.accent.toUpperCase();
-      if (buttonHex) buttonHex.value = preset.button.toUpperCase();
-      applyCustomThemeColors({ bg: preset.bg, accent: preset.accent, button: preset.button });
-      markActiveCustomPreset(preset.bg);
-      applyUserTheme('custom');
-    });
-    wrap.appendChild(btn);
-  });
+  wrap.replaceChildren(...sortPalettesByFavorite(getAllThemePresets())
+    .map(preset => createPaletteCard(preset, preset.theme ? 'builtin' : 'custom')));
+  markActiveThemePreset();
+}
+
+function renderSavedPalettes() {
+  const wrap = document.getElementById('settings-saved-palettes');
+  if (!wrap) return;
+  const palettes = sortPalettesByFavorite(getSavedPalettes());
+  wrap.replaceChildren(...palettes.map(palette => createPaletteCard(palette, 'saved')));
+  const block = document.getElementById('settings-saved-block');
+  if (block) block.hidden = palettes.length === 0;
   markActiveThemePreset();
 }
 
 function initCustomThemeEditor() {
   renderCustomThemePresets();
+  renderSavedPalettes();
   renderCustomColorSwatches();
   const { bg, accent, button } = getCustomThemeColors();
   const bgInput = document.getElementById('settings-custom-bg');
@@ -8578,14 +8816,14 @@ function initCustomThemeEditor() {
   if (accentHex) accentHex.value = accent.toUpperCase();
   if (buttonHex) buttonHex.value = button.toUpperCase();
   applyCustomThemeColors({ bg, accent, button });
-  markActiveCustomPreset(bg);
+  markActiveThemePreset();
 
   const HEX_RE = /^#[0-9a-f]{6}$/i;
   const sync = () => {
     const colors = { bg: bgInput?.value || bg, accent: accentInput?.value || accent, button: buttonInput?.value || button };
     applyCustomThemeColors(colors);
-    markActiveCustomPreset(colors.bg);
     if (getUserTheme() === 'custom' || document.documentElement.dataset.theme === 'custom') applyUserTheme('custom');
+    else markActiveThemePreset();
   };
   bgInput?.addEventListener('input', () => { if (bgHex) bgHex.value = bgInput.value.toUpperCase(); sync(); });
   accentInput?.addEventListener('input', () => { if (accentHex) accentHex.value = accentInput.value.toUpperCase(); sync(); });
@@ -8601,6 +8839,20 @@ function initCustomThemeEditor() {
   buttonHex?.addEventListener('input', () => {
     const v = buttonHex.value.trim();
     if (HEX_RE.test(v)) { if (buttonInput) buttonInput.value = v; sync(); }
+  });
+
+  const paletteName = document.getElementById('settings-palette-name');
+  const paletteSave = document.getElementById('settings-palette-save');
+  const storePalette = () => {
+    const palette = saveCurrentPalette(paletteName?.value);
+    if (paletteName) paletteName.value = '';
+    showToast(`${palette.name} · ${t('settings.themePaletteSaved')}`, 'ok');
+  };
+  paletteSave?.addEventListener('click', storePalette);
+  paletteName?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    storePalette();
   });
 }
 
