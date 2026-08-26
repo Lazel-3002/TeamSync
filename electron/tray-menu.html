@@ -58,24 +58,32 @@
 <body>
   <div class="menu-container">
     <div class="menu-item" id="btn-show">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> 
-      Uygulamayı Göster
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <span id="tray-label-show">Show App</span>
     </div>
     <div class="divider"></div>
     <div class="menu-item danger" id="btn-quit">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-      Tamamen Çıkış Yap
+      <span id="tray-label-quit">Quit Completely</span>
     </div>
   </div>
- 
+
   <script>
     document.getElementById('btn-show').addEventListener('click', () => {
       window.trayAPI.showApp();
     });
- 
+
     document.getElementById('btn-quit').addEventListener('click', () => {
       window.trayAPI.quitApp();
     });
+
+    function applyTrayStrings(strings) {
+      if (!strings) return;
+      document.getElementById('tray-label-show').textContent = strings.show;
+      document.getElementById('tray-label-quit').textContent = strings.quit;
+    }
+    window.trayAPI.getStrings().then(applyTrayStrings);
+    window.trayAPI.onSetStrings(applyTrayStrings);
   </script>
 </body>
 </html>

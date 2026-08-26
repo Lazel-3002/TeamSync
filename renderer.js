@@ -1112,7 +1112,10 @@ function renderFriends() {
   flist.innerHTML = '';
   const friendKeys = Object.keys(state.friends);
   if (friendKeys.length === 0) {
-    flist.innerHTML = `<li class="muted menu-empty-friends" data-i18n="menu.noFriends">${escapeHtml(t('menu.noFriends'))}</li>`;
+    flist.innerHTML = `<li class="muted menu-empty-friends">
+      <span data-i18n="menu.noFriends">${escapeHtml(t('menu.noFriends'))}</span>
+      <button type="button" class="menu-empty-friends-cta" onclick="document.getElementById('btn-show-add-friend').click()" data-i18n="menu.addFriend">${escapeHtml(t('menu.addFriend'))}</button>
+    </li>`;
   } else {
     friendKeys.forEach(fId => {
       const f = state.friends[fId];
@@ -2408,11 +2411,11 @@ function beginRoomOperation(kind, roomLabel) {
   const detail = document.getElementById('room-operation-detail');
   const cancel = document.getElementById('room-operation-cancel');
   if (title) title.textContent = kind === 'join'
-    ? `${roomLabel} Odasına Katılıyor`
-    : `${roomLabel} Odası Oluşturuluyor`;
+    ? t('room.joiningTitle', { room: roomLabel })
+    : t('room.creatingTitle', { room: roomLabel });
   if (detail) detail.textContent = kind === 'join'
-    ? 'Oda aranıyor ve güvenli bağlantı hazırlanıyor…'
-    : 'Oda ve ses bağlantısı hazırlanıyor…';
+    ? t('room.joiningDetail')
+    : t('room.creatingDetail');
   if (modal) modal.classList.remove('hidden');
 
   if (cancel) cancel.onclick = () => {
@@ -2455,6 +2458,12 @@ function roomOperationWasCancelled(operation) {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  // Kayıtlı dil tercihi burada, cihaz kimliği doğrulaması (checkSession/deviceLogin)
+  // başlamadan ÖNCE uygulanır. Aksi halde doğrulama ekranı Supabase'e ağ isteği
+  // atarken statik HTML'deki varsayılan Türkçe metinler bindUI() çalışana kadar
+  // (satırlarca aşağıda, ağ isteği bitene dek) ekranda kalıyordu.
+  try { applyUserLanguage(getUserLanguage(), false); } catch (e) {}
+
   // Başlangıç menüsünün sol altına uygulama sürümünü yaz (package.json'dan).
   try {
     const verEl = document.getElementById('app-version');
@@ -2620,8 +2629,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   try {
     const ips = await window.electronAPI.getLocalIPs();
     if (ips.length) {
-      document.getElementById('my-ip').innerHTML =
-        `🌐 ${t('network.yourIp')}: <code>${ips[0].address}</code> (${t('network.discoveryHint')})`;
+      // Gerçek IP adresi ekranda gösterilmez (gizlilik); sadece keşif ipucu yazılır.
+      document.getElementById('my-ip').innerHTML = `🌐 ${t('network.discoveryHint')}`;
     }
   } catch (e) {}
 
@@ -7105,6 +7114,10 @@ const USER_SHARE_SYSTEM_AUDIO_KEY = 'teamsync_share_system_audio';
 // the rest of its interface with English: that produces a mixed-language UI
 // and misrepresents the level of support.
 const SUPPORTED_LANGUAGES = ['tr', 'en', 'de', 'es', 'fr', 'pt-BR', 'ru', 'ar', 'kk', 'tk', 'mn', 'zh-CN', 'ja'];
+// Türkçe ve İngilizce her sürümde elle bakımı yapılan, tam çevrilmiş diller.
+// Diğerleri topluluk katalog dosyalarından geliyor ve her güncellemede aynı
+// özenle gözden geçirilmeyebiliyor — Ayarlar'da bu ikisi ayrı gruplanır.
+const DEVELOPED_LANGUAGES = ['tr', 'en'];
 const LANGUAGE_META = {
   tr: { flag: '🇹🇷', name: 'Türkçe', native: 'Turkish', locale: 'tr-TR' },
   en: { flag: '🇬🇧', name: 'English', native: 'İngilizce', locale: 'en-GB' },
@@ -7144,6 +7157,10 @@ const I18N = {
     'auth.emailConfirmationPending': 'Sunucu e-posta onayı bekliyor; Supabase panelinden "Confirm email" kapatılmalı.',
     'auth.loginFailed': 'Giriş yapılamadı: ',
     'auth.profileLoadFailed': 'Profil yüklenemedi: ',
+    'room.creatingTitle': '{room} Odası Oluşturuluyor',
+    'room.joiningTitle': '{room} Odasına Katılıyor',
+    'room.creatingDetail': 'Oda ve ses bağlantısı hazırlanıyor…',
+    'room.joiningDetail': 'Oda aranıyor ve güvenli bağlantı hazırlanıyor…',
     'menu.join': 'Sunucuya Katıl',
     'menu.joinDesc': 'Bir odaya giriş yap',
     'menu.create': 'Sunucu Oluştur',
@@ -7337,6 +7354,8 @@ const I18N = {
     'settings.password': 'Şifre',
     'settings.turnHelp': 'Bir kişinin TURN bilgisi girmesi yeterlidir; odadaki diğer katılımcılarla otomatik paylaşılır.',
     'settings.chooseLanguage': 'Bir dil seç',
+    'settings.languageDevelopedGroup': 'Geliştirilen diller',
+    'settings.languageOtherGroup': 'Güncelleme almayan diller — hata olabilir',
     'settings.timeFormat': 'Zaman formatı',
     'settings.timeAuto': 'Otomatik',
     'settings.time12': '12 saatlik',
@@ -7368,6 +7387,10 @@ const I18N = {
     'auth.emailConfirmationPending': 'The server is waiting for email confirmation; disable "Confirm email" in the Supabase dashboard.',
     'auth.loginFailed': 'Login failed: ',
     'auth.profileLoadFailed': 'Failed to load profile: ',
+    'room.creatingTitle': '{room} — Creating Room',
+    'room.joiningTitle': '{room} — Joining Room',
+    'room.creatingDetail': 'Setting up room and voice connection…',
+    'room.joiningDetail': 'Searching for the room and preparing a secure connection…',
     'menu.join': 'Join a Server',
     'menu.joinDesc': 'Enter an existing room',
     'menu.create': 'Create a Server',
@@ -7561,6 +7584,8 @@ const I18N = {
     'settings.password': 'Password',
     'settings.turnHelp': 'Only one person needs to enter TURN details; they are shared automatically with the room.',
     'settings.chooseLanguage': 'Choose a language',
+    'settings.languageDevelopedGroup': 'Developed languages',
+    'settings.languageOtherGroup': "Languages that don't receive updates — may have errors",
     'settings.timeFormat': 'Time format',
     'settings.timeAuto': 'Automatic',
     'settings.time12': '12-hour',
@@ -8351,6 +8376,16 @@ function applySimpleUi(enabled, persist = false) {
   return active;
 }
 
+// Tema, özel tema renkleri ve sade görünüm; Kaydet'e basılmadan sadece
+// önizleme olarak canlı uygulanır (localStorage'a yazılmaz). Ayarlar
+// kapatılırken Kaydet'e basılmadıysa son kaydedilmiş değerlere geri
+// dönülmezse önizleme kalıcıymış gibi görünürdü (bkz. settings-v2-close).
+function revertUnsavedSettingsPreview() {
+  applySimpleUi(getSimpleUiEnabled());
+  const savedTheme = applyUserTheme(getUserTheme());
+  if (savedTheme === 'custom') applyCustomThemeColors(getCustomThemeColors());
+}
+
 function syncThemeSelection(theme = getUserTheme()) {
   const selected = APP_THEMES.has(theme) ? theme : 'aurora';
   const input = document.querySelector(`input[name="settings-theme"][value="${selected}"]`);
@@ -8606,9 +8641,11 @@ function hasCompleteLocaleCatalog(language) {
   return structuredComplete && legacyComplete;
 }
 
-function t(key) {
+function t(key, vars) {
   const lang = getUserLanguage();
-  return (I18N[lang] && I18N[lang][key]) || I18N.en[key] || I18N.tr[key] || key;
+  const value = (I18N[lang] && I18N[lang][key]) || I18N.en[key] || I18N.tr[key] || key;
+  if (!vars) return value;
+  return Object.entries(vars).reduce((text, [name, replacement]) => text.replaceAll(`{${name}}`, String(replacement)), value);
 }
 
 function renderLanguageOptions() {
@@ -8616,7 +8653,8 @@ function renderLanguageOptions() {
   if (!container) return;
   const activeLanguage = getUserLanguage();
   const fragment = document.createDocumentFragment();
-  SUPPORTED_LANGUAGES.forEach(language => {
+
+  const buildOption = (language) => {
     const meta = LANGUAGE_META[language];
     const label = document.createElement('label');
     label.className = 'language-option';
@@ -8625,6 +8663,12 @@ function renderLanguageOptions() {
     input.name = 'settings-language';
     input.value = language;
     input.checked = language === activeLanguage;
+    // renderLanguageOptions() re-runs (and replaces these nodes) every time the
+    // language changes, so the change listener is bound here rather than once
+    // at startup — otherwise clicking a language a second time would no-op.
+    input.addEventListener('change', () => {
+      if (input.checked) applyUserLanguage(input.value, true);
+    });
     const flag = document.createElement('span');
     flag.className = 'language-flag';
     flag.textContent = meta.flag;
@@ -8637,8 +8681,26 @@ function renderLanguageOptions() {
     const mark = document.createElement('i');
     mark.textContent = '✓';
     label.append(input, flag, copy, mark);
-    fragment.append(label);
-  });
+    return label;
+  };
+
+  const buildGroupTitle = (key, extraClass = '') => {
+    const title = document.createElement('div');
+    title.className = `language-group-title${extraClass ? ` ${extraClass}` : ''}`;
+    title.textContent = t(key);
+    return title;
+  };
+
+  const otherLanguages = SUPPORTED_LANGUAGES.filter(language => !DEVELOPED_LANGUAGES.includes(language));
+
+  fragment.append(buildGroupTitle('settings.languageDevelopedGroup'));
+  DEVELOPED_LANGUAGES.forEach(language => fragment.append(buildOption(language)));
+
+  if (otherLanguages.length) {
+    fragment.append(buildGroupTitle('settings.languageOtherGroup', 'language-group-title-warn'));
+    otherLanguages.forEach(language => fragment.append(buildOption(language)));
+  }
+
   container.replaceChildren(fragment);
 }
 
@@ -8662,6 +8724,8 @@ function applyUserLanguage(language, persist = true) {
     }
   });
   translateLegacyStaticUI(lang);
+  // Tepsi menüsü / arka plan bildirimi renderer'ın localStorage'ını göremez.
+  try { window.electronAPI?.setAppLanguage?.(lang); } catch (e) {}
   if (typeof refreshCustomThemePresetLabels === 'function') refreshCustomThemePresetLabels();
   refreshActivityCoverLocale();
   if (typeof window.refreshNameCityLocale === 'function') window.refreshNameCityLocale();
@@ -8671,8 +8735,7 @@ function applyUserLanguage(language, persist = true) {
   if (typeof updateFocusFullscreenBtn === 'function') updateFocusFullscreenBtn();
   if (typeof updateFocusExitBtn === 'function') updateFocusExitBtn();
   if (typeof refreshFocusControlTitles === 'function') refreshFocusControlTitles();
-  const selectedLanguage = document.querySelector(`input[name="settings-language"][value="${lang}"]`);
-  if (selectedLanguage) selectedLanguage.checked = true;
+  renderLanguageOptions();
   const createName = document.getElementById('create-name');
   if (createName && Object.values(I18N).map(locale => locale['menu.gameRoom']).includes(createName.value)) {
     createName.value = t('menu.gameRoom');
@@ -8985,8 +9048,7 @@ function initUserSettings() {
   document.getElementById('settings-v2-close')?.addEventListener('click', () => {
     stopSettingsMicTest();
     window.releaseMediaLibrarySettingsUrls?.();
-    applySimpleUi(getSimpleUiEnabled());
-    applyUserTheme(getUserTheme());
+    revertUnsavedSettingsPreview();
     document.getElementById('settings-modal').classList.add('hidden');
   });
   document.getElementById('settings-v2-save')?.addEventListener('click', saveUserSettings);
@@ -9025,11 +9087,10 @@ function initUserSettings() {
     document.getElementById('user-broadcast-advanced')?.classList.toggle('hidden', !expanded);
   });
 
-  document.querySelectorAll('input[name="settings-language"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      if (radio.checked) applyUserLanguage(radio.value, true);
-    });
-  });
+  // Not: settings-language radio'larının change dinleyicisi artık
+  // renderLanguageOptions() içinde her oluşturulduklarında bağlanıyor (bkz.
+  // buildOption) — applyUserLanguage() dil değişiminde bu düğümleri yeniden
+  // oluşturduğu için burada tek seferlik bağlama eskiyen düğümlere kalırdı.
   document.querySelectorAll('input[name="settings-time-format"]').forEach(radio => {
     radio.addEventListener('change', () => {
       if (!radio.checked) return;
@@ -9079,6 +9140,7 @@ function initUserSettings() {
     if (e.code === 'Escape' && !document.getElementById('settings-modal')?.classList.contains('hidden')) {
       stopSettingsMicTest();
       window.releaseMediaLibrarySettingsUrls?.();
+      revertUnsavedSettingsPreview();
       document.getElementById('settings-modal').classList.add('hidden');
     }
   });

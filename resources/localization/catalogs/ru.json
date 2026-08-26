@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "Отправка больших файлов через MQTT медленная и может прерваться. Дождитесь установления WebRTC-соединения.",
     "toast.defaultSomeone": "Кто-то",
     "toast.friendSentMessage": "отправил(а) вам сообщение.",
-    "toast.friendSentFile": "отправил(а) вам файл."
+    "toast.friendSentFile": "отправил(а) вам файл.",
+    "auth.creatingAccount": "Создание новой учётной записи для этого устройства...",
+    "auth.deviceApiMissing": "API идентификации устройства не найден (preload устарел).",
+    "auth.emailConfirmationPending": "Сервер ожидает подтверждения по электронной почте; отключите «Confirm email» в панели Supabase.",
+    "auth.loginFailed": "Не удалось войти: ",
+    "auth.profileLoadFailed": "Не удалось загрузить профиль: ",
+    "auth.retry": "Повторить",
+    "auth.serverConfigMissing": "Отсутствует конфигурация сервера (проверьте файл .env).",
+    "auth.verifyingDevice": "Проверка личности устройства...",
+    "room.creatingDetail": "Настройка комнаты и голосового соединения…",
+    "room.creatingTitle": "{room} — Создание комнаты",
+    "room.joiningDetail": "Поиск комнаты и подготовка безопасного соединения…",
+    "room.joiningTitle": "{room} — Вход в комнату",
+    "settings.languageDevelopedGroup": "Разрабатываемые языки",
+    "settings.languageOtherGroup": "Языки без обновлений — возможны ошибки"
   },
   "legacy": {
     " oy": "голосовать",

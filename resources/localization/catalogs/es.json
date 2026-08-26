@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "Enviar archivos grandes por MQTT es lento y puede fallar. Espera a que se establezca una conexión WebRTC.",
     "toast.defaultSomeone": "Alguien",
     "toast.friendSentMessage": "te envió un mensaje.",
-    "toast.friendSentFile": "te envió un archivo."
+    "toast.friendSentFile": "te envió un archivo.",
+    "auth.creatingAccount": "Creando una nueva cuenta para este dispositivo...",
+    "auth.deviceApiMissing": "No se encontró la API de identidad del dispositivo (el preload está desactualizado).",
+    "auth.emailConfirmationPending": "El servidor está esperando la confirmación por correo electrónico; desactiva \"Confirm email\" en el panel de Supabase.",
+    "auth.loginFailed": "Error al iniciar sesión: ",
+    "auth.profileLoadFailed": "No se pudo cargar el perfil: ",
+    "auth.retry": "Reintentar",
+    "auth.serverConfigMissing": "Falta la configuración del servidor (revisa el archivo .env).",
+    "auth.verifyingDevice": "Verificando la identidad del dispositivo...",
+    "room.creatingDetail": "Configurando la sala y la conexión de voz…",
+    "room.creatingTitle": "{room} — Creando sala",
+    "room.joiningDetail": "Buscando la sala y preparando una conexión segura…",
+    "room.joiningTitle": "{room} — Uniéndose a la sala",
+    "settings.languageDevelopedGroup": "Idiomas desarrollados",
+    "settings.languageOtherGroup": "Idiomas sin actualizaciones — pueden tener errores"
   },
   "legacy": {
     " oy": "votar",

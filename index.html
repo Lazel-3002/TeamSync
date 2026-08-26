@@ -157,7 +157,10 @@
               </div>
             </div>
             <ul id="friends-list" class="menu-friends-list">
-              <li class="muted menu-empty-friends" data-i18n="menu.noFriends">Henüz hiç arkadaşın yok.</li>
+              <li class="muted menu-empty-friends">
+                <span data-i18n="menu.noFriends">Henüz hiç arkadaşın yok.</span>
+                <button type="button" class="menu-empty-friends-cta" onclick="document.getElementById('btn-show-add-friend').click()" data-i18n="menu.addFriend">Arkadaş Ekle</button>
+              </li>
             </ul>
           </div>
         </div>
@@ -322,8 +325,10 @@
 
         <button id="btn-create" data-i18n="common.create">Oluştur</button>
       </div>
-      <p id="my-ip" class="hint"></p>
-      <p class="hint" style="color:var(--ok); margin-top:0; display:flex; align-items:center; justify-content:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg> <span data-i18n="network.connected">İnternet üzerinden bağlantı aktif</span></p>
+      <div class="login-status-footer">
+        <p id="my-ip" class="hint"></p>
+        <p class="hint" style="color:var(--ok); margin-top:0; display:flex; align-items:center; justify-content:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg> <span data-i18n="network.connected">İnternet üzerinden bağlantı aktif</span></p>
+      </div>
     </div>
   </div>
 
@@ -2107,13 +2112,13 @@
     </div>
 
     <div id="leave-modal" class="modal hidden">
-      <div class="mcard" style="text-align: center; border-top: 4px solid var(--danger);">
-        <div style="margin-bottom: 16px; animation: pulse 2s infinite; display:flex; justify-content:center;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--acc-light)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg></div>
-        <h3 style="justify-content: center; font-size: 24px;">Odadan Ayrıl</h3>
-        <p class="muted" style="font-size: 16px; margin-bottom: 24px;">TeamSync'ten ayrılmak istermisiniz?</p>
-        <div class="mactions" style="justify-content: center; gap: 16px;">
-          <button id="leave-cancel" class="btn-sec" style="padding: 12px 24px; font-size: 15px;">Takımı Bırakmam!</button>
-          <button id="leave-confirm" class="btn-pri" style="background: var(--danger); padding: 12px 24px; font-size: 15px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);">Evet, Ayrıl</button>
+      <div class="mcard leave-mcard">
+        <div class="leave-icon-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg></div>
+        <h3 class="leave-title">Odadan Ayrıl</h3>
+        <p class="muted leave-desc">TeamSync'ten ayrılmak istermisiniz?</p>
+        <div class="mactions leave-actions">
+          <button id="leave-cancel" class="btn-sec leave-btn">Takımı Bırakmam!</button>
+          <button id="leave-confirm" class="btn-pri leave-btn leave-btn-danger">Evet, Ayrıl</button>
         </div>
       </div>
     </div>

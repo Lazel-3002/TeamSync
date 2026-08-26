@@ -688,8 +688,8 @@ function createWindow() {
       if (!hasShownHideNotification) {
         hasShownHideNotification = true;
         const hideNotif = new Notification({
-          title: 'TeamSync Arka Planda',
-          body: 'Uygulama tamamen kapatılmadı. Sağ alt köşedeki simgeye sağ tıklayarak çıkış yapabilirsiniz.',
+          title: mainT('hideNotifTitle'),
+          body: mainT('hideNotifBody'),
           silent: true
         });
         hideNotif.show();
@@ -846,6 +846,47 @@ function writeSettings(obj) {
     return false;
   }
 }
+// --- Ana süreç lokalizasyonu (tepsi menüsü + arka plan bildirimi) -------------
+// Tepsi menüsü ve "arka planda çalışıyor" bildirimi ayrı pencere/işlemlerde
+// çalışır ve renderer'ın localStorage'ındaki dil tercihine erişemez; bu yüzden
+// renderer applyUserLanguage() her çağrıldığında dili buraya da IPC ile yazar.
+// Sadece TR/EN tam çevrilir (Ayarlar'daki "geliştirilen diller" ile tutarlı);
+// başka bir dil seçiliyse bu iki pencere İngilizce'ye düşer.
+const MAIN_I18N = {
+  tr: {
+    trayShow: 'Uygulamayı Göster',
+    trayQuit: 'Tamamen Çıkış Yap',
+    hideNotifTitle: 'TeamSync Arka Planda',
+    hideNotifBody: 'Uygulama tamamen kapatılmadı. Sağ alt köşedeki simgeye sağ tıklayarak çıkış yapabilirsiniz.'
+  },
+  en: {
+    trayShow: 'Show App',
+    trayQuit: 'Quit Completely',
+    hideNotifTitle: 'TeamSync is running in the background',
+    hideNotifBody: 'The app was not fully closed. Right-click the tray icon to quit completely.'
+  }
+};
+let currentAppLanguage = readSettings().appLanguage === 'tr' ? 'tr' : 'en';
+function mainT(key) {
+  return (MAIN_I18N[currentAppLanguage] && MAIN_I18N[currentAppLanguage][key]) || MAIN_I18N.en[key];
+}
+function getTrayStrings() {
+  return { show: mainT('trayShow'), quit: mainT('trayQuit') };
+}
+ipcMain.on('set-app-language', (event, lang) => {
+  if (!isMainWindowSender(event)) return;
+  const next = lang === 'tr' ? 'tr' : 'en';
+  if (next === currentAppLanguage) return;
+  currentAppLanguage = next;
+  const s = readSettings();
+  s.appLanguage = currentAppLanguage;
+  writeSettings(s);
+  if (trayMenuWindow && !trayMenuWindow.isDestroyed()) {
+    trayMenuWindow.webContents.send('tray-set-strings', getTrayStrings());
+  }
+});
+ipcMain.handle('tray-get-strings', () => getTrayStrings());
+
 ipcMain.handle('get-hardware-acceleration', (event) => isMainWindowSender(event) && readSettings().hardwareAcceleration !== false);
 ipcMain.handle('get-effective-hardware-acceleration', (event) => isMainWindowSender(event) ? _diagHwAccelEffective : false);
 ipcMain.handle('set-hardware-acceleration', (event, enabled) => {

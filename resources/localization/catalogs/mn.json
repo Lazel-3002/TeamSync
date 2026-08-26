@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "Том файлыг MQTT-ээр илгээх удаан бөгөөд амжилтгүй болж болно. WebRTC холболт үүсэхийг хүлээнэ үү.",
     "toast.defaultSomeone": "Хэн нэгэн",
     "toast.friendSentMessage": "танд мессеж илгээлээ.",
-    "toast.friendSentFile": "танд файл илгээлээ."
+    "toast.friendSentFile": "танд файл илгээлээ.",
+    "auth.creatingAccount": "Энэ төхөөрөмжид зориулж шинэ бүртгэл үүсгэж байна...",
+    "auth.deviceApiMissing": "Төхөөрөмжийн ID API олдсонгүй (preload хуучирсан).",
+    "auth.emailConfirmationPending": "Сервер имэйл баталгаажуулалт хүлээж байна; Supabase хяналтын самбар дээрх «Confirm email»-г идэвхгүй болгоно уу.",
+    "auth.loginFailed": "Нэвтрэх амжилтгүй боллоо: ",
+    "auth.profileLoadFailed": "Профайлыг ачаалж чадсангүй: ",
+    "auth.retry": "Дахин оролдох",
+    "auth.serverConfigMissing": "Серверийн тохиргоо олдсонгүй (.env файлыг шалгана уу).",
+    "auth.verifyingDevice": "Төхөөрөмжийн ID-г шалгаж байна...",
+    "room.creatingDetail": "Өрөө болон дуут холболтыг бэлтгэж байна…",
+    "room.creatingTitle": "{room} — Өрөө үүсгэж байна",
+    "room.joiningDetail": "Өрөөг хайж, аюулгүй холболт бэлтгэж байна…",
+    "room.joiningTitle": "{room} — Өрөөнд нэгдэж байна",
+    "settings.languageDevelopedGroup": "Хөгжүүлсэн хэлүүд",
+    "settings.languageOtherGroup": "Шинэчлэгддэггүй хэлүүд — алдаа гарч болзошгүй"
   },
   "legacy": {
     " oy": "санал өгөх",

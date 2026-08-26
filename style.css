@@ -368,8 +368,11 @@ body { padding-top: 35px; } /* Prevent overlap */
     font-size: 14px;
   }
 
-  .login-card:has(#step-create:not(.hidden)) > .hint {
+  .login-card:has(#step-create:not(.hidden)) > .login-status-footer {
     margin-top: 4px;
+    padding-top: 4px;
+  }
+  .login-card:has(#step-create:not(.hidden)) > .login-status-footer .hint {
     font-size: 10px;
     line-height: 1.2;
   }
@@ -487,6 +490,13 @@ body { padding-top: 35px; } /* Prevent overlap */
   margin-top: 16px;
 }
 .hint { margin-top: 16px; text-align: center; }
+.login-status-footer {
+  margin-top: 18px;
+  padding: 10px 14px 4px;
+  border-top: 1px solid color-mix(in srgb, var(--txt-main) 8%, transparent);
+}
+.login-status-footer .hint { margin-top: 6px; font-size: 12px; }
+.login-status-footer .hint:first-child { margin-top: 0; }
 
 /* Friend List Items */
 .friend-item {
@@ -607,7 +617,9 @@ body { padding-top: 35px; } /* Prevent overlap */
      temada koyu döner ve koyu zemin üstünde okunmaz hale gelirdi). */
   color: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(4px);
-  z-index: 9999;
+  /* 1000+ olan .modal katmanlarının (Ayarlar, Davetler, vb.) altında kalmalı;
+     9999 iken bu köşe rozeti açık modallerin kenarından taşıp görünüyordu. */
+  z-index: 40;
 }
 /* Ping rozetiyle aynı sınıfı paylaşan tek gerçek buton (bilgi/güncelleme
    günlüğü "i" düğmesi) seçilen tema/buton rengini kullanmalı; salt bilgi
@@ -1002,10 +1014,26 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .menu-friends-list::-webkit-scrollbar { width: 4px; }
 .menu-friends-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
 .menu-empty-friends {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   text-align: center;
   padding: 16px 10px;
-  font-style: italic;
 }
+.menu-empty-friends span { font-style: italic; }
+.menu-empty-friends-cta {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--acc-btn, var(--acc));
+  border: 1px solid color-mix(in srgb, var(--acc-btn, var(--acc)) 45%, transparent);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.menu-empty-friends-cta:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 
 .menu-main-actions {
   display: flex;
@@ -1045,7 +1073,17 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .ac-icon {
   font-size: 32px;
   margin-bottom: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--txt-main) 8%, transparent);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
 }
+.action-card.pri .ac-icon {
+  background: color-mix(in srgb, var(--acc-btn, var(--acc)) 22%, transparent);
+  color: var(--acc-light);
+}
+.action-card:hover .ac-icon { transform: scale(1.06); }
 .ac-text {
   font-size: 16px;
   font-weight: 700;
@@ -1746,6 +1784,32 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 .mcard.wide { width: 90vw; max-width: 1200px; padding: 24px; }
+
+.leave-mcard { width: min(380px, calc(100vw - 40px)); text-align: center; border-top: 4px solid var(--danger); }
+.leave-icon-badge {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+  animation: leaveIconPulse 2.2s ease-in-out infinite;
+}
+@keyframes leaveIconPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 35%, transparent); }
+  50% { box-shadow: 0 0 0 8px transparent; }
+}
+.leave-title { justify-content: center; font-size: 21px; margin-bottom: 8px; }
+.leave-desc { font-size: 14px; margin-bottom: 26px; }
+.leave-actions { justify-content: center; gap: 12px; }
+.leave-btn { padding: 11px 22px; font-size: 14px; font-weight: 600; border-radius: 10px; }
+.leave-btn-danger {
+  background: var(--danger);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--danger) 40%, transparent);
+}
 .mcard h3 { margin-bottom: 16px; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px;}
 .mcard h4 { margin: 20px 0 8px; font-size: 14px; color: var(--txt-main); font-weight: 600; }
 .mcard p.muted { margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
@@ -2192,8 +2256,18 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .settings-broadcast-row strong { display: block; margin-bottom: 6px; font-size: 14px; }
 .settings-broadcast-row p,
 .settings-broadcast-row small { margin: 0; color: var(--txt-mut); font-size: 12px; line-height: 1.5; }
-.settings-advanced-toggle { cursor: pointer; font: inherit; }
+.settings-advanced-toggle {
+  cursor: pointer;
+  font: inherit;
+  padding: 15px 12px;
+  margin: 0 -12px;
+  width: calc(100% + 24px);
+  border-radius: 10px;
+  transition: background .15s ease;
+}
+.settings-advanced-toggle:hover { background: color-mix(in srgb, var(--acc) 6%, transparent); }
 .settings-advanced-toggle:hover strong { color: var(--txt-main); }
+.settings-advanced-toggle:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
 /* Aşağı ok: sabit gri kutu her temada yamalı duruyordu; vurgu renginden
    türetilen yuvarlak rozet hem açık hem koyu paletlerde oturuyor. */
 .settings-advanced-toggle i {
@@ -3061,6 +3135,17 @@ button.global-ping:hover { background: var(--acc-btn-hover, var(--acc-hover)); }
 .language-option small { color: var(--txt-mut); font-size: 11px; }
 .language-option i { color: var(--acc-ink); opacity: 0; font-style: normal; font-weight: 900; }
 .language-option:has(input:checked) i { opacity: 1; }
+.language-group-title {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--txt-mut);
+  margin: 4px 0 -2px;
+}
+.language-group-title:first-child { margin-top: 0; }
+.language-group-title-warn { color: var(--warn, #f59e0b); }
 .settings-time-title { margin-top: 34px; }
 .time-options { display: flex; flex-wrap: wrap; gap: 12px; }
 .time-options label {

@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "通过 MQTT 发送大文件速度较慢且可能失败。请等待 WebRTC 连接建立。",
     "toast.defaultSomeone": "有人",
     "toast.friendSentMessage": "给你发了一条消息。",
-    "toast.friendSentFile": "给你发了一个文件。"
+    "toast.friendSentFile": "给你发了一个文件。",
+    "auth.creatingAccount": "正在为此设备创建新账户...",
+    "auth.deviceApiMissing": "未找到设备身份 API（预加载脚本已过期）。",
+    "auth.emailConfirmationPending": "服务器正在等待邮箱确认；请在 Supabase 控制台中关闭“Confirm email”。",
+    "auth.loginFailed": "登录失败：",
+    "auth.profileLoadFailed": "加载个人资料失败：",
+    "auth.retry": "重试",
+    "auth.serverConfigMissing": "缺少服务器配置（请检查 .env 文件）。",
+    "auth.verifyingDevice": "正在验证设备身份...",
+    "room.creatingDetail": "正在设置房间和语音连接…",
+    "room.creatingTitle": "{room} — 正在创建房间",
+    "room.joiningDetail": "正在搜索房间并准备安全连接…",
+    "room.joiningTitle": "{room} — 正在加入房间",
+    "settings.languageDevelopedGroup": "已完善的语言",
+    "settings.languageOtherGroup": "未更新的语言 — 可能存在错误"
   },
   "legacy": {
     " oy": "投票",

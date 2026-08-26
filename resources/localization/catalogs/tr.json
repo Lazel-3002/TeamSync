@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "Büyük dosyaları MQTT üzerinden göndermek yavaştır ve kopabilir. WebRTC bağlantısı kurulmasını bekleyin.",
     "toast.defaultSomeone": "Biri",
     "toast.friendSentMessage": "sana mesaj gönderdi.",
-    "toast.friendSentFile": "sana bir dosya gönderdi."
+    "toast.friendSentFile": "sana bir dosya gönderdi.",
+    "auth.verifyingDevice": "Cihaz kimliği doğrulanıyor...",
+    "auth.retry": "Tekrar Dene",
+    "auth.serverConfigMissing": "Sunucu yapılandırması eksik (.env dosyasını kontrol edin).",
+    "auth.deviceApiMissing": "Cihaz kimliği API bulunamadı (preload güncel değil).",
+    "auth.creatingAccount": "Bu cihaz için yeni hesap oluşturuluyor...",
+    "auth.emailConfirmationPending": "Sunucu e-posta onayı bekliyor; Supabase panelinden \"Confirm email\" kapatılmalı.",
+    "auth.loginFailed": "Giriş yapılamadı: ",
+    "auth.profileLoadFailed": "Profil yüklenemedi: ",
+    "room.creatingTitle": "{room} Odası Oluşturuluyor",
+    "room.joiningTitle": "{room} Odasına Katılıyor",
+    "room.creatingDetail": "Oda ve ses bağlantısı hazırlanıyor…",
+    "room.joiningDetail": "Oda aranıyor ve güvenli bağlantı hazırlanıyor…",
+    "settings.languageDevelopedGroup": "Geliştirilen diller",
+    "settings.languageOtherGroup": "Güncelleme almayan diller — hata olabilir"
   },
   "legacy": {
     " oy": " oy",

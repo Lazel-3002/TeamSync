@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "إرسال الملفات الكبيرة عبر MQTT بطيء وقد يفشل. انتظر حتى يتم إنشاء اتصال WebRTC.",
     "toast.defaultSomeone": "شخص ما",
     "toast.friendSentMessage": "أرسل لك رسالة.",
-    "toast.friendSentFile": "أرسل لك ملفًا."
+    "toast.friendSentFile": "أرسل لك ملفًا.",
+    "auth.creatingAccount": "جارٍ إنشاء حساب جديد لهذا الجهاز...",
+    "auth.deviceApiMissing": "لم يتم العثور على واجهة برمجة هوية الجهاز (الإصدار قديم).",
+    "auth.emailConfirmationPending": "الخادم بانتظار تأكيد البريد الإلكتروني؛ عطّل خيار \"Confirm email\" من لوحة Supabase.",
+    "auth.loginFailed": "فشل تسجيل الدخول: ",
+    "auth.profileLoadFailed": "فشل تحميل الملف الشخصي: ",
+    "auth.retry": "إعادة المحاولة",
+    "auth.serverConfigMissing": "إعدادات الخادم مفقودة (تحقق من ملف .env).",
+    "auth.verifyingDevice": "جارٍ التحقق من هوية الجهاز...",
+    "room.creatingDetail": "جارٍ إعداد الغرفة واتصال الصوت…",
+    "room.creatingTitle": "{room} — جارٍ إنشاء الغرفة",
+    "room.joiningDetail": "جارٍ البحث عن الغرفة وتجهيز اتصال آمن…",
+    "room.joiningTitle": "{room} — جارٍ الانضمام إلى الغرفة",
+    "settings.languageDevelopedGroup": "اللغات المطوَّرة",
+    "settings.languageOtherGroup": "لغات لا تتلقى تحديثات — قد تحتوي على أخطاء"
   },
   "legacy": {
     " oy": "التصويت",

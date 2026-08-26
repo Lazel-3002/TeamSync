@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "Үлкен файлдарды MQTT арқылы жіберу баяу және сәтсіз аяқталуы мүмкін. WebRTC байланысы орнатылғанша күтіңіз.",
     "toast.defaultSomeone": "Біреу",
     "toast.friendSentMessage": "саған хабар жіберді.",
-    "toast.friendSentFile": "саған файл жіберді."
+    "toast.friendSentFile": "саған файл жіберді.",
+    "auth.creatingAccount": "Осы құрылғы үшін жаңа тіркелгі жасалуда...",
+    "auth.deviceApiMissing": "Құрылғы жеке басы API табылмады (preload ескірген).",
+    "auth.emailConfirmationPending": "Сервер электрондық пошта растауын күтуде; Supabase панелінде «Confirm email» опциясын өшіріңіз.",
+    "auth.loginFailed": "Кіру сәтсіз аяқталды: ",
+    "auth.profileLoadFailed": "Профильді жүктеу мүмкін болмады: ",
+    "auth.retry": "Қайталау",
+    "auth.serverConfigMissing": "Сервер конфигурациясы жоқ (.env файлын тексеріңіз).",
+    "auth.verifyingDevice": "Құрылғы жеке басы тексерілуде...",
+    "room.creatingDetail": "Бөлме және дауыс байланысы дайындалуда…",
+    "room.creatingTitle": "{room} — Бөлме құрылуда",
+    "room.joiningDetail": "Бөлме ізделуде және қауіпсіз байланыс дайындалуда…",
+    "room.joiningTitle": "{room} — Бөлмеге кіру",
+    "settings.languageDevelopedGroup": "Дамытылған тілдер",
+    "settings.languageOtherGroup": "Жаңартылмайтын тілдер — қателер болуы мүмкін"
   },
   "legacy": {
     " oy": "дауыс беру",

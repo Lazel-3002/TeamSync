@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "Uly faýllary MQTT arkaly ibermek haýal we üstünliksiz bolup biler. WebRTC baglanyşygynyň gurulmagyna garaşyň.",
     "toast.defaultSomeone": "Biri",
     "toast.friendSentMessage": "size habar iberdi.",
-    "toast.friendSentFile": "size faýl iberdi."
+    "toast.friendSentFile": "size faýl iberdi.",
+    "auth.creatingAccount": "Bu enjam üçin täze hasap döredilýär...",
+    "auth.deviceApiMissing": "Enjam kimlik API tapylmady (preload köne).",
+    "auth.emailConfirmationPending": "Server e-poçta tassyklamasyna garaşýar; Supabase panelinde \"Confirm email\" öçüriň.",
+    "auth.loginFailed": "Giriş başa barmady: ",
+    "auth.profileLoadFailed": "Profil ýüklenip bilmedi: ",
+    "auth.retry": "Gaýtadan synanyş",
+    "auth.serverConfigMissing": "Server konfigurasiýasy ýok (.env faýlyny barlaň).",
+    "auth.verifyingDevice": "Enjam kimligi barlanýar...",
+    "room.creatingDetail": "Otag we ses baglanyşygy taýýarlanýar…",
+    "room.creatingTitle": "{room} — Otag döredilýär",
+    "room.joiningDetail": "Otag gözlenýär we howpsuz baglanyşyk taýýarlanýar…",
+    "room.joiningTitle": "{room} — Otaga girilýär",
+    "settings.languageDevelopedGroup": "Ösdürilen diller",
+    "settings.languageOtherGroup": "Täzelenmeýän diller — ýalňyşlyklar bolup biler"
   },
   "legacy": {
     " oy": "ses ber",

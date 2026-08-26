@@ -59,6 +59,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Kişisel tema seçildiğinde pencerenin native arka planını da günceller
   // (frame:false olduğu için yeniden boyutlandırmada bu renk görünür).
   setWindowTheme: (theme, persist, customBg) => ipcRenderer.send('set-window-theme', theme, persist, customBg),
+  // Tepsi menüsü + arka plan bildirimi ayrı pencerelerde çalıştığından dil
+  // tercihini localStorage yerine IPC ile main sürecine de iletmemiz gerekir.
+  setAppLanguage: (lang) => ipcRenderer.send('set-app-language', lang),
   // İndirmeler main süreçte İndirilenler klasörüne yazılır (bkz. main.js
   // will-download); arayüz sonucu buradan öğrenip bildirim gösterir.
   onDownloadDone: (cb) => ipcRenderer.on('download-done', (_e, info) => cb(info)),

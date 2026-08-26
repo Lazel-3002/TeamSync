@@ -376,7 +376,21 @@
     "toast.largeFileMqttWarning": "MQTT経由での大きなファイルの送信は遅く、失敗する可能性があります。WebRTC接続が確立されるまでお待ちください。",
     "toast.defaultSomeone": "誰か",
     "toast.friendSentMessage": "があなたにメッセージを送りました。",
-    "toast.friendSentFile": "があなたにファイルを送りました。"
+    "toast.friendSentFile": "があなたにファイルを送りました。",
+    "auth.creatingAccount": "このデバイス用の新しいアカウントを作成しています...",
+    "auth.deviceApiMissing": "デバイスID APIが見つかりません（プリロードが古い可能性があります）。",
+    "auth.emailConfirmationPending": "サーバーがメール確認を待っています。Supabaseダッシュボードで「Confirm email」を無効にしてください。",
+    "auth.loginFailed": "ログインに失敗しました: ",
+    "auth.profileLoadFailed": "プロフィールの読み込みに失敗しました: ",
+    "auth.retry": "再試行",
+    "auth.serverConfigMissing": "サーバー設定が見つかりません（.envファイルを確認してください）。",
+    "auth.verifyingDevice": "デバイスIDを確認しています...",
+    "room.creatingDetail": "ルームと音声接続を準備しています…",
+    "room.creatingTitle": "{room} — ルームを作成中",
+    "room.joiningDetail": "ルームを検索し、安全な接続を準備しています…",
+    "room.joiningTitle": "{room} — ルームに参加中",
+    "settings.languageDevelopedGroup": "対応が完了している言語",
+    "settings.languageOtherGroup": "更新されていない言語 — エラーが発生する可能性があります"
   },
   "legacy": {
     " oy": "投票する",
