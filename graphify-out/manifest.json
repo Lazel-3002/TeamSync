@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1787710535.5597746,
-    "ast_hash": "b95861a927f925f53d4d2b5d79c2d3fe",
+    "mtime": 1787713814.993735,
+    "ast_hash": "c6fd364020892b12d23c52a2a557e635",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1787710631.1311176,
-    "ast_hash": "f6dde43e230cdba27eb1e18a07a2e4eb",
+    "mtime": 1787713814.9891744,
+    "ast_hash": "0e1d377a3d07d24b9317a8f1af07f020",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -385,73 +385,73 @@
     "semantic_hash": ""
   },
   "resources/localization/catalogs.bundle.js": {
-    "mtime": 1787710553.3666053,
-    "ast_hash": "ca44842f636eca7cce3eeef211520e3c",
+    "mtime": 1787711739.600046,
+    "ast_hash": "747dc705f2354a23813ff5f286d37133",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ar.json": {
-    "mtime": 1787710549.2268507,
-    "ast_hash": "c7a56190dcf800dc69ccab9d2d336c06",
+    "mtime": 1787711729.827216,
+    "ast_hash": "02475e661cffecf975febf2bf4adec84",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/de.json": {
-    "mtime": 1787710549.2289503,
-    "ast_hash": "7014fde0295250cef01b9ea0c572a1b8",
+    "mtime": 1787711729.8282175,
+    "ast_hash": "c7f26bb97bb7d1953e17d3ed83e8d22c",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/en.json": {
-    "mtime": 1787710549.2289503,
-    "ast_hash": "ec589d66fca69db881ac340c9e652de4",
+    "mtime": 1787711729.8297217,
+    "ast_hash": "f67930f64454b13fb3fc873b644f53bb",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/es.json": {
-    "mtime": 1787710549.2309554,
-    "ast_hash": "3e49a4a98c52659686a76122ac55fcf1",
+    "mtime": 1787711729.830727,
+    "ast_hash": "994d887547bb69ee5b5a5b5c20489ce0",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/fr.json": {
-    "mtime": 1787710549.231955,
-    "ast_hash": "a38d6f09a2ac6ab16402542fac73ea12",
+    "mtime": 1787711729.830727,
+    "ast_hash": "81058ba0888d2bded94c896cccc51f54",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ja.json": {
-    "mtime": 1787710549.2329574,
-    "ast_hash": "e6f81d83527461aea48648e3cb9c7f06",
+    "mtime": 1787711729.8322613,
+    "ast_hash": "b90d9a27905fcee2b4f3283d6a200c09",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/kk.json": {
-    "mtime": 1787710549.2339563,
-    "ast_hash": "846038c4b2be7037fc09ea2bf9be8476",
+    "mtime": 1787711729.8332658,
+    "ast_hash": "bbaf826493c396b36f56fc25d556ff44",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/mn.json": {
-    "mtime": 1787710549.2349555,
-    "ast_hash": "e75389fc5177bd58ff12ed2b5cdc9076",
+    "mtime": 1787711729.8342676,
+    "ast_hash": "d1e651363d98b4921f54e206483d657c",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/pt-BR.json": {
-    "mtime": 1787710549.2359564,
-    "ast_hash": "2b9f62bb5ade81d43a13c4e40d65d63a",
+    "mtime": 1787711729.8352668,
+    "ast_hash": "28f34ed605b400bc3ba13e21d93ba680",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ru.json": {
-    "mtime": 1787710549.2369547,
-    "ast_hash": "7c4bbcbbab00aa22099f842719003eae",
+    "mtime": 1787711729.8362656,
+    "ast_hash": "1ee150c913f7139f13c4fe17c522fead",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tk.json": {
-    "mtime": 1787710549.2384586,
-    "ast_hash": "610283f740ec45ec53ddfad9940a6982",
+    "mtime": 1787711729.8362656,
+    "ast_hash": "c3dcf8f6bcfd5e8cdffb6380f28cc6ff",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tr.json": {
-    "mtime": 1787710549.2394626,
-    "ast_hash": "f4d62796735b95796b2d672c77ceff20",
+    "mtime": 1787711729.8373394,
+    "ast_hash": "8418fcc7c25389cf069ab7c8602c317b",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/zh-CN.json": {
-    "mtime": 1787710549.2404642,
-    "ast_hash": "bb59e82b68f376a93a03681133d32ad3",
+    "mtime": 1787711729.8383374,
+    "ast_hash": "5ce6c074160c2a60613d2154032fd6de",
     "semantic_hash": ""
   },
   "tools/i18n/audit-locales.js": {
@@ -552,6 +552,11 @@
   "tools/i18n/toast-translations.json": {
     "mtime": 1787100523.372262,
     "ast_hash": "2433875d1ea81a177c21cf36c2368687",
+    "semantic_hash": ""
+  },
+  "js/color-picker.js": {
+    "mtime": 1787711729.8172047,
+    "ast_hash": "635e2e62c3c07969e2dfb381671dbff4",
     "semantic_hash": ""
   }
 }
