@@ -1111,11 +1111,6 @@ function renderFriends() {
   // Render Friends
   flist.innerHTML = '';
   const friendKeys = Object.keys(state.friends);
-  const countBadge = document.getElementById('friends-count-badge');
-  if (countBadge) {
-    countBadge.textContent = friendKeys.length;
-    countBadge.classList.toggle('hidden', friendKeys.length === 0);
-  }
   if (friendKeys.length === 0) {
     flist.innerHTML = `<li class="muted menu-empty-friends">
       <span data-i18n="menu.noFriends">${escapeHtml(t('menu.noFriends'))}</span>
