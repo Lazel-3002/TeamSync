@@ -610,7 +610,10 @@ body { padding-top: 35px; } /* Prevent overlap */
 }
 .global-ping {
   position: fixed;
-  top: 12px;
+  /* Özel titlebar 35px yükseklikte ve z-index: 999999; top: 12px iken bu
+     rozet/buton titlebar'ın altında kalıp pencere kontrolleriyle çakışıyor ve
+     tıklanamıyordu. Bu yüzden titlebar'ın bittiği yerden başlar. */
+  top: calc(35px + 12px);
   left: 12px;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
