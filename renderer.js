@@ -3591,7 +3591,8 @@ async function setupLocalAudio(options = {}) {
   }
 
   const sel = document.getElementById('mic-select');
-  const selectedMicId = localStorage.getItem(USER_MIC_DEVICE_KEY) || (sel && sel.value) || '';
+  // Ayarlar'da henüz kaydedilmemiş bir cihaz seçimi varsa önizleme onu kullanır.
+  const selectedMicId = getActiveMicDeviceId(sel && sel.value);
   const deviceId = selectedMicId ? { exact: selectedMicId } : undefined;
 
   let useRnnoise = !!state.useAI
@@ -3945,13 +3946,14 @@ function setupVUMeter() {
 // Boş id = sistem varsayılanı (setSinkId('') varsayılana döner).
 function applySpeakerTo(el) {
   if (!el || typeof el.setSinkId !== 'function') return;
-  const id = localStorage.getItem('teamsync_speaker_id') || '';
+  const id = getActiveSpeakerDeviceId();
   el.setSinkId(id).catch(e => {
     // Kayıtlı cihaz artık yok/değişmiş (cihaz id'leri kalıcı değildir):
     // varsayılana dönmezsek ses "geliyor ama duyulmuyor" gibi görünür.
     console.warn('setSinkId başarısız, varsayılan hoparlöre dönülüyor:', e && e.message ? e.message : e);
     if (id) {
-      localStorage.removeItem('teamsync_speaker_id');
+      localStorage.removeItem(USER_SPEAKER_DEVICE_KEY);
+      settingsPreview.speakerDeviceId = null;
       el.setSinkId('').catch(() => {});
       showToast(t('toast.audioDeviceNotFound'), 'warn');
     }
@@ -3970,6 +3972,9 @@ async function setupDeviceList() {
     fillAudioDeviceSelect(sel, devices, 'audioinput', t('settings.defaultMicrophone'), savedMic);
     if (sel) {
       sel.onchange = async () => {
+        // Oda içindeki hızlı seçim doğrudan kaydeder (Ayarlar'daki "Kaydet"
+        // akışının parçası değildir); bekleyen önizleme varsa onu geçersiz kılar.
+        settingsPreview.micDeviceId = null;
         if (sel.value) localStorage.setItem(USER_MIC_DEVICE_KEY, sel.value);
         else localStorage.removeItem(USER_MIC_DEVICE_KEY);
         const settingsSelect = document.getElementById('user-mic-select');
@@ -3983,12 +3988,14 @@ async function setupDeviceList() {
     // geri girince oluşur; kulaklığı buradan seçmek bunu keser.
     const spk = document.getElementById('speaker-select');
     if (spk) {
-      const saved = localStorage.getItem('teamsync_speaker_id') || '';
+      const saved = localStorage.getItem(USER_SPEAKER_DEVICE_KEY) || '';
       fillAudioDeviceSelect(spk, devices, 'audiooutput', t('settings.defaultSpeaker'), saved);
-      if (saved && ![...spk.options].some(o => o.value === saved)) localStorage.removeItem('teamsync_speaker_id');
+      if (saved && ![...spk.options].some(o => o.value === saved)) localStorage.removeItem(USER_SPEAKER_DEVICE_KEY);
       spk.onchange = () => {
-        if (spk.value) localStorage.setItem('teamsync_speaker_id', spk.value);
-        else localStorage.removeItem('teamsync_speaker_id');
+        // Oda içindeki hızlı seçim doğrudan kaydeder; bkz. mic-select.
+        settingsPreview.speakerDeviceId = null;
+        if (spk.value) localStorage.setItem(USER_SPEAKER_DEVICE_KEY, spk.value);
+        else localStorage.removeItem(USER_SPEAKER_DEVICE_KEY);
         const settingsSelect = document.getElementById('user-speaker-select');
         if (settingsSelect && [...settingsSelect.options].some(option => option.value === spk.value)) settingsSelect.value = spk.value;
         applySpeakerToAll();
@@ -7153,6 +7160,45 @@ const USER_SPEAKER_VOLUME_KEY = 'teamsync_speaker_volume';
 const USER_STREAM_PREVIEWS_KEY = 'teamsync_stream_previews';
 const USER_STREAM_FPS_KEY = 'teamsync_stream_fps';
 const USER_SHARE_SYSTEM_AUDIO_KEY = 'teamsync_share_system_audio';
+const USER_SPEAKER_DEVICE_KEY = 'teamsync_speaker_id';
+
+// ---- Ayarlar önizleme durumu ---------------------------------------------
+// Ayarlar penceresindeki hiçbir değişiklik anında kaydedilmez: yalnızca canlı
+// önizlenir ve Kaydet'e basılınca localStorage'a yazılır (bkz.
+// saveUserSettings). Aşağıdaki geçici değerler önizleme sürerken "etkin"
+// değer olarak okunur; pencere kaydedilmeden kapatılırsa
+// revertUnsavedSettingsPreview() bunları temizleyip kayıtlı değerlere döner.
+// null = "bekleyen seçim yok", '' = "sistem varsayılanı seçildi" (ikisi farklı).
+const settingsPreview = { micDeviceId: null, speakerDeviceId: null, language: null, timeFormat: null, dirty: false };
+
+function clearSettingsPreview() {
+  settingsPreview.micDeviceId = null;
+  settingsPreview.speakerDeviceId = null;
+  settingsPreview.language = null;
+  settingsPreview.timeFormat = null;
+  settingsPreview.dirty = false;
+}
+
+// Tema ve sade görünüm önizlemesi ayrı bir değişkende tutulmuyor (doğrudan
+// DOM'a uygulanıyor), bu yüzden "kaydedilmemiş değişiklik var mı" sorusunun
+// tek cevabı bu bayrak.
+function markSettingsDirty() {
+  settingsPreview.dirty = true;
+}
+
+function getActiveMicDeviceId(fallback = '') {
+  if (settingsPreview.micDeviceId !== null) return settingsPreview.micDeviceId;
+  return localStorage.getItem(USER_MIC_DEVICE_KEY) || fallback || '';
+}
+
+function getActiveSpeakerDeviceId() {
+  if (settingsPreview.speakerDeviceId !== null) return settingsPreview.speakerDeviceId;
+  return localStorage.getItem(USER_SPEAKER_DEVICE_KEY) || '';
+}
+
+function getSavedTimeFormat() {
+  return localStorage.getItem(USER_TIME_FORMAT_KEY) || 'auto';
+}
 // A locale is selectable only when its complete, reviewed catalogue is
 // available. Do not expose a partly translated locale and silently replace
 // the rest of its interface with English: that produces a mixed-language UI
@@ -8438,14 +8484,64 @@ function applySimpleUi(enabled, persist = false) {
   return active;
 }
 
-// Tema, özel tema renkleri ve sade görünüm; Kaydet'e basılmadan sadece
-// önizleme olarak canlı uygulanır (localStorage'a yazılmaz). Ayarlar
-// kapatılırken Kaydet'e basılmadıysa son kaydedilmiş değerlere geri
-// dönülmezse önizleme kalıcıymış gibi görünürdü (bkz. settings-v2-close).
+// Ayarlar penceresindeki tüm değişiklikler (tema, özel renkler, sade görünüm,
+// ses seviyeleri, ses cihazları, dil, saat formatı, donanım hızlandırma)
+// Kaydet'e basılmadan sadece önizleme olarak canlı uygulanır; localStorage'a
+// yazılmaz. Pencere Kaydet'e basılmadan kapatılırsa burada son kaydedilmiş
+// değerlere dönülür — aksi hâlde önizleme kalıcıymış gibi görünürdü
+// (bkz. settings-v2-close ve Escape).
 function revertUnsavedSettingsPreview() {
+  // Hiç dokunulmadıysa geri alacak bir şey de yok: dil geri yükleme tüm
+  // belgeyi tarıdığı için Ayarlar'ı her kapatışta bedava çalıştırmayalım.
+  if (!settingsPreview.dirty) return;
+  const hadMicPreview = settingsPreview.micDeviceId !== null;
+  const hadSpeakerPreview = settingsPreview.speakerDeviceId !== null;
+  const hadLanguagePreview = settingsPreview.language !== null;
+  clearSettingsPreview();
+
   applySimpleUi(getSimpleUiEnabled());
   const savedTheme = applyUserTheme(getUserTheme());
   if (savedTheme === 'custom') applyCustomThemeColors(getCustomThemeColors());
+
+  applyMicrophoneVolume(readPercentPreference(USER_MIC_VOLUME_KEY), false);
+  applySpeakerVolume(readPercentPreference(USER_SPEAKER_VOLUME_KEY), false);
+
+  syncAudioDeviceSelects();
+  if (hadSpeakerPreview) applySpeakerToAll();
+  // Mikrofon önizlemesi akışı gerçekten değiştirdiği için kayıtlı cihaza
+  // dönmek de akışı yeniden kurmayı gerektirir.
+  if (hadMicPreview && (state.room || state.rawMicStream)) {
+    setupLocalAudio().then(() => setupVUMeter()).catch(() => {});
+  }
+
+  if (hadLanguagePreview) applyUserLanguage(getSavedLanguage(), false);
+  syncSettingsTimeFormatSelection();
+  syncHardwareAccelerationCheckbox();
+}
+
+// Kayıtlı cihaz seçimlerini hem Ayarlar hem oda içindeki listelere yansıtır.
+function syncAudioDeviceSelects() {
+  const savedMic = localStorage.getItem(USER_MIC_DEVICE_KEY) || '';
+  const savedSpeaker = localStorage.getItem(USER_SPEAKER_DEVICE_KEY) || '';
+  [['user-mic-select', savedMic], ['mic-select', savedMic],
+   ['user-speaker-select', savedSpeaker], ['speaker-select', savedSpeaker]].forEach(([id, value]) => {
+    const select = document.getElementById(id);
+    if (select && [...select.options].some(option => option.value === value)) select.value = value;
+  });
+}
+
+function syncSettingsTimeFormatSelection() {
+  const radio = document.querySelector(`input[name="settings-time-format"][value="${getSavedTimeFormat()}"]`);
+  if (radio) radio.checked = true;
+  updateSettingsTimePreview();
+}
+
+function syncHardwareAccelerationCheckbox() {
+  const hwEl = document.getElementById('user-settings-hwaccel');
+  if (!hwEl) return;
+  delete hwEl.dataset.pendingValue;
+  if (!window.electronAPI?.getHardwareAcceleration) return;
+  window.electronAPI.getHardwareAcceleration().then(on => { hwEl.checked = !!on; }).catch(() => {});
 }
 
 function syncThemeSelection(theme = getUserTheme()) {
@@ -8771,6 +8867,7 @@ function createPaletteCard(preset, kind) {
   }
 
   btn.addEventListener('click', () => {
+    markSettingsDirty();
     if (preset.theme) {
       applyUserTheme(preset.theme);
       return;
@@ -8820,6 +8917,7 @@ function initCustomThemeEditor() {
 
   const HEX_RE = /^#[0-9a-f]{6}$/i;
   const sync = () => {
+    markSettingsDirty();
     const colors = { bg: bgInput?.value || bg, accent: accentInput?.value || accent, button: buttonInput?.value || button };
     applyCustomThemeColors(colors);
     if (getUserTheme() === 'custom' || document.documentElement.dataset.theme === 'custom') applyUserTheme('custom');
@@ -8846,7 +8944,7 @@ function initCustomThemeEditor() {
   const storePalette = () => {
     const palette = saveCurrentPalette(paletteName?.value);
     if (paletteName) paletteName.value = '';
-    showToast(`${palette.name} · ${t('settings.themePaletteSaved')}`, 'ok');
+    showToast(`${palette.name} · ${t('settings.themePaletteSaved')}`, 'info');
   };
   paletteSave?.addEventListener('click', storePalette);
   paletteName?.addEventListener('keydown', event => {
@@ -8875,9 +8973,16 @@ function applyUserTheme(theme, persist = false) {
   return selected;
 }
 
-function getUserLanguage() {
+function getSavedLanguage() {
   const saved = localStorage.getItem(USER_LANGUAGE_KEY);
   return SUPPORTED_LANGUAGES.includes(saved) ? saved : 'en';
+}
+
+// Ayarlar'da seçilen dil Kaydet'e basılana kadar yalnızca önizlemedir; t() ve
+// dili okuyan diğer her yer bu geçici değeri görmeli, yoksa arayüzün bir kısmı
+// yeni, bir kısmı eski dilde kalırdı.
+function getUserLanguage() {
+  return settingsPreview.language || getSavedLanguage();
 }
 
 function hasCompleteLocaleCatalog(language) {
@@ -8919,7 +9024,10 @@ function renderLanguageOptions() {
     // language changes, so the change listener is bound here rather than once
     // at startup — otherwise clicking a language a second time would no-op.
     input.addEventListener('change', () => {
-      if (input.checked) applyUserLanguage(input.value, true);
+      if (!input.checked) return;
+      // Önizleme; kalıcı yazma Kaydet'te (bkz. saveUserSettings).
+      markSettingsDirty();
+      applyUserLanguage(input.value, false);
     });
     const flag = document.createElement('span');
     flag.className = 'language-flag';
@@ -8958,7 +9066,12 @@ function renderLanguageOptions() {
 
 function applyUserLanguage(language, persist = true) {
   const lang = SUPPORTED_LANGUAGES.includes(language) ? language : 'en';
-  if (persist) localStorage.setItem(USER_LANGUAGE_KEY, lang);
+  if (persist) {
+    localStorage.setItem(USER_LANGUAGE_KEY, lang);
+    settingsPreview.language = null;
+  } else {
+    settingsPreview.language = lang === getSavedLanguage() ? null : lang;
+  }
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const value = (I18N[lang] && I18N[lang][el.dataset.i18n]) || I18N.en[el.dataset.i18n] || I18N.tr[el.dataset.i18n];
@@ -8997,13 +9110,31 @@ function applyUserLanguage(language, persist = true) {
   updateSettingsTimePreview();
   setMicTestButtonState(!!state.settingsMicTestActive);
   populateSettingsAudioDevices();
+  refreshAudioDeviceDefaultLabels();
   window.TeamSyncMediaLibrary?.refresh();
 }
 
-function formatUserTime(value) {
+// Oda içindeki cihaz listeleri (#mic-select / #speaker-select) odaya girilirken
+// setupDeviceList() ile bir kez doldurulur ve dil değişiminde yeniden
+// doldurulmaz; "Windows Varsayılanı" seçeneği bu yüzden sunucu kurulduğu andaki
+// dilde takılı kalıyordu. Cihaz adları işletim sisteminden geldiği için sadece
+// bu çevrilebilir seçeneğin metni tazelenir — liste ve seçim korunur.
+function refreshAudioDeviceDefaultLabels() {
+  [
+    ['mic-select', 'settings.defaultMicrophone'],
+    ['user-mic-select', 'settings.defaultMicrophone'],
+    ['speaker-select', 'settings.defaultSpeaker'],
+    ['user-speaker-select', 'settings.defaultSpeaker']
+  ].forEach(([id, key]) => {
+    const option = document.getElementById(id)?.querySelector('option[value=""]');
+    if (option) option.textContent = t(key);
+  });
+}
+
+function formatUserTime(value, formatOverride) {
   const date = value instanceof Date ? value : new Date(value);
   const lang = getUserLanguage();
-  const format = localStorage.getItem(USER_TIME_FORMAT_KEY) || 'auto';
+  const format = formatOverride || getSavedTimeFormat();
   const options = { hour: '2-digit', minute: '2-digit' };
   if (format === '12') options.hour12 = true;
   if (format === '24') options.hour12 = false;
@@ -9013,7 +9144,9 @@ function formatUserTime(value) {
 
 function updateSettingsTimePreview() {
   const preview = document.getElementById('settings-time-preview');
-  if (preview) preview.textContent = formatUserTime(new Date());
+  // Önizleme, henüz kaydedilmemiş seçimi gösterir; sohbetteki saatler
+  // Kaydet'e basılana kadar eski formatta kalır.
+  if (preview) preview.textContent = formatUserTime(new Date(), settingsPreview.timeFormat || getSavedTimeFormat());
 }
 
 function readPercentPreference(key, fallback = 100) {
@@ -9075,8 +9208,11 @@ async function populateSettingsAudioDevices() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const savedMic = localStorage.getItem(USER_MIC_DEVICE_KEY) || document.getElementById('mic-select')?.value || '';
-    const savedSpeaker = localStorage.getItem('teamsync_speaker_id') || document.getElementById('speaker-select')?.value || '';
+    // Bekleyen (henüz kaydedilmemiş) seçim varsa liste yenilendiğinde de o korunur.
+    const savedMic = getActiveMicDeviceId(document.getElementById('mic-select')?.value);
+    const savedSpeaker = settingsPreview.speakerDeviceId !== null
+      ? settingsPreview.speakerDeviceId
+      : (localStorage.getItem(USER_SPEAKER_DEVICE_KEY) || document.getElementById('speaker-select')?.value || '');
     fillAudioDeviceSelect(document.getElementById('user-mic-select'), devices, 'audioinput', t('settings.defaultMicrophone'), savedMic);
     fillAudioDeviceSelect(document.getElementById('user-speaker-select'), devices, 'audiooutput', t('settings.defaultSpeaker'), savedSpeaker);
   } catch (error) {
@@ -9172,6 +9308,9 @@ function setSettingsPanel(name) {
 function openUserSettings(panel = 'general') {
   const modal = document.getElementById('settings-modal');
   if (!modal) return;
+  // Pencere Kaydet'e basılmadan başka bir yoldan kapatıldıysa önizleme hâlâ
+  // ekranda olabilir; her açılışta kayıtlı değerlerden başla.
+  if (settingsPreview.dirty) revertUnsavedSettingsPreview();
   modal.classList.remove('hidden');
   setSettingsPanel(panel);
 
@@ -9198,17 +9337,11 @@ function openUserSettings(panel = 'general') {
   const language = getUserLanguage();
   const languageRadio = document.querySelector(`input[name="settings-language"][value="${language}"]`);
   if (languageRadio) languageRadio.checked = true;
-  const timeFormat = localStorage.getItem(USER_TIME_FORMAT_KEY) || 'auto';
-  const timeRadio = document.querySelector(`input[name="settings-time-format"][value="${timeFormat}"]`);
-  if (timeRadio) timeRadio.checked = true;
   applySimpleUi(getSimpleUiEnabled());
   syncThemeSelection();
-  updateSettingsTimePreview();
-
-  const hwEl = document.getElementById('user-settings-hwaccel');
-  if (hwEl && window.electronAPI && window.electronAPI.getHardwareAcceleration) {
-    window.electronAPI.getHardwareAcceleration().then(on => { hwEl.checked = !!on; }).catch(() => {});
-  }
+  syncAudioDeviceSelects();
+  syncSettingsTimeFormatSelection();
+  syncHardwareAccelerationCheckbox();
 }
 
 async function saveUserSettings() {
@@ -9238,6 +9371,41 @@ async function saveUserSettings() {
   applyMicrophoneVolume(document.getElementById('user-mic-volume').value, true);
   applySpeakerVolume(document.getElementById('user-speaker-volume').value, true);
 
+  // Ses cihazları, dil ve saat formatı da yalnızca burada kalıcı olur;
+  // pencere açıkken yapılan seçimler o ana kadar sadece önizlemeydi.
+  // Listeler henüz doldurulmadıysa (enumerateDevices tamamlanmadan Kaydet'e
+  // basılırsa) boş bir değer yazıp kayıtlı cihazı silmeyelim.
+  const micSelect = document.getElementById('user-mic-select');
+  const speakerSelect = document.getElementById('user-speaker-select');
+  if (micSelect?.options.length) {
+    if (micSelect.value) localStorage.setItem(USER_MIC_DEVICE_KEY, micSelect.value);
+    else localStorage.removeItem(USER_MIC_DEVICE_KEY);
+  }
+  if (speakerSelect?.options.length) {
+    if (speakerSelect.value) localStorage.setItem(USER_SPEAKER_DEVICE_KEY, speakerSelect.value);
+    else localStorage.removeItem(USER_SPEAKER_DEVICE_KEY);
+  }
+
+  const timeFormat = document.querySelector('input[name="settings-time-format"]:checked')?.value || getSavedTimeFormat();
+  localStorage.setItem(USER_TIME_FORMAT_KEY, timeFormat);
+  const language = document.querySelector('input[name="settings-language"]:checked')?.value || getUserLanguage();
+
+  // Donanım hızlandırma main sürecinde (settings.json) tutulur.
+  const hwEl = document.getElementById('user-settings-hwaccel');
+  const hwPending = hwEl && hwEl.dataset.pendingValue;
+  if (hwPending && window.electronAPI?.setHardwareAcceleration) {
+    window.electronAPI.setHardwareAcceleration(hwPending === '1');
+    delete hwEl.dataset.pendingValue;
+    showToast(t('settings.hwSaved'), 'info');
+  }
+
+  clearSettingsPreview();
+  // Dil değişmediyse tüm belgeyi yeniden çevirmeye gerek yok.
+  if (language !== getSavedLanguage()) applyUserLanguage(language, true);
+  syncAudioDeviceSelects();
+  applySpeakerToAll();
+  updateSettingsTimePreview();
+
   // Oda içindeki eski çalışma yolları bu alanları kullanıyor; görünür ayar
   // merkezindeki değerlerle eşit tutarak mevcut ses/ağ davranışını koru.
   document.getElementById('turn-url').value = turnUrl;
@@ -9255,7 +9423,9 @@ async function saveUserSettings() {
       if (status) status.textContent = t('settings.savedLocally');
     }, 1800);
   }
-  showToast(t('settings.saved'), 'ok');
+  // Ayarlar onayı seçili temanın vurgu rengini kullanır: sabit yeşil "ok"
+  // çubuğu mor/beyaz gibi temalarda arayüzden kopuk duruyordu.
+  showToast(t('settings.saved'), 'info');
 }
 
 function initUserSettings() {
@@ -9305,32 +9475,28 @@ function initUserSettings() {
   });
   document.getElementById('settings-v2-save')?.addEventListener('click', saveUserSettings);
   document.getElementById('user-mic-test')?.addEventListener('click', toggleSettingsMicTest);
+  // Aşağıdaki kontroller yalnızca canlı önizleme yapar; kalıcı yazma
+  // saveUserSettings() içindedir (bkz. settingsPreview).
   document.getElementById('user-mic-volume')?.addEventListener('input', event => {
-    applyMicrophoneVolume(event.target.value, true);
+    markSettingsDirty();
+    applyMicrophoneVolume(event.target.value, false);
   });
   document.getElementById('user-speaker-volume')?.addEventListener('input', event => {
-    applySpeakerVolume(event.target.value, true);
+    markSettingsDirty();
+    applySpeakerVolume(event.target.value, false);
   });
   document.getElementById('user-mic-select')?.addEventListener('change', async event => {
-    const value = event.target.value;
-    if (value) localStorage.setItem(USER_MIC_DEVICE_KEY, value);
-    else localStorage.removeItem(USER_MIC_DEVICE_KEY);
-    const roomSelect = document.getElementById('mic-select');
-    if (roomSelect && [...roomSelect.options].some(option => option.value === value)) roomSelect.value = value;
+    markSettingsDirty();
+    settingsPreview.micDeviceId = event.target.value;
     if (state.room || state.rawMicStream) {
       await setupLocalAudio();
       setupVUMeter();
     }
-    showToast(t('settings.deviceChanged'), 'info');
   });
   document.getElementById('user-speaker-select')?.addEventListener('change', event => {
-    const value = event.target.value;
-    if (value) localStorage.setItem('teamsync_speaker_id', value);
-    else localStorage.removeItem('teamsync_speaker_id');
-    const roomSelect = document.getElementById('speaker-select');
-    if (roomSelect && [...roomSelect.options].some(option => option.value === value)) roomSelect.value = value;
+    markSettingsDirty();
+    settingsPreview.speakerDeviceId = event.target.value;
     applySpeakerToAll();
-    showToast(t('settings.deviceChanged'), 'info');
   });
   document.getElementById('user-broadcast-advanced-toggle')?.addEventListener('click', event => {
     const button = event.currentTarget;
@@ -9346,24 +9512,30 @@ function initUserSettings() {
   document.querySelectorAll('input[name="settings-time-format"]').forEach(radio => {
     radio.addEventListener('change', () => {
       if (!radio.checked) return;
-      localStorage.setItem(USER_TIME_FORMAT_KEY, radio.value);
+      markSettingsDirty();
+      settingsPreview.timeFormat = radio.value;
       updateSettingsTimePreview();
     });
   });
   document.querySelectorAll('input[name="settings-theme"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      if (radio.checked) applyUserTheme(radio.value);
+      if (!radio.checked) return;
+      markSettingsDirty();
+      applyUserTheme(radio.value);
     });
   });
   document.getElementById('user-settings-simple-ui')?.addEventListener('change', event => {
+    markSettingsDirty();
     applySimpleUi(event.target.checked);
   });
 
   const hwEl = document.getElementById('user-settings-hwaccel');
   if (hwEl && window.electronAPI && window.electronAPI.setHardwareAcceleration) {
+    // Donanım hızlandırma main sürecinde saklanır; kutuyu işaretlemek tek
+    // başına yazmaz, seçim Kaydet'e kadar burada bekletilir.
     hwEl.addEventListener('change', e => {
-      window.electronAPI.setHardwareAcceleration(e.target.checked);
-      showToast(t('settings.hwSaved'), 'info');
+      markSettingsDirty();
+      hwEl.dataset.pendingValue = e.target.checked ? '1' : '0';
     });
   }
   if (navigator.mediaDevices && !state.settingsDeviceChangeHooked) {
