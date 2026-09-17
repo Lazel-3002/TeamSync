@@ -47,6 +47,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getHardwareAcceleration: () => ipcRenderer.invoke('get-hardware-acceleration'),
   getEffectiveHardwareAcceleration: () => ipcRenderer.invoke('get-effective-hardware-acceleration'),
   setHardwareAcceleration: (enabled) => ipcRenderer.invoke('set-hardware-acceleration', enabled),
+  // DNS sağlayıcısı (DoH). WARP/VPN bozuk yerel DNS'i devre dışı bırakmak için.
+  // Değerler: 'cloudflare' | 'quad9' | 'google' | 'system'. Anında etkili.
+  getDnsProvider: () => ipcRenderer.invoke('get-dns-provider'),
+  setDnsProvider: (provider) => ipcRenderer.invoke('set-dns-provider', provider),
   // TEŞHİS: DIAG açık mı? ve canlı DOM'daki indirme butonlarını günlüğe gönder.
   diagEnabled: () => ipcRenderer.invoke('diag-enabled'),
   diagCapture: (info) => ipcRenderer.send('diag-capture', info),
