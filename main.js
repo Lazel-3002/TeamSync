@@ -1,21 +1,5 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, powerSaveBlocker, screen, shell, Tray, nativeImage, safeStorage } = require('electron');
 app.name = 'TeamSync';
-// Windows görev çubuğu KİMLİĞİ. Bu ayarlanmazsa Windows pencereyi başlatan
-// çalıştırılabilirin (geliştirmede electron.exe) kimliğiyle eşleştirir ve
-// görev çubuğu düğmesinde uygulamanın değil ELECTRON'un varsayılan atom
-// simgesi çıkar; bildirimler de uygulama adı yerine "Electron" der.
-// Değer, package.json içindeki build.appId ile aynı olmak zorunda: farklı
-// olursa kurulu sürümün kısayolu ile çalışan pencere ayrı düğmelere bölünür
-// ve sabitlenen (pin) simge çalışmaz.
-if (process.platform === 'win32') app.setAppUserModelId('com.TeamSync.voice');
-
-// Uygulama simgesi. Windows görev çubuğu 16/24/32/48px varyantları olan bir
-// .ico ister; tek boyutlu 512px PNG verildiğinde küçültme işini kendisi yapar
-// ve sonuç bulanık olur (bazı Windows sürümlerinde hiç uygulanmaz). Bu yüzden
-// Windows'ta çok boyutlu .ico, diğer platformlarda PNG kullanılıyor.
-const APP_ICON_PATH = require('path').join(
-  __dirname, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'
-);
 // Donanım hızlandırma tercihi ayarlardan değiştirilebilir (settings.json).
 // Varsayılan: AÇIK — backdrop-filter (buzlu cam) yalnızca GPU açıkken çalışır.
 // Sadece ayar açıkça false ise kapatılır. Değişiklik yeniden başlatınca etkin olur.
@@ -594,7 +578,7 @@ function createWindow() {
       return THEME_BG_COLORS[s.theme] || '#1e1f22';
     })(),
     title: 'TeamSync - P2P',
-    icon: APP_ICON_PATH,
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     autoHideMenuBar: true,
     webSecurity: true,
     frame: false

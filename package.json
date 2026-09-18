@@ -56,7 +56,7 @@
       "!yapaydenetliyici.md"
     ],
     "win": {
-      "icon": "assets/icon.ico",
+      "icon": "assets/icon.png",
       "target": [
         {
           "target": "nsis",
