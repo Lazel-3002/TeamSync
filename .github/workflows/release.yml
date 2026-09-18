@@ -7,6 +7,7 @@
 #   1) package.json'da "version"ı yükselt (örn. 1.0.0 -> 1.0.1)
 #   2) git push
 # Version yükseltilmeden yapılan push'lar hiçbir şey yayınlamaz (güvenli).
+# Etiket (vX.Y.Z) elle atılmaz, aşağıda otomatik oluşturulur.
 name: Release
 
 on:
@@ -44,6 +45,28 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "v$VERSION yeni, derlenip yayınlanacak."
+          fi
+
+      # Etiket, derlemeden ÖNCE var olmalı. package.json'da releaseType "release"
+      # olduğu için electron-builder taslak değil, doğrudan yayınlanmış bir
+      # release oluşturmaya çalışır; GitHub ise var olmayan bir etikete
+      # yayınlanmış release açmayı reddeder:
+      #   422 — "Published releases must have a valid tag"
+      # v1.0.6'da tam olarak bu oldu: istek reddedildi ama blockmap yüklenmiş
+      # olduğu için ortada .exe'si ve latest.yml'si olmayan, yarım ve yayında
+      # bir release kaldı. Etiketi önden atınca electron-builder var olan bir
+      # etikete yayınlar ve bu hata oluşamaz.
+      - name: Sürüm etiketini oluştur
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null 2>&1; then
+            echo "v$VERSION etiketi zaten var, oluşturma atlanıyor."
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+            echo "v$VERSION etiketi oluşturuldu ve push'landı."
           fi
 
       - name: Bağımlılıkları kur
