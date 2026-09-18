@@ -106,6 +106,13 @@ module.exports = async function run() {
        1`
     );
 
+    // Dil ve saat bicimi radyolari artik YALNIZCA ONIZLEME; kalici olmalari
+    // icin Kaydet'e basilmali (sade gorunum tercihiyle ayni akis, bkz.
+    // saveUserSettings). Kaydet'e basmadan localStorage'a bakmak eski
+    // otomatik kaydetme davranisini olcuyordu.
+    await evalJS(peer.client, `document.getElementById('settings-v2-save').click(); 1`);
+    await new Promise(resolve => setTimeout(resolve, 250));
+
     const english = await evalJS(
       peer.client,
       `({
@@ -154,17 +161,25 @@ module.exports = async function run() {
     assert.strictEqual(english.timeFormat, '12', JSON.stringify(english, null, 2));
     assert.match(english.formattedTime, /PM/i, JSON.stringify(english, null, 2));
 
-    const twentyFourHour = await evalJS(
+    // Burada da radyo tek basina yeterli degil: secim Kaydet'e kadar onizleme.
+    await evalJS(
       peer.client,
       `(() => {
         const time24 = document.querySelector('input[name="settings-time-format"][value="24"]');
         time24.checked = true;
         time24.dispatchEvent(new Event('change', { bubbles: true }));
-        return {
-          stored: localStorage.getItem('teamsync_time_format'),
-          formatted: formatUserTime(new Date(2026, 0, 1, 13, 5)),
-        };
+        document.getElementById('settings-v2-save').click();
+        1;
       })()`
+    );
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    const twentyFourHour = await evalJS(
+      peer.client,
+      `({
+        stored: localStorage.getItem('teamsync_time_format'),
+        formatted: formatUserTime(new Date(2026, 0, 1, 13, 5)),
+      })`
     );
     assert.strictEqual(twentyFourHour.stored, '24', JSON.stringify(twentyFourHour, null, 2));
     assert.match(twentyFourHour.formatted, /13[.:]05/, JSON.stringify(twentyFourHour, null, 2));
@@ -266,14 +281,19 @@ module.exports = async function run() {
       legacyPtt: true,
     });
 
+    // Dil seçimi de sade görünüm gibi ÖNİZLEME: Kaydet'e basmadan kapatmak
+    // tercihi geri alır. Bu yüzden önce Kaydet, sonra Kapat.
     await evalJS(
       peer.client,
       `const turkish = document.querySelector('input[name="settings-language"][value="tr"]');
        turkish.checked = true;
        turkish.dispatchEvent(new Event('change', { bubbles: true }));
-       document.getElementById('settings-v2-close').click();
+       document.getElementById('settings-v2-save').click();
        1`
     );
+    await new Promise(resolve => setTimeout(resolve, 250));
+    await evalJS(peer.client, `document.getElementById('settings-v2-close').click(); 1`);
+    await new Promise(resolve => setTimeout(resolve, 150));
     assert.strictEqual(await evalJS(peer.client, `localStorage.getItem('teamsync_language')`), 'tr');
     assert.strictEqual(
       await evalJS(peer.client, `document.getElementById('focus-lock-btn').title`),

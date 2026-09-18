@@ -5,7 +5,10 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const TEST_TIMEOUT_MS = Number(process.env.E2E_TEST_TIMEOUT_MS || 90000);
+// 90 sn, shared-browser icin fazla darmis: gercek bir web sayfasi yukleyen o
+// test tek basina ~82 sn suruyor ve takim halinde calisirken (paylasilan CPU)
+// duzenli olarak zaman asimina ugrayip yanlis FAIL uretiyordu.
+const TEST_TIMEOUT_MS = Number(process.env.E2E_TEST_TIMEOUT_MS || 150000);
 
 function runIsolatedTest(file) {
   const filePath = path.resolve(__dirname, file);

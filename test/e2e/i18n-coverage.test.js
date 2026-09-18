@@ -78,6 +78,17 @@ module.exports = async function run() {
     assert.match(result.localVideoText, /Only play\/pause\/time is synchronized/, JSON.stringify(result, null, 2));
     assert.match(result.localVideoText, /Please choose the same video file/, JSON.stringify(result, null, 2));
 
+    // Ingilizce arayuzde Turkce metin sizintisi: asagidaki yuzeylerin hepsi
+    // ceviriden gecmek zorunda. Bu degisken eskiden HIC tanimlanmamisti, bu
+    // yuzden kontrol ReferenceError ile patliyor ve sizintiyi hic olcmuyordu.
+    const keySurfaces = [
+      result.activityText,
+      result.lobbyText,
+      result.pollText,
+      result.wheelText,
+      result.localVideoText,
+      result.inviteText,
+    ].join('\n');
     assert.ok(!/[çğıöşüÇĞİÖŞÜ]/.test(keySurfaces), `Turkish text leaked into English activity UI:\n${keySurfaces}`);
 
     const unsupportedLocale = await evalJS(peer.client, `(() => {

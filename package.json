@@ -13,6 +13,7 @@
     "build-full": "electron-builder --win --x64",
     "release": "electron-builder --win nsis --x64 --publish always",
     "test:e2e": "node test/e2e/run-all.js",
+    "diag:net": "node tools/net/diagnose.js",
     "i18n:audit": "node tools/i18n/audit-locales.js",
     "i18n:build-runtime": "node tools/i18n/build-runtime-catalogs.js"
   },
@@ -55,7 +56,7 @@
       "!yapaydenetliyici.md"
     ],
     "win": {
-      "icon": "assets/icon.png",
+      "icon": "assets/icon.ico",
       "target": [
         {
           "target": "nsis",

@@ -835,6 +835,31 @@ function initSharedBrowser() {
     //      handler'ındaki eylem kalkanı) — böylece yoldaki eski bir rutin,
     //      taze bir sarmayı geri çekemez.
     //
+    // Sayfadaki GERÇEK kullanıcı eylemlerini (play/pause/seek) damgalayan
+    // izleyici. Renderer video durumunu saniyede bir yokluyor; bu gecikme
+    // içinde kurucunun 3 sn'lik rutin senkronu gelirse misafirin AZ ÖNCE
+    // yaptığı duraklatmayı geri açabiliyor, üstelik bu geri açma yankı
+    // kalkanını kurduğu için misafirin eylemi hiç yayınlanmadan yok
+    // oluyordu ("durdurdum ama ona yansımadı"). Damga sayfanın içinde,
+    // olayın kendi anında tutuluyor: artık yoklama gecikmesi bir şey
+    // kaçırmıyor. Gezinmede window sıfırlandığı için kurulum idempotent.
+    try {
+      await sbWebview.executeJavaScript(`(() => {
+        if (window.__sbActionTracker) return;
+        window.__sbActionTracker = true;
+        window.__sbLastUserAction = 0;
+        const mark = () => {
+          // Uzaktan uygulanan senkronun kendi tetiklediği olaylar kullanıcı
+          // eylemi değildir; __sbApplying damgası onları eler.
+          if (Date.now() - (window.__sbApplying || 0) < 400) return;
+          window.__sbLastUserAction = Date.now();
+        };
+        document.addEventListener('play', mark, true);
+        document.addEventListener('pause', mark, true);
+        document.addEventListener('seeked', mark, true);
+      })()`);
+    } catch (e) {}
+
     // Reklam gösterilirken ASLA okuma/yayın yapılmaz (reklam zamanı içerik
     // zamanıyla alakasız); ölçüm sondası (lastVideoState) da sıfırlanır ki
     // reklam bitince "video reklam süresi kadar geri sıçradı" sanılıp sahte
@@ -1118,6 +1143,15 @@ function handleSBMessage(peerId, msg) {
           if (document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay')) return 'retry';
           const v = document.querySelector('video');
           if (!v) return 'retry';
+          // RUTİN, taze bir yerel eylemin üstüne YAZMAZ. Kurucunun 3 sn'lik
+          // drift turu, misafirin yarım saniye önce bastığı duraklat/sarmayı
+          // geri alırsa o eylem hiçbir yere ulaşmadan kaybolur. Gerçek
+          // eylemler zaten rutin DEĞİL olarak yayınlanır; onlar bu kalkandan
+          // etkilenmez ve karşı tarafa normal şekilde uygulanır.
+          if (${JSON.stringify(isRoutine)} && Date.now() - (window.__sbLastUserAction || 0) < 6000) return false;
+          // Bundan sonraki play/pause/seek olayları BİZİM ürettiğimizdir;
+          // izleyici bunları kullanıcı eylemi saymasın.
+          window.__sbApplying = Date.now();
           let changed = false;
           const targetTime = ${JSON.stringify(targetTime)};
           if (Math.abs(v.currentTime - targetTime) > ${JSON.stringify(tolerance)}) {

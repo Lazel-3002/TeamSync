@@ -61,14 +61,21 @@ module.exports = async function run() {
         hasCard: !!card,
         hasCover: !!image,
         source: image?.getAttribute('src') || '',
-        hasCustomIcon: !!card?.querySelector('.activity-icon-vampire svg')
+        hasCustomIcon: !!card?.querySelector('.activity-icon-vampire svg'),
+        language: typeof getUserLanguage === 'function' ? getUserLanguage() : 'en'
       };
     })()`);
+    // Kapak gorseli DILE bagli: Turkce afis v3, diger diller icin basligi
+    // ayrica yazilan v2 kullaniliyor (bkz. renderer.js applyActivityCovers).
+    // Test dili sabitlemedigi icin beklenen kaynak da dilden turetilmeli.
     assert.deepStrictEqual(activityCover, {
       hasCard: true,
       hasCover: true,
-      source: 'assets/vampire-villager-cover-v3.png',
-      hasCustomIcon: true
+      source: activityCover.language === 'tr'
+        ? 'assets/vampire-villager-cover-v3.png'
+        : 'assets/vampire-villager-cover-v2.png',
+      hasCustomIcon: true,
+      language: activityCover.language
     }, JSON.stringify(activityCover));
 
     // Yeni Gece Meclisi kabuğu: faz akışı, bağımsız oyun masası ve bilgi rayı

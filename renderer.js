@@ -672,6 +672,63 @@ function isJunkIceCandidate(cand) {
   return false;
 }
 
+// NAT DAVRANIŞI: relay'in gerçekten ŞART olup olmadığına karar veren ölçüm.
+//
+// Yalnızca adresin CGNAT aralığında olmasına bakmak YANLIŞ bir ölçüttü:
+// taşıyıcı NAT'ların çoğu endpoint-independent (cone) çalışır ve bu
+// durumda delik açma (hole punching) gayet kurulur — relay'e zorlamak
+// boşuna bant genişliği ve gecikme demekti. Belirleyici olan, aynı yerel
+// porttan FARKLI STUN sunucularına çıkarken dış portun DEĞİŞİP değişmediği:
+// değişiyorsa NAT simetriktir, karşı taraf bize hiçbir zaman doğru porttan
+// ulaşamaz ve tek yol relay olur.
+//
+// getIceServers() bilerek İKİ FARKLI sağlayıcıdan STUN veriyor; bu yüzden
+// tek bir toplama turu ölçüm için yeterli: cone NAT'ta iki sunucu da aynı
+// dış adres/portu görür (Chromium ikisini tek adaya indirger), simetrik
+// NAT'ta aynı yerel porta (rport) karşılık iki FARKLI dış port çıkar.
+function parseSrflxCandidate(line) {
+  const m = /^candidate:\S+ \d+ \S+ \d+ (\S+) (\d+) typ srflx(?:.* rport (\d+))?/.exec(line || '');
+  if (!m) return null;
+  return { address: m[1], port: m[2], rport: m[3] || '' };
+}
+
+// 100.64.0.0/10 (RFC 6598) = taşıyıcı sınıfı NAT. Tek başına relay gerekçesi
+// DEĞİL (yukarıya bakın), ama tanı mesajlarını isabetli kılar: kullanıcı
+// bağlanamadığında sebebin operatör NAT'ı olduğunu söyleyebilelim.
+function isCgnatAddress(addr) {
+  const m = /^(\d{1,3})\.(\d{1,3})\./.exec(addr || '');
+  return !!m && Number(m[1]) === 100 && Number(m[2]) >= 64 && Number(m[2]) <= 127;
+}
+
+// Toplanan her srflx adayını yerel portuna göre gruplar. Aynı yerel port
+// için iki farklı dış port görülürse NAT simetriktir.
+function noteNatBehaviourFromCandidate(cand) {
+  const parsed = parseSrflxCandidate((cand && cand.candidate) || '');
+  if (!parsed) return;
+
+  if (!state.cgnatDetected && isCgnatAddress(parsed.address)) {
+    state.cgnatDetected = true;
+    console.log('📶 Taşıyıcı NAT (CGNAT) adresi: ' + parsed.address +
+      ' — dışarıdan erişilemez, port yönlendirme işe yaramaz.');
+  }
+
+  if (state.symmetricNatDetected || !parsed.rport) return;
+  if (!state.srflxByLocalPort) state.srflxByLocalPort = {};
+  const seen = state.srflxByLocalPort[parsed.rport];
+  if (!seen) {
+    state.srflxByLocalPort[parsed.rport] = parsed.port;
+    return;
+  }
+  if (seen === parsed.port) return; // aynı eşleme: cone NAT
+
+  state.symmetricNatDetected = true;
+  const hasTurn = getIceServers().some(s => iceEntryHasTurn(s));
+  console.warn('🚧 SİMETRİK NAT algılandı (yerel port ' + parsed.rport + ' → dış port ' +
+    seen + ' ve ' + parsed.port + ') — doğrudan P2P kurulamaz, ' +
+    (hasTurn ? 'TURN relay önceliklendirilecek' : 'TURN YOK, bağlantı kurulamayabilir'));
+  showToast(hasTurn ? t('toast.warpDetectedWithTurn') : t('toast.warpDetectedNoTurn'), 'warn');
+}
+
 async function processSignal(id, ip, signal) {
   if (!isValidPeerId(id) || !signal || typeof signal !== 'object' || Array.isArray(signal)
       || typeof signal.type !== 'string' || signal.type.length > 32
@@ -1888,8 +1945,33 @@ function publishPresence() {
 // kesintide tüm istemciler sıradaki aynı yedek broker'da yeniden buluşur.
 let globalMqttSessionId = 0;
 
+// Hangi kimlikle bağlanıldığını tutar. Abonelik konusu (teamsync/user/<id>/
+// events) BAĞLANMA ANINDAKİ state.friendId'den kurulur; kimlik sonradan
+// değişirse istemci ESKİ konuda dinlemeye devam eder.
+let globalMqttIdentity = null;
+
 function setupGlobalMQTT() {
-  if (state.globalMqtt) return;
+  // Kimliksiz bağlanmak, kimsenin dinlemediği bir konuya abone olmak demektir.
+  if (!state.friendId) return;
+
+  if (state.globalMqtt) {
+    // Aynı kimlik: mevcut bağlantı zaten doğru konuda, dokunma.
+    if (globalMqttIdentity === state.friendId) return;
+
+    // KİMLİK DEĞİŞTİ. Eskiden burada koşulsuz "return" vardı; bu yüzden
+    // bağlantı kurulduktan SONRA kimliği değişen her oturum (cihaz hesabıyla
+    // otomatik girip ardından isim adımından geçmek, ya da çıkış yapmadan
+    // hesap değiştirmek) kendi konusuna HİÇ abone olamıyordu: arkadaşlık
+    // istekleri, odaya katılma istekleri ve DM'ler o oturum boyunca sessizce
+    // kayboluyordu ("istek atıyor ama bana gelmiyor" şikayetinin kök nedeni).
+    // Yeni kimlikle baştan bağlanıyoruz.
+    console.warn(`🔄 Arkadaşlık kimliği değişti (${globalMqttIdentity} → ${state.friendId}), broker bağlantısı yenileniyor`);
+    try { state.globalMqtt.end(true); } catch (e) {}
+    state.globalMqtt = null;
+    globalMqttSessionId++; // bekleyen broker rotasyonlarını geçersiz kıl
+  }
+
+  globalMqttIdentity = state.friendId;
   connectGlobalBroker(0, ++globalMqttSessionId);
 }
 
@@ -2155,7 +2237,7 @@ function iceEntryHasTurn(s, requireCredential = true) {
 // applyIceEscalationPolicy devralır ve gerekirse 'all'a geri döner.
 function preferredIceTransportPolicy() {
   if (state.useRelay) return 'relay';
-  if (state.warpDetected && getIceServers().some(s => iceEntryHasTurn(s))) return 'relay';
+  if ((state.warpDetected || state.symmetricNatDetected) && getIceServers().some(s => iceEntryHasTurn(s))) return 'relay';
   return 'all';
 }
 
@@ -3177,6 +3259,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       } catch (e) {}
       state.globalMqtt.end();
       state.globalMqtt = null;
+      globalMqttIdentity = null; // sonraki giriş "aynı kimlik" sanıp bağlanmayı atlamasın
       globalMqttSessionId++; // bekleyen broker rotasyonlarını geçersiz kıl
     }
     
@@ -4654,7 +4737,7 @@ function applyIceEscalationPolicy(peer) {
   // kendisi ulaşılamaz çıkarsa relay-only hiç bağlanamamak demektir. Sadece
   // ilk üç deneme relay'e çekiliyor, sonrasında mevcut 4'lük döngü devralıyor
   // ve 'all'a dönme kaçışı korunuyor.
-  const warpRelayWindow = state.warpDetected && peer.restartCount <= 3;
+  const warpRelayWindow = (state.warpDetected || state.symmetricNatDetected) && peer.restartCount <= 3;
   const wantRelay = hasTurn && (peer.forceRelayNext || warpRelayWindow || (peer.restartCount % 4) >= 2);
   peer.forceRelayNext = false;
   try {
@@ -4824,6 +4907,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
   pc.onicecandidate = (e) => {
     if (e.candidate) {
       if (isJunkIceCandidate(e.candidate)) return; // çöp adayı hiç yayınlama
+      noteNatBehaviourFromCandidate(e.candidate);
       // Adayları sakla: karşı taraf ilk gönderimi kaçırırsa (abonelik gecikmesi,
       // paket kaybı) offer/answer tekrarıyla birlikte yeniden gönderilirler.
       const p = state.peers.get(peerId);
@@ -9631,8 +9715,14 @@ async function saveUserSettings() {
   }
 
   clearSettingsPreview();
-  // Dil değişmediyse tüm belgeyi yeniden çevirmeye gerek yok.
+  // Seçilen dil, DEĞİŞMEMİŞ GÖRÜNSE BİLE açıkça kaydedilir. getSavedLanguage()
+  // kayıt yokken 'en' döndürüyor; bu yüzden hiç dil seçmemiş bir kullanıcı
+  // Ayarlar'dan İngilizce'yi seçip Kaydet'e bastığında karşılaştırma eşit çıkıyor
+  // ve tercih localStorage'a HİÇ yazılmıyordu: seçim, varsayılanın değiştiği ilk
+  // gün (başka bir cihaz/sürüm, farklı sistem dili) sessizce kayboluyordu.
+  // Belgeyi yeniden çevirmek ise pahalı; o yalnızca dil gerçekten değiştiyse yapılır.
   if (language !== getSavedLanguage()) applyUserLanguage(language, true);
+  else localStorage.setItem(USER_LANGUAGE_KEY, language);
   syncAudioDeviceSelects();
   applySpeakerToAll();
   updateSettingsTimePreview();
