@@ -3,6 +3,8 @@
 -- ----------------------------------------------------------------------------
 -- avatars_bucket.sql'den SONRA, Supabase panelinde SQL Editor > New query
 -- içine yapıştırıp "Run" ile bir kez çalıştırın (tekrar çalıştırılabilir).
+-- 2026-09-23: zperyrjpfumtblossyod projesine migration olarak uygulandı
+-- (profile_media_banner_gif_avatar).
 --
 -- Ne değişir:
 --   • Her kullanıcı artık şu yollara da yazabilir:
@@ -28,8 +30,8 @@ create policy "Avatar upload own"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'avatars' and (
-      name = auth.uid()::text || '.jpg'
-      or name ~ ('^' || auth.uid()::text || '/(avatar_anim\.gif|banner\.(gif|jpg|png|webp))$')
+      name = (select auth.uid())::text || '.jpg'
+      or name ~ ('^' || (select auth.uid())::text || '/(avatar_anim\.gif|banner\.(gif|jpg|png|webp))$')
     )
   );
 
@@ -37,8 +39,15 @@ create policy "Avatar update own"
   on storage.objects for update to authenticated
   using (
     bucket_id = 'avatars' and (
-      name = auth.uid()::text || '.jpg'
-      or name ~ ('^' || auth.uid()::text || '/(avatar_anim\.gif|banner\.(gif|jpg|png|webp))$')
+      name = (select auth.uid())::text || '.jpg'
+      or name ~ ('^' || (select auth.uid())::text || '/(avatar_anim\.gif|banner\.(gif|jpg|png|webp))$')
+    )
+  )
+  -- WITH CHECK: dosya başka bir kullanıcının yoluna taşınamasın.
+  with check (
+    bucket_id = 'avatars' and (
+      name = (select auth.uid())::text || '.jpg'
+      or name ~ ('^' || (select auth.uid())::text || '/(avatar_anim\.gif|banner\.(gif|jpg|png|webp))$')
     )
   );
 
@@ -46,8 +55,8 @@ create policy "Avatar delete own"
   on storage.objects for delete to authenticated
   using (
     bucket_id = 'avatars' and (
-      name = auth.uid()::text || '.jpg'
-      or name ~ ('^' || auth.uid()::text || '/(avatar_anim\.gif|banner\.(gif|jpg|png|webp))$')
+      name = (select auth.uid())::text || '.jpg'
+      or name ~ ('^' || (select auth.uid())::text || '/(avatar_anim\.gif|banner\.(gif|jpg|png|webp))$')
     )
   );
 
