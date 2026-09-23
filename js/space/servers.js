@@ -689,6 +689,15 @@
     // Kontrol günlüğü henüz yok (yeni katıldım): ilk kalp atan barındırıcıdan iste
     if (!rt.st) { if (m.k === 'hhb' && peerEk(rt, fid)) requestCtl(rt, fid); return; }
     if (!rt.st.members[fid]) { if (m.k === 'hhb') requestCtl(rt); return; }
+    if (m.k === 'bye') {
+      rt.hostsSeen.delete(fid);
+      rt.membersSeen.delete(fid);
+      rt.voice.forEach(map => map.delete(fid));
+      notePresence(rt);
+      emit('ts:server-voice', { sid: rt.rec.gid });
+      emit('ts:servers', { sid: rt.rec.gid });
+      return;
+    }
     const now = Date.now();
     const prev = rt.membersSeen.get(fid);
     const av = window.TSProfile && typeof m.av === 'string' ? window.TSProfile._safeMedia(m.av) : '';
@@ -1046,7 +1055,7 @@
     const code = parseInvite(input);
     if (!code) throw Object.assign(new Error('notfound'), { reason: 'notfound' });
     const cached = peekCache.get(code);
-    if (cached && Date.now() - cached.at < 60000) return cached.info;
+    if (cached && Date.now() - cached.at < 20000) return cached.info;
     const info = await inviteRequest(code, { k: 'peek' });
     if (!info || typeof info.sid !== 'string' || typeof info.genesis !== 'string') throw Object.assign(new Error('notfound'), { reason: 'notfound' });
     peekCache.set(code, { at: Date.now(), info });
@@ -1390,7 +1399,14 @@
     return startPromise;
   }
 
+  // Kapanırken / çıkışta haber ver: sunucu (barındırıcıysam) hemen gri görünsün
+  function sayBye() {
+    servers.forEach(rt => { if (rt.st && rt.st.members[me()]) sendEph(rt, { k: 'bye' }); });
+  }
+  window.addEventListener('beforeunload', () => { try { sayBye(); } catch (e) {} });
+
   function stop() {
+    try { sayBye(); } catch (e) {}
     timers.forEach(t => clearInterval(t));
     timers = [];
     servers.forEach(rt => { unsubscribe(rt); rt.pending.forEach(p => clearTimeout(p.timer)); });

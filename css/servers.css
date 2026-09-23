@@ -60,6 +60,9 @@ body[data-home="server"] #side-server { display: flex; }
 .ss-banner strong { font-size: 13px; }
 .ss-banner.is-offline { background: color-mix(in srgb, var(--status-offline) 18%, var(--sh-side)); border: 1px solid color-mix(in srgb, var(--status-offline) 35%, transparent); color: var(--txt-mut); }
 .ss-banner.is-offline strong { color: var(--txt-main); }
+.ss-banner.is-compact { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; cursor: help; }
+.ss-banner.is-compact strong { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.ss-banner.is-compact span { font-size: 11px; }
 .ss-banner.is-offer { background: color-mix(in srgb, var(--acc) 16%, var(--sh-side)); border: 1px solid color-mix(in srgb, var(--acc) 45%, transparent); }
 .ss-banner-actions { display: flex; gap: 6px; margin-top: 4px; }
 .ss-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 8px 12px; scrollbar-width: thin; }

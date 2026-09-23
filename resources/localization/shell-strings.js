@@ -515,7 +515,9 @@ window.TeamSyncExtraStrings = {
     "servers.perm.MANAGE_SERVER": "Sunucuyu yönet",
     "servers.permDesc.MANAGE_SERVER": "Sunucunun adını, simgesini, açıklamasını değiştirebilir; @everyone ile herkesi anabilir; tüm davetleri iptal edebilir.",
     "servers.perm.ADMINISTRATOR": "Yönetici",
-    "servers.permDesc.ADMINISTRATOR": "Tüm izinler; kanal kısıtlamalarını da aşar. Dikkatli ver!"
+    "servers.permDesc.ADMINISTRATOR": "Tüm izinler; kanal kısıtlamalarını da aşar. Dikkatli ver!",
+    "servers.memberCountOne": "{n} üye",
+    "servers.readOnly": "salt okunur"
   },
   en: {
     'shell.home': 'Direct Messages',
@@ -1028,6 +1030,8 @@ window.TeamSyncExtraStrings = {
     "servers.perm.MANAGE_SERVER": "Manage server",
     "servers.permDesc.MANAGE_SERVER": "Can change the server's name, icon and description, ping @everyone and revoke any invite.",
     "servers.perm.ADMINISTRATOR": "Administrator",
-    "servers.permDesc.ADMINISTRATOR": "Every permission, and bypasses channel restrictions. Grant carefully!"
+    "servers.permDesc.ADMINISTRATOR": "Every permission, and bypasses channel restrictions. Grant carefully!",
+    "servers.memberCountOne": "{n} member",
+    "servers.readOnly": "read-only"
   }
 };

@@ -166,7 +166,7 @@
         preview.innerHTML = `
           <div class="srv-join-card">
             <span class="srv-join-icon">${UI().serverIconHtml(info.name, info.icon, 56, info.sid)}</span>
-            <span><strong>${esc(info.name)}</strong><small><i class="inv-dot is-online"></i>${esc(tr('servers.onlineCount', { n: info.online }))} <i class="inv-dot"></i>${esc(tr('servers.memberCount', { n: info.members }))}</small>${info.desc ? `<em>${esc(info.desc)}</em>` : ''}</span>
+            <span><strong>${esc(info.name)}</strong><small><i class="inv-dot is-online"></i>${esc(tr('servers.onlineCount', { n: info.online }))} <i class="inv-dot"></i>${esc(UI().memberCountText(info.members))}</small>${info.desc ? `<em>${esc(info.desc)}</em>` : ''}</span>
           </div>`;
         go.disabled = false;
       } catch (e) {
@@ -888,7 +888,7 @@
       m.el.querySelector('.srv-discover-list').innerHTML = list.length ? list.map(r => `
         <div class="srv-discover-card">
           <span class="srv-discover-icon">${UI().serverIconHtml(r.name, r.icon, 56, r.code)}</span>
-          <span class="srv-discover-copy"><strong>${esc(r.name)}</strong>${r.desc ? `<em>${esc(r.desc)}</em>` : ''}<small><i class="inv-dot is-online"></i>${esc(tr('servers.onlineCount', { n: r.online }))} <i class="inv-dot"></i>${esc(tr('servers.memberCount', { n: r.members }))}</small></span>
+          <span class="srv-discover-copy"><strong>${esc(r.name)}</strong>${r.desc ? `<em>${esc(r.desc)}</em>` : ''}<small><i class="inv-dot is-online"></i>${esc(tr('servers.onlineCount', { n: r.online }))} <i class="inv-dot"></i>${esc(UI().memberCountText(r.members))}</small></span>
           <button type="button" class="btn-pri btn-sm" data-dcode="${esc(r.code)}">${esc(mine.has(r.name) ? tr('servers.open') : tr('servers.joinShort'))}</button>
         </div>`).join('') : `<div class="srv-discover-empty">${esc(results.length ? tr('servers.discoverNoMatch') : tr('servers.discoverEmpty'))}</div>`;
     };

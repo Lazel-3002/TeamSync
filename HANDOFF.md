@@ -133,19 +133,72 @@ Files: `js/space/crypto.js` (TSCrypto), `js/space/store.js` (TSSpaceStore),
 - **Harness trap fixed**: `waitFor` now awaits promises (before, any
   `.then(...)` condition passed instantly without checking).
 
-## Phase 3 — NEXT: hosted servers
-Build on `js/space/groups.js` (generalize it: hosts = owner + co-hosts instead of every member). Owner + accepted co-hosts (`host.offer` → `host.accept`) store
-everything; members cache last 500 msgs/channel. Hosts receipt events
-(`{host,hseq,hlc,hsig}`); every PC re-validates signatures, membership, bans,
-Discord-style permission bitfield with role/member channel overrides, slow
-mode. Private channels get their own key, rotated on revoke. Invites
-`teamsync://invite/<sid8>-<code>` (1d/3d/7d/30d/never, max uses): joiner and
-host meet on `teamsync/inv/<H(code)>`, ECDH + HMAC proof so the code never
-crosses the wire. Voice channels map to rooms `sv-<HMAC(K_s,ch)>` via a new
-`TSRoom.joinOrCreate` (alone is not an error); occupancy beacons every 10 s
-give per-user timers under each voice channel. No host heartbeat for 25 s →
-greyed/read-only. Server search = signed directory beacons on
-`teamsync/dir/v1/…` while a host is online. Export/backup `.tsspace` file.
+## Phase 3 — DONE: PC-hosted servers
+Files: `js/space/server-state.js` (TSServerState — PURE, also `require`-able
+from Node), `js/space/servers.js` (TSServers — network/storage/hosting),
+`js/ui/server-view.js` (TSServerUI), `js/ui/server-dialogs.js`
+(TSServerDialogs), `css/servers.css`, `electron/deep-link.js`.
+Store: `js/space/store.js` is now DB v2 (`ctl` store for control events +
+`by_space_ch_ts` index); groups skip records with `kind:'server'`.
+- **Model**: a server is a signed event log. Control events (`srv.*`, `ch.*`,
+  `role.*`, `member.*`, `ban.*`, `invite.*`, `host.*`) are replicated to every
+  member and folded by `TSServerState.derive(events, {genesis})` — sorted by
+  (ts,id), each checked against the state at that point (Discord permission
+  bits, role hierarchy `outranks`, "can't grant what you don't have", channel
+  overrides everyone → roles → `u:<fid>`). `genesis` pins the real
+  `srv.create` (a member can't forge an older one). State keeps `keys[fid]`
+  (all signing keys ever used) and `everHosts` for signature checks.
+  Message events (`msg`, `msg.edit`, `msg.del`, `react`) carry top-level `ch`.
+- **Hosts** = owner + co-hosts who accepted `host.offer` (max 5). Members
+  submit signed events on `/sub`; an online host checks perms/slow mode/bans
+  (`checkMessage`), adds `acc {h, at, hs}` (host signature over id+author sig)
+  and publishes on `/ev`. Every receiver verifies BOTH signatures. Several
+  hosts online → rank by owner-first then fid; rank>0 waits 700ms·rank.
+  Host heartbeat `hhb` every 10 s on `/eph` (cn/clast = control count/last,
+  n/last = message count/last). No `hhb` for 26 s → offline → grey rail icon,
+  read-only composer, voice disabled. Hosts sync each other (`hsreq`), members
+  fetch control log (`creq`) and per-channel history on open (`hreq`,
+  "Load older" → `before`). Graceful `bye` on logout/close.
+- **Private channels**: any channel some member can't view is "restricted".
+  Its events never go on `/ev`: author → each online host with `psub`, host →
+  each online viewer via `pev`; ALL `/to/` traffic is pairwise-encrypted
+  (ECDH of the two identity keys → HKDF, `pairKey`). Hosts store everything
+  (they are trusted by the owner). Members drop events of channels they can't
+  view. Private VOICE is only hidden in UI (room id derivable by members).
+- **Invites**: code = 10 chars (no I/O). PBKDF2(code, 60k) → meet topic
+  `teamsync/inv/<hex>` + AES key. `peek` → server card; `join` → joiner's
+  signed `member.join` inside an AES box; host accepts it, replies with the
+  server key wrapped to the joiner's ek + `hek` (host ek, to decrypt the first
+  pairwise reply before the control log arrives). Requests retry every 3 s.
+  Links `teamsync://invite/CODE`: in-app → invite card (MutationObserver fills
+  `.inv-card[data-invite]` in DMs/groups/servers); from outside → protocol
+  handler (`app.setAsDefaultProtocolClient`, also in `npm start`; NSIS via
+  `build.protocols`), a second instance forwards the link over a named pipe.
+- **Kick/ban** → the accepting host rotates the key (`rekey` notice on the old
+  `/eph`, `srv_key` to members seen recently). Anyone else: no host heartbeat
+  → `srv_kreq` to hosts' personal topics → `srv_key` (or `srv_gone` if kicked).
+- **Voice channels**: room `sv-<HMAC(key,'voice|sid|ch|epoch')>`, always joined
+  as founder (two founders connect fine). Occupancy beacon `vc` every 5 s →
+  sidebar list with per-user timers, mute/deaf/LIVE icons.
+- **Discovery**: `srv.update {public:true}` + an automatic permanent public
+  invite → the rank-0 host publishes a RETAINED signed beacon on
+  `teamsync/dir/v1/<hash>` every 5 min (cleared when made private); the
+  compass button subscribes to `teamsync/dir/v1/+` for 3.5 s.
+- UI: `body[data-home="server"]` swaps the DM column for the channel list;
+  `setView('server', sid)`; server menu on the header (invite, settings,
+  create channel, hosting, nickname, mark read, leave/delete); settings
+  full-screen (overview/public, roles + permission switches, members,
+  invites, bans, hosting with offer/revoke/resign); channel settings with a
+  tri-state permission grid + slow mode; replies, edits (↑ edits last),
+  reactions, @mentions (@everyone only from Manage Server).
+- Tests: `server-state.test.js` (Node: hierarchy, overrides, invites, bans,
+  hosts, slow mode, order-independence, genesis pin) and `servers.test.js`
+  (3 non-friend peers: invite, host accept, private channel confidentiality,
+  slow mode, offline read-only, co-host failover + catch-up, voice, kick +
+  key rotation).
+- Not done / ideas: file & image sharing in server channels, `.tsspace`
+  export, @mention autocomplete, per-channel encryption against hosts,
+  categories, pinned messages, Ctrl+K search over channels.
 
 ## How to verify (the standard in this repo)
 Real Electron instances over CDP (`test/e2e/lib/harness.js`): `spawnPeer`,

@@ -81,6 +81,8 @@
     return typeof window.formatUserTime === 'function' ? window.formatUserTime(new Date(ts)) : new Date(ts).toLocaleTimeString();
   }
 
+  const memberCountText = n => tr(n === 1 ? 'servers.memberCountOne' : 'servers.memberCount', { n });
+
   // ---------- ray ----------
   function renderRail() {
     const host = $('rail-spaces');
@@ -177,10 +179,12 @@
       return;
     }
     if (rt && !X().isOnline(sid)) {
-      banner.className = 'ss-banner is-offline';
-      banner.innerHTML = `<strong>${esc(tr('servers.offlineTitle'))}</strong><span>${esc(tr('servers.offlineBody'))}</span>`;
+      banner.className = 'ss-banner is-offline is-compact';
+      banner.title = tr('servers.offlineBody');
+      banner.innerHTML = `<strong><i class="inv-dot"></i>${esc(tr('servers.offlineTitle'))}</strong><span>${esc(tr('servers.readOnly'))}</span>`;
       return;
     }
+    banner.title = '';
     banner.className = 'ss-banner hidden';
     banner.innerHTML = '';
   }
@@ -648,9 +652,13 @@
     const btn = card.querySelector('.inv-card-btn');
     try {
       const info = await X().peekInvite(code);
-      const joined = X().get(info.sid) && X().get(info.sid).st && X().get(info.sid).st.members[me()];
+      const local = X().get(info.sid) && X().get(info.sid).st;
+      const joined = !!(local && local.members[me()]);
+      // Üyesi olduğum sunucu: güncel sayıları yerel durumdan al
+      const members = joined ? Object.keys(local.members).length : info.members;
+      const online = joined ? Object.keys(local.members).filter(f => (X().memberPresence(info.sid, f) || {}).online).length : info.online;
       icon.innerHTML = serverIconHtml(info.name, info.icon, 48, info.sid);
-      copy.innerHTML = `<strong>${esc(info.name)}</strong><small><i class="inv-dot is-online"></i>${esc(tr('servers.onlineCount', { n: info.online }))} <i class="inv-dot"></i>${esc(tr('servers.memberCount', { n: info.members }))}</small>`;
+      copy.innerHTML = `<strong>${esc(info.name)}</strong><small><i class="inv-dot is-online"></i>${esc(tr('servers.onlineCount', { n: online }))} <i class="inv-dot"></i>${esc(memberCountText(members))}</small>`;
       btn.disabled = false;
       btn.textContent = joined ? tr('servers.joined') : tr('servers.joinShort');
       btn.classList.toggle('is-joined', !!joined);
@@ -852,8 +860,10 @@
         }
       }
     }).observe(document.body, { childList: true, subtree: true });
-    // Süreli yavaş mod / çevrimdışı durumları yavaş değişir: 5 sn'de bir tazele
+    // Süreli yavaş mod / çevrimdışı durumları yavaş değişir: 5 sn'de bir tazele;
+    // ses kanalından sessizce düşenler (kapanan bilgisayar) 10 sn'de bir temizlenir.
     setInterval(() => { if (viewSid && window.TSShell.view() === 'server') renderComposer(); }, 5000);
+    setInterval(() => { if (activeSid && document.body.dataset.home === 'server') renderSide(); }, 10000);
   }
 
   async function findEvent(id) {
@@ -864,7 +874,7 @@
   document.addEventListener('DOMContentLoaded', bind);
 
   window.TSServerUI = {
-    show, setActiveServer, renderRail, renderSide, viewingChannel, serverIconHtml, inviteCardHtml,
+    memberCountText, show, setActiveServer, renderRail, renderSide, viewingChannel, serverIconHtml, inviteCardHtml,
     openMemberCard, current: () => ({ sid: viewSid, ch: viewCh }), renderMessages, run, showError
   };
 })();
