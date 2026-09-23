@@ -209,14 +209,13 @@
     const cs = sanitizeCustom(data.cs);
     const act = sanitizeAct(data.act, prev.act);
     const pr = Number.isInteger(data.pr) && data.pr > 0 ? data.pr : 0;
-    const next = { st, cs, act, pr, at: Date.now() };
+    const v = Number.isInteger(data.v) ? data.v : 1;
+    const next = { st, cs, act, pr, v, at: Date.now() };
     window.state.presenceOf[fid] = next;
     const changed = prev.st !== next.st
       || (prev.cs ? `${prev.cs.e}|${prev.cs.t}` : '') !== (cs ? `${cs.e}|${cs.t}` : '')
       || (prev.act ? `${prev.act.n}|${prev.act.sid}|${prev.act.startLocal}` : '') !== (act ? `${act.n}|${act.sid}|${act.startLocal}` : '');
-    if (pr && pr !== (prev.pr || 0) && window.TSProfile && window.TSProfile.onRevSeen) {
-      window.TSProfile.onRevSeen(fid, pr);
-    }
+    if (pr && window.TSProfile && window.TSProfile.onRevSeen) window.TSProfile.onRevSeen(fid, pr);
     if (changed) document.dispatchEvent(new CustomEvent('ts:presence', { detail: { fid } }));
     return changed;
   }

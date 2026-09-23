@@ -1,7 +1,7 @@
 /* =====================================================================
    DM GÖRÜNÜMÜ — Discord tarzı gruplanmış mesajlar (js/shell-dm.js)
    #dm-messages ve .dm-input-area eski ana menüden buraya taşınır; eski
-   baloncuk kuralları yalnızca #view-dm kapsamında ezilir (oda içi DM
+   baloncuk kuralları yalnızca .view-dm (DM + grup görünümü) kapsamında ezilir (oda içi DM
    penceresi #server-dm-messages eski görünümünü korur).
    ===================================================================== */
 .dm-view-header { gap: 8px; }
@@ -35,7 +35,7 @@
 .view-dm.panel-open .dm-profile-panel { display: block; }
 @media (max-width: 1180px) { .view-dm.panel-open .dm-profile-panel { display: none; } }
 
-#view-dm #dm-messages {
+.view-dm .dm-messages {
   flex: 1 1 auto;
   min-height: 0;
   height: auto !important;
@@ -48,7 +48,7 @@
   border-radius: 0;
   --dot-ring: var(--sh-main);
 }
-#view-dm .dm-input-area {
+.view-dm .dm-input-area {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -60,7 +60,7 @@
   border-radius: 8px;
   background: var(--sh-panel) !important;
 }
-#view-dm .dm-input-area #dm-input {
+.view-dm .dm-input-area input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
   height: 44px;
@@ -72,7 +72,7 @@
   box-shadow: none !important;
   outline: none;
 }
-#view-dm .dm-input-area button {
+.view-dm .dm-input-area button {
   width: 36px !important;
   height: 36px !important;
   padding: 0 !important;
@@ -82,8 +82,8 @@
   color: var(--txt-mut) !important;
   flex: 0 0 36px;
 }
-#view-dm .dm-input-area button:hover { color: var(--txt-main) !important; background: var(--sh-hover) !important; }
-#view-dm .dm-input-area button svg { width: 20px; height: 20px; }
+.view-dm .dm-input-area button:hover { color: var(--txt-main) !important; background: var(--sh-hover) !important; }
+.view-dm .dm-input-area button svg { width: 20px; height: 20px; }
 
 .dmx-intro { padding: 32px 16px 16px; --dot-ring: var(--sh-main); }
 .dmx-intro h2 { margin: 12px 0 2px; font-size: 30px; font-weight: 800; color: var(--txt-main); word-break: break-word; }
@@ -134,7 +134,7 @@
 .dmx-name:hover { text-decoration: underline; }
 .dmx-group[data-sender="me"] .dmx-name { color: var(--acc-ink, var(--acc-light)); }
 .dmx-head time { color: var(--txt-mut); font-size: 12px; white-space: nowrap; }
-#view-dm .dmx-msg.dm-msg {
+.view-dm .dmx-msg {
   position: relative;
   max-width: none;
   margin: 0 -48px 0 -72px;
@@ -151,7 +151,7 @@
   overflow-wrap: anywhere;
   white-space: normal;
 }
-#view-dm .dmx-msg.dm-msg:hover { background: color-mix(in srgb, var(--txt-main) 3%, transparent) !important; }
+.view-dm .dmx-msg:hover { background: color-mix(in srgb, var(--txt-main) 3%, transparent) !important; }
 .dmx-hover-time {
   position: absolute;
   left: 16px;
@@ -171,6 +171,6 @@
 
 @media (max-width: 560px) {
   .dmx-group { padding-right: 12px; gap: 10px; }
-  #view-dm .dmx-msg.dm-msg { margin: 0 -12px 0 -66px; padding: 2px 12px 2px 66px; }
-  #view-dm .dm-input-area { margin: 0 8px 12px; }
+  .view-dm .dmx-msg { margin: 0 -12px 0 -66px; padding: 2px 12px 2px 66px; }
+  .view-dm .dm-input-area { margin: 0 8px 12px; }
 }

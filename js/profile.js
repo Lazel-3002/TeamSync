@@ -149,9 +149,9 @@
     try { client.publish(`teamsync/user/${fid}/events`, JSON.stringify(payload), { qos }); return true; } catch (e) { return false; }
   }
 
-  function request(fid, wantRev) {
+  function request(fid, wantRev, force) {
     if (!fid || fid === window.state.friendId || !/^[A-Za-z0-9_-]{3,128}$/.test(fid)) return;
-    const have = cache[fid] ? cache[fid].rev : 0;
+    const have = cache[fid] && !force ? cache[fid].rev : 0;
     if (wantRev && have >= wantRev) return;
     if (pending[fid]) return;
     const job = { tries: 0, timer: null };
@@ -170,20 +170,33 @@
     attempt();
   }
 
+  const lastRevRequest = {};
+  // Presence her geldiğinde çağrılır: önbellek eskiyse (en fazla 15 sn'de bir)
+  // yeniden ister — tek bir kayıp yanıt profili sonsuza dek eski bırakmasın.
   function onRevSeen(fid, rev) {
     if ((cache[fid] ? cache[fid].rev : 0) >= rev) return;
-    // Presence'ta her yeni sürüm yalnızca bir kez tetikler.
+    const now = Date.now();
+    if (now - (lastRevRequest[fid] || 0) < 15000) return;
+    lastRevRequest[fid] = now;
     setTimeout(() => request(fid, rev), Math.random() * 1500);
   }
 
-  function answer(toFid) {
+  async function answer(toFid) {
     if (!toFid || !/^[A-Za-z0-9_-]{3,128}$/.test(toFid)) return;
     if (window.TSStatus && window.TSStatus.isInvisible()) return;
     const now = Date.now();
-    if (now - (lastAnswered[toFid] || 0) < 10000) return;
-    lastAnswered[toFid] = now;
     const p = mine();
-    publishTo(toFid, { type: 'res_profile', fromId: window.state.friendId, rev: p.rev || 0, profile: wirePayload(p) }, 1);
+    // Aynı sürümü 10 sn içinde tekrar gönderme; ama yeni bir sürüm (profil
+    // az önce değiştiyse) sınıra takılmadan gider.
+    const last = lastAnswered[toFid];
+    if (last && now - last.at < 10000 && last.rev === (p.rev || 0)) return;
+    lastAnswered[toFid] = { at: now, rev: p.rev || 0 };
+    // Açık kimlik anahtarları (grup davetleri için; js/space/crypto.js).
+    let keys = null;
+    try { if (window.TSCrypto) { await window.TSCrypto.ensureIdentity(); keys = window.TSCrypto.publicKeysSync(); } } catch (e) {}
+    const payload = { type: 'res_profile', fromId: window.state.friendId, rev: p.rev || 0, profile: wirePayload(p) };
+    if (keys) payload.keys = keys;
+    publishTo(toFid, payload, 1);
   }
 
   function onEvent(data) {
@@ -197,6 +210,7 @@
       // İstemediğimiz ya da tanımadığımız birinin profilini önbelleğe alma.
       if (!pending[fid] && !(window.state.friends && window.state.friends[fid]) && !cache[fid]) return;
       const r = Number.isInteger(data.rev) ? data.rev : 0;
+      if (data.keys && window.TSCrypto && window.state.friends && window.state.friends[fid]) window.TSCrypto.rememberPeer(fid, data.keys);
       cache[fid] = { rev: r, profile: sanitizeProfile(data.profile), at: Date.now() };
       saveCache();
       if (pending[fid]) { clearTimeout(pending[fid].timer); delete pending[fid]; }

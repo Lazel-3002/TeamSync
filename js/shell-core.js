@@ -26,7 +26,7 @@
   function readLastHome() {
     try {
       const saved = JSON.parse(localStorage.getItem(LAST_VIEW) || 'null');
-      if (saved && (saved.view === 'friends' || saved.view === 'dm')) lastHome = saved;
+      if (saved && (saved.view === 'friends' || saved.view === 'dm' || saved.view === 'group')) lastHome = saved;
     } catch (e) {}
   }
 
@@ -132,6 +132,10 @@
       next = 'friends';
       param = null;
     }
+    if (next === 'group' && !(param && window.TSGroups && window.TSGroups.get(param))) {
+      next = 'friends';
+      param = null;
+    }
     view = next;
     viewParam = param || null;
     if (next !== 'call') {
@@ -140,6 +144,7 @@
     }
     $('view-friends')?.classList.toggle('hidden', next !== 'friends');
     $('view-dm')?.classList.toggle('hidden', next !== 'dm');
+    $('view-group')?.classList.toggle('hidden', next !== 'group');
     $('view-call')?.classList.toggle('is-bg', next !== 'call');
     document.body.dataset.view = next;
     $('rail-home')?.classList.toggle('active', next !== 'call');
@@ -147,7 +152,8 @@
     $('side-friends')?.classList.toggle('active', next === 'friends');
     document.body.classList.remove('shell-drawer-open');
     if (next === 'dm' && window.TSDM) window.TSDM.show(viewParam);
-    if (window.TSDM) window.TSDM.markActive(next === 'dm' ? viewParam : null);
+    if (next === 'group' && window.TSGroupUI) window.TSGroupUI.show(viewParam);
+    if (window.TSDM) window.TSDM.markActive(next === 'dm' ? viewParam : null, next === 'group' ? viewParam : null);
     if (next === 'call') {
       // Odak modundaki kart gizliyken ölçülemez; geri dönünce hizala.
       requestAnimationFrame(() => { if (typeof window.syncFocusLayout === 'function') window.syncFocusLayout(); });
@@ -170,12 +176,17 @@
     if (window.TSFriends) window.TSFriends.render();
     if (window.TSDM) window.TSDM.renderList();
     setView(lastHome.view, lastHome.param);
+    // Arkadaş grupları (js/space/groups.js): kayıtlı grupları aç, konulara abone ol.
+    if (window.TSGroups) window.TSGroups.start().then(() => {
+      if (lastHome.view === 'group' && view === 'friends') setView('group', lastHome.param);
+    });
   }
 
   function exit() {
     if (!active) return;
     active = false;
     window.TSUI.closePopover();
+    if (window.TSGroups) window.TSGroups.stop();
     document.body.classList.remove('shell-active', 'qc-open', 'shell-drawer-open');
     $('shell')?.classList.add('hidden');
   }
@@ -448,7 +459,9 @@
     $('rail-search')?.addEventListener('click', () => window.showToast(window.TSUI.tr('shell.searchSoon'), 'info'));
     $('side-friends')?.addEventListener('click', () => setView('friends'));
     $('side-search-btn')?.addEventListener('click', openSwitcher);
-    $('side-new-dm')?.addEventListener('click', openSwitcher);
+    $('side-new-dm')?.addEventListener('click', e => {
+      if (window.TSGroupUI) window.TSGroupUI.openCreate(e.currentTarget); else openSwitcher();
+    });
     $('vm-open')?.addEventListener('click', () => setView('call'));
     $('vm-leave')?.addEventListener('click', () => { if (typeof window.disconnectApp === 'function') window.disconnectApp(); });
     $('up-profile')?.addEventListener('click', e => window.TSProfile && window.TSProfile.showSelfPanel(e.currentTarget));

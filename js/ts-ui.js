@@ -65,9 +65,10 @@
   // saniyede bir güncellenir. setInterval kullanılır (rAF arka planda kısılır)
   // ve pencere görünmezken DOM'a hiç dokunulmaz.
   let tickTimer = null;
-  let uiActive = true;
+  // Yalnızca simge durumundayken (document.hidden) durur: pencere odakta
+  // olmasa da (ör. oyun başka ekrandayken) sayaçlar akmaya devam etmeli.
   function tick() {
-    if (!uiActive || document.hidden) return;
+    if (document.hidden) return;
     const now = Date.now();
     document.querySelectorAll('[data-ts-since]').forEach(el => {
       const since = Number(el.dataset.tsSince);
@@ -80,9 +81,6 @@
     if (tickTimer) return;
     tickTimer = setInterval(tick, 1000);
   }
-  try {
-    window.electronAPI?.onWindowUiActive?.(active => { uiActive = !!active; if (uiActive) tick(); });
-  } catch (e) {}
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 
   function sinceHtml(since, cls = '') {

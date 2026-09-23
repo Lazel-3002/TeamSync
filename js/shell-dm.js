@@ -8,6 +8,7 @@
   const HIDDEN_KEY = fid => `teamsync_dm_hidden_${fid}`;
   const PANEL_KEY = 'teamsync_dm_profile_panel';
   const GROUP_GAP = 7 * 60 * 1000;
+  const REACT_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>';
 
   let unread = {};
   let hiddenAt = {};
@@ -34,7 +35,8 @@
 
   function totalUnread() {
     ensureLoaded();
-    return Object.values(unread).reduce((a, b) => a + (Number(b) || 0), 0);
+    const groupsUnread = window.TSGroups ? window.TSGroups.totalUnread() : 0;
+    return Object.values(unread).reduce((a, b) => a + (Number(b) || 0), 0) + groupsUnread;
   }
 
   function lastTimestamp(fid) {
@@ -105,12 +107,17 @@
     if (!host) return;
     const ids = listIds();
     const active = currentDmView();
-    if (!ids.length) {
+    const activeGroup = window.TSShell && window.TSShell.view() === 'group' ? window.TSShell.viewParam() : null;
+    const groupItems = window.TSGroupUI ? window.TSGroupUI.listItems(activeGroup) : [];
+    if (!ids.length && !groupItems.length) {
       host.innerHTML = `<li class="dm-list-empty">${esc(tr('shell.noDms'))}</li>`;
       return;
     }
     const friends = window.state.friends || {};
-    host.innerHTML = ids.map(fid => {
+    const dmItems = ids.map(fid => ({ ts: lastTimestamp(fid), html: dmRowHtml(fid) }));
+    host.innerHTML = dmItems.concat(groupItems).sort((a, b) => b.ts - a.ts).map(item => item.html).join('');
+
+    function dmRowHtml(fid) {
       const f = friends[fid] || {};
       const st = window.TSStatus ? window.TSStatus.statusOf(fid) : (f.online ? 'online' : 'offline');
       const sub = subLine(fid);
@@ -126,11 +133,11 @@
           ${n ? `<span class="ts-count-badge">${n > 99 ? '99+' : n}</span>` : ''}
           <button type="button" class="dm-row-close" data-close="${esc(fid)}" title="${esc(tr('shell.closeDm'))}">×</button>
         </li>`;
-    }).join('');
+    }
   }
 
-  function markActive(fid) {
-    document.querySelectorAll('#dm-list .dm-row').forEach(li => li.classList.toggle('active', li.dataset.fid === fid));
+  function markActive(fid, gid) {
+    document.querySelectorAll('#dm-list .dm-row').forEach(li => li.classList.toggle('active', (!!fid && li.dataset.fid === fid) || (!!gid && li.dataset.gid === gid)));
   }
 
   // ---------- DM görünümü ----------
@@ -231,7 +238,8 @@
               <div class="dmx-head"><button type="button" class="dmx-name" data-dmx-profile="${isMe ? 'self' : esc(fid)}">${esc(name)}</button>${ts ? `<time>${esc(dayLabel(ts))} ${esc(fmtTime(ts))}</time>` : ''}</div>`;
         groupOpen = true;
       }
-      out += `<div class="dmx-msg dm-msg ${m.sender === 'me' ? 'sent' : 'recv'}" ${m.id ? `data-mid="${esc(m.id)}"` : ''}>${cont && ts ? `<time class="dmx-hover-time">${esc(fmtTime(ts))}</time>` : ''}<div class="dmx-content">${html}</div></div>`;
+      const tools = m.id ? `<div class="msg-tools"><button type="button" class="msg-tool" data-react-open="${esc(m.id)}" title="${esc(tr('emoji.addReaction'))}">${REACT_SVG}</button></div>` : '';
+      out += `<div class="dmx-msg dm-msg ${m.sender === 'me' ? 'sent' : 'recv'} ${m.pending ? 'is-pending' : ''}" ${m.id ? `data-mid="${esc(m.id)}"` : ''}>${cont && ts ? `<time class="dmx-hover-time">${esc(fmtTime(ts))}</time>` : ''}${tools}<div class="dmx-content">${html}</div></div>`;
       prev = m;
     });
     closeGroup();
@@ -253,6 +261,8 @@
         if (window.TSFriends) window.TSFriends.renderBadges();
         return;
       }
+      const grp = e.target.closest('[data-gid]');
+      if (grp && window.TSShell) { window.TSShell.setView('group', grp.dataset.gid); return; }
       const row = e.target.closest('[data-fid]');
       if (row && typeof window.openDM === 'function') window.openDM(row.dataset.fid);
     });

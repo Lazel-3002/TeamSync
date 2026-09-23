@@ -2077,11 +2077,19 @@ function connectGlobalBroker(idx, session) {
     if (presenceInterval) clearInterval(presenceInterval);
     presenceInterval = setInterval(publishPresence, 5000);
 
+    // Broker değişiminden sonra grup konularına yeniden abone ol.
+    if (window.TSGroups) window.TSGroups.onConnect(client);
+
     // Removed global MQTT ping logic for serverless operation
   });
   
   client.on('message', (topic, message) => {
     if (state.globalMqtt !== client) return; // eski hesabın istemcisi, yok say
+    // Arkadaş grupları: şifreli grup konuları (js/space/groups.js)
+    if (topic.startsWith('teamsync/s/')) {
+      if (window.TSGroups) window.TSGroups.onMqtt(topic, message).catch(() => {});
+      return;
+    }
     try {
       const data = JSON.parse(message.toString());
       if (topic.endsWith('/presence')) {
@@ -2123,6 +2131,11 @@ function connectGlobalBroker(idx, session) {
           // Durum / özel durum / oyun değiştiyse de liste yeniden çizilir
           // (yalnızca geçen süre değiştiyse ÇİZİLMEZ — sayaç kendi işler).
           const richChanged = window.TSStatus ? window.TSStatus.ingestPresence(data.id, data) : false;
+          if (!wasOnline) {
+            // Çevrimdışıyken bekleyen DM'ler ve grup davetleri/anahtarları şimdi gider.
+            if (window.TSDMX) window.TSDMX.onFriendOnline(data.id);
+            if (window.TSGroups) window.TSGroups.onFriendOnline(data.id);
+          }
           if (!wasOnline || oldRoom !== data.room || oldAvatarHash !== data.avatarHash || avatarChanged || richChanged) {
             renderFriends();
           } else {
@@ -2221,6 +2234,14 @@ function connectGlobalBroker(idx, session) {
           }
         } else if (data.type === 'dm_msg' || data.type === 'dm_file_start' || data.type === 'dm_file_chunk') {
           receiveDM(data.fromId, data);
+        } else if (data.type === 'dm_typing') {
+          if (window.TSTyping) window.TSTyping.onDmTypingEvent(data);
+        } else if (data.type === 'dm_react') {
+          if (window.TSDMX) window.TSDMX.onReact(data);
+        } else if (data.type === 'dm_ack') {
+          if (window.TSDMX) window.TSDMX.onAck(data);
+        } else if (data.type === 'grp_invite' || data.type === 'grp_key') {
+          if (window.TSGroups) window.TSGroups.onPersonalEvent(data);
         }
       }
     } catch(e) {}
@@ -12133,9 +12154,13 @@ function dmContentHtml(m) {
           </div>
         </div>`;
   }
+  if (m.type === 'text' && !m.isCensored && window.TSEmoji && window.TSEmoji.isJumbo(m.content)) {
+    contentHtml = `<span class="emoji-jumbo">${contentHtml}</span>`;
+  }
   if (m.count > 1) {
     contentHtml += `<span class="msg-repeat-badge">×${m.count}</span>`;
   }
+  if (window.TSDMX) contentHtml += window.TSDMX.reactionsHtml(m);
   return contentHtml;
 }
 
@@ -12212,6 +12237,9 @@ function pushDmMessage(friendId, entry) {
 window.sendDMText = async (text) => {
   if (!state.activeDM || !text.trim() || !state.globalMqtt || !state.globalMqtt.connected) return;
   const friendId = state.activeDM;
+  // :thumbsup: → 👍 (js/ui/emoji.js); yazıyor göstergesi sıfırlanır.
+  if (window.TSEmoji) text = window.TSEmoji.replaceShortcodes(text);
+  if (window.TSTyping) window.TSTyping.localSent(`dm:${friendId}`);
 
   const res = await checkTextWithAI(text);
   let textToSend = res.ok ? text : (res.text || '');
@@ -12248,7 +12276,7 @@ window.sendDMText = async (text) => {
   }
 
   // MQTT send
-  state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
+  const dmPayload = {
     type: 'dm_msg',
     fromId: state.friendId,
     fromName: state.myName, // alıcı bizi arkadaş listesinde tanımıyorsa isim buradan gelir
@@ -12256,7 +12284,13 @@ window.sendDMText = async (text) => {
     content: textToSend,
     isCensored: isCensored,
     mid
-  }));
+  };
+  state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify(dmPayload));
+  // Güvenilir teslim (js/dm-extras.js): onay gelene kadar "bekliyor".
+  if (window.TSDMX && window.TSDMX.track(friendId, dmPayload)) {
+    const sent = state.dms[friendId].find(m => m.id === mid);
+    if (sent) { sent.pending = true; saveDMs(); renderDMs(); }
+  }
 };
 
 window.sendDMFile = async (file) => {
@@ -12356,6 +12390,8 @@ window.receiveDM = async (fromId, data) => {
     }
     
     const mid = typeof data.mid === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(data.mid) ? data.mid : null;
+    if (mid && window.TSDMX) window.TSDMX.sendAck(fromId, mid); // tekrar gelse de onayla
+    if (window.TSTyping) window.TSTyping.remoteStopped(`dm:${fromId}`, fromId);
     if (mid && state.dms[fromId].some(m => m.id === mid || (m.mergedIds && m.mergedIds.includes(mid)))) return; // QoS 1 çift teslim
     pushDmMessage(fromId, { id: mid || undefined, sender: 'them', type: data.msgType, content: safeContent, isCensored: isCensored, timestamp: Date.now() });
     saveDMs();

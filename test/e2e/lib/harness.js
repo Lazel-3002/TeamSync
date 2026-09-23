@@ -73,7 +73,9 @@ async function evalJS(client, expression, awaitPromise = false) {
 async function waitFor(client, expression, timeoutMs, label) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    try { const v = await evalJS(client, expression); if (v) return v; } catch (e) {}
+    // awaitPromise: ifade bir Promise döndürürse sonucu beklenir; aksi hâlde
+    // "Promise nesnesi truthy" diye koşul hiç sınanmadan geçiliyordu.
+    try { const v = await evalJS(client, expression, true); if (v) return v; } catch (e) {}
     await new Promise(r => setTimeout(r, 500));
   }
   throw new Error('waitFor timeout: ' + label);

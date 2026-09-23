@@ -80,42 +80,61 @@ invite links with expiry (1d/3d/7d/30d/unlimited), server search.
   so test runs no longer create real accounts. Use `TEAMSYNC_E2E_ONLINE=1`
   only for a test that truly needs the real backend.
 
-## Phase 2 — NEXT: friend groups, typing indicator, emoji & reactions
-Build a shared **space engine** in `js/space/*` (used again in Phase 3):
-- Identity: WebCrypto P-256 ECDSA (`ik`, signing) + ECDH (`ek`) per account,
-  non-extractable, stored in IndexedDB; public keys published in
-  `res_profile`, bound to the friend ID on first use (warn on key change).
-- A space = signed event log. Groups: every member is a host. Group key
-  `K_g` (AES-GCM-256) delivered to invitees via ECDH-wrapped `grp_invite` on
-  their personal topic `teamsync/user/<friendId>/events`. Topics derived from
-  `HMAC(K_g,…)`: `teamsync/s/<T>/hb` (heartbeat), `/ev` (events+receipts),
-  `/to/<H(fid)>` (directed backfill), `/eph` (typing, call state).
-  Hybrid logical clock ordering; IndexedDB `ts-spaces-<fid>`; ≤56 KB per
-  publish (fragment above), ~15 ms pacing; re-subscribe after broker failover
-  (`setupGlobalMQTT`/`connectGlobalBroker` in renderer.js). Kick/leave rotates
-  the key. Max 25 members.
-- UI: "+" next to "DİREKT MESAJLAR" creates a group (pick friends); groups in
-  the DM list with stacked avatars + member count; group view header like
-  Teams: name, member count; during a call: caller avatar, `00:12` timer,
-  **Katıl** (or Ayrıl). Group call = existing room via `window.TSRoom.start`
-  with roomId `gc-<HMAC(K_g,'call:'+epoch)>`; `call` heartbeat every 5 s on
-  `/eph`; ring toast with Accept/Decline (silent in DND via `TSStatus.isDnd()`).
-- Typing: 1:1 `dm_typing{fromId, tv}` on the personal topic; groups `typing`
-  on `/eph`; max 1 per 3 s, shown 6 s; `tv` = typer's own verb
-  (`TSProfile.typingVerbOf`, saved in the profile editor already), ≤24 chars,
-  escaped. Not sent while invisible.
-- Emoji: `resources/emoji/shortcodes.json` (emojibase data, MIT) + Turkish
-  aliases; autocomplete after `:` + 2 chars; `:thumbsup:` → 👍; emoji-only
-  messages rendered large. Reactions: 1:1 `dm_react{mid,e,op}` stored on the
-  message; groups via engine events.
-- DM reliability: outbox + `dm_ack{mid}`, resend when the friend comes online.
-- Tests: 3-peer group (offline member catches up; kicked member stops
-  receiving after key rotation); typing/reactions between 2 peers; group call
-  ring + Katıl + timer; Node unit test that random delivery order yields the
-  same state.
+## Phase 2 — DONE: friend groups, group calls, typing, emoji, reactions
+Files: `js/space/crypto.js` (TSCrypto), `js/space/store.js` (TSSpaceStore),
+`js/space/groups.js` (TSGroups — the "space" engine), `js/ui/group-view.js`
+(TSGroupUI), `js/ui/emoji.js` (TSEmoji), `js/ui/typing.js` (TSTyping),
+`js/dm-extras.js` (TSDMX), `css/groups.css`, `resources/emoji/shortcodes.js`
+(emojibase-data 16, MIT, + Turkish aliases like `:kalp:` `:agla:` `:ates:`).
+- **Identity**: per-account ECDSA P-256 (`ik`) + ECDH P-256 (`ek`), private
+  keys non-extractable in IndexedDB `ts-identity`. Public keys travel in
+  `res_profile.keys`; stored TOFU in localStorage `teamsync_peer_keys_<me>`
+  (`TSCrypto.rememberPeer/peerKeys`), toast on key change.
+- **Group = signed event log stored by every member** in IndexedDB
+  `ts-spaces-<friendId>` (stores `spaces`, `events` index `[gid, ts]`).
+  Event `{id, gid, author, type, body, ts, sig}` (ECDSA over canonical JSON).
+  Types: `msg`, `react`, `msg.del`, `rename`, `member.add` (carries ik/ek),
+  `member.remove` (owner only), `member.leave`, `call.start`. Every receiver
+  verifies signature + membership + permission before storing.
+- **Transport**: AES-GCM with group key over the existing global MQTT client;
+  topics `teamsync/s/<T>/ev|eph|to/<H>` where T/H are HMACs of the key (routed
+  in renderer.js `client.on('message')` before JSON.parse; re-subscribed in
+  the `connect` handler after broker failover).
+- **Catch-up**: heartbeat on `/eph` every 20 s `{last ts, n events}`; a member
+  that is behind sends `sreq` to that member, who replies on the requester's
+  `/to/` topic in ≤30-event batches (paced). Probe on subscribe.
+- **Invites**: `grp_invite` on the friend's personal topic, group key wrapped
+  with ephemeral ECDH → HKDF → AES-GCM to the friend's `ek`, signed by the
+  inviter; only accepted from non-muted real friends. Friends whose keys are
+  unknown (offline/old version) go to `pendingInvites` and are invited when
+  their keys arrive. **Kick** → owner rotates key (`grp_key`, epoch+1) to the
+  remaining members; kicked member's app drops the group. Owner leaves →
+  earliest-joined member becomes owner and rotates.
+- **Group calls**: room `gc-<HMAC(key,'call|gid|epoch')>` via
+  `window.TSRoom.start` (starter = founder, others join with
+  `state.isJoining=true` + own 15 s timeout). Call beacons on `/eph` every 5 s
+  → Teams-style header pill (caller avatar, `00:12` timer, avatars, Katıl /
+  Ayrıl) + DM-list row "🔊 Aramada · 0:13" + ring card (`.grp-ring`, silent in
+  DND).
+- **DMs**: `dm_typing{fromId,name,tv}`, `dm_react{mid,e,op}` (reactions stored
+  as `m.reactions = {emoji: ['me'|'them']}`), `dm_ack{mid}`; text DMs to
+  friends on presence `v>=2` are tracked in an outbox (`teamsync_dm_outbox_<me>`)
+  and resent when the friend comes back online (receiver dedupes by `mid`,
+  also via `mergedIds`). Pending messages render faded with ⏱.
+- **Typing**: each person's own verb from the profile editor ("mırlıyor 🐱"),
+  max 1 signal / 3 s, shown 6 s, never sent while invisible.
+- **Emoji**: `:code:` → emoji on send (DM, group, room chat), autocomplete
+  after `:`+2 chars (capture-phase keydown so Enter picks instead of sending),
+  jumbo rendering for emoji-only messages, picker for reactions.
+- Tests: `friend-groups.test.js` (3 real peers: invite, live msg, offline
+  catch-up, custom typing verb, reaction, kick + key rotation),
+  `group-call-dm-extras.test.js` (DM emoji/reaction/typing, offline outbox
+  delivered once, group call ring + header + join + tiles).
+- **Harness trap fixed**: `waitFor` now awaits promises (before, any
+  `.then(...)` condition passed instantly without checking).
 
-## Phase 3 — later: hosted servers
-Same engine. Owner + accepted co-hosts (`host.offer` → `host.accept`) store
+## Phase 3 — NEXT: hosted servers
+Build on `js/space/groups.js` (generalize it: hosts = owner + co-hosts instead of every member). Owner + accepted co-hosts (`host.offer` → `host.accept`) store
 everything; members cache last 500 msgs/channel. Hosts receipt events
 (`{host,hseq,hlc,hsig}`); every PC re-validates signatures, membership, bans,
 Discord-style permission bitfield with role/member channel overrides, slow

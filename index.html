@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/messages.css?v=1" />
   <link rel="stylesheet" href="css/call.css?v=1" />
   <link rel="stylesheet" href="css/profile.css?v=1" />
+  <link rel="stylesheet" href="css/groups.css?v=1" />
   <script>
     try {
       var _theme = localStorage.getItem('teamsync_theme') || 'aurora';
@@ -460,6 +461,30 @@
         <div class="dm-body">
           <div id="dm-main-host" class="dm-main"></div>
           <aside id="dm-profile-panel" class="dm-profile-panel" data-i18n-ignore></aside>
+        </div>
+      </div>
+
+      <!-- Arkadaş grubu (js/ui/group-view.js) -->
+      <div id="view-group" class="shell-view view-dm view-group hidden">
+        <header class="view-header dm-view-header grp-header">
+          <button class="vh-drawer" type="button" data-shell-drawer data-i18n-title="shell.menu" title="Menü"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+          <button id="grp-who" class="dmh-who" type="button" data-i18n-title="groups.rename" title="Grubun adını değiştir" data-i18n-ignore></button>
+          <div class="vh-actions">
+            <div id="grp-call" class="grp-call" data-i18n-ignore></div>
+            <button id="grp-members-toggle" class="vh-icon-btn grp-members-toggle" type="button" data-i18n-title="groups.members" title="Üyeler"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span id="grp-member-count"></span></button>
+          </div>
+        </header>
+        <div class="dm-body">
+          <div class="dm-main">
+            <div id="grp-messages" class="dm-messages grp-messages" data-i18n-ignore></div>
+            <div class="dm-input-area grp-input-area">
+              <button id="grp-emoji-btn" type="button" data-i18n-title="emoji.picker" title="Emoji"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+              <input id="grp-input" type="text" autocomplete="off" maxlength="4000" />
+              <button id="grp-send" type="button" data-i18n-title="common.send" title="Gönder" data-emoji-send-for="grp-input"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+            </div>
+            <div id="grp-typing" class="typing-line" data-i18n-ignore aria-live="polite"></div>
+          </div>
+          <aside id="grp-members-panel" class="dm-profile-panel grp-members-panel" data-i18n-ignore></aside>
         </div>
       </div>
 
@@ -2546,6 +2571,14 @@
   <script src="js/shell-friends.js"></script>
   <script src="js/shell-dm.js"></script>
   <script src="js/call-tiles.js"></script>
+  <script src="resources/emoji/shortcodes.js"></script>
+  <script src="js/ui/emoji.js"></script>
+  <script src="js/ui/typing.js"></script>
+  <script src="js/dm-extras.js"></script>
+  <script src="js/space/crypto.js"></script>
+  <script src="js/space/store.js"></script>
+  <script src="js/space/groups.js"></script>
+  <script src="js/ui/group-view.js"></script>
   <script src="js/media-library.js"></script>
   <script src="js/media-collect.js"></script>
   <script src="js/dm-resize.js"></script>
