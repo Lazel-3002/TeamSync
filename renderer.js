@@ -484,6 +484,8 @@ function setupInternetSignaling(roomId, myId, myName) {
           bannedIds: state.isRoomFounder ? Array.from(state.bannedIds || []) : undefined,
           serverMutedIds: state.isRoomFounder ? Array.from(state.serverMutedIds || []) : undefined,
           audioBitrate: state.isRoomFounder ? getAudioBitrate() : undefined,
+          // Durum + oynanan oyun (oda kutucukları için; eski istemciler yok sayar).
+          presence: window.TSStatus ? window.TSStatus.roomPresence() : undefined,
         }));
       }
     }, 3000);
@@ -589,6 +591,7 @@ function setupInternetSignaling(roomId, myId, myName) {
         }
         applySharedTurn(data.turn);
         handlePeerDiscovered({ id: data.id, name: data.name, ip: 'internet', avatar: data.avatar, isFounder: data.isRoomFounder, isModerator: data.isModerator, friendId: data.friendId, joinedAt: data.joinedAt });
+        if (data.presence && window.TSStatus) window.TSStatus.ingestRoomPresence(data.id, data.presence);
       } else if (data.type === 'signal' && data.target === myId) {
         let peer = state.peers.get(data.id);
         if (!peer) {
@@ -915,6 +918,7 @@ window.deleteAccount = async function(id) {
 window.loginWithAccount = function(acc) {
   state.myName = acc.name;
   state.friendId = acc.id;
+  if (window.TSProfile && acc.profileExt) window.TSProfile.importExt(acc.profileExt);
   state.myAvatar = safeAvatarUrl(acc.avatar);
   state.myAvatarHash = acc.avatarHash || null;
   state.friends = acc.friends || {};
@@ -1035,7 +1039,9 @@ async function saveProfile() {
     avatar: state.myAvatar,
     avatarHash: state.myAvatarHash,
     friends: state.friends,
-    requests: state.friendRequests
+    requests: state.friendRequests,
+    // Zengin profil (bio, arka plan, çerçeve...): js/profile.js
+    profileExt: window.TSProfile ? window.TSProfile.exportExt() : undefined
   };
   localStorage.setItem('teamsync_profile', JSON.stringify(profileData));
   await updateAccountInList(profileData);
@@ -1176,7 +1182,11 @@ function renderFriends() {
   } else {
     friendKeys.forEach(fId => {
       const f = state.friends[fId];
-      const isOnline = f.online ? 'online' : '';
+      // Görünen durum (js/status.js): çevrimdışı arkadaş hiçbir zaman durum,
+      // oyun ya da "Sunucuda" satırı göstermez.
+      const status = window.TSStatus ? window.TSStatus.statusOf(fId) : (f.online ? 'online' : 'offline');
+      const isOnline = status !== 'offline' ? 'online' : '';
+      const presence = window.TSStatus ? window.TSStatus.presenceOf(fId) : null;
       // Oda bilgisi son presence paketinden kalmış olabilir. Çevrimdışı bir
       // arkadaş hiçbir zaman "Sunucuda" veya katılınabilir gösterilmemeli.
       const inRoom = Boolean(f.online && f.room);
@@ -1184,34 +1194,48 @@ function renderFriends() {
       const friendArg = safeInlineArg(fId);
       const avatarHtml = safeFriendAvatar
         ? `<img src="${escapeHtml(safeFriendAvatar)}" class="friend-avatar" />`
-        : `<div class="friend-avatar" style="background: rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:16px;">👤</div>`;
+        : `<div class="friend-avatar friend-avatar-initial" style="background:${window.TSUI ? window.TSUI.colorFromString(fId) : 'rgba(255,255,255,0.1)'};">${escapeHtml(String(f.name || '?').trim().charAt(0).toUpperCase() || '?')}</div>`;
+      let subHtml = '';
+      if (presence && presence.act) {
+        subHtml = `<span class="friend-sub is-activity">${escapeHtml(t('activity.playingLine', { name: presence.act.n }))}</span>`;
+      } else if (presence && presence.cs) {
+        subHtml = `<span class="friend-sub">${escapeHtml(`${presence.cs.e ? presence.cs.e + ' ' : ''}${presence.cs.t || ''}`)}</span>`;
+      } else {
+        subHtml = `<span class="friend-sub">${escapeHtml(t(`status.${status}`))}</span>`;
+      }
 
       const li = document.createElement('li');
       li.className = 'friend-item';
+      li.dataset.fid = fId;
+      li.dataset.online = isOnline ? '1' : '0';
+      li.dataset.status = status;
+      li.dataset.muted = f.isMuted ? '1' : '0';
+      li.dataset.temp = f.temporary ? '1' : '0';
       li.innerHTML = `
-        <div class="friend-info" onclick="showFriendProfile(${friendArg})" style="cursor:pointer;" title="Profili Görüntüle">
-          <div style="position:relative;">
+        <div class="friend-info" onclick="openDM(${friendArg})" style="cursor:pointer;">
+          <div class="friend-avatar-wrap" onclick="event.stopPropagation(); showFriendProfile(${friendArg}, this)" title="${escapeHtml(t('profile.aboutMe'))}">
             ${avatarHtml}
-            <div class="friend-status ${isOnline}" id="${safeDomId('status-', fId)}" style="position:absolute; bottom:0; right:6px; border:2px solid #1e1e24; margin:0;"></div>
+            <div class="friend-status fs-dot s-${status} ${isOnline}" id="${safeDomId('status-', fId)}"></div>
           </div>
           <div class="friend-copy">
             <b class="friend-name">${escapeHtml(f.name)}</b>
-            ${inRoom ? '<div class="friend-presence"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="12"></circle></svg><span>Sunucuda</span></div>' : ''}
+            ${subHtml}
+            ${inRoom ? `<div class="friend-presence"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="12"></circle></svg><span>${escapeHtml(t('friends.inVoice'))}</span></div>` : ''}
           </div>
         </div>
         <div class="friend-actions">
-          <button class="icon-btn sm friend-action-chat" style="display: flex; align-items: center; justify-content: center;" onclick="openDM(${friendArg})" title="Mesaj Gönder">
+          <button class="icon-btn sm friend-action-chat" style="display: flex; align-items: center; justify-content: center;" onclick="openDM(${friendArg})" title="${escapeHtml(t('friends.message'))}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           </button>
-          ${inRoom ? `<button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="requestJoinRoom(${friendArg})" title="Sunucusuna Katıl">
+          ${inRoom ? `<button class="icon-btn sm friend-action-join" style="display: flex; align-items: center; justify-content: center;" onclick="requestJoinRoom(${friendArg})" title="${escapeHtml(t('friends.joinRoom'))}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h4"></path><path d="M8 10v4"></path><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line></svg>
           </button>` : ''}
-          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: ${f.isMuted ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'}; color: ${f.isMuted ? '#fca5a5' : '#9ca3af'}; border-color: ${f.isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(107, 114, 128, 0.3)'};" onclick="toggleMuteFriend(${friendArg})" title="${f.isMuted ? 'Sesi Aç' : 'Sessize Al / Engelle'}">
-            ${f.isMuted 
-              ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>` 
+          <button class="icon-btn sm friend-action-mute ${f.isMuted ? 'is-on' : ''}" style="display: flex; align-items: center; justify-content: center;" onclick="toggleMuteFriend(${friendArg})" title="${escapeHtml(t(f.isMuted ? 'profile.unmute' : 'profile.mute'))}">
+            ${f.isMuted
+              ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
               : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`}
           </button>
-          <button class="icon-btn sm" style="display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);" onclick="removeFriend(${friendArg})" title="Arkadaşlıktan Çıkar">
+          <button class="icon-btn sm friend-action-remove" style="display: flex; align-items: center; justify-content: center;" onclick="removeFriend(${friendArg})" title="${escapeHtml(t('profile.removeFriend'))}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="23" y1="11" x2="17" y2="11"></line></svg>
           </button>
         </div>
@@ -1220,6 +1244,7 @@ function renderFriends() {
     });
   }
   updateFriendsListCap();
+  if (window.TSShell && window.TSShell.onFriendsRendered) window.TSShell.onFriendsRendered();
 }
 
 // Arkadaş listesi sabit bir max-height'e kilitliyken, panelde bol yer olsa
@@ -1589,6 +1614,7 @@ function setNickname(id, nick) {
 // Oda listesindeki satırın isim metnini (lakap dahil) canlı günceller.
 // Gerçek isim satırın dataset'inde tutulur (bkz: addUser / handlePeerDiscovered).
 function refreshUserRowName(id) {
+  if (window.TSTiles) window.TSTiles.update(id);
   const li = document.querySelector(`[data-uid="${id}"]`);
   if (!li) return;
   const t = li.querySelector('.uname-text');
@@ -1900,6 +1926,12 @@ window.removeFriend = async (id) => {
 let presenceInterval = null;
 let pingInterval = null;
 
+// Masaüstü bildirimi: "Rahatsız Etmeyin" durumunda hiçbiri gösterilmez.
+function tsNotify(title, body) {
+  if (window.TSStatus && window.TSStatus.isDnd()) return;
+  if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify(title, body);
+}
+
 function markFriendOffline(friend) {
   if (!friend) return;
   friend.online = false;
@@ -1924,7 +1956,7 @@ function starIconSvg(filled) {
 // Kendi çevrimiçi durumumu (ad, oda, avatar URL) arkadaşlara yayınlar.
 function publishPresence() {
   if (state.globalMqtt && state.globalMqtt.connected) {
-    state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
+    const base = {
       online: true,
       id: state.friendId,
       name: state.myName,
@@ -1933,7 +1965,12 @@ function publishPresence() {
       // Avatar bir Supabase URL'iyse presence ile paylaş (kısa); base64 ise
       // gönderme, eski avatarHash/req_avatar akışına bırak.
       avatar: (typeof state.myAvatar === 'string' && state.myAvatar.startsWith('http')) ? state.myAvatar : undefined
-    }));
+    };
+    // Durum/özel durum/oyun/profil sürümü (js/status.js). Görünmezken null:
+    // hiç yayın yapılmaz, arkadaşlar çevrimdışı görür.
+    const payload = window.TSStatus ? window.TSStatus.buildPresence(base) : base;
+    if (!payload) return;
+    state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify(payload));
   }
 }
 
@@ -2058,6 +2095,7 @@ function connectGlobalBroker(idx, session) {
           // arkadaşın yeşil görünmesine neden oluyordu.
           if (data.online === false) {
             markFriendOffline(state.friends[data.id]);
+            if (window.TSStatus) window.TSStatus.clearPresence(data.id);
             if (wasOnline || oldRoom) renderFriends();
             return;
           }
@@ -2081,7 +2119,10 @@ function connectGlobalBroker(idx, session) {
             }));
           }
 
-          if (!wasOnline || oldRoom !== data.room || oldAvatarHash !== data.avatarHash || avatarChanged) {
+          // Durum / özel durum / oyun değiştiyse de liste yeniden çizilir
+          // (yalnızca geçen süre değiştiyse ÇİZİLMEZ — sayaç kendi işler).
+          const richChanged = window.TSStatus ? window.TSStatus.ingestPresence(data.id, data) : false;
+          if (!wasOnline || oldRoom !== data.room || oldAvatarHash !== data.avatarHash || avatarChanged || richChanged) {
             renderFriends();
           } else {
             const dot = document.getElementById(`status-${data.id}`);
@@ -2104,7 +2145,7 @@ function connectGlobalBroker(idx, session) {
             state.friendRequests.push({ id: data.id, name: data.name });
             saveProfile();
             showToast(`${data.name} ${t('toast.friendRequestReceived')}`, 'info');
-            if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify('Arkadaşlık İsteği', `${data.name} sana arkadaşlık isteği gönderdi!`);
+            tsNotify('Arkadaşlık İsteği', `${data.name} sana arkadaşlık isteği gönderdi!`);
             renderFriends();
           }
         } else if (data.type === 'friend_accepted') {
@@ -2112,15 +2153,15 @@ function connectGlobalBroker(idx, session) {
             state.friends[data.id] = { name: data.name, online: false };
             saveProfile();
             showToast(`${data.name} ${t('toast.friendRequestAccepted')}`, 'ok');
-            if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify('İstek Kabul Edildi', `${data.name} arkadaşlık isteğini kabul etti!`);
+            tsNotify('İstek Kabul Edildi', `${data.name} arkadaşlık isteğini kabul etti!`);
             state.globalMqtt.subscribe(`teamsync/user/${data.id}/presence`);
             renderFriends();
           }
         } else if (data.type === 'room_join_request') {
           if (state.room) {
             showJoinRequestNote(data.id, data.name);
-            playSound('on');
-            if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify('Katılma İsteği', `${data.name} odanıza katılmak istiyor.`);
+            if (!(window.TSStatus && window.TSStatus.isDnd())) playSound('on');
+            tsNotify('Katılma İsteği', `${data.name} odanıza katılmak istiyor.`);
           } else {
             state.globalMqtt.publish(`teamsync/user/${data.id}/events`, JSON.stringify({
               type: 'room_join_declined',
@@ -2159,8 +2200,10 @@ function connectGlobalBroker(idx, session) {
             state.lastInviteReceivedAt[data.id] = inviteNow;
             showServerInviteNotification({ id: data.id, name: data.name, roomId: data.roomId, password: data.password });
           }
+        } else if (data.type === 'req_profile' || data.type === 'res_profile') {
+          if (window.TSProfile) window.TSProfile.onEvent(data);
         } else if (data.type === 'req_avatar') {
-          if (state.myAvatar) {
+          if (state.myAvatar && !(window.TSStatus && window.TSStatus.isInvisible())) {
             state.globalMqtt.publish(`teamsync/user/${data.fromId}/events`, JSON.stringify({
               type: 'res_avatar',
               fromId: state.friendId,
@@ -3159,6 +3202,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   function loginWithProfileData(profile) {
     state.myName = profile.name;
     state.friendId = profile.friend_id;
+    if (window.TSProfile && profile.profile_ext) window.TSProfile.importExt(profile.profile_ext);
     state.myAvatar = safeAvatarUrl(profile.avatar);
     state.myAvatarHash = null;
     state.friends = profile.friends || {};
@@ -3335,9 +3379,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-add-friend').addEventListener('click', () => {
     const targetId = document.getElementById('friend-id-input').value.trim().toUpperCase();
-    if (!targetId || targetId === state.friendId) return alert(t('alert.validId'));
-    
-    if (state.friends[targetId]) return alert(t('alert.alreadyFriend'));
+    const addFriendError = (key, legacyKey) => window.TSFriends ? window.TSFriends.addFriendError(t(key)) : alert(t(legacyKey));
+    if (!targetId || targetId === state.friendId) return addFriendError('friends.errorValidId', 'alert.validId');
+
+    if (state.friends[targetId] && !state.friends[targetId].temporary) return addFriendError('friends.errorAlreadyFriend', 'alert.alreadyFriend');
     
     if (state.globalMqtt && state.globalMqtt.connected) {
       state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
@@ -3347,6 +3392,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       }));
       showToast(t('toast.friendRequestSent'), "ok");
       document.getElementById('friend-id-input').value = '';
+      if (window.TSFriends) window.TSFriends.onFriendRequestSent(targetId);
       document.getElementById('step-add-friend').classList.add('hidden');
       document.getElementById('step-action').classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
     } else {
@@ -3601,6 +3647,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       return false;
     }
   };
+
+  // Yeni kabuk (js/shell-core.js) ve ileride sunucu ses kanalları odaya bu
+  // kapıdan girer; startApp DOMContentLoaded kapanışının içinde yaşıyor.
+  window.TSRoom = { start: startApp };
 
   btnJoin.addEventListener('click', async () => {
     document.getElementById('error-modal').classList.add('hidden');
@@ -4337,6 +4387,8 @@ function removePeer(peerId) {
   state.peers.delete(peerId);
   const userEl = document.querySelector(`[data-uid="${peerId}"]`);
   if (userEl) userEl.remove();
+  if (window.TSTiles) window.TSTiles.remove(peerId);
+  if (state.roomPresenceOf) delete state.roomPresenceOf[peerId];
   removeVideoCard(peerId, false);
   removeVideoCard(peerId, true);
   state.speakingPeers.delete(peerId);
@@ -6202,6 +6254,8 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
     li.addEventListener('click', openMenu);
     li.addEventListener('contextmenu', openMenu);
   }
+  // Arama görünümündeki katılımcı kutucuğu (js/call-tiles.js)
+  if (window.TSTiles) window.TSTiles.add(id);
   updateEmptyGrid();
 }
 
@@ -6535,12 +6589,14 @@ function updateUserUI(uid) {
     else if (!peer.mic) st.classList.add('muted');
     if (peer.sharing) st.classList.add('share');
   }
+  if (window.TSTiles) window.TSTiles.update(uid);
+  if (isSelf && window.TSShell) window.TSShell.onSelfVoiceState();
 }
 
 function updateEmptyGrid() {
   const grid = document.getElementById('grid');
   const empty = grid.querySelector('.empty');
-  const hasContent = grid.querySelector('.vcard');
+  const hasContent = grid.querySelector('.vcard, .ptile');
   if (hasContent && empty) empty.remove();
 }
 
@@ -7277,9 +7333,9 @@ function appendChat(uid, name, text, isCensored = false) {
   }
 
   if (uid !== 'self') {
-    if (window.electronAPI && window.electronAPI.notify) {
-      window.electronAPI.notify(name, notifyText);
-    }
+    tsNotify(name, notifyText);
+    // Sağ panel (sohbet) kapalıyken okunmamış rozeti
+    if (window.TSShell && window.TSShell.onRoomChat) window.TSShell.onRoomChat();
   }
 }
 
@@ -8569,6 +8625,22 @@ Object.entries(window.TeamSyncLocaleCatalogs || {}).forEach(([locale, catalog]) 
   LEGACY_TEXT_BY_LOCALE[locale] = catalog.legacy;
 });
 
+// Yeni kabuk metinleri (resources/localization/shell-strings.js). Katalog
+// birleştirmesinden SONRA uygulanır: yoksa tr kataloğu bu anahtarları
+// İngilizce yedekle ezerdi. Diğer diller çevrilene kadar İngilizce görür.
+(function mergeShellStrings() {
+  const extra = window.TeamSyncExtraStrings || {};
+  const en = extra.en || {};
+  Object.keys(I18N).forEach(locale => {
+    const source = extra[locale] || {};
+    Object.keys(en).forEach(key => {
+      if (!Object.prototype.hasOwnProperty.call(I18N[locale], key)) {
+        I18N[locale][key] = source[key] !== undefined ? source[key] : en[key];
+      }
+    });
+  });
+})();
+
 function translateLegacyValue(value, dictionary) {
   if (dictionary[value]) return dictionary[value];
   // Activity UIs commonly decorate labels with icons, counters or a user's
@@ -8605,6 +8677,10 @@ function translateLegacyValue(value, dictionary) {
 
 function translateLegacyStaticUI(language, root = document.body) {
   if (!root) return;
+  // Kullanıcı içeriği taşıyan kaplar (DM listesi, profil kartı...) hiç
+  // taranmaz: her eklenen düğümde tüm sözlüğü dolaşmak pahalı ve anlamsız.
+  const rootEl = root.nodeType === Node.ELEMENT_NODE ? root : root.parentElement;
+  if (rootEl && rootEl !== document.body && rootEl.closest && rootEl.closest('[data-i18n-ignore]')) return;
   // Dynamic cards are authored in Turkish.  Any non-Turkish locale first
   // receives the complete English safety net so a language switch cannot
   // produce a mixed Turkish interface.
@@ -9577,6 +9653,8 @@ function setSettingsPanel(name) {
   if (name !== 'voice' && state.settingsMicTestActive) stopSettingsMicTest();
   if (name === 'media') window.TeamSyncMediaLibrary?.renderSettings();
   else window.releaseMediaLibrarySettingsUrls?.();
+  if (name === 'profile') window.TSProfile?.renderEditor();
+  if (name === 'activity') window.TSActivity?.renderSettings();
 }
 
 function openUserSettings(panel = 'general') {
@@ -11465,6 +11543,8 @@ function disconnectApp() {
   
   document.getElementById('users').innerHTML = '';
   document.getElementById('msgs').innerHTML = '';
+  if (window.TSTiles) window.TSTiles.clear();
+  if (state.roomPresenceOf) state.roomPresenceOf = {};
   lastChatEntry = null;
   releaseChatBlobUrls();
   fileBuffer.clear();
@@ -11535,7 +11615,12 @@ function initFileTransfer() {
   document.addEventListener('dragleave', e => { if(e.target === dropOverlay) dropOverlay.classList.remove('active'); });
   document.addEventListener('drop', e => {
     e.preventDefault(); dropOverlay.classList.remove('active');
-    if (e.dataTransfer.files.length) sendFile(e.dataTransfer.files[0]);
+    if (!e.dataTransfer.files.length) return;
+    // Kabukta hangi görünüm açıksa dosya oraya gider: DM'deyken odaya değil
+    // arkadaşa, arkadaş listesindeyken hiçbir yere.
+    const shellView = window.TSShell && window.TSShell.isActive() ? window.TSShell.view() : 'call';
+    if (shellView === 'dm') { if (typeof window.sendDMFile === 'function') window.sendDMFile(e.dataTransfer.files[0]); }
+    else if (shellView === 'call') sendFile(e.dataTransfer.files[0]);
   });
   
   document.getElementById('fbtn').addEventListener('click', event => {
@@ -11991,47 +12076,40 @@ window.closeDM = () => {
   document.getElementById('server-dm-messages').innerHTML = '<div class="muted" style="text-align:center; margin-top:50px;">Mesajlaşmaya başlamak için bir arkadaş seç.</div>';
 };
 
-window.renderDMs = () => {
-  if (!state.activeDM) return;
-  const friendId = state.activeDM;
-  const messages = state.dms[friendId] || [];
-  
-  const html = messages.map(m => {
-    const cls = m.sender === 'me' ? 'sent' : 'recv';
-    let contentHtml = escapeHtml(m.content || '');
-    const originalContent = m.content;
-    const originalFileName = m.fileName;
-    
-    if (m.isCensored) {
-       contentHtml = `<span style="color: #f87171; font-style: italic; font-weight: 500; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.2); display: inline-flex; align-items: center; gap: 4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg> Sansürlendi</span>`;
-    } else if (m.expired) {
-      // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
-      contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
-    } else if (m.type === 'image') {
-      m.content = escapeHtml(safeMediaUrl(m.content, 'image'));
-      m.fileName = escapeHtml(safeFileName(m.fileName || 'Gorsel'));
-      // data-media-name: "Koleksiyona ekle" dosyayı özgün adıyla kaydetsin.
-      contentHtml = `
+// Tek bir DM mesajının içerik HTML'i (metin / görsel / video / dosya).
+// Saftır: mesaj nesnesini değiştirmez. Hem yeni DM görünümü (gruplanmış) hem
+// oda içi DM penceresi (baloncuk) bunu kullanır.
+function dmContentHtml(m) {
+  let contentHtml = escapeHtml(m.content || '');
+  if (m.isCensored) {
+    contentHtml = censoredTextHtml(m.content);
+  } else if (m.expired) {
+    // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
+    contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
+  } else if (m.type === 'image') {
+    const src = escapeHtml(safeMediaUrl(m.content, 'image'));
+    const name = safeFileName(m.fileName || 'Gorsel');
+    // data-media-name: "Koleksiyona ekle" dosyayı özgün adıyla kaydetsin.
+    contentHtml = `
         <div class="img-wrap">
-          <img src="${m.content}" class="chat-img" alt="${escapeHtml(m.fileName || 'Görsel')}" data-media-name="${escapeHtml(m.fileName || '')}" />
-          <a href="${m.content}" download="${m.fileName || 'gorsel'}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
+          <img src="${src}" class="chat-img" alt="${escapeHtml(name || 'Görsel')}" data-media-name="${escapeHtml(name || '')}" />
+          <a href="${src}" download="${escapeHtml(name || 'gorsel')}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
         </div>`;
-    } else if (m.type === 'video') {
-      m.content = escapeHtml(safeMediaUrl(m.content, 'video'));
-      m.fileName = escapeHtml(safeFileName(m.fileName || 'Video'));
-      contentHtml = `
+  } else if (m.type === 'video') {
+    const src = escapeHtml(safeMediaUrl(m.content, 'video'));
+    const name = safeFileName(m.fileName || 'Video');
+    contentHtml = `
         <div class="img-wrap">
-          <video src="${m.content}" controls playsinline preload="metadata" aria-label="${escapeHtml(m.fileName || 'Video')}" data-media-name="${escapeHtml(m.fileName || '')}"></video>
-          <a href="${m.content}" download="${m.fileName || 'video'}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
+          <video src="${src}" controls playsinline preload="metadata" aria-label="${escapeHtml(name || 'Video')}" data-media-name="${escapeHtml(name || '')}"></video>
+          <a href="${src}" download="${escapeHtml(name || 'video')}" class="dl-btn" title="İndir" aria-label="İndir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><g class="dl-arrow"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></g></svg></a>
         </div>`;
-    } else if (m.type === 'file') {
-      const rawDataUrl = safeMediaUrl(originalContent, 'file');
-      const safeName = safeFileName(m.fileName || 'dosya');
-      m.content = escapeHtml(rawDataUrl);
-      m.fileName = escapeHtml(safeName);
-      const sizeLabel = formatFileSize(dataUrlByteSize(rawDataUrl));
-      const previewable = isPreviewableFile(safeName, '');
-      contentHtml = `
+  } else if (m.type === 'file') {
+    const rawDataUrl = safeMediaUrl(m.content, 'file');
+    const safeName = safeFileName(m.fileName || 'dosya');
+    const href = escapeHtml(rawDataUrl);
+    const sizeLabel = formatFileSize(dataUrlByteSize(rawDataUrl));
+    const previewable = isPreviewableFile(safeName, '');
+    contentHtml = `
         <div class="msg-file">
           <div class="icon">${fileCardIcon(safeName, '')}</div>
           <div class="info">
@@ -12040,32 +12118,39 @@ window.renderDMs = () => {
           </div>
           <div class="file-actions">
             ${previewable ? `<button type="button" class="text-dl view-btn" data-dm-preview="${escapeHtml(rawDataUrl)}" data-dm-preview-name="${escapeHtml(safeName)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${t('viewer.preview')}</button>` : ''}
-            <a href="${m.content}" download="${safeName}" class="text-dl"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${t('viewer.download')}</a>
+            <a href="${href}" download="${escapeHtml(safeName)}" class="text-dl"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> ${t('viewer.download')}</a>
           </div>
         </div>`;
-    }
+  }
+  if (m.count > 1) {
+    contentHtml += `<span class="msg-repeat-badge">×${m.count}</span>`;
+  }
+  return contentHtml;
+}
 
-    m.content = originalContent;
-    m.fileName = originalFileName;
-    if (m.isCensored) contentHtml = censoredTextHtml(m.content);
-    if (m.count > 1) {
-      contentHtml += `<span class="msg-repeat-badge">×${m.count}</span>`;
-    }
+window.renderDMs = () => {
+  if (!state.activeDM) return;
+  const friendId = state.activeDM;
+  const messages = state.dms[friendId] || [];
+  const rendered = messages.map(m => ({ m, html: dmContentHtml(m) }));
+  const bubbles = rendered.map(({ m, html }) => `<div class="dm-msg ${m.sender === 'me' ? 'sent' : 'recv'}">${html}</div>`).join('');
+  const emptyHtml = '<div class="muted" style="text-align:center; margin-top:50px;">Henüz mesaj yok.</div>';
 
-    return `<div class="dm-msg ${cls}">${contentHtml}</div>`;
-  }).join('');
-  
+  // Ana DM görünümü: Discord tarzı gruplanmış mesajlar (js/shell-dm.js).
   const container = document.getElementById('dm-messages');
   if (container) {
-    container.innerHTML = html || '<div class="muted" style="text-align:center; margin-top:50px;">Henüz mesaj yok.</div>';
+    container.innerHTML = window.TSDM ? window.TSDM.groupedHtml(friendId, rendered) : (bubbles || emptyHtml);
     container.scrollTop = container.scrollHeight;
   }
-  
+
+  // Oda içi DM penceresi: eski baloncuklar.
   const serverContainer = document.getElementById('server-dm-messages');
   if (serverContainer) {
-    serverContainer.innerHTML = html || '<div class="muted" style="text-align:center; margin-top:50px;">Henüz mesaj yok.</div>';
+    serverContainer.innerHTML = bubbles || emptyHtml;
     serverContainer.scrollTop = serverContainer.scrollHeight;
   }
+  // Yan sütundaki DM listesi son mesaja göre sıralanır.
+  if (window.TSDM) window.TSDM.renderList();
 };
 
 window.renderServerDMFriends = () => {
@@ -12106,6 +12191,8 @@ function pushDmMessage(friendId, entry) {
   if (last && entry.type === 'text' && last.type === 'text' && last.sender === entry.sender && last.content === entry.content && !!last.isCensored === !!entry.isCensored) {
     last.count = (last.count || 1) + 1;
     last.timestamp = entry.timestamp;
+    // Birleştirilen mesajın kimliği de hatırlanır: QoS 1 çift teslimi ×N'i şişirmesin.
+    if (entry.id) last.mergedIds = (last.mergedIds || []).concat(entry.id).slice(-50);
   } else {
     list.push(entry);
   }
@@ -12125,7 +12212,10 @@ window.sendDMText = async (text) => {
 
   // Local store
   if (!state.dms[friendId]) state.dms[friendId] = [];
-  pushDmMessage(friendId, { sender: 'me', type: 'text', content: textToSend, isCensored: isCensored, timestamp: Date.now() });
+  // mid: alıcının QoS-1 çift teslimleri ayıklayabilmesi için mesaj kimliği
+  // (eski istemciler alanı yok sayar).
+  const mid = crypto.randomUUID();
+  pushDmMessage(friendId, { id: mid, sender: 'me', type: 'text', content: textToSend, isCensored: isCensored, timestamp: Date.now() });
   saveDMs();
   renderDMs();
   
@@ -12153,7 +12243,8 @@ window.sendDMText = async (text) => {
     fromName: state.myName, // alıcı bizi arkadaş listesinde tanımıyorsa isim buradan gelir
     msgType: 'text',
     content: textToSend,
-    isCensored: isCensored
+    isCensored: isCensored,
+    mid
   }));
 };
 
@@ -12187,7 +12278,7 @@ window.sendDMFile = async (file) => {
   const msgType = isImage ? 'image' : (isVideo ? 'video' : 'file');
 
   if (!state.dms[friendId]) state.dms[friendId] = [];
-  state.dms[friendId].push({ sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
+  state.dms[friendId].push({ id: crypto.randomUUID(), sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
   saveDMs();
   renderDMs();
 
@@ -12253,10 +12344,14 @@ window.receiveDM = async (fromId, data) => {
        }
     }
     
-    pushDmMessage(fromId, { sender: 'them', type: data.msgType, content: safeContent, isCensored: isCensored, timestamp: Date.now() });
+    const mid = typeof data.mid === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(data.mid) ? data.mid : null;
+    if (mid && state.dms[fromId].some(m => m.id === mid || (m.mergedIds && m.mergedIds.includes(mid)))) return; // QoS 1 çift teslim
+    pushDmMessage(fromId, { id: mid || undefined, sender: 'them', type: data.msgType, content: safeContent, isCensored: isCensored, timestamp: Date.now() });
     saveDMs();
+    const viewing = window.TSDM ? window.TSDM.isViewing(fromId) : state.activeDM === fromId;
     if (state.activeDM === fromId) renderDMs();
-    else showToast(`${state.friends[fromId]?.name || t('toast.defaultSomeone')} ${t('toast.friendSentMessage')}`, 'info');
+    if (!viewing && !(window.TSStatus && window.TSStatus.isDnd())) showToast(`${state.friends[fromId]?.name || t('toast.defaultSomeone')} ${t('toast.friendSentMessage')}`, 'info');
+    if (window.TSDM) window.TSDM.onReceived(fromId);
 
     // Supabase Kayıt (Gelen DM)
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
@@ -12311,8 +12406,10 @@ window.receiveDM = async (fromId, data) => {
         saveDMs();
         delete state.incomingDMFiles[data.fileId];
         
+        const viewingFile = window.TSDM ? window.TSDM.isViewing(fromId) : state.activeDM === fromId;
         if (state.activeDM === fromId) renderDMs();
-        else showToast(`${state.friends[fromId]?.name || t('toast.defaultSomeone')} ${t('toast.friendSentFile')}`, 'info');
+        if (!viewingFile && !(window.TSStatus && window.TSStatus.isDnd())) showToast(`${state.friends[fromId]?.name || t('toast.defaultSomeone')} ${t('toast.friendSentFile')}`, 'info');
+        if (window.TSDM) window.TSDM.onReceived(fromId);
 
         // Gelen medya da bulut veritabanına kopyalanmaz; yalnızca bu cihazdaki
         // sohbet durumu ve yerel kütüphane kullanılır.
@@ -13273,11 +13370,13 @@ const ACTIVITY_CARD_IDS = [
 const SHORTCUT_DEFS = [
   {
     id: 'mic', nameKey: 'shortcut.mic', descKey: 'shortcut.micDesc',
-    def: { code: 'KeyM' }, run: () => document.getElementById('mic')?.click()
+    // Kabukta kullanıcı panelindeki düğmeye gider: odadaysan #mic'e, değilsen
+    // katılım öncesi tercihe uygulanır.
+    def: { code: 'KeyM' }, run: () => document.getElementById(window.TSShell && window.TSShell.isActive() ? 'up-mic' : 'mic')?.click()
   },
   {
     id: 'deafen', nameKey: 'shortcut.deafen', descKey: 'shortcut.deafenDesc',
-    def: { code: 'KeyD' }, run: () => document.getElementById('deaf')?.click()
+    def: { code: 'KeyD' }, run: () => document.getElementById(window.TSShell && window.TSShell.isActive() ? 'up-deaf' : 'deaf')?.click()
   },
   {
     id: 'camera', nameKey: 'shortcut.camera', descKey: 'shortcut.cameraDesc',
@@ -13285,11 +13384,11 @@ const SHORTCUT_DEFS = [
   },
   {
     id: 'share', nameKey: 'shortcut.share', descKey: 'shortcut.shareDesc',
-    def: { code: 'KeyS' }, run: () => document.getElementById('share')?.click()
+    def: { code: 'KeyS' }, run: () => { if (!window.TSShell || window.TSShell.isCallVisible()) document.getElementById('share')?.click(); }
   },
   {
     id: 'record', nameKey: 'shortcut.record', descKey: 'shortcut.recordDesc',
-    def: { code: 'KeyR' }, run: () => document.getElementById('rec')?.click()
+    def: { code: 'KeyR' }, run: () => { if (!window.TSShell || window.TSShell.isCallVisible()) document.getElementById('rec')?.click(); }
   },
   {
     id: 'fullscreen', nameKey: 'shortcut.fullscreen', descKey: 'shortcut.fullscreenDesc',
@@ -13443,6 +13542,9 @@ function isShortcutTypingTarget(node) {
 // Etkinlik/oyun önplanda mı? Odaklanmış kart bir etkinlik kartıysa ya da
 // klavye odağı görünür bir etkinlik kartının içindeyse önplandadır.
 function isActivityForeground() {
+  // Arama görünümü arka plandaysa (DM/Arkadaşlar sayfası) etkinlik kartı
+  // önplanda sayılmaz; yoksa M/D kısayolları DM sayfasında da susardı.
+  if (window.TSShell && !window.TSShell.isCallVisible()) return false;
   try {
     if (typeof focusedCard !== 'undefined' && focusedCard && ACTIVITY_CARD_IDS.includes(focusedCard.id)) return true;
   } catch (e) {}

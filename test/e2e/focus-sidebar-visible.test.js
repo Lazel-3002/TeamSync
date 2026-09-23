@@ -1,8 +1,10 @@
-// Odak modunda (Etkinlik / Ekran / Tahta) sol panel ile alt çubuğun
+// Odak modunda (Etkinlik / Ekran / Tahta) oda paneli ile alt çubuğun
 // kaybolmadığını doğrular. Regresyon: `.app:has(> .main.focus-mode) > .sidebar
 // { display:none }` + `.main.focus-mode > .bar { justify-content:flex-start }`
 // yüzünden odağa girer girmez sunucudaki kişiler ve sohbet tamamen yok oluyor,
 // alt çubuktaki düğmeler de ekranın soluna yapışıyordu.
+// Discord tarzı kabukta panel sağdadır ve sağ üstteki sohbet düğmesiyle açılır;
+// Sohbet ve Kişiler ayrı sekmelerdir.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
@@ -115,6 +117,9 @@ module.exports = async function run() {
       mobile: false,
     });
     await createRoom(peer);
+    // Panel varsayılan olarak kapalı: sağ üstteki sohbet düğmesiyle aç.
+    await evalJS(peer.client, `document.getElementById('btn-call-chat').click(); 1`);
+    await new Promise(resolve => setTimeout(resolve, 200));
 
     const beforeFocus = await inspectFocusLayout(peer);
     assert.notStrictEqual(beforeFocus.sidebar.display, 'none', JSON.stringify(beforeFocus, null, 2));
@@ -140,19 +145,26 @@ module.exports = async function run() {
     assert.strictEqual(focused.sidebar.width, sidebarWidthBefore, dump);
     assert.ok(focused.sidebar.width >= 260, dump);
 
-    // 2) Kullanıcı listesi ve sohbet gerçekten görünür.
-    for (const [label, item] of [['users', focused.users], ['chat', focused.chat], ['chatInput', focused.chatInput]]) {
+    // 2) Sohbet (varsayılan sekme) ve Kişiler sekmesindeki liste gerçekten görünür.
+    for (const [label, item] of [['chat', focused.chat], ['chatInput', focused.chatInput]]) {
       assert.notStrictEqual(item.display, 'none', label + ' gizli: ' + dump);
       assert.ok(item.width > 0 && item.height > 0, label + ' sıfır boyutlu: ' + dump);
       assert.strictEqual(item.insideViewport, true, label + ' ekran dışı: ' + dump);
     }
+    await evalJS(peer.client, `document.querySelector('[data-call-tab="people"]').click(); 1`);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const peopleTab = await inspectFocusLayout(peer);
+    assert.notStrictEqual(peopleTab.users.display, 'none', 'users gizli: ' + JSON.stringify(peopleTab, null, 2));
+    assert.ok(peopleTab.users.width > 0 && peopleTab.users.height > 0, 'users sıfır boyutlu: ' + JSON.stringify(peopleTab, null, 2));
+    assert.strictEqual(peopleTab.users.insideViewport, true, 'users ekran dışı: ' + JSON.stringify(peopleTab, null, 2));
+    await evalJS(peer.client, `document.querySelector('[data-call-tab="chat"]').click(); 1`);
 
     // 3) Üst çubuk (SUNUCU ID / Mesajlar / Arkadaşlar) odakta kayboluyor.
     assert.notStrictEqual(focused.topBar.display, 'none', dump);
     assert.ok(focused.topBar.height > 0, dump);
 
-    // 4) Odaklı kart panelin üstüne binmiyor ve ekran içinde.
-    assert.ok(focused.card.left >= focused.sidebar.right - 1, dump);
+    // 4) Odaklı kart (sağdaki) panelin üstüne binmiyor ve ekran içinde.
+    assert.ok(focused.card.right <= focused.sidebar.left + 1, dump);
     assert.strictEqual(focused.card.insideViewport, true, dump);
     assert.ok(focused.card.width >= 240 && focused.card.height >= 180, dump);
 

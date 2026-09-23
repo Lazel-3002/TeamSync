@@ -137,7 +137,44 @@ async function waitForPeerConnected(peer, timeoutMs = 40000) {
   );
 }
 
+// Discord tarzı kabuk giriş sonrası açılır (body.shell-active).
+async function waitForShell(peer, timeoutMs = 20000) {
+  return waitFor(peer.client, `document.body.classList.contains('shell-active')`, timeoutMs, 'shell active');
+}
+
+// Cihaz girişi isim adımından sonra friendId'yi değiştirebilir; arkadaşlık
+// konuları bağlantı anındaki kimliğe abone olur. Kimlik oturana kadar bekle.
+async function waitStableIdentity(peer, timeoutMs = 40000) {
+  const start = Date.now();
+  let last = null;
+  while (Date.now() - start < timeoutMs) {
+    const id = await evalJS(peer.client, `(state.globalMqtt && state.globalMqtt.connected && typeof globalMqttIdentity !== 'undefined' && globalMqttIdentity === state.friendId) ? state.friendId : null`).catch(() => null);
+    if (id && id === last) return id;
+    last = id;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  throw new Error('waitStableIdentity timeout');
+}
+
+// İki peer'i istek/kabul akışına girmeden arkadaş yapar ve birbirlerinin
+// presence konusuna abone eder.
+async function makeFriends(a, b) {
+  const fa = await waitStableIdentity(a);
+  const fb = await waitStableIdentity(b);
+  const link = (peer, fid, name) => evalJS(peer.client, `(() => {
+    state.friends[${JSON.stringify(fid)}] = { name: ${JSON.stringify(name)}, online: false };
+    state.globalMqtt.subscribe('teamsync/user/' + ${JSON.stringify(fid)} + '/presence');
+    renderFriends();
+    publishPresence();
+    return 1;
+  })()`);
+  await link(a, fb, b.name);
+  await link(b, fa, a.name);
+  return { fa, fb };
+}
+
 module.exports = {
   APP_DIR, launch, getPageTarget, cdp, evalJS, waitFor, clickWhenReady, setValueWhenReady,
   spawnPeer, cleanupPeer, createRoom, joinRoom, waitForPeerConnected,
+  waitForShell, waitStableIdentity, makeFriends,
 };

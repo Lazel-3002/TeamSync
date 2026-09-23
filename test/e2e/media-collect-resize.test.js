@@ -184,49 +184,6 @@ module.exports = async function run() {
     assert.strictEqual(roomSaved.count, 2, JSON.stringify(roomSaved, null, 2));
     assert.deepStrictEqual(roomSaved.names, ['oda-dansi.gif', 'parti.gif'], JSON.stringify(roomSaved, null, 2));
 
-    // --- Ana menüdeki DM panelini sürükleyerek yükseltme ---
-    const menuResize = await evalJS(
-      peer.client,
-      `(() => {
-        const layout = document.getElementById('step-action');
-        const handle = document.querySelector('[data-dm-resize="menu"]');
-        const before = Math.round(layout.getBoundingClientRect().height);
-        const start = handle.getBoundingClientRect().top;
-        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 2, clientY: start }));
-        // Yukarı sürükleme: clientY azalır.
-        handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 2, clientY: start - 120 }));
-        const during = Math.round(layout.getBoundingClientRect().height);
-        handle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 2, clientY: start - 120 }));
-        return {
-          visible: handle.getBoundingClientRect().height > 0,
-          before,
-          during,
-          after: Math.round(layout.getBoundingClientRect().height),
-          stored: Number(localStorage.getItem('teamsync_menu_dm_height')),
-          resizingClassCleared: !document.body.classList.contains('dm-resizing')
-        };
-      })()`
-    );
-    assert.strictEqual(menuResize.visible, true, JSON.stringify(menuResize, null, 2));
-    assert.ok(menuResize.during > menuResize.before, JSON.stringify(menuResize, null, 2));
-    assert.strictEqual(menuResize.after, menuResize.during, JSON.stringify(menuResize, null, 2));
-    assert.ok(menuResize.stored >= menuResize.after, JSON.stringify(menuResize, null, 2));
-    assert.strictEqual(menuResize.resizingClassCleared, true, JSON.stringify(menuResize, null, 2));
-
-    // Çift tıklama varsayılana döner.
-    const menuReset = await evalJS(
-      peer.client,
-      `(() => {
-        const handle = document.querySelector('[data-dm-resize="menu"]');
-        handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-        return {
-          height: Math.round(document.getElementById('step-action').getBoundingClientRect().height),
-          stored: Number(localStorage.getItem('teamsync_menu_dm_height'))
-        };
-      })()`
-    );
-    assert.strictEqual(menuReset.stored, 440, JSON.stringify(menuReset, null, 2));
-
     // --- Sunucu içi Mesajlar modalini sürükleyerek yükseltme ---
     const serverResize = await evalJS(
       peer.client,
@@ -258,51 +215,29 @@ module.exports = async function run() {
     assert.ok(serverResize.clamped <= serverResize.viewport, JSON.stringify(serverResize, null, 2));
     assert.strictEqual(serverResize.messagesScrollable, true, JSON.stringify(serverResize, null, 2));
 
-    // --- Oda kenar çubuğundaki SOHBET panelini sürükleyerek yükseltme ---
-    const roomChatResize = await evalJS(
+    // --- Arama görünümünde sohbet, sağ paneli tamamen doldurur ---
+    // (Discord tarzı kabuk: sürükleme tutamacı yok, panel sekmeli.)
+    const roomChatPanel = await evalJS(
       peer.client,
       `(() => {
-        // Odaya girmeden panelin kendisi ölçülebilsin diye oda arayüzü açılır.
         document.getElementById('server-dm-modal').classList.add('hidden');
-        document.getElementById('login').style.display = 'none';
         document.getElementById('app').classList.remove('hidden');
+        window.TSShell.setView('call');
+        window.TSShell.setCallSide(true, 'chat');
         const chat = document.querySelector('.chat');
+        const side = document.querySelector('#app > .sidebar');
         const handle = chat.querySelector('[data-dm-resize="roomChat"]');
-        const before = Math.round(chat.getBoundingClientRect().height);
-        const usersBefore = Math.round(document.querySelector('.users').getBoundingClientRect().height);
-        const start = handle.getBoundingClientRect().top;
-        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 5, clientY: start }));
-        handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 5, clientY: start - 140 }));
-        handle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 5, clientY: start - 140 }));
-        const after = Math.round(chat.getBoundingClientRect().height);
-        // Aşırı sürükleme kullanıcı listesi/ses testi blokunu ezmemeli.
-        handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 6, clientY: start }));
-        handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 6, clientY: start - 4000 }));
-        handle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 6, clientY: start - 4000 }));
+        const chatRect = chat.getBoundingClientRect();
+        const sideRect = side.getBoundingClientRect();
         return {
-          handleVisible: handle.getBoundingClientRect().height > 0,
-          before,
-          after,
-          clamped: Math.round(chat.getBoundingClientRect().height),
-          stored: Number(localStorage.getItem('teamsync_room_chat_height')),
-          usersStillVisible: document.querySelector('.users').getBoundingClientRect().height > 0,
-          usersBefore,
-          sidebarHeight: Math.round(document.querySelector('.sidebar').getBoundingClientRect().height),
-          // Gönderme kutusu panelin içinde kalmalı.
-          formInside: document.querySelector('.cform').getBoundingClientRect().bottom
-            <= chat.getBoundingClientRect().bottom + 1
+          handleHidden: getComputedStyle(handle).display === 'none',
+          chatFillsPanel: chatRect.height >= sideRect.height - 60,
+          formInside: document.querySelector('.cform').getBoundingClientRect().bottom <= chatRect.bottom + 1,
+          formVisible: document.querySelector('.cform').getBoundingClientRect().height > 0
         };
       })()`
     );
-    assert.strictEqual(roomChatResize.handleVisible, true, JSON.stringify(roomChatResize, null, 2));
-    assert.strictEqual(roomChatResize.before, 280, JSON.stringify(roomChatResize, null, 2));
-    assert.strictEqual(roomChatResize.after, 420, JSON.stringify(roomChatResize, null, 2));
-    assert.ok(
-      roomChatResize.clamped <= roomChatResize.sidebarHeight - 300,
-      JSON.stringify(roomChatResize, null, 2)
-    );
-    assert.strictEqual(roomChatResize.usersStillVisible, true, JSON.stringify(roomChatResize, null, 2));
-    assert.strictEqual(roomChatResize.formInside, true, JSON.stringify(roomChatResize, null, 2));
+    assert.deepStrictEqual(roomChatPanel, { handleHidden: true, chatFillsPanel: true, formInside: true, formVisible: true }, JSON.stringify(roomChatPanel, null, 2));
 
     await peer.client.send('Page.enable');
     const shot = await peer.client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
@@ -311,7 +246,7 @@ module.exports = async function run() {
 
     console.log(JSON.stringify({
       hoverState, dmDetail, savedFromDM, duplicateState, roomCollect, roomSaved,
-      menuResize, menuReset, serverResize, roomChatResize, shotPath
+      serverResize, roomChatPanel, shotPath
     }, null, 2));
   } finally {
     cleanupPeer(peer);

@@ -18,12 +18,11 @@ module.exports = async function run() {
 
     const metrics = await evalJS(client, `(() => {
       const friendId = 'scroll-test-friend';
-      const step = document.getElementById('step-action');
+      // Discord tarzı kabuk: DM'ler kendi görünümünde (#view-dm) açılır.
+      if (!window.state.friendId) window.state.friendId = 'KNK-SCROLL-TEST';
       document.querySelectorAll('#login .login-card > div').forEach(el => el.classList.add('hidden'));
-      document.getElementById('login').classList.remove('hidden');
-      document.querySelector('.login-card').classList.add('expanded', 'dm-open');
-      step.classList.remove('hidden');
-      step.classList.add('dm-open');
+      document.getElementById('step-action').classList.remove('hidden');
+      window.TSShell.enter();
 
       window.state.friends[friendId] = { name: 'Kaydırma Testi', online: true };
       window.state.activeDM = friendId;
@@ -33,10 +32,11 @@ module.exports = async function run() {
         content: 'Test mesajı ' + (i + 1) + ' — uzun konuşma içeriği',
         timestamp: Date.now() + i
       }));
+      window.TSShell.setView('dm', friendId);
       window.renderDMs();
 
       const main = document.getElementById('dm-messages');
-      const mainPanel = document.querySelector('.menu-right');
+      const mainPanel = document.querySelector('#view-dm .dm-main');
       const mainInput = mainPanel.querySelector('.dm-input-area');
       const initialMain = {
         scrollable: main.scrollHeight > main.clientHeight,

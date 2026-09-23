@@ -1,0 +1,322 @@
+/* =====================================================================
+   ARAMA GÖRÜNÜMÜ — mevcut oda ekranı (#app) kabuğun içinde
+   .main ve .sidebar sınıfları/DOM yeri DEĞİŞMEZ (odak modu ve renderer
+   .app > .main ilişkisine güvenir); yalnızca #view-call kapsamında yeniden
+   düzenlenir. Eski sol panel artık sağda açılır/kapanır sohbet paneli.
+   ===================================================================== */
+#view-call > .app {
+  height: 100% !important;
+  flex-direction: row !important;
+  background: color-mix(in srgb, var(--bg-dark) 55%, #000);
+  --dot-ring: color-mix(in srgb, var(--bg-dark) 55%, #000);
+}
+:root:is([data-theme="white"], [data-theme="violet"]) #view-call > .app { background: var(--sh-panel); }
+#view-call > .app > .main {
+  order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto !important;
+  overflow: hidden;
+}
+
+/* ---------- Sağ panel (Sohbet | Kişiler) ---------- */
+#view-call > .app > .sidebar.call-side {
+  order: 2;
+  display: none;
+  width: 340px;
+  flex: 0 0 340px;
+  height: auto;
+  min-height: 0;
+  background: var(--sh-side);
+  backdrop-filter: none;
+  border-right: 0;
+  border-left: 1px solid var(--sh-border);
+  overflow: hidden;
+  --dot-ring: var(--sh-side);
+}
+#view-call > .app.side-open > .sidebar.call-side { display: flex; }
+#view-call > .app.side-open:has(> .main.focus-mode) > .sidebar.call-side { flex: 0 0 340px; }
+/* Dar pencerede panel + odaklı kart birlikte sığmaz: odakta paneli gizle. */
+@media (max-width: 900px) {
+  #view-call > .app.side-open:has(> .main.focus-mode) > .sidebar.call-side { display: none; }
+}
+.call-side-tabs {
+  height: 48px;
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 12px !important;
+  border-bottom: 1px solid var(--sh-border) !important;
+  background: none !important;
+}
+.call-side-tab {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--txt-mut);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.call-side-tab:hover { background: var(--sh-hover); color: var(--txt-main); }
+.call-side-tab.active { background: var(--sh-active); color: var(--txt-main); }
+.call-side-close {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--txt-mut);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.call-side-close:hover { color: var(--txt-main); background: var(--sh-hover); }
+.call-side[data-tab="chat"] .cp-people,
+.call-side[data-tab="people"] .cp-chat { display: none !important; }
+.call-side .lbl.cp-chat { display: none !important; }
+.call-side .chat.cp-chat {
+  flex: 1 1 auto;
+  height: auto !important;
+  min-height: 0;
+  margin-top: 0;
+  border-top: 0;
+  background: none;
+}
+.call-side .chat .dm-resize-handle { display: none; }
+.call-side[data-tab="people"] { overflow-y: auto; }
+.call-side #users { max-height: none; }
+
+/* ---------- Üst çubuk ---------- */
+#view-call .top-bar {
+  min-height: 48px;
+  padding: 0 12px 0 16px;
+  gap: 10px;
+  background: none;
+  border-bottom: 1px solid var(--sh-border);
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.call-topbar-lead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-right: auto;
+  color: var(--txt-mut);
+}
+.call-topbar-lead #room-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--txt-main);
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0;
+}
+.call-topbar-lead .dot { flex: 0 0 10px; box-shadow: none; }
+#view-call .top-bar > span:not(#display-server-id) { white-space: nowrap; }
+#view-call #display-server-id { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px !important; }
+#view-call #btn-show-server-dms,
+#view-call .top-bar > div[style*="width: 1px"] { display: none !important; }
+#view-call #btn-show-server-invites { white-space: nowrap; }
+.call-chat-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--txt-mut);
+  cursor: pointer;
+}
+.call-chat-btn:hover, .call-chat-btn.active { color: var(--txt-main); background: var(--sh-hover); }
+.call-chat-btn .ts-count-badge { position: absolute; right: -2px; bottom: -2px; }
+@media (max-width: 900px) {
+  #view-call .top-bar > span:not(#display-server-id) { display: none; }
+  #view-call #display-server-id { display: none; }
+}
+
+/* ---------- Katılımcı kutucukları ---------- */
+#view-call .grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding: 16px; }
+.ptile {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tile-bg, #5865f2) 38%, #16171a);
+  color: #fff;
+  cursor: pointer;
+  outline: 3px solid transparent;
+  outline-offset: -3px;
+  transition: outline-color 0.12s ease;
+  user-select: none;
+  --dot-ring: #16171a;
+}
+.ptile:focus-visible { outline-color: var(--acc); }
+.ptile.speaking { outline-color: var(--status-online); }
+.ptile-center { display: flex; align-items: center; justify-content: center; }
+.ptile .ptile-av .ts-av-img, .ptile .ptile-av .ts-av-initial { outline: 3px solid transparent; outline-offset: 2px; transition: outline-color 0.12s ease; }
+.ptile.speaking .ptile-av .ts-av-img, .ptile.speaking .ptile-av .ts-av-initial { outline-color: var(--status-online); }
+.ptile-lbl {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ptile-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ptile-ico { display: flex; color: #f87171; flex: 0 0 auto; }
+.ptile-activity {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  max-width: calc(100% - 70px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+}
+.ptile-activity svg { width: 14px; height: 14px; flex: 0 0 14px; color: var(--status-online); }
+.ptile-activity span:not(.ts-since) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ptile-activity .ts-since { color: #86efac; font-weight: 600; }
+.ptile-live {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--status-dnd);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.ptile-invite {
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 2px dashed color-mix(in srgb, var(--txt-main) 22%, transparent);
+  background: transparent;
+  color: var(--txt-mut);
+  text-align: center;
+  font: inherit;
+}
+.ptile-invite:hover { color: var(--txt-main); border-color: var(--acc); }
+.ptile-invite strong { color: var(--txt-main); font-size: 15px; }
+.ptile-invite small { font-size: 13px; }
+.ptile-invite-icon {
+  width: 56px; height: 56px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--acc) 22%, transparent);
+  color: var(--acc-light);
+}
+/* Odak modunda kutucuklar alttaki şeritte küçük kalır */
+.main.focus-mode .grid .ptile {
+  width: 160px !important;
+  height: 90px !important;
+  min-height: 90px !important;
+  max-height: 90px !important;
+  aspect-ratio: auto;
+  flex: 0 0 160px;
+}
+.main.focus-mode .grid .ptile .ts-av { --av: 40px !important; }
+.main.focus-mode .grid .ptile .ptile-activity { display: none; }
+.main.focus-mode .grid .ptile-invite { display: none; }
+
+/* ---------- Kontrol çubuğu ---------- */
+#view-call .bar {
+  background: none;
+  border-top: 0;
+  padding: 10px 16px 16px;
+  gap: 12px;
+  /* Konteyner sorgusu çubuğun kendisinde: .main'i konteyner yapmak yerleşim
+     kısıtlaması getirir ve position:fixed #focus-controls'ün dayanağını bozar. */
+  container-type: inline-size;
+}
+@container (max-width: 700px) {
+  #view-call .bar .bar-group { gap: 6px; }
+  #view-call .bar .btn { width: 42px; min-width: 42px; height: 42px; }
+  #view-call .bar .btn svg { width: 19px; height: 19px; }
+  #view-call #leave.call-leave-btn { width: 54px; height: 42px; }
+}
+#view-call .bar .btn {
+  position: relative;
+  width: 52px;
+  min-width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sh-panel);
+  color: var(--txt-main);
+}
+#view-call .bar .btn .lbl { display: none; }
+#view-call .bar .btn:hover { transform: none; background: color-mix(in srgb, var(--sh-panel) 84%, var(--txt-main)); }
+#view-call .bar .btn.off { background: color-mix(in srgb, var(--status-dnd) 22%, var(--sh-panel)); color: var(--status-dnd); }
+#view-call .bar .btn.ptt.active { background: var(--status-online); color: #fff; }
+#view-call #leave.call-leave-btn {
+  width: 68px;
+  height: 52px;
+  border-radius: 26px;
+  background: var(--status-dnd);
+  color: #fff;
+}
+#view-call #leave.call-leave-btn:hover { background: color-mix(in srgb, var(--status-dnd) 85%, #000); }
+#view-call .main.focus-mode > .bar .btn,
+#view-call .main.focus-mode #leave.call-leave-btn { width: 44px; min-width: 44px; height: 44px; }
+#view-call .main.focus-mode #leave.call-leave-btn { width: 56px; border-radius: 22px; }
+
+/* Odak modunda üst çubuk eski kurallardaki gibi alçalır. */
+#view-call .main.focus-mode > .top-bar { min-height: 44px; }
+/* Dar pencerede odak (etkinlik/ekran) sürükleyici olsun: sunucu rayı da
+   çekilir, odaklı karta tam genişlik kalır. */
+@media (max-width: 1000px) {
+  body[data-view="call"] .ts-shell:has(.main.focus-mode) .srv-rail { display: none; }
+}
+
+/* Dar pencerede eski "sütun" yerleşimi yerine panel üstte açılır */
+@media (max-width: 750px) {
+  #view-call > .app > .main { height: 100% !important; }
+  #view-call > .app > .sidebar.call-side {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(340px, 100%);
+    height: auto;
+    z-index: 30;
+    border-bottom: 0;
+  }
+  #view-call .grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+}

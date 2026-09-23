@@ -39,7 +39,9 @@ module.exports = async function run() {
     );
     assert.strictEqual(opened.hidden, false, JSON.stringify(opened, null, 2));
     // Genel / Ses ve Görüntü / Yayın / Bağlantılar / Kısayollar / GIF ve Medya / Dil ve Zaman
-    assert.strictEqual(opened.navCount, 7, JSON.stringify(opened, null, 2));
+    // Genel, Profil, Ses ve Görüntü, Yayın, Bağlantılar, Kısayollar, Oyun
+    // Etkinliği | GIF ve Medya, Dil ve Zaman
+    assert.strictEqual(opened.navCount, 9, JSON.stringify(opened, null, 2));
     assert.strictEqual(opened.activePanel, 'general', JSON.stringify(opened, null, 2));
     assert.ok(opened.rect.right - opened.rect.left >= 800, JSON.stringify(opened, null, 2));
     assert.ok(opened.rect.bottom - opened.rect.top >= 500, JSON.stringify(opened, null, 2));
