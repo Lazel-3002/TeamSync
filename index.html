@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/call.css?v=1" />
   <link rel="stylesheet" href="css/profile.css?v=1" />
   <link rel="stylesheet" href="css/groups.css?v=1" />
+  <link rel="stylesheet" href="css/servers.css?v=1" />
   <script>
     try {
       var _theme = localStorage.getItem('teamsync_theme') || 'aurora';
@@ -380,6 +381,15 @@
         </div>
         <ul id="dm-list" class="dm-list" data-i18n-ignore></ul>
       </div>
+      <!-- Sunucu seçiliyken DM listesinin yerine kanal listesi (js/ui/server-view.js) -->
+      <div id="side-server" class="side-server" data-i18n-ignore>
+        <button id="ss-header" class="ss-header" type="button">
+          <span id="ss-name" class="ss-name"></span>
+          <svg class="ss-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="ss-banner" class="ss-banner hidden"></div>
+        <div id="ss-scroll" class="ss-scroll"></div>
+      </div>
       <div id="voice-mini" class="voice-mini hidden">
         <button id="vm-open" class="vm-info" type="button" data-i18n-title="shell.openCall" title="Aramaya dön">
           <span class="vm-status"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="20" x2="6" y2="16"/><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/></svg><span data-i18n="shell.voiceConnected">Ses Bağlandı</span></span>
@@ -485,6 +495,36 @@
             <div id="grp-typing" class="typing-line" data-i18n-ignore aria-live="polite"></div>
           </div>
           <aside id="grp-members-panel" class="dm-profile-panel grp-members-panel" data-i18n-ignore></aside>
+        </div>
+      </div>
+
+      <!-- Sunucu metin kanalı (js/ui/server-view.js) -->
+      <div id="view-server" class="shell-view view-dm view-server hidden">
+        <header class="view-header dm-view-header srv-header">
+          <button class="vh-drawer" type="button" data-shell-drawer data-i18n-title="shell.menu" title="Menü"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+          <div class="srvh-title" data-i18n-ignore>
+            <span class="srvh-hash">#</span>
+            <span id="srvh-name" class="dmh-name"></span>
+            <span id="srvh-topic" class="srvh-topic"></span>
+          </div>
+          <div class="vh-actions">
+            <button id="srv-invite-btn" class="vh-icon-btn" type="button" data-i18n-title="servers.invite" title="Davet et"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></button>
+            <button id="srv-members-toggle" class="vh-icon-btn" type="button" data-i18n-title="servers.memberList" title="Üye listesi"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
+          </div>
+        </header>
+        <div class="dm-body">
+          <div class="dm-main">
+            <div id="srv-offline" class="srv-offline hidden" data-i18n-ignore></div>
+            <div id="srv-messages" class="dm-messages srv-messages" data-i18n-ignore></div>
+            <div id="srv-composer-note" class="srv-composer-note hidden" data-i18n-ignore></div>
+            <div class="dm-input-area srv-input-area">
+              <button id="srv-emoji-btn" type="button" data-i18n-title="emoji.picker" title="Emoji"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+              <input id="srv-input" type="text" autocomplete="off" maxlength="4000" />
+              <button id="srv-send" type="button" data-i18n-title="common.send" title="Gönder" data-emoji-send-for="srv-input"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+            </div>
+            <div id="srv-typing" class="typing-line" data-i18n-ignore aria-live="polite"></div>
+          </div>
+          <aside id="srv-members-panel" class="dm-profile-panel srv-members-panel" data-i18n-ignore></aside>
         </div>
       </div>
 
@@ -2578,7 +2618,11 @@
   <script src="js/space/crypto.js"></script>
   <script src="js/space/store.js"></script>
   <script src="js/space/groups.js"></script>
+  <script src="js/space/server-state.js"></script>
+  <script src="js/space/servers.js"></script>
   <script src="js/ui/group-view.js"></script>
+  <script src="js/ui/server-view.js"></script>
+  <script src="js/ui/server-dialogs.js"></script>
   <script src="js/media-library.js"></script>
   <script src="js/media-collect.js"></script>
   <script src="js/dm-resize.js"></script>

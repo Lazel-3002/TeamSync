@@ -189,7 +189,7 @@
       const text = String(e.body.text || '');
       const jumbo = window.TSEmoji && window.TSEmoji.isJumbo(text);
       const tools = `<div class="msg-tools"><button type="button" class="msg-tool" data-greact="${esc(e.id)}" title="${esc(tr('emoji.addReaction'))}">${REACT_SVG}</button>${e.author === me() ? `<button type="button" class="msg-tool" data-gdel="${esc(e.id)}" title="${esc(tr('groups.deleteMessage'))}">${TRASH_SVG}</button>` : ''}</div>`;
-      out += `<div class="dmx-msg" data-mid="${esc(e.id)}">${cont ? `<time class="dmx-hover-time">${esc(fmtTime(e.ts))}</time>` : ''}${tools}<div class="dmx-content">${jumbo ? `<span class="emoji-jumbo">${esc(text)}</span>` : esc(text)}${reactionsHtml(e.id, reactions[e.id])}</div></div>`;
+      out += `<div class="dmx-msg" data-mid="${esc(e.id)}">${cont ? `<time class="dmx-hover-time">${esc(fmtTime(e.ts))}</time>` : ''}${tools}<div class="dmx-content">${jumbo ? `<span class="emoji-jumbo">${esc(text)}</span>` : esc(text)}${window.TSServerUI ? window.TSServerUI.inviteCardHtml(text) : ''}${reactionsHtml(e.id, reactions[e.id])}</div></div>`;
       prev = e;
     });
     close();

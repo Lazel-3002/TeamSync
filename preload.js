@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Durum sistemi: sistem boşta süresi (sn) ve kilit/uyku olayları.
   getSystemIdleTime: () => ipcRenderer.invoke('get-system-idle-time'),
   onPowerEvent: (cb) => ipcRenderer.on('power-event', (_e, name) => cb(name)),
+  // teamsync://invite/... bağlantıları (sunucu davetleri)
+  takeDeepLink: () => ipcRenderer.invoke('take-deep-link'),
+  onDeepLink: (cb) => ipcRenderer.on('deep-link', (_e, link) => cb(link)),
   // Oyun etkinliği (Oynuyor): main süreçteki algılayıcı (electron/activity-detector.js).
   activityGetState: () => ipcRenderer.invoke('activity-get-state'),
   activitySetEnabled: (enabled) => ipcRenderer.invoke('activity-set-enabled', enabled),

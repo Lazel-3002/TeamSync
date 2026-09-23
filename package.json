@@ -80,6 +80,14 @@
         "repo": "TeamSync",
         "releaseType": "release"
       }
+    ],
+    "protocols": [
+      {
+        "name": "TeamSync",
+        "schemes": [
+          "teamsync"
+        ]
+      }
     ]
   }
 }

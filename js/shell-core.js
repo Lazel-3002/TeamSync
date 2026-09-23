@@ -26,7 +26,7 @@
   function readLastHome() {
     try {
       const saved = JSON.parse(localStorage.getItem(LAST_VIEW) || 'null');
-      if (saved && (saved.view === 'friends' || saved.view === 'dm' || saved.view === 'group')) lastHome = saved;
+      if (saved && ['friends', 'dm', 'group', 'server'].includes(saved.view)) lastHome = saved;
     } catch (e) {}
   }
 
@@ -136,6 +136,10 @@
       next = 'friends';
       param = null;
     }
+    if (next === 'server' && !(param && window.TSServers && window.TSServers.get(param))) {
+      next = 'friends';
+      param = null;
+    }
     view = next;
     viewParam = param || null;
     if (next !== 'call') {
@@ -145,14 +149,22 @@
     $('view-friends')?.classList.toggle('hidden', next !== 'friends');
     $('view-dm')?.classList.toggle('hidden', next !== 'dm');
     $('view-group')?.classList.toggle('hidden', next !== 'group');
+    $('view-server')?.classList.toggle('hidden', next !== 'server');
     $('view-call')?.classList.toggle('is-bg', next !== 'call');
     document.body.dataset.view = next;
-    $('rail-home')?.classList.toggle('active', next !== 'call');
+    // Sol sütun: DM listesi mi, sunucunun kanal listesi mi? Sunucu ses
+    // kanalındayken arama görünümünde de kanal listesi kalır (Discord gibi).
+    const voiceIn = next === 'call' && window.TSServers ? window.TSServers.myVoiceChannel() : null;
+    const homeServer = next === 'server' ? viewParam : (voiceIn ? voiceIn.sid : null);
+    document.body.dataset.home = homeServer ? 'server' : 'dm';
+    if (window.TSServerUI) window.TSServerUI.setActiveServer(homeServer);
+    $('rail-home')?.classList.toggle('active', next !== 'call' && !homeServer);
     $('rail-call')?.classList.toggle('active', next === 'call');
     $('side-friends')?.classList.toggle('active', next === 'friends');
     document.body.classList.remove('shell-drawer-open');
     if (next === 'dm' && window.TSDM) window.TSDM.show(viewParam);
     if (next === 'group' && window.TSGroupUI) window.TSGroupUI.show(viewParam);
+    if (next === 'server' && window.TSServerUI) window.TSServerUI.show(viewParam);
     if (window.TSDM) window.TSDM.markActive(next === 'dm' ? viewParam : null, next === 'group' ? viewParam : null);
     if (next === 'call') {
       // Odak modundaki kart gizliyken ölçülemez; geri dönünce hizala.
@@ -180,6 +192,13 @@
     if (window.TSGroups) window.TSGroups.start().then(() => {
       if (lastHome.view === 'group' && view === 'friends') setView('group', lastHome.param);
     });
+    // Sunucular (js/space/servers.js)
+    const wantServer = lastHome.view === 'server' ? lastHome.param : null;
+    if (window.TSServers) window.TSServers.start().then(() => {
+      if (wantServer && view === 'friends') setView('server', wantServer);
+      // Uygulama bir davet bağlantısıyla açıldıysa katılma penceresini göster
+      if (window.TSServerDialogs) window.TSServerDialogs.flushPendingLink();
+    });
   }
 
   function exit() {
@@ -187,6 +206,7 @@
     active = false;
     window.TSUI.closePopover();
     if (window.TSGroups) window.TSGroups.stop();
+    if (window.TSServers) window.TSServers.stop();
     document.body.classList.remove('shell-active', 'qc-open', 'shell-drawer-open');
     $('shell')?.classList.add('hidden');
   }
@@ -370,10 +390,24 @@
           <span class="ts-menu-card-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
           <span><strong>${esc(tr('shell.quickCallJoin'))}</strong><small>${esc(tr('shell.quickCallJoinDesc'))}</small></span>
         </button>
-        <div class="ts-menu-note"><strong>${esc(tr('shell.serversSoon'))}</strong><small>${esc(tr('shell.serversSoonDesc'))}</small></div>
+        <div class="ts-menu-title ts-menu-title-2">${esc(tr('servers.servers'))}</div>
+        <button type="button" class="ts-menu-card" data-srv="create">
+          <span class="ts-menu-card-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
+          <span><strong>${esc(tr('servers.create'))}</strong><small>${esc(tr('servers.createDesc'))}</small></span>
+        </button>
+        <button type="button" class="ts-menu-card" data-srv="join">
+          <span class="ts-menu-card-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg></span>
+          <span><strong>${esc(tr('servers.join'))}</strong><small>${esc(tr('servers.joinDesc'))}</small></span>
+        </button>
       </div>`;
     const pop = window.TSUI.popover(html, anchor, { placement: 'right', cls: 'ts-menu-pop' });
     pop.el.addEventListener('click', e => {
+      const srv = e.target.closest('[data-srv]');
+      if (srv && window.TSServerDialogs) {
+        pop.close();
+        if (srv.dataset.srv === 'create') window.TSServerDialogs.openCreate(); else window.TSServerDialogs.openJoin();
+        return;
+      }
       const btn = e.target.closest('[data-qc]');
       if (!btn) return;
       if (inCall) {
@@ -456,7 +490,9 @@
     $('rail-home')?.addEventListener('click', () => setView(lastHome.view === 'call' ? 'friends' : lastHome.view, lastHome.param));
     $('rail-call')?.addEventListener('click', () => setView('call'));
     $('rail-add')?.addEventListener('click', e => showAddMenu(e.currentTarget));
-    $('rail-search')?.addEventListener('click', () => window.showToast(window.TSUI.tr('shell.searchSoon'), 'info'));
+    $('rail-search')?.addEventListener('click', () => {
+      if (window.TSServerDialogs) window.TSServerDialogs.openDiscover();
+    });
     $('side-friends')?.addEventListener('click', () => setView('friends'));
     $('side-search-btn')?.addEventListener('click', openSwitcher);
     $('side-new-dm')?.addEventListener('click', e => {

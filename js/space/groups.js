@@ -706,7 +706,7 @@
       await C().ensureIdentity();
       const recs = await S().allSpaces().catch(() => []);
       for (const rec of recs) {
-        if (rec.removed) continue;
+        if (rec.removed || rec.kind === 'server') continue; // sunucular: js/space/servers.js
         try { await activate(rec); } catch (e) { console.warn('Grup açılamadı:', rec.gid, e && e.message); }
       }
       started = true;

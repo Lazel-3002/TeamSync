@@ -108,6 +108,9 @@ const fs = require('fs');
 const baseUserData = app.getPath('userData');
 const lockFile = path.join(baseUserData, 'teamsync.lock');
 let isSecondInstance = false;
+// teamsync://invite/... bağlantıları (sunucu davetleri) — electron/deep-link.js
+const deepLink = require('./electron/deep-link');
+let pendingDeepLink = deepLink.linkFromArgv(process.argv);
 
 // Load .env variables. Bu blok process.env'i modül yüklenirken (pencere/preload
 // oluşturulmadan ÖNCE) doldurur; renderer/preload süreçleri bu değerleri kalıtır.
@@ -1483,7 +1486,37 @@ function normalizeKey(key) {
   return map[key] || (key.length === 1 ? key.toLowerCase() : key);
 }
 
-app.whenReady().then(() => {
+// Davet bağlantısını renderer'a teslim eder (pencere hazır değilse bekletir).
+function deliverDeepLink(link) {
+  pendingDeepLink = link;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('deep-link', link);
+  } catch (e) {}
+}
+
+ipcMain.handle('take-deep-link', (event) => {
+  if (!isMainWindowSender(event)) return null;
+  const link = pendingDeepLink;
+  pendingDeepLink = null;
+  return link;
+});
+
+app.whenReady().then(async () => {
+  // Davet bağlantısıyla açılan ikinci örnek: bağlantıyı çalışan örneğe verip
+  // kapanır (yoksa bu örnek bağlantıyı kendisi açar).
+  if (isSecondInstance && pendingDeepLink && await deepLink.forwardToPrimary(pendingDeepLink)) {
+    app.exit(0);
+    return;
+  }
+  if (!isSecondInstance) {
+    deepLink.listen(deliverDeepLink);
+    deepLink.register(app);
+  }
+
   // İLK İŞ: DNS. Bundan sonraki her ad çözümlemesi (Supabase, sinyalleşme
   // broker'ı, CDN'ler ve WebRTC'nin TURN hostları) seçili yoldan gider.
   applyDnsSettings();

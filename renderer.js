@@ -2077,17 +2077,25 @@ function connectGlobalBroker(idx, session) {
     if (presenceInterval) clearInterval(presenceInterval);
     presenceInterval = setInterval(publishPresence, 5000);
 
-    // Broker değişiminden sonra grup konularına yeniden abone ol.
+    // Broker değişiminden sonra grup ve sunucu konularına yeniden abone ol.
     if (window.TSGroups) window.TSGroups.onConnect(client);
+    if (window.TSServers) window.TSServers.onConnect(client);
 
     // Removed global MQTT ping logic for serverless operation
   });
   
   client.on('message', (topic, message) => {
     if (state.globalMqtt !== client) return; // eski hesabın istemcisi, yok say
-    // Arkadaş grupları: şifreli grup konuları (js/space/groups.js)
+    // Arkadaş grupları ve sunucular: şifreli konular (js/space/groups.js,
+    // js/space/servers.js); her motor yalnızca kendi konularını tanır.
     if (topic.startsWith('teamsync/s/')) {
       if (window.TSGroups) window.TSGroups.onMqtt(topic, message).catch(() => {});
+      if (window.TSServers) window.TSServers.onMqtt(topic, message).catch(() => {});
+      return;
+    }
+    // Sunucu davet buluşma noktaları ve herkese açık sunucu dizini
+    if (topic.startsWith('teamsync/inv/') || topic.startsWith('teamsync/dir/')) {
+      if (window.TSServers) window.TSServers.onMqtt(topic, message).catch(() => {});
       return;
     }
     try {
@@ -2242,6 +2250,8 @@ function connectGlobalBroker(idx, session) {
           if (window.TSDMX) window.TSDMX.onAck(data);
         } else if (data.type === 'grp_invite' || data.type === 'grp_key') {
           if (window.TSGroups) window.TSGroups.onPersonalEvent(data);
+        } else if (data.type === 'srv_kreq' || data.type === 'srv_key' || data.type === 'srv_gone') {
+          if (window.TSServers) window.TSServers.onPersonalEvent(data).catch(() => {});
         }
       }
     } catch(e) {}
@@ -12160,6 +12170,8 @@ function dmContentHtml(m) {
   if (m.count > 1) {
     contentHtml += `<span class="msg-repeat-badge">×${m.count}</span>`;
   }
+  // Sunucu davet bağlantısı → "Katıl" kartı (js/ui/server-view.js doldurur)
+  if (m.type === 'text' && !m.isCensored && window.TSServerUI) contentHtml += window.TSServerUI.inviteCardHtml(m.content);
   if (window.TSDMX) contentHtml += window.TSDMX.reactionsHtml(m);
   return contentHtml;
 }
@@ -12291,6 +12303,15 @@ window.sendDMText = async (text) => {
     const sent = state.dms[friendId].find(m => m.id === mid);
     if (sent) { sent.pending = true; saveDMs(); renderDMs(); }
   }
+};
+
+// Açık DM'yi değiştirmeden belirli bir arkadaşa metin DM'si (sunucu davetleri).
+window.sendDMTextTo = async (friendId, text) => {
+  if (!state.friends[friendId]) return false;
+  const prev = state.activeDM;
+  state.activeDM = friendId;
+  try { await window.sendDMText(text); } finally { state.activeDM = prev; renderDMs(); }
+  return true;
 };
 
 window.sendDMFile = async (file) => {
