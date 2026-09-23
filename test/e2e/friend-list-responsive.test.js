@@ -54,6 +54,18 @@ module.exports = async function run() {
       10000,
       'main menu'
     );
+
+    // Arkadaslik broker'i baglanmadan enjekte edilen sahte arkadas, connect
+    // isleyicisindeki markFriendOffline() taramasina yakalanip "cevrimdisi"
+    // oluyor; o zaman "Sunucusuna Katil" dugmesi cizilmiyor ve buton sayisi
+    // 4 yerine 3 cikiyor. Once baglanti otursun, sonra durumu kuralim.
+    await waitFor(
+      peer.client,
+      `!!(state.globalMqtt && state.globalMqtt.connected)`,
+      25000,
+      'global mqtt connected'
+    );
+
     await evalJS(
       peer.client,
       `state.friends = {

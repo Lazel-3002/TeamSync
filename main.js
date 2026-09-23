@@ -38,7 +38,17 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('allow-loopback-in-peer-connection');
-app.commandLine.appendSwitch('disable-async-dns');
+
+// KALDIRILDI: appendSwitch('disable-async-dns')
+// Bu anahtar Chromium'un dahili asenkron çözücüsünü kapatıp TÜM ad çözümlemeyi
+// işletim sistemine (getaddrinfo) yıkıyordu. Cloudflare WARP açıkken sistem
+// resolver'ı WARP'ın 127.0.2.2 / 127.0.2.3 üzerindeki yerel DNS proxy'sidir;
+// o proxy tıkandığında her çözümleme -105 (ERR_NAME_NOT_RESOLVED) veriyor ve
+// TURN ana bilgisayar adları hiç çözülemediği için bağlantı tamamen düşüyordu.
+// Yerine aşağıdaki applyDnsSettings() gelir: Chromium'un kendi çözücüsü +
+// kullanıcının Ayarlar'dan seçtiği DoH sağlayıcısı. WebRTC'nin STUN/TURN ad
+// çözümlemesi de (P2PSocketManager::DnsRequest) aynı resolver'dan geçtiği için
+// bu ayar TURN'ü de kapsar.
 
 // TEŞHİS: renderer içinde çalışır (executeJavaScript ile enjekte edilir).
 // GERÇEKTE yüklenen stylesheet'leri, .dl-btn'in tüm eşleşen kurallarını ve
@@ -846,6 +856,64 @@ function writeSettings(obj) {
     return false;
   }
 }
+
+// --- DNS sağlayıcısı (DoH) ---------------------------------------------------
+// Uç noktalar BİLEREK IP-literal yazılmıştır. Ad tabanlı bir uç nokta
+// (ör. https://cloudflare-dns.com/dns-query) kullanılsaydı Chromium önce o adı
+// çözmek zorunda kalırdı — ve bunu bozuk olan sistem resolver'ıyla yapardı;
+// tavuk-yumurta problemi. IP-literal uçlar bu zinciri tamamen kesiyor.
+// Üç sağlayıcının da sertifikaları kendi IP'lerini SAN olarak taşır.
+const DNS_PROVIDERS = {
+  cloudflare: ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query'],
+  quad9:      ['https://9.9.9.9/dns-query', 'https://149.112.112.112/dns-query'],
+  google:     ['https://8.8.8.8/dns-query', 'https://8.8.4.4/dns-query'],
+  system:     null   // configureHostResolver hiç çağrılmaz, Electron varsayılanı
+};
+const DEFAULT_DNS_PROVIDER = 'cloudflare';
+
+function getDnsProvider() {
+  const v = readSettings().dnsProvider;
+  return Object.prototype.hasOwnProperty.call(DNS_PROVIDERS, v) ? v : DEFAULT_DNS_PROVIDER;
+}
+
+// app.whenReady() SONRASINDA çağrılmalıdır (Electron kısıtı). Ayar değiştiğinde
+// yeniden çağrılabilir; NetworkService tek bir host resolver manager tuttuğu
+// için değişiklik mevcut oturumlara da anında yansır, yeniden başlatma gerekmez.
+function applyDnsSettings() {
+  const provider = getDnsProvider();
+  const servers = DNS_PROVIDERS[provider];
+  try {
+    if (!servers) {
+      // 'system': işletim sistemi resolver'ına dön. disable-async-dns artık
+      // kapalı olduğu için bu bile eski davranıştan iyi durumda.
+      app.configureHostResolver({ enableBuiltInResolver: false, secureDnsMode: 'automatic' });
+      console.log('🔐 DNS: sistem resolver\'ı (DoH kapalı)');
+      return true;
+    }
+    app.configureHostResolver({
+      // Windows'ta varsayılan false. Kapalı bırakılırsa Chromium getaddrinfo'ya
+      // düşer ve WARP'ın loopback proxy'sine geri bağımlı oluruz.
+      enableBuiltInResolver: true,
+      secureDnsMode: 'secure',
+      secureDnsServers: servers
+    });
+    console.log(`🔐 DNS: ${provider} (DoH, secure) → ${servers.join(', ')}`);
+    return true;
+  } catch (e) {
+    console.warn('configureHostResolver başarısız:', e && e.message ? e.message : e);
+    return false;
+  }
+}
+
+ipcMain.handle('get-dns-provider', (event) => isMainWindowSender(event) ? getDnsProvider() : null);
+ipcMain.handle('set-dns-provider', (event, provider) => {
+  if (!isMainWindowSender(event)) return false;
+  if (!Object.prototype.hasOwnProperty.call(DNS_PROVIDERS, provider)) return false;
+  const s = readSettings();
+  s.dnsProvider = provider;
+  if (!writeSettings(s)) return false;
+  return applyDnsSettings();   // anında etkili, yeniden başlatma yok
+});
 // --- Ana süreç lokalizasyonu (tepsi menüsü + arka plan bildirimi) -------------
 // Tepsi menüsü ve "arka planda çalışıyor" bildirimi ayrı pencere/işlemlerde
 // çalışır ve renderer'ın localStorage'ındaki dil tercihine erişemez; bu yüzden
@@ -1401,6 +1469,10 @@ function normalizeKey(key) {
 }
 
 app.whenReady().then(() => {
+  // İLK İŞ: DNS. Bundan sonraki her ad çözümlemesi (Supabase, sinyalleşme
+  // broker'ı, CDN'ler ve WebRTC'nin TURN hostları) seçili yoldan gider.
+  applyDnsSettings();
+
   app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   const { session } = require('electron');
   session.defaultSession.webRequest.onBeforeSendHeaders(

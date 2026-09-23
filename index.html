@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.youtube.com https://s.ytimg.com; connect-src 'self' wss://broker.emqx.io:8084 https://s3.amazonaws.com https://unpkg.com https://cdn.jsdelivr.net https://1.1.1.1 https://8.8.8.8 https://*.metered.live https://zperyrjpfumtblossyod.supabase.co wss://zperyrjpfumtblossyod.supabase.co http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob: https://*; frame-src 'self' blob: https://www.youtube.com; worker-src 'self' blob:; object-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.youtube.com https://s.ytimg.com; connect-src 'self' wss://broker.emqx.io:8084 wss://broker.hivemq.com:8884 wss://test.mosquitto.org:8081 https://s3.amazonaws.com https://unpkg.com https://cdn.jsdelivr.net https://1.1.1.1 https://8.8.8.8 https://*.metered.live https://zperyrjpfumtblossyod.supabase.co wss://zperyrjpfumtblossyod.supabase.co http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob: https://*; frame-src 'self' blob: https://www.youtube.com; worker-src 'self' blob:; object-src 'none';">
   <meta name="referrer" content="no-referrer" />
   <title>TeamSync</title>
   <link rel="stylesheet" href="style.css?v=20" />
@@ -1637,6 +1637,22 @@
             <div class="settings-panel" data-settings-content="network">
               <h2 data-i18n="settings.connections">Bağlantılar</h2>
               <p class="settings-lead" data-i18n="settings.networkLead">Kısıtlı ağlarda bağlantı kurmak için özel TURN sunucusu kullan.</p>
+
+              <!-- DNS sağlayıcısı: WARP/VPN gibi araçlar yerel DNS'i bozunca
+                   TURN sunucu adları çözülemiyor ve bağlantı tamamen düşüyor.
+                   Şifreli DNS (DoH) bu yolu tamamen atlar. -->
+              <div class="settings-card">
+                <label class="settings-field-label" for="user-dns-provider" data-i18n="settings.dnsProvider">Şifreli DNS (DoH)</label>
+                <select id="user-dns-provider" class="settings-select">
+                  <option value="cloudflare" data-i18n="settings.dnsCloudflare">Cloudflare — 1.1.1.1 (önerilen)</option>
+                  <option value="quad9" data-i18n="settings.dnsQuad9">Quad9 — 9.9.9.9 (zararlı site engelli)</option>
+                  <option value="google" data-i18n="settings.dnsGoogle">Google — 8.8.8.8</option>
+                  <option value="system" data-i18n="settings.dnsSystem">Sistem DNS'i (kapalı)</option>
+                </select>
+                <p class="settings-help" id="dns-provider-desc"></p>
+                <p class="settings-help" data-i18n="settings.dnsHelp">VPN, WARP veya kısıtlı bir ağ kullanıyorsan bu ayar bağlantı kurulamama ve uzun bekleme sorunlarını çözer. Değişiklik anında geçerli olur, yeniden başlatma gerekmez.</p>
+              </div>
+
               <div class="settings-card settings-network-card">
                 <label class="settings-field-label" for="user-turn-url" data-i18n="settings.turnUrl">TURN URL / Credentials API</label>
                 <input type="text" id="user-turn-url" class="settings-input" placeholder="turns:sunucu.com:443 veya https://...apiKey=..." />
@@ -2351,8 +2367,16 @@
 
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- YouTube IFrame API: render-blocking'di, WARP/VPN altında DNS yavaşlayınca
+       uygulama açılışını saniyelerce geciktiriyordu. YT yalnızca "Birlikte İzle"
+       içinde ve hep fonksiyon gövdesinde kullanıldığı için defer güvenli. -->
+  <script defer src="https://www.youtube.com/iframe_api"></script>
+  <!-- Supabase: ARTIK CDN'DEN DEĞİL, yerelden. @supabase/supabase-js zaten bir
+       package.json bağımlılığı; UMD derlemesi vendor/'a kopyalandı. Böylece
+       açılışta ağ/DNS beklemesi tamamen ortadan kalkıyor. Buraya defer KOYMA:
+       renderer.js (aşağıda, defer'siz) window.supabase'i tepe seviyede okuyor,
+       deferred yüklenirse client hiç kurulmaz ve giriş bozulur. -->
+  <script src="vendor/supabase.min.js"></script>
   <script src="vendor/mqtt.min.js"></script>
   <script src="vendor/crypto-js.min.js"></script>
   <script src="js/state.js"></script>

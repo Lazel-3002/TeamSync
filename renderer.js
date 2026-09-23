@@ -672,6 +672,63 @@ function isJunkIceCandidate(cand) {
   return false;
 }
 
+// NAT DAVRANIŞI: relay'in gerçekten ŞART olup olmadığına karar veren ölçüm.
+//
+// Yalnızca adresin CGNAT aralığında olmasına bakmak YANLIŞ bir ölçüttü:
+// taşıyıcı NAT'ların çoğu endpoint-independent (cone) çalışır ve bu
+// durumda delik açma (hole punching) gayet kurulur — relay'e zorlamak
+// boşuna bant genişliği ve gecikme demekti. Belirleyici olan, aynı yerel
+// porttan FARKLI STUN sunucularına çıkarken dış portun DEĞİŞİP değişmediği:
+// değişiyorsa NAT simetriktir, karşı taraf bize hiçbir zaman doğru porttan
+// ulaşamaz ve tek yol relay olur.
+//
+// getIceServers() bilerek İKİ FARKLI sağlayıcıdan STUN veriyor; bu yüzden
+// tek bir toplama turu ölçüm için yeterli: cone NAT'ta iki sunucu da aynı
+// dış adres/portu görür (Chromium ikisini tek adaya indirger), simetrik
+// NAT'ta aynı yerel porta (rport) karşılık iki FARKLI dış port çıkar.
+function parseSrflxCandidate(line) {
+  const m = /^candidate:\S+ \d+ \S+ \d+ (\S+) (\d+) typ srflx(?:.* rport (\d+))?/.exec(line || '');
+  if (!m) return null;
+  return { address: m[1], port: m[2], rport: m[3] || '' };
+}
+
+// 100.64.0.0/10 (RFC 6598) = taşıyıcı sınıfı NAT. Tek başına relay gerekçesi
+// DEĞİL (yukarıya bakın), ama tanı mesajlarını isabetli kılar: kullanıcı
+// bağlanamadığında sebebin operatör NAT'ı olduğunu söyleyebilelim.
+function isCgnatAddress(addr) {
+  const m = /^(\d{1,3})\.(\d{1,3})\./.exec(addr || '');
+  return !!m && Number(m[1]) === 100 && Number(m[2]) >= 64 && Number(m[2]) <= 127;
+}
+
+// Toplanan her srflx adayını yerel portuna göre gruplar. Aynı yerel port
+// için iki farklı dış port görülürse NAT simetriktir.
+function noteNatBehaviourFromCandidate(cand) {
+  const parsed = parseSrflxCandidate((cand && cand.candidate) || '');
+  if (!parsed) return;
+
+  if (!state.cgnatDetected && isCgnatAddress(parsed.address)) {
+    state.cgnatDetected = true;
+    console.log('📶 Taşıyıcı NAT (CGNAT) adresi: ' + parsed.address +
+      ' — dışarıdan erişilemez, port yönlendirme işe yaramaz.');
+  }
+
+  if (state.symmetricNatDetected || !parsed.rport) return;
+  if (!state.srflxByLocalPort) state.srflxByLocalPort = {};
+  const seen = state.srflxByLocalPort[parsed.rport];
+  if (!seen) {
+    state.srflxByLocalPort[parsed.rport] = parsed.port;
+    return;
+  }
+  if (seen === parsed.port) return; // aynı eşleme: cone NAT
+
+  state.symmetricNatDetected = true;
+  const hasTurn = getIceServers().some(s => iceEntryHasTurn(s));
+  console.warn('🚧 SİMETRİK NAT algılandı (yerel port ' + parsed.rport + ' → dış port ' +
+    seen + ' ve ' + parsed.port + ') — doğrudan P2P kurulamaz, ' +
+    (hasTurn ? 'TURN relay önceliklendirilecek' : 'TURN YOK, bağlantı kurulamayabilir'));
+  showToast(hasTurn ? t('toast.warpDetectedWithTurn') : t('toast.warpDetectedNoTurn'), 'warn');
+}
+
 async function processSignal(id, ip, signal) {
   if (!isValidPeerId(id) || !signal || typeof signal !== 'object' || Array.isArray(signal)
       || typeof signal.type !== 'string' || signal.type.length > 32
@@ -1888,8 +1945,33 @@ function publishPresence() {
 // kesintide tüm istemciler sıradaki aynı yedek broker'da yeniden buluşur.
 let globalMqttSessionId = 0;
 
+// Hangi kimlikle bağlanıldığını tutar. Abonelik konusu (teamsync/user/<id>/
+// events) BAĞLANMA ANINDAKİ state.friendId'den kurulur; kimlik sonradan
+// değişirse istemci ESKİ konuda dinlemeye devam eder.
+let globalMqttIdentity = null;
+
 function setupGlobalMQTT() {
-  if (state.globalMqtt) return;
+  // Kimliksiz bağlanmak, kimsenin dinlemediği bir konuya abone olmak demektir.
+  if (!state.friendId) return;
+
+  if (state.globalMqtt) {
+    // Aynı kimlik: mevcut bağlantı zaten doğru konuda, dokunma.
+    if (globalMqttIdentity === state.friendId) return;
+
+    // KİMLİK DEĞİŞTİ. Eskiden burada koşulsuz "return" vardı; bu yüzden
+    // bağlantı kurulduktan SONRA kimliği değişen her oturum (cihaz hesabıyla
+    // otomatik girip ardından isim adımından geçmek, ya da çıkış yapmadan
+    // hesap değiştirmek) kendi konusuna HİÇ abone olamıyordu: arkadaşlık
+    // istekleri, odaya katılma istekleri ve DM'ler o oturum boyunca sessizce
+    // kayboluyordu ("istek atıyor ama bana gelmiyor" şikayetinin kök nedeni).
+    // Yeni kimlikle baştan bağlanıyoruz.
+    console.warn(`🔄 Arkadaşlık kimliği değişti (${globalMqttIdentity} → ${state.friendId}), broker bağlantısı yenileniyor`);
+    try { state.globalMqtt.end(true); } catch (e) {}
+    state.globalMqtt = null;
+    globalMqttSessionId++; // bekleyen broker rotasyonlarını geçersiz kıl
+  }
+
+  globalMqttIdentity = state.friendId;
   connectGlobalBroker(0, ++globalMqttSessionId);
 }
 
@@ -2137,75 +2219,128 @@ setInterval(() => {
 }, 10000);
 
 
+// Bir RTCIceServer girdisinin TURN taşıyıp taşımadığını söyler. urls hem tek
+// bir string hem de dizi olabilir (aşağıda host başına gruplanıyor), bu yüzden
+// "typeof s.urls === 'string'" varsayan her kontrol bu yardımcıdan geçmeli.
+function iceEntryHasTurn(s, requireCredential = true) {
+  if (!s || !s.urls) return false;
+  if (requireCredential && !s.username) return false;
+  const list = Array.isArray(s.urls) ? s.urls : [s.urls];
+  return list.some(u => typeof u === 'string' && /^turns?:/.test(u));
+}
+
+// İLK bağlantı için taşıma politikası. Kullanıcı kalıcı relay modundaysa ya da
+// bir tünel (WARP) algılandıysa doğrudan relay ile başlanır — WARP altında
+// doğrudan P2P neredeyse hiç kurulmadığı için 'all' ile başlamak yalnızca
+// onlarca saniye ölü aday denemesi demek. TURN yoksa relay anlamsızdır, o
+// durumda 'all' kalır (kilitlenmemek için). Sonraki denemelerde
+// applyIceEscalationPolicy devralır ve gerekirse 'all'a geri döner.
+function preferredIceTransportPolicy() {
+  if (state.useRelay) return 'relay';
+  if ((state.warpDetected || state.symmetricNatDetected) && getIceServers().some(s => iceEntryHasTurn(s))) return 'relay';
+  return 'all';
+}
+
+// TEK bir TURN ana bilgisayarı için denenecek URL listesini üretir.
+//
+// Neden bu kadar kısıtlı: Chromium her (URL × ağ arayüzü) için ayrı bir
+// TurnPort ve ayrı bir Allocate transaction açar. Var olmayan/ulaşılamayan
+// her hedef, STUN retransmit zamanlaması yüzünden (250+500+1000+2000+4000+
+// 8000×4 ms) ICE toplamayı ~40 SANİYE boyunca "gathering" durumunda tutar.
+// Eski kod host başına 6 URL üretiyordu (udp:80, udp:443, tcp:80, tcp:443,
+// tls:443 + orijinal) ve buna IP-literal kopyalar ekleniyordu: tek TURN
+// hostunda 19 iceServer / 16 TURN URL. Kullanıcının makinesindeki sanal
+// adaptörlerle (WSL, Hyper-V, Radmin, WARP tüneli) çarpılınca ~96 Allocate
+// isteği ediyordu. Ayrıca W3C spec'i 32'den fazla iceServer girdisini hata
+// vermeden SESSİZCE yok sayar.
+//
+// DAR MOD (varsayılan) — host başına en fazla 3 URL:
+//   • kullanıcının kendi yazdığı URL (genelde udp:3478) → UDP açıkken en hızlı
+//   • turn:host:443?transport=tcp                        → UDP kapalıyken
+//   • turns:host:443?transport=tcp                       → DPI/derin inceleme
+//   Bu üçlü, pratikte karşılaşılan ağ durumlarının hepsini kapsar.
+//
+// GENİŞ MOD (state.iceWideMode) — ilk toplama hiç relay adayı üretemezse
+//   açılır: :80 varyantları ve (DNS çözülemiyorsa) IP-literal kopyalar eklenir.
+//   Eski kodun dayanıklılığı böylece kaybolmuyor; sadece maliyeti yalnızca
+//   gerçekten gerektiğinde ödeniyor.
+function buildTurnUrlList(rawUrl, wide) {
+  const p = parseTurnHost(rawUrl);
+  if (!p || isIpLiteral(p.host)) return [rawUrl];
+
+  const urls = [rawUrl];
+  const push = u => { if (!urls.includes(u)) urls.push(u); };
+
+  push(`turn:${p.host}:443?transport=tcp`);
+  push(`turns:${p.host}:443?transport=tcp`);
+
+  if (wide) {
+    push(`turn:${p.host}:80?transport=tcp`);
+    push(`turn:${p.host}:80`);
+    push(`turn:${p.host}:443`);
+    // DNS bozuksa son çare: önbellekteki IP'lerle doğrudan. turns: (TLS)
+    // sertifika ad doğrulaması gerektirdiği için IP'ye çevrilmez.
+    const entry = getTurnIpCache()[p.host];
+    if (entry && Array.isArray(entry.ips)) {
+      entry.ips.slice(0, 2).forEach(ip => {
+        push(`turn:${ip}:443?transport=tcp`);
+        push(`turn:${ip}:80?transport=tcp`);
+      });
+    }
+  }
+  return urls;
+}
+
 function getIceServers() {
   const customUrl = localStorage.getItem('teamsync_turn_url') || '';
   const customUser = localStorage.getItem('teamsync_turn_user') || '';
   const customPass = localStorage.getItem('teamsync_turn_pass') || '';
+  const wide = !!state.iceWideMode;
 
+  // İki STUN, ama FARKLI SAĞLAYICILARDAN. Eski liste üçtü ve ikisi aynı
+  // sağlayıcıydı (stun.l / stun1.l — ikisi de Google), yani gerçek yedeklilik
+  // yoktu. STUN portları paralel toplandığı için ikinci sağlayıcı duvar saati
+  // maliyeti eklemez; buna karşılık TURN yapılandırmamış kullanıcı (çoğunluk)
+  // tek bir sağlayıcının engellenmesine karşı korunmuş olur.
   const servers = [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' }
   ];
+
+  // Aynı ana bilgisayar için birden fazla girdi üretmeyi engeller: Metered gibi
+  // API'ler aynı hostu udp/tcp/tls olarak ayrı ayrı döndürür, biz zaten o
+  // varyantları buildTurnUrlList içinde üretiyoruz.
+  const seenHosts = new Set();
+  const addTurn = (rawUrl, user, pass) => {
+    if (typeof rawUrl !== 'string' || !/^turns?:/.test(rawUrl) || !user || !pass) return;
+    const p = parseTurnHost(rawUrl);
+    const key = (p ? p.host : rawUrl) + '|' + user;
+    if (seenHosts.has(key)) return;
+    seenHosts.add(key);
+    servers.push({ urls: buildTurnUrlList(rawUrl, wide), username: user, credential: pass });
+  };
 
   // NOT: openrelay.metered.ca (openrelayproject) servisi kapandı; ölü TURN
   // sunucuları ICE toplamayı yavaşlatıp bağlantıyı geciktirdiği için listeden
   // çıkarıldı. CGNAT/simetrik NAT arkasındaki kullanıcılar için ayarlardan
   // kendi TURN bilgilerinizi girin (ör. metered.ca / expressturn.com ücretsiz hesap).
   // TURN URL alanına https://... yazılırsa API'den otomatik çekilir (aşağıya bkz).
-  if (customUrl && customUrl.startsWith('http')) {
-    // API modunda gerçek sunucular refreshDynamicTurn() ile state'e yüklenir.
-  } else if (customUrl && customUser && customPass) {
+  if (customUrl && !customUrl.startsWith('http') && customUser && customPass) {
     // Virgülle ayrılmış birden çok URL desteklenir (aynı kullanıcı adı/şifre ile)
-    customUrl.split(',').map(u => u.trim()).filter(Boolean).forEach(u => {
-      servers.push({ urls: u, username: customUser, credential: customPass });
-    });
+    customUrl.split(',').map(u => u.trim()).filter(Boolean).forEach(u => addTurn(u, customUser, customPass));
   }
 
   // Metered API'den otomatik çekilen sunucular
   if (Array.isArray(state.dynamicTurnServers)) {
-    state.dynamicTurnServers.forEach(s => { if (s && s.urls) servers.push(s); });
+    state.dynamicTurnServers.forEach(s => { if (s) addTurn(s.urls, s.username, s.credential); });
   }
 
   // Odadaki başka bir üyenin (ör. kurucunun) paylaştığı TURN bilgileri:
   // tek kişinin TURN girmesi odadaki herkesin bağlanabilmesine yeter.
   if (Array.isArray(state.sharedTurn)) {
-    state.sharedTurn.forEach(s => {
-      if (s && typeof s.urls === 'string' && /^turns?:/.test(s.urls)) servers.push(s);
-    });
+    state.sharedTurn.forEach(s => { if (s) addTurn(s.urls, s.username, s.credential); });
   }
-  return expandTurnWithIpVariants(expandTurnFamily(servers));
-}
-
-// Yapılandırılmış her TURN ana bilgisayarı için tüm taşıma varyantlarını
-// üretir: udp:80, udp:443, tcp:80, tcp:443 ve tls:443. WARP gibi VPN/tünel
-// araçları bazı günler UDP'yi (CreatePermission 600), bazı günler DNS'i
-// (-105) bozuyor; kullanıcının kayıtlı listesinde çoğu zaman tek taşıma
-// türü var ve o tür bozulunca hiçbir çalışan yol kalmıyordu. Var olmayan
-// kombinasyonlar (ör. Metered'de düz TCP:443) sadece aday üretmez, ICE
-// toplamayı bloklamaz. Ardından expandTurnWithIpVariants, tcp varyantları
-// dahil turn: URL'lerinin IP-literal kopyalarını ekler — böylece DNS ve UDP
-// AYNI ANDA bozuk olsa bile turn:IP:80?transport=tcp yolu ayakta kalır.
-function expandTurnFamily(servers) {
-  const seen = new Set(servers.map(s => (s && typeof s.urls === 'string') ? s.urls : ''));
-  const out = servers.slice();
-  servers.forEach(s => {
-    if (!s || typeof s.urls !== 'string' || !s.username || !s.credential) return;
-    const p = parseTurnHost(s.urls);
-    if (!p || isIpLiteral(p.host)) return;
-    [
-      `turn:${p.host}:80`,
-      `turn:${p.host}:443`,
-      `turn:${p.host}:80?transport=tcp`,
-      `turn:${p.host}:443?transport=tcp`,
-      `turns:${p.host}:443?transport=tcp`
-    ].forEach(url => {
-      if (seen.has(url)) return;
-      seen.add(url);
-      out.push({ urls: url, username: s.username, credential: s.credential });
-    });
-  });
-  return out;
+  return servers;
 }
 
 // ---- TURN DNS dayanıklılığı (WARP/VPN/DPI araçlarına karşı) ----
@@ -2231,26 +2366,11 @@ function isIpLiteral(host) {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes('[');
 }
 
-function expandTurnWithIpVariants(servers) {
-  const cache = getTurnIpCache();
-  const seen = new Set(servers.map(s => typeof s.urls === 'string' ? s.urls : ''));
-  const out = servers.slice();
-  servers.forEach(s => {
-    if (!s || typeof s.urls !== 'string') return;
-    const p = parseTurnHost(s.urls);
-    // Sadece turn: (TLS'siz) URL'ler IP'ye çevrilebilir
-    if (!p || p.scheme !== 'turn' || isIpLiteral(p.host)) return;
-    const entry = cache[p.host];
-    if (!entry || !Array.isArray(entry.ips)) return;
-    entry.ips.slice(0, 2).forEach(ip => {
-      const url = `turn:${ip}${p.port}${p.query}`;
-      if (seen.has(url)) return;
-      seen.add(url);
-      out.push({ urls: url, username: s.username, credential: s.credential });
-    });
-  });
-  return out;
-}
+// NOT: expandTurnFamily() ve expandTurnWithIpVariants() kaldırıldı. Yaptıkları
+// iş artık buildTurnUrlList() içinde, iki kademeli (dar/geniş) olarak yapılıyor:
+// IP-literal kopyalar yalnızca geniş modda, yani ilk toplama relay adayı
+// üretemediğinde ekleniyor. getTurnIpCache/parseTurnHost/isIpLiteral hâlâ
+// kullanılıyor (yukarıda).
 
 // Ana bilgisayar adını yerel DNS'i atlayarak çözer. Uç noktalar IP-literal
 // olduğu için bozuk yerel DNS bu isteği etkileyemez.
@@ -2319,7 +2439,10 @@ async function refreshDynamicTurn() {
   const customUrl = localStorage.getItem('teamsync_turn_url') || '';
   if (!customUrl.startsWith('http')) return;
   try {
-    const res = await fetch(customUrl);
+    // Timeout ŞART: bu istek eskiden sınırsızdı. WARP/VPN DNS'i bozduğunda
+    // Chromium'un varsayılan ağ timeout'larına kadar (onlarca saniye) asılı
+    // kalıp odaya girişi tamamen durduruyordu.
+    const res = await fetch(customUrl, { signal: AbortSignal.timeout(3000) });
     const list = await res.json();
     if (Array.isArray(list)) {
       state.dynamicTurnServers = list.filter(s => s && typeof s.urls === 'string').slice(0, 8);
@@ -2374,7 +2497,7 @@ function applySharedTurn(turnList) {
       try {
         peer.pc.setConfiguration({
           iceServers: getIceServers(),
-          iceTransportPolicy: state.useRelay ? 'relay' : 'all'
+          iceTransportPolicy: preferredIceTransportPolicy()
         });
       } catch (e) {}
     });
@@ -2385,9 +2508,10 @@ function applySharedTurn(turnList) {
     try {
       peer.pc.setConfiguration({
         iceServers: getIceServers(),
-        iceTransportPolicy: state.useRelay ? 'relay' : 'all'
+        iceTransportPolicy: preferredIceTransportPolicy()
       });
       peer.lastRestartAt = 0; // hemen denemeye izin ver
+      peer.restartBackoffStep = 0; // yeni TURN bilgisi geldi: backoff'u da sıfırla
       attemptIceRestart(peerId);
     } catch (e) {
       console.warn('setConfiguration başarısız:', e && e.message ? e.message : e);
@@ -2410,10 +2534,28 @@ async function detectTunnelInterference() {
     if (!warp) { state.warpDetected = false; return; }
     state.warpDetected = true;
     console.warn('🛡️ Cloudflare WARP algılandı (warp=' + warp + ') — doğrudan P2P büyük olasılıkla çalışmaz, TURN yolları önceliklendirilecek');
-    const hasTurn = getIceServers().some(s => typeof s.urls === 'string' && /^turns?:/.test(s.urls) && s.username);
+    const hasTurn = getIceServers().some(s => iceEntryHasTurn(s));
     showToast(hasTurn
       ? t('toast.warpDetectedWithTurn')
       : t('toast.warpDetectedNoTurn'), 'warn');
+
+    // Bu fonksiyon odaya girişi bloklamasın diye await'siz çağrılıyor; sonuç
+    // geldiğinde ilk peer bağlantıları çoktan kurulmaya başlamış olabilir ve
+    // onlar hâlâ 'all' politikasıyla ölü doğrudan yolları deniyordur. Henüz
+    // bağlanmamış olanları hemen relay'e çekiyoruz — yoksa WARP tespitinin
+    // pratikte hiçbir etkisi olmuyordu.
+    if (!hasTurn) return;
+    state.peers.forEach((peer) => {
+      if (!peer.pc) return;
+      const st = peer.pc.iceConnectionState;
+      if (st === 'connected' || st === 'completed') return;
+      try {
+        peer.pc.setConfiguration({
+          iceServers: getIceServers(),
+          iceTransportPolicy: preferredIceTransportPolicy()
+        });
+      } catch (e) {}
+    });
   } catch (e) {}
 }
 
@@ -2428,7 +2570,16 @@ async function diagnoseIceFailure(peerId) {
       if (r.type === 'local-candidate' && r.candidateType) types.add(r.candidateType);
     });
     console.log('🩺 ICE tanı — yerel aday türleri:', [...types].join(', ') || 'yok');
-    const hasTurnConfigured = getIceServers().some(s => typeof s.urls === 'string' && s.urls.startsWith('turn'));
+    const hasTurnConfigured = getIceServers().some(s => iceEntryHasTurn(s, false));
+
+    // Dar TURN listesi relay adayı üretemedi → GENİŞ MODA GEÇ. Bundan sonraki
+    // getIceServers() çağrıları :80 varyantlarını ve (DNS bozuksa) önbellekteki
+    // IP-literal kopyaları da içerir. Hızlı yol önce denenir, pahalı yol ancak
+    // gerçekten gerektiğinde devreye girer.
+    if (hasTurnConfigured && !types.has('relay') && !state.iceWideMode) {
+      state.iceWideMode = true;
+      console.warn('🧰 ICE geniş moda geçildi: dar TURN listesi relay adayı üretemedi');
+    }
     if (!types.has('srflx') && !types.has('relay')) {
       showToast(t('toast.stunBlocked'), 'danger');
     } else if (!hasTurnConfigured) {
@@ -3108,6 +3259,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       } catch (e) {}
       state.globalMqtt.end();
       state.globalMqtt = null;
+      globalMqttIdentity = null; // sonraki giriş "aynı kimlik" sanıp bağlanmayı atlamasın
       globalMqttSessionId++; // bekleyen broker rotasyonlarını geçersiz kıl
     }
     
@@ -3385,10 +3537,22 @@ window.addEventListener('DOMContentLoaded', async () => {
       state.cryptoKey = await setupCrypto(state.password);
       if (roomOperationWasCancelled(roomOperation)) return false;
       detectTunnelInterference(); // await yok: girişte bloklamasın, toast async gelsin
-      await refreshDynamicTurn();
-      if (roomOperationWasCancelled(roomOperation)) return false;
-      await resolveTurnHostsViaDoH();
-      if (roomOperationWasCancelled(roomOperation)) return false;
+
+      // TURN hazırlığı ARTIK ODAYA GİRİŞİ BEKLETMİYOR.
+      // Eskiden bu iki çağrı `await`'liydi ve kullanıcı, mikrofonu bile
+      // açılmadan önce en kötü ihtimalle ~50 saniye "odaya katılınıyor"
+      // ekranında bekliyordu: refreshDynamicTurn()'ün fetch'inin timeout'u
+      // yoktu, resolveTurnHostsViaDoH() ise host başına 2 tur × 2 uç × 4 sn
+      // harcıyordu. WARP altında bu süreler garanti ödeniyordu.
+      // Artık arka planda koşuyorlar; sonuç geldiğinde getIceServers() zaten
+      // taze listeyi döndürür ve henüz bağlanmamış peer'lara uygulanır
+      // (applySharedTurn / attemptIceRestart yolları bunu zaten yapıyor).
+      // NOT: DoH çözümlemesi main sürecindeki applyDnsSettings() (Chromium'un
+      // kendi secure-DoH resolver'ı) sayesinde çoğu kurulumda gereksizdir;
+      // yalnızca kullanıcı "Sistem DNS'i" seçtiyse hâlâ işe yarar.
+      refreshDynamicTurn().catch(() => {});
+      resolveTurnHostsViaDoH().catch(() => {});
+
       await setupLocalAudio();
       if (roomOperationWasCancelled(roomOperation)) return false;
       if (!state.uiBound) {
@@ -4255,15 +4419,74 @@ function getAudioBitrate() {
 // zaman 111 değildir — SDP'den dinamik bulunur, yoksa fmtp satırı eklenir.
 // cbr=1 (sabit bit hızı) kaldırıldı; VBR daha iyi ses/oran verir. useinbandfec
 // paket kaybında sesi netleştirir, maxplaybackrate 48kHz tam bant sağlar.
+// ---- Adaptif jitter buffer (ses gecikmesinin ana kaynağı) -------------------
+// Chromium'un NetEq tamponu ağ jitter'ına göre kendini büyütür ama koşullar
+// düzeldiğinde kendiliğinden yeterince geri inmez. WARP/VPN veya TURN relay
+// gibi yüksek jitter'lı bir yolda 200-500 ms'e çıkıp orada kalıyor — kullanıcının
+// "ses geç gidiyor" dediği gecikmenin büyük kısmı tam olarak budur. Bu kod
+// tamponu aşağı çeker, ama KÖRLEMESİNE DEĞİL: sabit 80 ms dayatmak yüksek
+// jitter'da sesi cızırtılı yapar. Kapalı döngü kuruyoruz — gizlenen örnek
+// (concealed: kayıp paket yerine uydurulan ses) oranı düşükken hedefi indir,
+// yükselince geri aç.
+//
+// API notu: jitterBufferTarget (ms) güncel standart, Chrome 123+ ve
+// Electron 43 = Chromium 150 olduğu için burada mevcut. playoutDelayHint
+// (saniye) eski adı; yine de yedek olarak deneniyor.
+const JITTER_MIN_MS = 60;
+const JITTER_MAX_MS = 400;
+const JITTER_START_MS = 120;
+const JITTER_CONCEAL_LIMIT = 0.02;   // %2'yi aşarsa duyulur bozulma başlıyor
+
+function setReceiverJitterTarget(receiver, ms) {
+  try {
+    if ('jitterBufferTarget' in receiver) { receiver.jitterBufferTarget = ms; return true; }
+    if ('playoutDelayHint' in receiver) { receiver.playoutDelayHint = ms / 1000; return true; }
+  } catch (e) {}
+  return false;
+}
+
+// concealed/total KÜMÜLATİF sayaçlardır; oranı mutlak değerden hesaplamak
+// yanlış olur (oturumun başındaki bir kayıp sonsuza dek oranı bozar). Bu yüzden
+// tick'ler arası FARK kullanılıyor. silentConcealed çıkarılıyor: sessizlik
+// sırasında gizlenen örnekler bir kalite sorunu değil.
+function tuneJitterBuffer(pp, pc, concealed, silentConcealed, total) {
+  if (pp.jitterUnsupported) return;   // bir kez öğrendik, her tick deneme
+  const dConcealed = Math.max(0, (concealed - silentConcealed) - (pp.lastConcealed || 0));
+  const dTotal = Math.max(0, total - (pp.lastTotalSamples || 0));
+  pp.lastConcealed = concealed - silentConcealed;
+  pp.lastTotalSamples = total;
+  if (dTotal <= 0) return;                    // henüz ses akmıyor
+
+  const ratio = dConcealed / dTotal;
+  const cur = pp.jitterTargetMs || JITTER_START_MS;
+  const next = ratio > JITTER_CONCEAL_LIMIT
+    ? Math.min(cur + 40, JITTER_MAX_MS)       // bozuldu: tamponu hızlı aç
+    : Math.max(cur - 10, JITTER_MIN_MS);      // iyi: yavaşça indir
+  if (next === cur) return;
+
+  const receivers = pc.getReceivers().filter(r => r.track && r.track.kind === 'audio');
+  if (!receivers.length) return;
+  let applied = false;
+  receivers.forEach(r => { if (setReceiverJitterTarget(r, next)) applied = true; });
+  if (!applied) { pp.jitterUnsupported = true; return; }   // tarayıcı desteklemiyor
+  pp.jitterTargetMs = next;
+}
+
 function setMediaBitrates(sdp) {
   if (!sdp) return sdp;
   const bps = getAudioBitrate() * 1000;
   const m = sdp.match(/a=rtpmap:(\d+)\s+opus/i);
   if (!m) return sdp;
   const pt = m[1];
+  // stereo=0: sesli sohbette stereo hem kodlayıcı gecikmesini artırıyor hem de
+  // bant genişliğini ikiye katlıyor. Full-mesh'te her peer'a AYRI akış
+  // gönderildiği için maliyet (n-1) kat; WARP/TURN relay gibi dar bir yolda bu
+  // doğrudan bufferbloat, yani gecikme demek. Mikrofon zaten mono.
+  // usedtx=0 bilinçli: DTX sessizlikte bant genişliği kazandırır ama konuşma
+  // başlangıcında duyulur bir artefakt/kesinti yaratıyor.
   const opusParams =
     `maxaveragebitrate=${bps};maxplaybackrate=48000;sprop-maxcapturerate=48000;` +
-    `stereo=1;sprop-stereo=1;useinbandfec=1;usedtx=0`;
+    `stereo=0;sprop-stereo=0;useinbandfec=1;usedtx=0`;
   const fmtpRe = new RegExp(`a=fmtp:${pt} ([^\\r\\n]*)`);
   if (fmtpRe.test(sdp)) {
     // Mevcut satırdan çakışan Opus parametrelerini temizleyip yenilerini ekle.
@@ -4505,8 +4728,17 @@ function applyIceEscalationPolicy(peer) {
   peer.restartCount = (peer.restartCount || 0) + 1;
   if (state.useRelay) return; // kullanıcı zaten kalıcı relay modunda
   const servers = getIceServers();
-  const hasTurn = servers.some(s => typeof s.urls === 'string' && /^turns?:/.test(s.urls) && s.username);
-  const wantRelay = hasTurn && (peer.forceRelayNext || (peer.restartCount % 4) >= 2);
+  const hasTurn = servers.some(s => iceEntryHasTurn(s));
+  // WARP/tünel algılandıysa BEKLEME: doğrudan P2P bu ortamda neredeyse hiç
+  // kurulmuyor. Eskiden döngü "all, all, relay, relay" olduğu için kullanıcı
+  // ilk 40-50 saniyeyi ölü doğrudan yolların denenmesiyle harcıyordu; kodun
+  // kendi yorumu bunu zaten söylüyordu ama davranışı değiştirmiyordu.
+  // DİKKAT: WARP altında bile relay'e KALICI olarak kilitlenmiyoruz — TURN'ün
+  // kendisi ulaşılamaz çıkarsa relay-only hiç bağlanamamak demektir. Sadece
+  // ilk üç deneme relay'e çekiliyor, sonrasında mevcut 4'lük döngü devralıyor
+  // ve 'all'a dönme kaçışı korunuyor.
+  const warpRelayWindow = (state.warpDetected || state.symmetricNatDetected) && peer.restartCount <= 3;
+  const wantRelay = hasTurn && (peer.forceRelayNext || warpRelayWindow || (peer.restartCount % 4) >= 2);
   peer.forceRelayNext = false;
   try {
     peer.pc.setConfiguration({ iceServers: servers, iceTransportPolicy: wantRelay ? 'relay' : 'all' });
@@ -4574,8 +4806,18 @@ async function attemptIceRestart(peerId) {
   const peer = state.peers.get(peerId);
   if (!peer || !peer.pc) return;
   const now = Date.now();
-  if (peer.lastRestartAt && now - peer.lastRestartAt < 5000) return;
+  // ÜSTEL BACKOFF. Eskiden sabit 5 sn'lik bir alt sınır vardı; bekçi 10 sn'de
+  // bir tick attığı için pratikte HER 10 SANİYEDE BİR restart oluyordu. Her
+  // restart yeni bir ufrag üretip aday toplamayı sıfırdan başlatıyor, yani
+  // yapılandırılmış tüm TURN sunucuları için Allocate turu yeniden koşuyor —
+  // ölü bir hedefin ~40 saniyelik STUN retransmit cezası her seferinde yeniden
+  // ödeniyordu. Bağlantı kurulmaya çalışırken sürekli kendini baştan başlatan
+  // bir döngü, WARP altında gecikmenin kendisiydi.
+  // 5 → 10 → 20 → 40 sn (üst sınır 40). Başarılı bağlantıda sıfırlanır.
+  const backoff = Math.min(5000 * Math.pow(2, peer.restartBackoffStep || 0), 40000);
+  if (peer.lastRestartAt && now - peer.lastRestartAt < backoff) return;
   peer.lastRestartAt = now;
+  peer.restartBackoffStep = (peer.restartBackoffStep || 0) + 1;
 
   if (!peer.isInitiator) {
     // Restart'ı karşı taraf başlatacak ama KENDİ politikamızı şimdi ayarlarız:
@@ -4614,7 +4856,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
   if (state.peers.has(peerId)) return;
   const pc = new RTCPeerConnection({ 
     iceServers: getIceServers(),
-    iceTransportPolicy: state.useRelay ? 'relay' : 'all'
+    iceTransportPolicy: preferredIceTransportPolicy()
   });
 
   if (state.localStream) state.localStream.getTracks().forEach(track => {
@@ -4665,6 +4907,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
   pc.onicecandidate = (e) => {
     if (e.candidate) {
       if (isJunkIceCandidate(e.candidate)) return; // çöp adayı hiç yayınlama
+      noteNatBehaviourFromCandidate(e.candidate);
       // Adayları sakla: karşı taraf ilk gönderimi kaçırırsa (abonelik gecikmesi,
       // paket kaybı) offer/answer tekrarıyla birlikte yeniden gönderilirler.
       const p = state.peers.get(peerId);
@@ -4816,6 +5059,7 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
     const st = pc.iceConnectionState;
     if (st === 'connected' || st === 'completed') {
       p.checkingSince = null;
+      p.restartBackoffStep = 0;   // bağlandı: backoff merdivenini sıfırla
       // 30 sn'de bir ses yolu fotoğrafı: teşhis logu + oynatma kendini onarır
       // (ör. ses verisi geldiği halde oynatıcı durmuşsa play ile diriltilir)
       p.voiceReportTick = (p.voiceReportTick || 0) + 1;
@@ -4829,10 +5073,18 @@ async function createPeerConnection(peerId, peerName, isInitiator, peerIp, peerA
       // track'i yoksa (mikrofon açılamamış) restart çare olmaz; sonsuz
       // döngüye girmemek için üst sınır var.
       pc.getStats().then((stats) => {
-        let bytes = 0;
-        stats.forEach(r => { if (r.type === 'inbound-rtp' && r.kind === 'audio') bytes += (r.bytesReceived || 0); });
+        let bytes = 0, concealed = 0, silentConcealed = 0, totalSamples = 0;
+        stats.forEach(r => {
+          if (r.type !== 'inbound-rtp' || r.kind !== 'audio') return;
+          bytes += (r.bytesReceived || 0);
+          concealed += (r.concealedSamples || 0);
+          silentConcealed += (r.silentConcealedSamples || 0);
+          totalSamples += (r.totalSamplesReceived || 0);
+        });
         const pp = state.peers.get(peerId);
         if (!pp || pp.pc !== pc) return;
+        // Aynı istatistik turundan jitter tamponunu da ayarla (ek getStats yok).
+        tuneJitterBuffer(pp, pc, concealed, silentConcealed, totalSamples);
         if (pp.lastAudioBytes != null && bytes <= pp.lastAudioBytes) {
           pp.audioStallTicks = (pp.audioStallTicks || 0) + 1;
           if (pp.audioStallTicks >= 2 && (pp.audioStallRestarts || 0) < 3) {
@@ -7737,6 +7989,17 @@ Object.assign(I18N.en, {
 
 // Ayarlar → Kısayollar paneli ve merkezi bastırma kapısının metinleri.
 Object.assign(I18N.tr, {
+  'settings.dnsProvider': 'Şifreli DNS (DoH)',
+  'settings.dnsCloudflare': 'Cloudflare — 1.1.1.1 (önerilen)',
+  'settings.dnsQuad9': 'Quad9 — 9.9.9.9 (zararlı site engelli)',
+  'settings.dnsGoogle': 'Google — 8.8.8.8',
+  'settings.dnsSystem': 'Sistem DNS\'i (kapalı)',
+  'settings.dnsDescCloudflare': 'Sorguların Cloudflare\'e şifreli gider. Kayıt tutmama politikası bağımsız denetimden geçmiş. Çoğu kullanıcı için en dengeli seçim.',
+  'settings.dnsDescQuad9': 'İsviçre merkezli, kâr amacı gütmeyen vakıf. Kayıt tutmaz ve bilinen zararlı/oltalama alan adlarını ayrıca engeller. Biraz daha yavaş olabilir.',
+  'settings.dnsDescGoogle': 'En yüksek erişilebilirlik ve hız; kısıtlı ağlarda genelde ayakta kalır. Karşılığında çözdüğün alan adlarını Google görür.',
+  'settings.dnsDescSystem': 'İşletim sisteminin (veya VPN\'inin) DNS\'i kullanılır. Cloudflare WARP gibi araçlar açıkken bağlantı kurulamama ve uzun bekleme sorunları yaşayabilirsin.',
+  'toast.dnsApplied': 'DNS ayarı uygulandı.',
+  'settings.dnsHelp': 'VPN, WARP veya kısıtlı bir ağ kullanıyorsan bu ayar bağlantı kurulamama ve uzun bekleme sorunlarını çözer. Değişiklik anında geçerli olur, yeniden başlatma gerekmez.',
   'settings.shortcuts': 'Kısayollar',
   'settings.shortcutsLead': 'Klavye kısayollarını aç, kapat veya yeniden ata.',
   'settings.shortcutsMaster': 'Kısayolları Etkinleştir',
@@ -7774,6 +8037,17 @@ Object.assign(I18N.tr, {
   'shortcut.pttDesc': 'Basılı tutulduğu sürece mikrofonu açar.'
 });
 Object.assign(I18N.en, {
+  'settings.dnsProvider': 'Encrypted DNS (DoH)',
+  'settings.dnsCloudflare': 'Cloudflare — 1.1.1.1 (recommended)',
+  'settings.dnsQuad9': 'Quad9 — 9.9.9.9 (blocks malicious sites)',
+  'settings.dnsGoogle': 'Google — 8.8.8.8',
+  'settings.dnsSystem': 'System DNS (off)',
+  'settings.dnsDescCloudflare': 'Queries go to Cloudflare encrypted. Its no-logging policy has been independently audited. The most balanced choice for most people.',
+  'settings.dnsDescQuad9': 'Swiss non-profit foundation. Keeps no logs and additionally blocks known malicious and phishing domains. May be slightly slower.',
+  'settings.dnsDescGoogle': 'Highest availability and speed; usually stays up on restricted networks. In exchange, Google sees the domains you resolve.',
+  'settings.dnsDescSystem': 'Uses your operating system (or VPN) DNS. With tools like Cloudflare WARP active you may hit connection failures and long waits.',
+  'toast.dnsApplied': 'DNS setting applied.',
+  'settings.dnsHelp': 'If you use a VPN, WARP or a restricted network, this setting fixes connection failures and long waits. Takes effect immediately, no restart needed.',
   'settings.shortcuts': 'Shortcuts',
   'settings.shortcutsLead': 'Turn keyboard shortcuts on or off, or assign new keys.',
   'settings.shortcutsMaster': 'Enable shortcuts',
@@ -9323,6 +9597,7 @@ function openUserSettings(panel = 'general') {
   document.getElementById('user-turn-url').value = localStorage.getItem('teamsync_turn_url') || '';
   document.getElementById('user-turn-user').value = localStorage.getItem('teamsync_turn_user') || '';
   document.getElementById('user-turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
+  syncDnsProviderSelect();
   document.getElementById('user-settings-ptt').checked = localStorage.getItem('teamsync_ptt_enabled') === '1';
   const noiseSuppressionEl = document.getElementById('user-settings-noise-suppression');
   if (noiseSuppressionEl) noiseSuppressionEl.checked = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
@@ -9342,6 +9617,46 @@ function openUserSettings(panel = 'general') {
   syncAudioDeviceSelects();
   syncSettingsTimeFormatSelection();
   syncHardwareAccelerationCheckbox();
+}
+
+// --- Şifreli DNS (DoH) seçicisi ----------------------------------------------
+// Ayar main sürecinde settings.json'da tutulur (localStorage değil), çünkü
+// app.configureHostResolver() main süreçte ve renderer açılmadan önce
+// uygulanmalı. Seçim anında geçerli olur; yeniden başlatma gerekmez.
+const DNS_PROVIDER_DESC_KEYS = {
+  cloudflare: 'settings.dnsDescCloudflare',
+  quad9: 'settings.dnsDescQuad9',
+  google: 'settings.dnsDescGoogle',
+  system: 'settings.dnsDescSystem'
+};
+
+function updateDnsProviderDesc() {
+  const sel = document.getElementById('user-dns-provider');
+  const desc = document.getElementById('dns-provider-desc');
+  if (!sel || !desc) return;
+  desc.textContent = t(DNS_PROVIDER_DESC_KEYS[sel.value] || DNS_PROVIDER_DESC_KEYS.cloudflare);
+}
+
+function syncDnsProviderSelect() {
+  const sel = document.getElementById('user-dns-provider');
+  if (!sel) return;
+  if (!sel.dataset.bound) {
+    sel.dataset.bound = '1';
+    sel.addEventListener('change', () => {
+      updateDnsProviderDesc();
+      if (!window.electronAPI?.setDnsProvider) return;
+      window.electronAPI.setDnsProvider(sel.value)
+        .then(ok => { if (ok) showToast(t('toast.dnsApplied'), 'info'); })
+        .catch(() => {});
+    });
+  }
+  if (window.electronAPI?.getDnsProvider) {
+    window.electronAPI.getDnsProvider()
+      .then(p => { if (p) sel.value = p; updateDnsProviderDesc(); })
+      .catch(() => updateDnsProviderDesc());
+  } else {
+    updateDnsProviderDesc();
+  }
 }
 
 async function saveUserSettings() {
@@ -9400,8 +9715,14 @@ async function saveUserSettings() {
   }
 
   clearSettingsPreview();
-  // Dil değişmediyse tüm belgeyi yeniden çevirmeye gerek yok.
+  // Seçilen dil, DEĞİŞMEMİŞ GÖRÜNSE BİLE açıkça kaydedilir. getSavedLanguage()
+  // kayıt yokken 'en' döndürüyor; bu yüzden hiç dil seçmemiş bir kullanıcı
+  // Ayarlar'dan İngilizce'yi seçip Kaydet'e bastığında karşılaştırma eşit çıkıyor
+  // ve tercih localStorage'a HİÇ yazılmıyordu: seçim, varsayılanın değiştiği ilk
+  // gün (başka bir cihaz/sürüm, farklı sistem dili) sessizce kayboluyordu.
+  // Belgeyi yeniden çevirmek ise pahalı; o yalnızca dil gerçekten değiştiyse yapılır.
   if (language !== getSavedLanguage()) applyUserLanguage(language, true);
+  else localStorage.setItem(USER_LANGUAGE_KEY, language);
   syncAudioDeviceSelects();
   applySpeakerToAll();
   updateSettingsTimePreview();

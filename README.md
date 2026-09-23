@@ -17,6 +17,28 @@
 3. `npm start` yazarak uygulamayı yerelde test edin.
 4. Kuruluma gerek kalmayan taşınabilir sürümünü almak için: `npm run build` komutunu çalıştırın. Dosya `dist/` klasöründe hazır olacaktır.
 
+### Bağlantı sorunlarını teşhis etme
+
+Biri bağlanamıyorsa sebebini tahmin etmeye gerek yok:
+
+```bash
+npm run diag:net
+npm run diag:net -- --turn turn:sunucu.com:3478 --user AD --pass SIFRE
+```
+
+Bu komut STUN erişimini, NAT tipini (simetrik NAT doğrudan P2P'yi öldürür),
+CGNAT olup olmadığını (mobil veride tipik, `100.64.0.0/10`), Cloudflare WARP
+tünelini, sinyalleşme brokerlarını ve — verilirse — TURN sunucusuna gerçek bir
+Allocate isteğini tek tek ölçer ve sonunda o ağda sesin kurulup kurulamayacağını
+açıkça söyler.
+
+> **Mobil veri notu:** mobil operatörler CGNAT kullanır. CGNAT adresi dışarıdan
+> erişilemez (port yönlendirme işe yaramaz, o bağlantıda relay barındırılamaz),
+> ama NAT *cone* tipindeyse giden bağlantıyla delik açma yine de kurulur. Ses
+> ancak NAT **simetrikse** kurulamaz; o zaman tek yol TURN relay'dir. Ayarlar >
+> Bağlantılar bölümüne çalışan bir TURN sunucusu girilmelidir — odada **tek
+> kişinin** girmesi yeterlidir, bilgiler diğer katılımcılara otomatik paylaşılır.
+
 ### RNNoise gürültü engelleme
 
 Uygulamadaki RNNoise seçeneği, ücretsiz ve açık kaynak RNNoise modelini 48 kHz
