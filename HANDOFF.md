@@ -67,7 +67,18 @@ invite links with expiry (1d/3d/7d/30d/unlimited), server search.
   `shell-navigation`, `status-presence` (2 real peers), `activity-detector-parse`.
   Harness helpers: `waitForShell`, `waitStableIdentity`, `makeFriends`.
 - `supabase/profile_media.sql` — storage policies for `<uid>/banner.*` and
-  `<uid>/avatar_anim.gif` + `profiles.profile_ext jsonb`.
+  `<uid>/avatar_anim.gif` + `profiles.profile_ext jsonb`. **Already applied**
+  to the live project `zperyrjpfumtblossyod` (2026-09-23) and verified with a
+  real upload.
+- Live DB hardening (2026-09-23, migration `lock_profiles_and_handle_new_user`):
+  `profiles` rows are readable/writable only by their owner (they used to be
+  world-readable incl. friend lists); `handle_new_user()` has a fixed
+  search_path and can't be called via RPC. The app only ever reads its own row.
+  ~1,480 throwaway E2E accounts were deleted; 7 real accounts remain.
+- E2E tests now run the app with `TEAMSYNC_E2E_OFFLINE=1` (set in
+  `test/e2e/lib/harness.js`): no Supabase login, classic first-run name step,
+  so test runs no longer create real accounts. Use `TEAMSYNC_E2E_ONLINE=1`
+  only for a test that truly needs the real backend.
 
 ## Phase 2 — NEXT: friend groups, typing indicator, emoji & reactions
 Build a shared **space engine** in `js/space/*` (used again in Phase 3):

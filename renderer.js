@@ -54,6 +54,7 @@ if (window.mqtt && window.CryptoJS) {
 let supabaseClient = null;
 if (window.supabase && window.electronAPI) {
   window.electronAPI.getEnv().then((envVars) => {
+    if (envVars && envVars.E2E_OFFLINE) window.__tsE2EOffline = true;
     if (envVars && envVars.SUPABASE_URL && envVars.SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && envVars.SUPABASE_ANON_KEY) {
       supabaseClient = window.supabase.createClient(envVars.SUPABASE_URL, envVars.SUPABASE_ANON_KEY);
       console.log('Supabase initialized successfully.');
@@ -3109,6 +3110,16 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
       // Sabitlenmiş eski profil artık yok — bayat pini temizle, normal akışa düş.
       localStorage.removeItem(DEFAULT_ACCOUNT_KEY);
+    }
+    // getEnv yanıtı henüz gelmediyse çevrimdışı test bayrağını burada öğren.
+    if (!supabaseClient && window.__tsE2EOffline === undefined && window.electronAPI) {
+      try { const env = await window.electronAPI.getEnv(); window.__tsE2EOffline = !!(env && env.E2E_OFFLINE); } catch (e) {}
+    }
+    if (!supabaseClient && window.__tsE2EOffline) {
+      // E2E çevrimdışı kipi: gerçek hesap yok, klasik ilk açılış (isim adımı).
+      document.getElementById('step-auth').classList.add('hidden');
+      await renderAccountsList();
+      return;
     }
     if (!supabaseClient) {
       console.warn("Supabase client is not initialized.");

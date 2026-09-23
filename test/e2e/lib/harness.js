@@ -17,7 +17,12 @@ function launch(port, userDataDir) {
     '--use-fake-ui-for-media-stream',
     `--user-data-dir=${userDataDir}`,
   ];
-  return spawn(ELECTRON_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  // TEAMSYNC_E2E_OFFLINE: gerçek Supabase projesinde test hesabı açılmasın
+  // (bkz. main.js get-env). Bir test gerçek girişe ihtiyaç duyarsa
+  // TEAMSYNC_E2E_ONLINE=1 ile çalıştırılabilir.
+  const env = { ...process.env };
+  if (env.TEAMSYNC_E2E_ONLINE !== '1') env.TEAMSYNC_E2E_OFFLINE = '1';
+  return spawn(ELECTRON_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'], env });
 }
 
 async function getPageTarget(port, timeoutMs = 15000) {

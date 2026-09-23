@@ -732,6 +732,10 @@ function isMainWindowSender(event) {
 
 ipcMain.handle('get-env', (event) => {
   if (!isMainWindowSender(event)) return null;
+  // E2E testleri (test/e2e/lib/harness.js) bu bayrakla başlatır: gerçek
+  // Supabase projesinde her koşuda onlarca atılık hesap oluşmasın diye
+  // uygulama çevrimdışı "ilk açılış" akışıyla (isim adımı) çalışır.
+  if (process.env.TEAMSYNC_E2E_OFFLINE === '1') return { SUPABASE_URL: null, SUPABASE_ANON_KEY: null, E2E_OFFLINE: true };
   return {
     SUPABASE_URL: process.env.SUPABASE_URL || null,
     SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || null
