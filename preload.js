@@ -69,6 +69,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // İndirmeler main süreçte İndirilenler klasörüne yazılır (bkz. main.js
   // will-download); arayüz sonucu buradan öğrenip bildirim gösterir.
   onDownloadDone: (cb) => ipcRenderer.on('download-done', (_e, info) => cb(info)),
-  showInFolder: (filePath) => ipcRenderer.send('show-in-folder', filePath)
+  showInFolder: (filePath) => ipcRenderer.send('show-in-folder', filePath),
+  // Durum sistemi: sistem boşta süresi (sn) ve kilit/uyku olayları.
+  getSystemIdleTime: () => ipcRenderer.invoke('get-system-idle-time'),
+  onPowerEvent: (cb) => ipcRenderer.on('power-event', (_e, name) => cb(name)),
+  // Oyun etkinliği (Oynuyor): main süreçteki algılayıcı (electron/activity-detector.js).
+  activityGetState: () => ipcRenderer.invoke('activity-get-state'),
+  activitySetEnabled: (enabled) => ipcRenderer.invoke('activity-set-enabled', enabled),
+  activityListRunning: () => ipcRenderer.invoke('activity-list-running'),
+  activityAddCustom: (game) => ipcRenderer.invoke('activity-add-custom', game),
+  activityRemoveCustom: (id) => ipcRenderer.invoke('activity-remove-custom', id),
+  activitySetHidden: (id, hidden) => ipcRenderer.invoke('activity-set-hidden', id, hidden),
+  activityRescan: () => ipcRenderer.invoke('activity-rescan'),
+  onActivityChanged: (cb) => ipcRenderer.on('activity-changed', (_e, activity) => cb(activity))
 });
 

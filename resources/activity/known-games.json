@@ -1,0 +1,1281 @@
+{
+ "version": 1,
+ "games": [
+  {
+   "id": "valorant",
+   "name": "VALORANT",
+   "exe": [
+    "VALORANT-Win64-Shipping.exe"
+   ]
+  },
+  {
+   "id": "lol",
+   "name": "League of Legends",
+   "exe": [
+    "League of Legends.exe"
+   ]
+  },
+  {
+   "id": "lor",
+   "name": "Legends of Runeterra",
+   "exe": [
+    "LoR.exe"
+   ]
+  },
+  {
+   "id": "fortnite",
+   "name": "Fortnite",
+   "exe": [
+    "FortniteClient-Win64-Shipping.exe"
+   ]
+  },
+  {
+   "id": "rocketleague",
+   "name": "Rocket League",
+   "exe": [
+    "RocketLeague.exe"
+   ],
+   "steam": 252950
+  },
+  {
+   "id": "minecraft-bedrock",
+   "name": "Minecraft",
+   "exe": [
+    "Minecraft.Windows.exe"
+   ]
+  },
+  {
+   "id": "roblox",
+   "name": "Roblox",
+   "exe": [
+    "RobloxPlayerBeta.exe"
+   ]
+  },
+  {
+   "id": "cs2",
+   "name": "Counter-Strike 2",
+   "exe": [
+    "cs2.exe"
+   ],
+   "steam": 730
+  },
+  {
+   "id": "dota2",
+   "name": "Dota 2",
+   "exe": [
+    "dota2.exe"
+   ],
+   "steam": 570
+  },
+  {
+   "id": "apex",
+   "name": "Apex Legends",
+   "exe": [
+    "r5apex.exe",
+    "r5apex_dx12.exe"
+   ],
+   "steam": 1172470
+  },
+  {
+   "id": "gta5",
+   "name": "Grand Theft Auto V",
+   "exe": [
+    "GTA5.exe",
+    "GTA5_Enhanced.exe"
+   ],
+   "steam": 271590
+  },
+  {
+   "id": "pubg",
+   "name": "PUBG: BATTLEGROUNDS",
+   "exe": [
+    "TslGame.exe"
+   ],
+   "steam": 578080
+  },
+  {
+   "id": "overwatch",
+   "name": "Overwatch 2",
+   "exe": [
+    "Overwatch.exe"
+   ],
+   "steam": 2357570
+  },
+  {
+   "id": "cod",
+   "name": "Call of Duty",
+   "exe": [
+    "cod.exe",
+    "ModernWarfare.exe",
+    "BlackOpsColdWar.exe",
+    "cod24-cod.exe"
+   ]
+  },
+  {
+   "id": "genshin",
+   "name": "Genshin Impact",
+   "exe": [
+    "GenshinImpact.exe",
+    "YuanShen.exe"
+   ]
+  },
+  {
+   "id": "starrail",
+   "name": "Honkai: Star Rail",
+   "exe": [
+    "StarRail.exe"
+   ]
+  },
+  {
+   "id": "zzz",
+   "name": "Zenless Zone Zero",
+   "exe": [
+    "ZenlessZoneZero.exe"
+   ]
+  },
+  {
+   "id": "osu",
+   "name": "osu!",
+   "exe": [
+    "osu!.exe"
+   ]
+  },
+  {
+   "id": "r6",
+   "name": "Rainbow Six Siege",
+   "exe": [
+    "RainbowSix.exe",
+    "RainbowSix_Vulkan.exe",
+    "RainbowSix_DX11.exe"
+   ],
+   "steam": 359550
+  },
+  {
+   "id": "rust",
+   "name": "Rust",
+   "exe": [
+    "RustClient.exe"
+   ],
+   "steam": 252490
+  },
+  {
+   "id": "destiny2",
+   "name": "Destiny 2",
+   "exe": [
+    "destiny2.exe"
+   ],
+   "steam": 1085660
+  },
+  {
+   "id": "warframe",
+   "name": "Warframe",
+   "exe": [
+    "Warframe.x64.exe"
+   ],
+   "steam": 230410
+  },
+  {
+   "id": "terraria",
+   "name": "Terraria",
+   "exe": [
+    "Terraria.exe"
+   ],
+   "steam": 105600
+  },
+  {
+   "id": "stardew",
+   "name": "Stardew Valley",
+   "exe": [
+    "Stardew Valley.exe",
+    "StardewModdingAPI.exe"
+   ],
+   "steam": 413150
+  },
+  {
+   "id": "amongus",
+   "name": "Among Us",
+   "exe": [
+    "Among Us.exe"
+   ],
+   "steam": 945360
+  },
+  {
+   "id": "fallguys",
+   "name": "Fall Guys",
+   "exe": [
+    "FallGuys_client_game.exe"
+   ],
+   "steam": 1097150
+  },
+  {
+   "id": "wow",
+   "name": "World of Warcraft",
+   "exe": [
+    "Wow.exe",
+    "WowClassic.exe"
+   ]
+  },
+  {
+   "id": "hearthstone",
+   "name": "Hearthstone",
+   "exe": [
+    "Hearthstone.exe"
+   ]
+  },
+  {
+   "id": "diablo4",
+   "name": "Diablo IV",
+   "exe": [
+    "Diablo IV.exe"
+   ],
+   "steam": 2344520
+  },
+  {
+   "id": "sc2",
+   "name": "StarCraft II",
+   "exe": [
+    "SC2_x64.exe",
+    "SC2.exe"
+   ]
+  },
+  {
+   "id": "poe",
+   "name": "Path of Exile",
+   "exe": [
+    "PathOfExile.exe",
+    "PathOfExile_x64.exe",
+    "PathOfExileSteam.exe",
+    "PathOfExile_x64Steam.exe"
+   ],
+   "steam": 238960
+  },
+  {
+   "id": "lostark",
+   "name": "Lost Ark",
+   "exe": [
+    "LOSTARK.exe"
+   ],
+   "steam": 1599340
+  },
+  {
+   "id": "eldenring",
+   "name": "ELDEN RING",
+   "exe": [
+    "eldenring.exe"
+   ],
+   "steam": 1245620
+  },
+  {
+   "id": "bg3",
+   "name": "Baldur's Gate 3",
+   "exe": [
+    "bg3.exe",
+    "bg3_dx11.exe"
+   ],
+   "steam": 1086940
+  },
+  {
+   "id": "cyberpunk",
+   "name": "Cyberpunk 2077",
+   "exe": [
+    "Cyberpunk2077.exe"
+   ],
+   "steam": 1091500
+  },
+  {
+   "id": "witcher3",
+   "name": "The Witcher 3: Wild Hunt",
+   "exe": [
+    "witcher3.exe"
+   ],
+   "steam": 292030
+  },
+  {
+   "id": "rdr2",
+   "name": "Red Dead Redemption 2",
+   "exe": [
+    "RDR2.exe"
+   ],
+   "steam": 1174180
+  },
+  {
+   "id": "palworld",
+   "name": "Palworld",
+   "exe": [
+    "Palworld-Win64-Shipping.exe"
+   ],
+   "steam": 1623730
+  },
+  {
+   "id": "helldivers2",
+   "name": "HELLDIVERS 2",
+   "exe": [
+    "helldivers2.exe"
+   ],
+   "steam": 553850
+  },
+  {
+   "id": "lethal",
+   "name": "Lethal Company",
+   "exe": [
+    "Lethal Company.exe"
+   ],
+   "steam": 1966720
+  },
+  {
+   "id": "phasmo",
+   "name": "Phasmophobia",
+   "exe": [
+    "Phasmophobia.exe"
+   ],
+   "steam": 739630
+  },
+  {
+   "id": "dbd",
+   "name": "Dead by Daylight",
+   "exe": [
+    "DeadByDaylight-Win64-Shipping.exe"
+   ],
+   "steam": 381210
+  },
+  {
+   "id": "tf2",
+   "name": "Team Fortress 2",
+   "exe": [
+    "tf_win64.exe",
+    "tf.exe"
+   ],
+   "steam": 440
+  },
+  {
+   "id": "gmod",
+   "name": "Garry's Mod",
+   "exe": [
+    "gmod.exe"
+   ],
+   "steam": 4000
+  },
+  {
+   "id": "l4d2",
+   "name": "Left 4 Dead 2",
+   "exe": [
+    "left4dead2.exe"
+   ],
+   "steam": 550
+  },
+  {
+   "id": "valheim",
+   "name": "Valheim",
+   "exe": [
+    "valheim.exe"
+   ],
+   "steam": 892970
+  },
+  {
+   "id": "sot",
+   "name": "Sea of Thieves",
+   "exe": [
+    "SoTGame.exe"
+   ],
+   "steam": 1172620
+  },
+  {
+   "id": "ark",
+   "name": "ARK: Survival Evolved",
+   "exe": [
+    "ShooterGame.exe"
+   ],
+   "steam": 346110
+  },
+  {
+   "id": "tarkov",
+   "name": "Escape from Tarkov",
+   "exe": [
+    "EscapeFromTarkov.exe"
+   ]
+  },
+  {
+   "id": "thefinals",
+   "name": "THE FINALS",
+   "exe": [
+    "Discovery.exe"
+   ],
+   "steam": 2073850
+  },
+  {
+   "id": "rivals",
+   "name": "Marvel Rivals",
+   "exe": [
+    "Marvel-Win64-Shipping.exe"
+   ],
+   "steam": 2767030
+  },
+  {
+   "id": "deadlock",
+   "name": "Deadlock",
+   "exe": [
+    "deadlock.exe"
+   ],
+   "steam": 1422450
+  },
+  {
+   "id": "hollowknight",
+   "name": "Hollow Knight",
+   "exe": [
+    "hollow_knight.exe"
+   ],
+   "steam": 367520
+  },
+  {
+   "id": "hades",
+   "name": "Hades",
+   "exe": [
+    "Hades.exe"
+   ],
+   "steam": 1145360
+  },
+  {
+   "id": "hades2",
+   "name": "Hades II",
+   "exe": [
+    "Hades2.exe"
+   ],
+   "steam": 1145350
+  },
+  {
+   "id": "celeste",
+   "name": "Celeste",
+   "exe": [
+    "Celeste.exe"
+   ],
+   "steam": 504230
+  },
+  {
+   "id": "brawlhalla",
+   "name": "Brawlhalla",
+   "exe": [
+    "Brawlhalla.exe"
+   ],
+   "steam": 291550
+  },
+  {
+   "id": "paladins",
+   "name": "Paladins",
+   "exe": [
+    "Paladins.exe"
+   ],
+   "steam": 444090
+  },
+  {
+   "id": "warthunder",
+   "name": "War Thunder",
+   "exe": [
+    "aces.exe"
+   ],
+   "steam": 236390
+  },
+  {
+   "id": "wot",
+   "name": "World of Tanks",
+   "exe": [
+    "WorldOfTanks.exe"
+   ]
+  },
+  {
+   "id": "ets2",
+   "name": "Euro Truck Simulator 2",
+   "exe": [
+    "eurotrucks2.exe"
+   ],
+   "steam": 227300
+  },
+  {
+   "id": "ats",
+   "name": "American Truck Simulator",
+   "exe": [
+    "amtrucks.exe"
+   ],
+   "steam": 270880
+  },
+  {
+   "id": "eafc",
+   "name": "EA SPORTS FC",
+   "exe": [
+    "FC24.exe",
+    "FC25.exe",
+    "FC26.exe"
+   ]
+  },
+  {
+   "id": "fh5",
+   "name": "Forza Horizon 5",
+   "exe": [
+    "ForzaHorizon5.exe"
+   ],
+   "steam": 1551360
+  },
+  {
+   "id": "fh4",
+   "name": "Forza Horizon 4",
+   "exe": [
+    "ForzaHorizon4.exe"
+   ],
+   "steam": 1293830
+  },
+  {
+   "id": "halo",
+   "name": "Halo Infinite",
+   "exe": [
+    "HaloInfinite.exe"
+   ],
+   "steam": 1240440
+  },
+  {
+   "id": "satisfactory",
+   "name": "Satisfactory",
+   "exe": [
+    "FactoryGame-Win64-Shipping.exe",
+    "FactoryGameSteam-Win64-Shipping.exe",
+    "FactoryGameEGS-Win64-Shipping.exe"
+   ],
+   "steam": 526870
+  },
+  {
+   "id": "factorio",
+   "name": "Factorio",
+   "exe": [
+    "factorio.exe"
+   ],
+   "steam": 427520
+  },
+  {
+   "id": "rimworld",
+   "name": "RimWorld",
+   "exe": [
+    "RimWorldWin64.exe"
+   ],
+   "steam": 294100
+  },
+  {
+   "id": "cities",
+   "name": "Cities: Skylines",
+   "exe": [
+    "Cities.exe"
+   ],
+   "steam": 255710
+  },
+  {
+   "id": "sims4",
+   "name": "The Sims 4",
+   "exe": [
+    "TS4_x64.exe"
+   ],
+   "steam": 1222670
+  },
+  {
+   "id": "subnautica",
+   "name": "Subnautica",
+   "exe": [
+    "Subnautica.exe"
+   ],
+   "steam": 264710
+  },
+  {
+   "id": "nms",
+   "name": "No Man's Sky",
+   "exe": [
+    "NMS.exe"
+   ],
+   "steam": 275850
+  },
+  {
+   "id": "hogwarts",
+   "name": "Hogwarts Legacy",
+   "exe": [
+    "HogwartsLegacy.exe"
+   ],
+   "steam": 990080
+  },
+  {
+   "id": "starfield",
+   "name": "Starfield",
+   "exe": [
+    "Starfield.exe"
+   ],
+   "steam": 1716740
+  },
+  {
+   "id": "skyrim",
+   "name": "The Elder Scrolls V: Skyrim Special Edition",
+   "exe": [
+    "SkyrimSE.exe"
+   ],
+   "steam": 489830
+  },
+  {
+   "id": "fallout4",
+   "name": "Fallout 4",
+   "exe": [
+    "Fallout4.exe"
+   ],
+   "steam": 377160
+  },
+  {
+   "id": "mhw",
+   "name": "Monster Hunter: World",
+   "exe": [
+    "MonsterHunterWorld.exe"
+   ],
+   "steam": 582010
+  },
+  {
+   "id": "mhwilds",
+   "name": "Monster Hunter Wilds",
+   "exe": [
+    "MonsterHunterWilds.exe"
+   ],
+   "steam": 2246340
+  },
+  {
+   "id": "wukong",
+   "name": "Black Myth: Wukong",
+   "exe": [
+    "b1-Win64-Shipping.exe"
+   ],
+   "steam": 2358720
+  },
+  {
+   "id": "sekiro",
+   "name": "Sekiro: Shadows Die Twice",
+   "exe": [
+    "sekiro.exe"
+   ],
+   "steam": 814380
+  },
+  {
+   "id": "ds3",
+   "name": "DARK SOULS III",
+   "exe": [
+    "DarkSoulsIII.exe"
+   ],
+   "steam": 374320
+  },
+  {
+   "id": "cuphead",
+   "name": "Cuphead",
+   "exe": [
+    "Cuphead.exe"
+   ],
+   "steam": 268910
+  },
+  {
+   "id": "undertale",
+   "name": "Undertale",
+   "exe": [
+    "UNDERTALE.exe"
+   ],
+   "steam": 391540
+  },
+  {
+   "id": "gd",
+   "name": "Geometry Dash",
+   "exe": [
+    "GeometryDash.exe"
+   ],
+   "steam": 322170
+  },
+  {
+   "id": "ultrakill",
+   "name": "ULTRAKILL",
+   "exe": [
+    "ULTRAKILL.exe"
+   ],
+   "steam": 1229490
+  },
+  {
+   "id": "portal2",
+   "name": "Portal 2",
+   "exe": [
+    "portal2.exe"
+   ],
+   "steam": 620
+  },
+  {
+   "id": "albion",
+   "name": "Albion Online",
+   "exe": [
+    "Albion-Online.exe"
+   ],
+   "steam": 761890
+  },
+  {
+   "id": "newworld",
+   "name": "New World: Aeternum",
+   "exe": [
+    "NewWorld.exe"
+   ],
+   "steam": 1063730
+  },
+  {
+   "id": "bdo",
+   "name": "Black Desert",
+   "exe": [
+    "BlackDesert64.exe"
+   ],
+   "steam": 582660
+  },
+  {
+   "id": "gw2",
+   "name": "Guild Wars 2",
+   "exe": [
+    "Gw2-64.exe"
+   ],
+   "steam": 1284210
+  },
+  {
+   "id": "ffxiv",
+   "name": "FINAL FANTASY XIV Online",
+   "exe": [
+    "ffxiv_dx11.exe"
+   ],
+   "steam": 39210
+  },
+  {
+   "id": "runescape",
+   "name": "RuneScape",
+   "exe": [
+    "rs2client.exe"
+   ],
+   "steam": 1343400
+  },
+  {
+   "id": "osrs",
+   "name": "Old School RuneScape",
+   "exe": [
+    "osclient.exe"
+   ],
+   "steam": 1343370
+  },
+  {
+   "id": "metin2",
+   "name": "Metin2",
+   "exe": [
+    "metin2client.exe"
+   ]
+  },
+  {
+   "id": "knightonline",
+   "name": "Knight Online",
+   "exe": [
+    "KnightOnLine.exe"
+   ]
+  },
+  {
+   "id": "pointblank",
+   "name": "Point Blank",
+   "exe": [
+    "PointBlank.exe"
+   ]
+  },
+  {
+   "id": "zula",
+   "name": "Zula",
+   "exe": [
+    "Zula.exe",
+    "zula_x64.exe"
+   ]
+  },
+  {
+   "id": "bannerlord",
+   "name": "Mount & Blade II: Bannerlord",
+   "exe": [
+    "Bannerlord.exe",
+    "Bannerlord.Native.exe"
+   ],
+   "steam": 261550
+  },
+  {
+   "id": "wolfteam",
+   "name": "Wolfteam",
+   "exe": [
+    "WolfTeam.exe"
+   ]
+  },
+  {
+   "id": "smite2",
+   "name": "SMITE 2",
+   "exe": [
+    "Hemingway-Win64-Shipping.exe"
+   ],
+   "steam": 2437170
+  },
+  {
+   "id": "naraka",
+   "name": "NARAKA: BLADEPOINT",
+   "exe": [
+    "NarakaBladepoint.exe"
+   ],
+   "steam": 1203220
+  },
+  {
+   "id": "stumble",
+   "name": "Stumble Guys",
+   "exe": [
+    "Stumble Guys.exe"
+   ],
+   "steam": 1677740
+  },
+  {
+   "id": "repo",
+   "name": "R.E.P.O.",
+   "exe": [
+    "REPO.exe"
+   ],
+   "steam": 3241660
+  },
+  {
+   "id": "peak",
+   "name": "PEAK",
+   "exe": [
+    "PEAK.exe"
+   ],
+   "steam": 3527290
+  },
+  {
+   "id": "schedule1",
+   "name": "Schedule I",
+   "exe": [
+    "Schedule I.exe"
+   ],
+   "steam": 3164500
+  },
+  {
+   "id": "contentwarning",
+   "name": "Content Warning",
+   "exe": [
+    "Content Warning.exe"
+   ],
+   "steam": 2881650
+  },
+  {
+   "id": "sons",
+   "name": "Sons Of The Forest",
+   "exe": [
+    "SonsOfTheForest.exe"
+   ],
+   "steam": 1326470
+  },
+  {
+   "id": "theforest",
+   "name": "The Forest",
+   "exe": [
+    "TheForest.exe"
+   ],
+   "steam": 242760
+  },
+  {
+   "id": "dst",
+   "name": "Don't Starve Together",
+   "exe": [
+    "dontstarve_steam_x64.exe",
+    "dontstarve_steam.exe"
+   ],
+   "steam": 322330
+  },
+  {
+   "id": "projectzomboid",
+   "name": "Project Zomboid",
+   "exe": [
+    "ProjectZomboid64.exe"
+   ],
+   "steam": 108600
+  },
+  {
+   "id": "7dtd",
+   "name": "7 Days to Die",
+   "exe": [
+    "7DaysToDie.exe"
+   ],
+   "steam": 251570
+  },
+  {
+   "id": "raft",
+   "name": "Raft",
+   "exe": [
+    "Raft.exe"
+   ],
+   "steam": 648800
+  },
+  {
+   "id": "grounded",
+   "name": "Grounded",
+   "exe": [
+    "Grounded-Win64-Shipping.exe",
+    "Maine-Win64-Shipping.exe"
+   ],
+   "steam": 962130
+  },
+  {
+   "id": "enshrouded",
+   "name": "Enshrouded",
+   "exe": [
+    "enshrouded.exe"
+   ],
+   "steam": 1203620
+  },
+  {
+   "id": "vrising",
+   "name": "V Rising",
+   "exe": [
+    "VRising.exe"
+   ],
+   "steam": 1604030
+  },
+  {
+   "id": "deeprock",
+   "name": "Deep Rock Galactic",
+   "exe": [
+    "FSD-Win64-Shipping.exe"
+   ],
+   "steam": 548430
+  },
+  {
+   "id": "payday2",
+   "name": "PAYDAY 2",
+   "exe": [
+    "payday2_win32_release.exe"
+   ],
+   "steam": 218620
+  },
+  {
+   "id": "payday3",
+   "name": "PAYDAY 3",
+   "exe": [
+    "PAYDAY3Client-Win64-Shipping.exe"
+   ],
+   "steam": 1272080
+  },
+  {
+   "id": "gtfo",
+   "name": "GTFO",
+   "exe": [
+    "GTFO.exe"
+   ],
+   "steam": 493520
+  },
+  {
+   "id": "riskofrain2",
+   "name": "Risk of Rain 2",
+   "exe": [
+    "Risk of Rain 2.exe"
+   ],
+   "steam": 632360
+  },
+  {
+   "id": "vampiresurvivors",
+   "name": "Vampire Survivors",
+   "exe": [
+    "VampireSurvivors.exe"
+   ],
+   "steam": 1794680
+  },
+  {
+   "id": "balatro",
+   "name": "Balatro",
+   "exe": [
+    "Balatro.exe"
+   ],
+   "steam": 2379780
+  },
+  {
+   "id": "isaac",
+   "name": "The Binding of Isaac: Rebirth",
+   "exe": [
+    "isaac-ng.exe"
+   ],
+   "steam": 250900
+  },
+  {
+   "id": "slaythespire",
+   "name": "Slay the Spire",
+   "exe": [
+    "SlayTheSpire.exe"
+   ],
+   "steam": 646570
+  },
+  {
+   "id": "civ6",
+   "name": "Sid Meier's Civilization VI",
+   "exe": [
+    "CivilizationVI.exe",
+    "CivilizationVI_DX12.exe"
+   ],
+   "steam": 289070
+  },
+  {
+   "id": "aoe2",
+   "name": "Age of Empires II: Definitive Edition",
+   "exe": [
+    "AoE2DE_s.exe"
+   ],
+   "steam": 813780
+  },
+  {
+   "id": "hoi4",
+   "name": "Hearts of Iron IV",
+   "exe": [
+    "hoi4.exe"
+   ],
+   "steam": 394360
+  },
+  {
+   "id": "eu4",
+   "name": "Europa Universalis IV",
+   "exe": [
+    "eu4.exe"
+   ],
+   "steam": 236850
+  },
+  {
+   "id": "ck3",
+   "name": "Crusader Kings III",
+   "exe": [
+    "ck3.exe"
+   ],
+   "steam": 1158310
+  },
+  {
+   "id": "stellaris",
+   "name": "Stellaris",
+   "exe": [
+    "stellaris.exe"
+   ],
+   "steam": 281990
+  },
+  {
+   "id": "warhammer3",
+   "name": "Total War: WARHAMMER III",
+   "exe": [
+    "Warhammer3.exe"
+   ],
+   "steam": 1142710
+  },
+  {
+   "id": "assettocorsa",
+   "name": "Assetto Corsa",
+   "exe": [
+    "acs.exe",
+    "AssettoCorsa.exe"
+   ],
+   "steam": 244210
+  },
+  {
+   "id": "beamng",
+   "name": "BeamNG.drive",
+   "exe": [
+    "BeamNG.drive.x64.exe",
+    "BeamNG.drive.exe"
+   ],
+   "steam": 284160
+  },
+  {
+   "id": "trackmania",
+   "name": "Trackmania",
+   "exe": [
+    "Trackmania.exe"
+   ],
+   "steam": 2225070
+  },
+  {
+   "id": "chivalry2",
+   "name": "Chivalry 2",
+   "exe": [
+    "Chivalry2-Win64-Shipping.exe"
+   ],
+   "steam": 1824220
+  },
+  {
+   "id": "forhonor",
+   "name": "For Honor",
+   "exe": [
+    "ForHonor.exe"
+   ],
+   "steam": 304390
+  },
+  {
+   "id": "bf2042",
+   "name": "Battlefield 2042",
+   "exe": [
+    "BF2042.exe"
+   ],
+   "steam": 1517290
+  },
+  {
+   "id": "bf1",
+   "name": "Battlefield 1",
+   "exe": [
+    "bf1.exe"
+   ],
+   "steam": 1238840
+  },
+  {
+   "id": "bf6",
+   "name": "Battlefield 6",
+   "exe": [
+    "bf6.exe"
+   ],
+   "steam": 2807960
+  },
+  {
+   "id": "squad",
+   "name": "Squad",
+   "exe": [
+    "SquadGame.exe"
+   ],
+   "steam": 393380
+  },
+  {
+   "id": "hunt",
+   "name": "Hunt: Showdown 1896",
+   "exe": [
+    "HuntGame.exe"
+   ],
+   "steam": 594650
+  },
+  {
+   "id": "arcraiders",
+   "name": "ARC Raiders",
+   "exe": [
+    "PioneerGame.exe"
+   ],
+   "steam": 1808500
+  },
+  {
+   "id": "wuthering",
+   "name": "Wuthering Waves",
+   "exe": [
+    "Wuthering Waves.exe"
+   ]
+  },
+  {
+   "id": "mcdungeons",
+   "name": "Minecraft Dungeons",
+   "exe": [
+    "Dungeons.exe"
+   ],
+   "steam": 1672970
+  },
+  {
+   "id": "bloons",
+   "name": "Bloons TD 6",
+   "exe": [
+    "BloonsTD6.exe"
+   ],
+   "steam": 960090
+  },
+  {
+   "id": "ittakestwo",
+   "name": "It Takes Two",
+   "exe": [
+    "ItTakesTwo.exe"
+   ],
+   "steam": 1426210
+  },
+  {
+   "id": "splitfiction",
+   "name": "Split Fiction",
+   "exe": [
+    "SplitFiction.exe"
+   ],
+   "steam": 2001120
+  },
+  {
+   "id": "awayout",
+   "name": "A Way Out",
+   "exe": [
+    "AWayOut.exe"
+   ],
+   "steam": 1222700
+  },
+  {
+   "id": "overcooked2",
+   "name": "Overcooked! 2",
+   "exe": [
+    "Overcooked2.exe"
+   ],
+   "steam": 728880
+  },
+  {
+   "id": "gangbeasts",
+   "name": "Gang Beasts",
+   "exe": [
+    "Gang Beasts.exe"
+   ],
+   "steam": 285900
+  },
+  {
+   "id": "humanfallflat",
+   "name": "Human: Fall Flat",
+   "exe": [
+    "Human.exe"
+   ],
+   "steam": 477160
+  },
+  {
+   "id": "pummel",
+   "name": "Pummel Party",
+   "exe": [
+    "Pummel Party.exe"
+   ],
+   "steam": 880940
+  },
+  {
+   "id": "uno",
+   "name": "UNO",
+   "exe": [
+    "UNO.exe"
+   ],
+   "steam": 470220
+  },
+  {
+   "id": "tabletop",
+   "name": "Tabletop Simulator",
+   "exe": [
+    "Tabletop Simulator.exe"
+   ],
+   "steam": 286160
+  },
+  {
+   "id": "jackbox",
+   "name": "The Jackbox Party Pack",
+   "exe": [
+    "The Jackbox Party Pack.exe"
+   ]
+  },
+  {
+   "id": "chained",
+   "name": "Chained Together",
+   "exe": [
+    "ChainedTogether-Win64-Shipping.exe"
+   ],
+   "steam": 2567870
+  },
+  {
+   "id": "supermarket",
+   "name": "Supermarket Simulator",
+   "exe": [
+    "Supermarket Simulator.exe"
+   ],
+   "steam": 2670630
+  },
+  {
+   "id": "liarsbar",
+   "name": "Liar's Bar",
+   "exe": [
+    "Liar's Bar.exe"
+   ],
+   "steam": 3097560
+  }
+ ],
+ "ignore": []
+}

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, powerSaveBlocker, screen, shell, Tray, nativeImage, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, globalShortcut, Menu, Notification, powerMonitor, powerSaveBlocker, screen, shell, Tray, nativeImage, safeStorage } = require('electron');
 app.name = 'TeamSync';
 // Donanım hızlandırma tercihi ayarlardan değiştirilebilir (settings.json).
 // Varsayılan: AÇIK — backdrop-filter (buzlu cam) yalnızca GPU açıkken çalışır.
@@ -994,6 +994,17 @@ ipcMain.handle('is-second-instance', (event) => {
   return isSecondInstance;
 });
 
+// Durum sistemi (Aktif/Boşta): kullanıcı klavye/fareye dokunmadığı süre.
+// Renderer bunu 30 sn'de bir sorar; eşik aşılınca otomatik "Boşta" olur.
+ipcMain.handle('get-system-idle-time', (event) => {
+  if (!isMainWindowSender(event)) return 0;
+  try { return powerMonitor.getSystemIdleTime(); } catch (e) { return 0; }
+});
+
+function forwardPowerEvent(name) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('power-event', name);
+}
+
 // --- TEŞHİS: renderer'ın canlı DOM'dan yakaladığı indirme butonlarını günlükle ---
 ipcMain.handle('diag-enabled', (event) => {
   if (!isMainWindowSender(event)) return false;
@@ -1472,6 +1483,22 @@ app.whenReady().then(() => {
   // İLK İŞ: DNS. Bundan sonraki her ad çözümlemesi (Supabase, sinyalleşme
   // broker'ı, CDN'ler ve WebRTC'nin TURN hostları) seçili yoldan gider.
   applyDnsSettings();
+
+  // Kilit ekranı / uyku: durum sistemi bunlarla anında "Boşta"ya geçer.
+  ['lock-screen', 'unlock-screen', 'suspend', 'resume'].forEach(name => {
+    try { powerMonitor.on(name, () => forwardPowerEvent(name)); } catch (e) {}
+  });
+
+  // "Oynuyor" algılayıcısı: Steam/Epic kütüphanesi + bilinen oyunlar listesi.
+  try {
+    require('./electron/activity-detector').initActivityDetector({
+      app, ipcMain, powerMonitor,
+      getWindow: () => mainWindow,
+      isMainWindowSender
+    });
+  } catch (e) {
+    console.warn('Oyun algılayıcı yüklenemedi:', e.message);
+  }
 
   app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   const { session } = require('electron');
