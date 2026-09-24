@@ -182,25 +182,6 @@
       gap: 64px;
     }
 
-    .kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 9px;
-      margin-bottom: 24px;
-      color: var(--muted);
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .kicker::before {
-      width: 22px;
-      height: 2px;
-      background: var(--accent);
-      content: "";
-    }
 
     h1 {
       max-width: 680px;
@@ -227,8 +208,7 @@
     .compatibility {
       margin-top: 18px;
       color: var(--muted);
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 12px;
+      font-size: 14px;
     }
 
     .product-shot {
@@ -245,46 +225,7 @@
       border: 1px solid #394157;
     }
 
-    .product-shot figcaption {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 12px 2px 2px;
-      color: #b8bfd0;
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 11px;
-    }
 
-    .facts {
-      border-bottom: 1px solid var(--line);
-    }
-
-    .facts-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-    }
-
-    .fact {
-      min-height: 118px;
-      padding: 27px 24px;
-      border-left: 1px solid var(--line);
-    }
-
-    .fact:last-child {
-      border-right: 1px solid var(--line);
-    }
-
-    .fact strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 24px;
-      line-height: 1.1;
-    }
-
-    .fact span {
-      color: var(--muted);
-      font-size: 13px;
-    }
 
     .section {
       padding: 104px 0;
@@ -300,11 +241,8 @@
 
     .section-label {
       color: var(--accent-dark);
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
     }
 
     h2 {
@@ -321,17 +259,10 @@
 
     .feature-row {
       display: grid;
-      grid-template-columns: 76px 0.7fr 1.3fr;
+      grid-template-columns: 0.7fr 1.3fr;
       gap: 28px;
       padding: 28px 0;
       border-bottom: 1px solid var(--line);
-    }
-
-    .feature-number {
-      color: var(--accent-dark);
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 13px;
-      font-weight: 700;
     }
 
     .feature-row h3 {
@@ -406,15 +337,6 @@
       opacity: 0.9;
     }
 
-    .settings-shot figcaption {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 12px 2px 2px;
-      color: #b8bfd0;
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 11px;
-    }
 
     .settings-gallery {
       display: grid;
@@ -443,13 +365,6 @@
       border-left: 1px solid var(--line);
     }
 
-    .step b {
-      display: block;
-      margin-bottom: 44px;
-      color: var(--accent-dark);
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 13px;
-    }
 
     .step h3 {
       margin-bottom: 10px;
@@ -515,8 +430,7 @@
     .download-note {
       margin-top: 12px;
       color: #8a8984;
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 11px;
+      font-size: 13px;
       text-align: center;
     }
 
@@ -578,18 +492,6 @@
         max-width: 720px;
       }
 
-      .facts-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .fact:nth-child(2) {
-        border-right: 1px solid var(--line);
-      }
-
-      .fact:nth-child(-n + 2) {
-        border-bottom: 1px solid var(--line);
-      }
-
       .section-intro,
       .download-grid,
       .customize-grid {
@@ -601,11 +503,8 @@
       }
 
       .feature-row {
-        grid-template-columns: 54px 1fr;
-      }
-
-      .feature-row p {
-        grid-column: 2;
+        grid-template-columns: 1fr;
+        gap: 8px;
       }
     }
 
@@ -639,23 +538,6 @@
         width: 100%;
       }
 
-      .facts-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .fact,
-      .fact:nth-child(2),
-      .fact:last-child {
-        min-height: auto;
-        padding: 20px 0;
-        border: 0;
-        border-bottom: 1px solid var(--line);
-      }
-
-      .fact:last-child {
-        border-bottom: 0;
-      }
-
       .section {
         padding: 74px 0;
       }
@@ -663,11 +545,6 @@
       .section-intro {
         gap: 18px;
         margin-bottom: 40px;
-      }
-
-      .feature-row {
-        grid-template-columns: 42px 1fr;
-        gap: 16px;
       }
 
       .settings-gallery {
@@ -687,10 +564,6 @@
 
       .step:last-child {
         border-bottom: 0;
-      }
-
-      .step b {
-        margin-bottom: 20px;
       }
 
       .download {
@@ -742,74 +615,71 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div>
-          <span class="kicker">P2P · Hesapsız · Ücretsiz</span>
           <h1>Arkadaşlarınla konuş. Araya sunucu koyma.</h1>
-          <p class="hero-copy">TeamSync; sesli konuşmayı, ekran paylaşımını ve kişiselleştirilebilir bir arayüzü tek bir Windows uygulamasında toplar. Hesap açmadan indir, odanı kur ve bağlantıyı paylaş.</p>
+          <p class="hero-copy">TeamSync, arkadaşlarınla sesli konuşup ekran paylaşabildiğin bir Windows uygulaması. Görüşmeler bilgisayarlar arasında doğrudan kurulur, e-posta ya da parola gerekmez.</p>
           <div class="hero-actions">
             <a class="button button-accent button-download" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">Windows için indir</a>
-            <a class="button button-light" href="#features">Neler yapabildiğine bak</a>
+            <a class="button button-light" href="#features">Özelliklere bak</a>
           </div>
-          <p class="compatibility">Sürüm 1.0.6 / Windows x64 / Ücretsiz</p>
+          <p class="compatibility">Windows 10/11 (x64) · Ücretsiz</p>
         </div>
 
         <figure class="product-shot">
-          <img src="assets/screenshot-main.png" alt="TeamSync uygulamasının ana ekranı">
-          <figcaption>
-            <span>TEAMSYNC / ANA EKRAN</span>
-            <span>AYARLARDAN ÖZELLEŞTİRİLEBİLİR</span>
-          </figcaption>
+          <img src="assets/screenshot-main.png" alt="TeamSync ana ekranı: sol tarafta sunucu ve sohbet listesi, ortada arkadaşlar, sağda şu an aktif olanlar">
         </figure>
       </div>
     </section>
 
-    <section class="facts" aria-label="TeamSync hakkında kısa bilgiler">
-      <div class="wrap facts-grid">
-        <div class="fact"><strong>0₺</strong><span>Sunucu maliyeti</span></div>
-        <div class="fact"><strong>0</strong><span>Gerekli hesap veya e-posta</span></div>
-        <div class="fact"><strong>P2P</strong><span>Bilgisayarlar arasında bağlantı</span></div>
-        <div class="fact"><strong>Windows</strong><span>x64 masaüstü uygulaması</span></div>
-      </div>
-    </section>
 
     <section id="features" class="section">
       <div class="wrap">
         <div class="section-intro">
           <span class="section-label">Özellikler</span>
-          <h2>Bir odada gerçekten kullanacağın araçlar.</h2>
+          <h2>TeamSync ile neler yapabilirsin</h2>
         </div>
 
         <div class="feature-list">
           <article class="feature-row">
-            <span class="feature-number">01</span>
             <h3>Sesli konuşma</h3>
-            <p>Arkadaşlarınla doğrudan bağlantı kur. Mikrofon, hoparlör, ses seviyesi ve Bas-Konuş seçeneklerini odanın içinden yönet.</p>
+            <p>Arkadaşlarınla doğrudan bağlan. Mikrofon, hoparlör ve ses seviyesini odanın içinden ayarla; istersen Bas-Konuş kullan.</p>
           </article>
           <article class="feature-row">
-            <span class="feature-number">02</span>
-            <h3>Ekran paylaşımı ve kontrol</h3>
-            <p>Ekranını paylaş; istersen fare ve klavye kontrolü için ayrıca izin ver. Kontrol her zaman sende kalır.</p>
+            <h3>Arama sesleri</h3>
+            <p>Biri seni aradığında zil çalar, sen aradığında çalma sesi duyarsın. Rahatsız Etme açıksa sessiz kalır.</p>
           </article>
           <article class="feature-row">
-            <span class="feature-number">03</span>
-            <h3>Hesapsız cihaz kimliği</h3>
-            <p>E-posta ve parola yerine uygulamanın oluşturduğu cihaz kimliğini kullan. Her açılışta form doldurman gerekmez.</p>
+            <h3>Ekran paylaşımı</h3>
+            <p>Ekranını paylaş. İstersen karşındakine fare ve klavye kontrolü için ayrıca izin verebilirsin; kontrolü istediğin an geri alırsın.</p>
           </article>
           <article class="feature-row">
-            <span class="feature-number">04</span>
-            <h3>Görünüm özelleştirme</h3>
-            <p>Hazır temalardan birini seç veya arka plan, vurgu ve buton renklerini ayrı ayrı belirleyerek kendi temanı oluştur.</p>
+            <h3>Sunucular ve gruplar</h3>
+            <p>Kendi bilgisayarında kanalları ve rolleri olan bir sunucu kur, davet gönder. Arkadaşlarını gruplara ayırıp toplu arama yapabilirsin.</p>
           </article>
           <article class="feature-row">
-            <span class="feature-number">05</span>
-            <h3>Gürültü engelleme</h3>
-            <p>RNNoise arka plan sesini azaltır. Klavye, fan ve ortam gürültüsü konuşmanın önüne geçmez.</p>
+            <h3>Oyunlar ve ortak etkinlikler</h3>
+            <p>Beyaz tahta, Vampir Köylü, Şans Çarkı, birlikte izleme ve ortak tarayıcı odanın içinde hazır.</p>
           </article>
           <article class="feature-row">
-            <span class="feature-number">06</span>
-            <h3>Aile dostu kullanım</h3>
-            <p>İsteğe bağlı filtreler sohbeti ve paylaşılan içerikleri daha güvenli bir grup ortamına uygun tutmaya yardımcı olur.</p>
+            <h3>Hesapsız giriş</h3>
+            <p>Uygulama sana bir cihaz kimliği verir. Form doldurmadan girersin, kimliğini arkadaşlarına vererek eklenirsin.</p>
+          </article>
+          <article class="feature-row">
+            <h3>Arka plan gürültüsü</h3>
+            <p>RNNoise klavye, fan ve ortam seslerini azaltır. Ayarlardan açıp kapatabilirsin.</p>
+          </article>
+          <article class="feature-row">
+            <h3>Görünüm</h3>
+            <p>Altı hazır temadan birini seç ya da renkleri kendin belirle. Sade görünüm parlama ve gradyanları kapatır.</p>
+          </article>
+          <article class="feature-row">
+            <h3>Filtreler</h3>
+            <p>İsteğe bağlı filtreler, sohbet ve paylaşılan içeriği daha ailece bir ortama uygun tutar.</p>
           </article>
         </div>
+
+        <figure class="settings-shot" style="margin-top:48px">
+          <img src="assets/screenshot-dm.png" alt="TeamSync'te bir arkadaşla birebir sohbet; sağda arkadaşın profil kartı" loading="lazy">
+        </figure>
       </div>
     </section>
 
@@ -817,15 +687,15 @@
       <div class="wrap customize-grid">
         <div class="customize-copy">
           <span class="section-label">Ayarlar ve görünüm</span>
-          <h2>Ayarların tamamı, uygulamanın içinden.</h2>
-          <p>Aşağıdaki görüntülerin tamamı çalışan TeamSync uygulamasından alındı. Her görüntüye tıklayarak gerçek ayar ekranını tam boy inceleyebilirsin.</p>
+          <h2>Ayarlar</h2>
+          <p>Aşağıdaki görüntüler uygulamanın kendisinden alındı. Büyütmek için üzerine tıkla.</p>
           <ul class="customize-points">
-            <li><b>6 tema seçeneği:</b> Mor, siyah, lacivert, beyaz, mor-beyaz veya kendi teman</li>
-            <li><b>Sade görünüm:</b> Gradyanları ve parlama efektlerini tek dokunuşla kaldırır</li>
+            <li><b>Temalar:</b> Mor, siyah, lacivert, beyaz, mor-beyaz ya da kendi renklerin</li>
+            <li><b>Sade görünüm:</b> Gradyan ve parlama efektlerini kapatır</li>
             <li><b>Ses ve yayın:</b> Mikrofon, hoparlör, Bas-Konuş ve ekran paylaşımı tercihleri</li>
-            <li><b>Bağlantılar:</b> Kısıtlı ağlar için isteğe bağlı TURN sunucusu bilgileri</li>
-            <li><b>GIF ve Medya:</b> GIF, fotoğraf ve kısa videolar için cihaz içi kütüphane</li>
-            <li><b>Dil ve Zaman:</b> 13 arayüz dili ve mesaj saati gösterimi</li>
+            <li><b>Bağlantılar:</b> Kısıtlı ağlarda kullanmak için TURN sunucusu bilgileri</li>
+            <li><b>GIF ve Medya:</b> GIF, fotoğraf ve kısa videolar için kütüphane</li>
+            <li><b>Dil ve Zaman:</b> 13 arayüz dili, mesaj saati</li>
           </ul>
         </div>
 
@@ -833,10 +703,6 @@
           <a href="assets/screenshot-settings.png" target="_blank" rel="noopener">
             <img src="assets/screenshot-settings.png" alt="TeamSync uygulamasının gerçek Genel Ayarlar ekranı; sade görünüm anahtarı ve altı tema seçeneği açıkça görünüyor" loading="lazy">
           </a>
-          <figcaption>
-            <span>01 / GENEL</span>
-            <span>TEMA VE SADE GÖRÜNÜM</span>
-          </figcaption>
         </figure>
       </div>
 
@@ -845,50 +711,30 @@
           <a href="assets/screenshot-settings-voice.png" target="_blank" rel="noopener">
             <img src="assets/screenshot-settings-voice.png" alt="TeamSync uygulamasının gerçek Ses ve Görüntü ayarları; mikrofon, hoparlör, ses seviyeleri, mikrofon testi ve Bas-Konuş seçenekleri" loading="lazy">
           </a>
-          <figcaption>
-            <span>02 / SES VE GÖRÜNTÜ</span>
-            <span>CİHAZLAR VE BAS-KONUŞ</span>
-          </figcaption>
         </figure>
 
         <figure class="settings-shot">
           <a href="assets/screenshot-settings-broadcast.png" target="_blank" rel="noopener">
             <img src="assets/screenshot-settings-broadcast.png" alt="TeamSync uygulamasının gerçek Yayın ayarları; ekran paylaşımı önizlemesi ve gelişmiş yayın seçenekleri" loading="lazy">
           </a>
-          <figcaption>
-            <span>03 / YAYIN</span>
-            <span>EKRAN PAYLAŞIMI</span>
-          </figcaption>
         </figure>
 
         <figure class="settings-shot">
           <a href="assets/screenshot-settings-connections.png" target="_blank" rel="noopener">
             <img src="assets/screenshot-settings-connections.png" alt="TeamSync uygulamasının gerçek Bağlantılar ayarları; TURN sunucusu, kullanıcı adı ve şifre alanları" loading="lazy">
           </a>
-          <figcaption>
-            <span>04 / BAĞLANTILAR</span>
-            <span>TURN SUNUCUSU</span>
-          </figcaption>
         </figure>
 
         <figure class="settings-shot">
           <a href="assets/screenshot-settings-media.png" target="_blank" rel="noopener">
             <img src="assets/screenshot-settings-media.png" alt="TeamSync uygulamasının gerçek GIF ve Medya ayarları; GIF, fotoğraf ve video ekleme alanı ile cihaz içi medya kütüphanesi" loading="lazy">
           </a>
-          <figcaption>
-            <span>05 / GIF VE MEDYA</span>
-            <span>YEREL KÜTÜPHANE</span>
-          </figcaption>
         </figure>
 
         <figure class="settings-shot">
           <a href="assets/screenshot-settings-language.png" target="_blank" rel="noopener">
             <img src="assets/screenshot-settings-language.png" alt="TeamSync uygulamasının gerçek Dil ve Zaman ayarları; Türkçe, İngilizce, Almanca, İspanyolca ve diğer arayüz dilleri" loading="lazy">
           </a>
-          <figcaption>
-            <span>06 / DİL VE ZAMAN</span>
-            <span>13 ARAYÜZ DİLİ</span>
-          </figcaption>
         </figure>
       </div>
     </section>
@@ -896,25 +742,22 @@
     <section id="how" class="section">
       <div class="wrap">
         <div class="section-intro">
-          <span class="section-label">Nasıl çalışır?</span>
-          <h2>Üç adım. Üyelik ekranı yok.</h2>
+          <span class="section-label">Nasıl başlanır</span>
+          <h2>İndir, oda aç, konuş.</h2>
         </div>
 
         <div class="how-grid">
           <article class="step">
-            <b>01 / İNDİR</b>
-            <h3>Uygulamayı aç</h3>
-            <p>Windows sürümünü GitHub üzerinden indir ve bilgisayarında çalıştır.</p>
+            <h3>1. İndir</h3>
+            <p>Kurulum dosyasını GitHub'dan indirip çalıştır.</p>
           </article>
           <article class="step">
-            <b>02 / ODA</b>
-            <h3>Odanı oluştur</h3>
-            <p>Yeni bir oda aç veya arkadaşının paylaştığı oda bilgisiyle katıl.</p>
+            <h3>2. Oda aç</h3>
+            <p>Yeni bir oda aç ya da arkadaşının verdiği oda bilgisiyle katıl.</p>
           </article>
           <article class="step">
-            <b>03 / BAĞLAN</b>
-            <h3>Konuşmaya başla</h3>
-            <p>Ses, görüntü ve ekran paylaşımı doğrudan odanın içinde kullanıma hazırdır.</p>
+            <h3>3. Konuş</h3>
+            <p>Ses ve ekran paylaşımı odanın içinden açılır.</p>
           </article>
         </div>
       </div>
@@ -924,15 +767,15 @@
       <div class="wrap download-grid">
         <div>
           <span class="section-label">İndirme</span>
-          <h2>Bir sonraki konuşma için oda hazır.</h2>
-          <p>TeamSync ücretsizdir. En güncel Windows sürümünü GitHub Releases sayfasından indirebilirsin.</p>
+          <h2>İndir</h2>
+          <p>TeamSync ücretsizdir. En son Windows sürümü GitHub Releases sayfasında.</p>
         </div>
         <div>
           <div class="download-actions">
             <a class="button button-accent button-download" href="https://github.com/Lazel-3002/TeamSync/releases/latest" target="_blank" rel="noopener">En son sürümü indir</a>
             <a class="button button-light" href="https://github.com/Lazel-3002/TeamSync/releases" target="_blank" rel="noopener">Tüm sürümler</a>
           </div>
-          <div class="download-note">WINDOWS X64 · SÜRÜM 1.0.6</div>
+          <div class="download-note">Windows x64</div>
         </div>
       </div>
     </section>
