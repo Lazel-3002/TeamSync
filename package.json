@@ -1,6 +1,6 @@
 {
   "name": "teamsync",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "releaseName": "Gece Meclisi",
   "description": "P2P sesli/görüntülü/ekran paylaşımı + uzaktan kontrol - sunucusuz",
   "main": "main.js",
