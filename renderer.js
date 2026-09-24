@@ -3822,6 +3822,38 @@ function playSound(type) {
   }
 }
 
+// Arama zil sesleri: harici dosya gerekmeden Web Audio ile üretilir.
+// 'ring' = gelen arama (çift tonlu zil), 'ringback' = giden arama (uzun bip).
+function playRingOnce(kind) {
+  const actx = state.sfxAudioCtx || (state.sfxAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+  if (actx.state === 'suspended') actx.resume().catch(() => {});
+  const t = actx.currentTime + 0.02;
+  if (kind === 'ringback') {
+    playNote(actx, 440, t, 0.9);
+    playNote(actx, 480, t, 0.9);
+  } else {
+    [0, 0.25, 0.5, 0.75].forEach((d, i) => playNote(actx, i % 2 ? 659 : 784, t + d, 0.2));
+  }
+}
+
+let ringLoopTimer = null;
+function stopRingLoop() {
+  if (ringLoopTimer) { clearInterval(ringLoopTimer); ringLoopTimer = null; }
+}
+// maxMs sonrası kendiliğinden durur; tekrar çağrılırsa öncekini değiştirir.
+function startRingLoop(kind, maxMs = 30000) {
+  stopRingLoop();
+  try { playRingOnce(kind); } catch (e) { console.error('Ring error:', e); }
+  const period = kind === 'ringback' ? 3000 : 2200;
+  const started = Date.now();
+  ringLoopTimer = setInterval(() => {
+    if (Date.now() - started >= maxMs) { stopRingLoop(); return; }
+    try { playRingOnce(kind); } catch (e) { stopRingLoop(); }
+  }, period);
+}
+window.startRingLoop = startRingLoop;
+window.stopRingLoop = stopRingLoop;
+
 async function setupLocalAudio(options = {}) {
   const generation = ++state.audioSetupGeneration;
   const forceSystemSuppression = options.forceSystemSuppression === true;

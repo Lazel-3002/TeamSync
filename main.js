@@ -1505,6 +1505,10 @@ ipcMain.handle('take-deep-link', (event) => {
   return link;
 });
 
+// Windows görev çubuğunda uygulamayı electron.exe'den ayrı tanıt; geliştirme
+// modunda (npm start) Electron atom simgesi yerine pencere simgesi görünsün.
+if (process.platform === 'win32') app.setAppUserModelId('com.TeamSync.voice');
+
 app.whenReady().then(async () => {
   // Davet bağlantısıyla açılan ikinci örnek: bağlantıyı çalışan örneğe verip
   // kapanır (yoksa bu örnek bağlantıyı kendisi açar).

@@ -361,15 +361,19 @@
       <button type="button" class="grp-ring-btn is-join" data-ring="join" title="${esc(tr('groups.join'))}">${PHONE_SVG}</button>
       <button type="button" class="grp-ring-btn is-decline" data-ring="decline" title="${esc(tr('groups.decline'))}">×</button>`;
     document.body.appendChild(ringEl);
-    if (typeof window.playSound === 'function') window.playSound('on');
+    if (typeof window.startRingLoop === 'function') window.startRingLoop('ring', 30000);
+    else if (typeof window.playSound === 'function') window.playSound('on');
     const el = ringEl;
-    const timer = setTimeout(() => { if (ringEl === el) { el.remove(); ringEl = null; } }, 30000);
+    const timer = setTimeout(() => {
+      if (ringEl === el) { el.remove(); ringEl = null; if (window.stopRingLoop) window.stopRingLoop(); }
+    }, 30000);
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-ring]');
       if (!b) return;
       clearTimeout(timer);
       el.remove();
       if (ringEl === el) ringEl = null;
+      if (window.stopRingLoop) window.stopRingLoop();
       if (b.dataset.ring === 'join') {
         if (window.TSShell) window.TSShell.setView('group', gid);
         G().startOrJoinCall(gid);
@@ -412,8 +416,14 @@
     $('grp-call')?.addEventListener('click', e => {
       const b = e.target.closest('[data-grp-call]');
       if (!b || !current) return;
-      if (b.dataset.grpCall === 'leave') G().leaveCall(current);
-      else G().startOrJoinCall(current);
+      if (b.dataset.grpCall === 'leave') {
+        if (window.stopRingLoop) window.stopRingLoop();
+        G().leaveCall(current);
+      } else {
+        // Yeni arama başlatılıyorsa arayan tarafta kısa süre çalma sesi duyulur.
+        if (b.dataset.grpCall === 'start' && window.startRingLoop) window.startRingLoop('ringback', 9000);
+        G().startOrJoinCall(current);
+      }
     });
     $('grp-messages')?.addEventListener('click', e => {
       const chip = e.target.closest('[data-grx]');
