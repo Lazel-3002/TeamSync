@@ -181,6 +181,21 @@
     return out;
   }
 
+  // Eski → yeni geçersiz kılmalarda DEĞİŞEN izin bitleri. Kanal izinleri de
+  // "sahip olmadığın izni veremezsin" kuralına tabi: yoksa Kanalları+Rolleri
+  // Yönet yetkili biri kendine (u:<fid>) Mesajları Yönet verebiliyordu.
+  function overrideBitsChanged(oldOv, newOv) {
+    let bits = 0;
+    const o = oldOv || {};
+    const n = newOv || {};
+    new Set([...Object.keys(o), ...Object.keys(n)]).forEach(k => {
+      const x = o[k] || { a: 0, d: 0 };
+      const y = n[k] || { a: 0, d: 0 };
+      bits |= (x.a ^ y.a) | (x.d ^ y.d);
+    });
+    return bits;
+  }
+
   // Tek bir kontrol olayını uygular; uygulandıysa true.
   function apply(st, ev) {
     if (st.deleted) return false;
@@ -215,7 +230,7 @@
         };
         if (b.overrides) {
           const ov = cleanOverrides(st, b.overrides);
-          if (ov && has(perms, P.MANAGE_ROLES)) st.channels[b.id].overrides = ov;
+          if (ov && has(perms, P.MANAGE_ROLES) && permsGrantable(st, a, overrideBitsChanged(null, ov))) st.channels[b.id].overrides = ov;
         }
         return true;
       }
@@ -226,7 +241,7 @@
         if (b.overrides !== undefined) {
           if (!has(perms, P.MANAGE_ROLES)) return false;
           ov = cleanOverrides(st, b.overrides);
-          if (!ov) return false;
+          if (!ov || !permsGrantable(st, a, overrideBitsChanged(ch.overrides, ov))) return false;
         }
         if (b.slow !== undefined && !SLOW_STEPS.includes(b.slow)) return false;
         if (b.name !== undefined) { const n = channelName(b.name, ch.kind); if (!n) return false; ch.name = n; }

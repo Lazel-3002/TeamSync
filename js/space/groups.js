@@ -195,7 +195,9 @@
       incoming.forEach(r => { if (window.TSTyping) window.TSTyping.remoteStopped(`grp:${rt.rec.gid}`, r.author); });
     }
     await saveRec(rt);
-    S().prune(rt.rec.gid).catch(() => {});
+    // Budanan olaylar sayaçtan da düşülmeli: yoksa kalp atışındaki şişmiş `n`,
+    // yeniden başlamış (sayısını depodan okuyan) üyelerde sonsuz eşitleme ister.
+    S().prune(rt.rec.gid).then(k => { if (k) rt.count = Math.max(0, rt.count - k); }).catch(() => {});
     if (rt.rec.removed && !rt.removedHandled) {
       // Kurucu beni çıkardı: grubu bu bilgisayardan kaldır.
       rt.removedHandled = true;

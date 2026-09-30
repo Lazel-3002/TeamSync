@@ -1150,7 +1150,7 @@
     if (!candidates.length) return '<div class="vv-waiting"><i></i>Bu yetenek için uygun hedef yok.</div>';
     const icons = { vampire: '◆', doctor: '✚', seer: '✦', oracle: '◉', fool: '◌', spy: '◇', healer: '❋', warrior: '⚔', vote: '✓', hunter: '⌖' };
     const selectedId = selectedTargetFor(action);
-    return `<div class="vv-target-grid">${candidates.map(player => `<button class="btn-sec vv-target${selectedId === player.id ? ' is-selected' : ''}" data-action="${action}" data-target="${player.id}" aria-pressed="${selectedId === player.id}"><span class="vv-target-icon">${selectedId === player.id ? '✓' : (icons[action] || '•')}</span><span class="vv-target-name">${esc(player.name)}</span><small>${selectedId === player.id ? 'Seçildi' : esc(label)}</small></button>`).join('')}</div>`;
+    return `<div class="vv-target-grid">${candidates.map(player => `<button class="btn-sec vv-target${selectedId === player.id ? ' is-selected' : ''}" data-action="${action}" data-target="${esc(player.id)}" aria-pressed="${selectedId === player.id}"><span class="vv-target-icon">${selectedId === player.id ? '✓' : (icons[action] || '•')}</span><span class="vv-target-name">${esc(player.name)}</span><small>${selectedId === player.id ? 'Seçildi' : esc(label)}</small></button>`).join('')}</div>`;
   }
   function botStatusBadge(bot) {
     const status = botOllamaStatus.get(bot.id);
@@ -1166,9 +1166,9 @@
     const canRemove = host() && !game().started;
     const lock = canEdit ? '' : ' disabled';
     const humans = game().players.filter(player => !player.isBot);
-    const operatorOptions = humans.map(human => `<option value="${human.id}" ${bot.operatorId === human.id ? 'selected' : ''}>${esc(human.name)}${human.id === state.myId ? ' (sen)' : ''}</option>`).join('');
+    const operatorOptions = humans.map(human => `<option value="${esc(human.id)}" ${bot.operatorId === human.id ? 'selected' : ''}>${esc(human.name)}${human.id === state.myId ? ' (sen)' : ''}</option>`).join('');
     const detected = botOllamaStatus.get(bot.id)?.models || [];
-    const modelList = `vv-models-${bot.id}`;
+    const modelList = `vv-models-${String(bot.id).replace(/[^A-Za-z0-9_-]/g, '_')}`;
     const selectedLanguage = BOT_LANGUAGE_CODES.includes(bot.language) ? bot.language : 'tr';
     const languageOptions = BOT_LANGUAGE_CODES.map(code => {
       const meta = typeof LANGUAGE_META !== 'undefined' ? LANGUAGE_META[code] : null;
@@ -1178,19 +1178,19 @@
     const memoryHtml = bot.operatorId === state.myId
       ? (memory.length ? memory.slice(-12).reverse().map(line => `<div>• ${esc(line)}</div>`).join('') : '<div class="vv-bot-memory-empty">Oyun başlayınca rolü, gizli sonuçları, sohbeti ve kendi kararlarını buraya yazacak.</div>')
       : `<div class="vv-bot-memory-empty">Bu botun hafızası ${esc(operatorName(bot))} adlı oyuncunun bilgisayarında tutuluyor.</div>`;
-    return `<div class="vv-bot-inline" data-bot="${bot.id}">
-      <input class="vv-bot-name" data-bot="${bot.id}" type="text" maxlength="24" value="${esc(bot.name)}" placeholder="Bot adı"${lock}>
-      <label class="vv-bot-field"><span>Çalıştıran bilgisayar</span><select class="vv-bot-operator" data-bot="${bot.id}"${lock}>${operatorOptions}</select></label>
+    return `<div class="vv-bot-inline" data-bot="${esc(bot.id)}">
+      <input class="vv-bot-name" data-bot="${esc(bot.id)}" type="text" maxlength="24" value="${esc(bot.name)}" placeholder="Bot adı"${lock}>
+      <label class="vv-bot-field"><span>Çalıştıran bilgisayar</span><select class="vv-bot-operator" data-bot="${esc(bot.id)}"${lock}>${operatorOptions}</select></label>
       <label class="vv-bot-field"><span>Model (${esc(operatorName(bot))} bilgisayarındaki)</span>${detected.length
-        ? `<select class="vv-bot-model" data-bot="${bot.id}"${lock}>${[...new Set([...detected, bot.model].filter(Boolean))].map(name => `<option value="${esc(name)}" ${name === bot.model ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select>`
-        : `<input class="vv-bot-model" data-bot="${bot.id}" type="text" list="${modelList}" value="${esc(bot.model)}" placeholder="Modeller yükleniyor…"${lock}><datalist id="${modelList}"></datalist>`}</label>
-      <label class="vv-bot-field"><span>Konuşacağı dil</span><select class="vv-bot-language" data-bot="${bot.id}"${lock}>${languageOptions}</select></label>
-      <label class="vv-bot-field vv-bot-field-wide"><span>Sistem promptu (karakter)</span><textarea class="vv-bot-persona" data-bot="${bot.id}" rows="3" maxlength="600" placeholder="${esc(DEFAULT_PERSONA)}"${lock}>${esc(bot.persona || '')}</textarea></label>
+        ? `<select class="vv-bot-model" data-bot="${esc(bot.id)}"${lock}>${[...new Set([...detected, bot.model].filter(Boolean))].map(name => `<option value="${esc(name)}" ${name === bot.model ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select>`
+        : `<input class="vv-bot-model" data-bot="${esc(bot.id)}" type="text" list="${modelList}" value="${esc(bot.model)}" placeholder="Modeller yükleniyor…"${lock}><datalist id="${modelList}"></datalist>`}</label>
+      <label class="vv-bot-field"><span>Konuşacağı dil</span><select class="vv-bot-language" data-bot="${esc(bot.id)}"${lock}>${languageOptions}</select></label>
+      <label class="vv-bot-field vv-bot-field-wide"><span>Sistem promptu (karakter)</span><textarea class="vv-bot-persona" data-bot="${esc(bot.id)}" rows="3" maxlength="600" placeholder="${esc(DEFAULT_PERSONA)}"${lock}>${esc(bot.persona || '')}</textarea></label>
       ${botStatusBadge(bot)}
       <div class="vv-bot-memory"><strong>HAFIZASI</strong>${memoryHtml}</div>
       <div class="vv-bot-row-actions">
-        <button class="btn-sec btn-sm vv-bot-check" data-bot="${bot.id}" type="button">Ollama'yı Kontrol Et</button>
-        ${canRemove ? `<button class="btn-sec btn-sm vv-bot-remove" data-bot="${bot.id}" type="button">Kaldır</button>` : ''}
+        <button class="btn-sec btn-sm vv-bot-check" data-bot="${esc(bot.id)}" type="button">Ollama'yı Kontrol Et</button>
+        ${canRemove ? `<button class="btn-sec btn-sm vv-bot-remove" data-bot="${esc(bot.id)}" type="button">Kaldır</button>` : ''}
         <button class="btn-sec btn-sm vv-bot-close" type="button">Kapat</button>
       </div>
     </div>`;
@@ -1227,7 +1227,7 @@
     const candidates = g.players.filter(player => player.alive && player.id !== state.myId && (!allowedIds || allowedIds.has(player.id)));
     const selectedId = selectedTargetFor('vote');
     const roster = g.players.filter(player => player.alive).map(player => `<div class="vv-council-person${player.id === state.myId ? ' is-me' : ''}"><span>${esc(playerInitials(player.name))}</span><strong>${esc(player.name)}</strong><small>${player.isBot ? 'YAPAY OYUNCU' : player.id === state.myId ? 'SEN' : 'MECLİSTE'}</small></div>`).join('');
-    const cards = candidates.map(player => `<button class="vv-vote-card vv-target${selectedId === player.id ? ' is-selected' : ''}" data-action="vote" data-target="${player.id}" aria-pressed="${selectedId === player.id}"><span class="vv-vote-avatar">${esc(playerInitials(player.name))}</span><span class="vv-vote-copy"><strong>${esc(player.name)}</strong><small>${selectedId === player.id ? 'OYUN KAYDEDİLDİ' : 'OY VERMEK İÇİN SEÇ'}</small></span><i>${selectedId === player.id ? '✓' : '◇'}</i></button>`).join('');
+    const cards = candidates.map(player => `<button class="vv-vote-card vv-target${selectedId === player.id ? ' is-selected' : ''}" data-action="vote" data-target="${esc(player.id)}" aria-pressed="${selectedId === player.id}"><span class="vv-vote-avatar">${esc(playerInitials(player.name))}</span><span class="vv-vote-copy"><strong>${esc(player.name)}</strong><small>${selectedId === player.id ? 'OYUN KAYDEDİLDİ' : 'OY VERMEK İÇİN SEÇ'}</small></span><i>${selectedId === player.id ? '✓' : '◇'}</i></button>`).join('');
     const voteCount = g.voteCount || Object.keys(g.actions.votes || {}).length;
     const total = aliveCount(g);
     content.innerHTML = `<header class="vv-council-hero">
@@ -1287,9 +1287,9 @@
     const canManageBots = host() && g.phase === 'lobby' && !g.started;
     const pillsHtml = g.players.map((player, index) => {
       const clickable = player.isBot && (host() || player.operatorId === state.myId);
-      if (player.isBot) return `<span class="vv-player-pill vv-player-pill-bot${player.alive ? '' : ' is-dead'}" ${clickable ? `data-bot-pill="${player.id}"` : ''}>🤖 ${esc(player.name)}</span>`;
+      if (player.isBot) return `<span class="vv-player-pill vv-player-pill-bot${player.alive ? '' : ' is-dead'}" ${clickable ? `data-bot-pill="${esc(player.id)}"` : ''}>🤖 ${esc(player.name)}</span>`;
       const initials = player.isBot ? 'AI' : playerInitials(player.name);
-      return `<span class="vv-player-pill${clickable ? ' vv-player-pill-bot' : ''}${player.alive ? '' : ' is-dead'}" ${clickable ? `data-bot-pill="${player.id}"` : ''}><span class="vv-player-avatar">${esc(initials)}</span><span class="vv-player-copy"><strong>${esc(player.name)}${player.id === state.myId ? ' · Sen' : ''}</strong><small>${player.alive ? `Masa ${String(index + 1).padStart(2, '0')}` : 'Elendi'}</small></span></span>`;
+      return `<span class="vv-player-pill${clickable ? ' vv-player-pill-bot' : ''}${player.alive ? '' : ' is-dead'}" ${clickable ? `data-bot-pill="${esc(player.id)}"` : ''}><span class="vv-player-avatar">${esc(initials)}</span><span class="vv-player-copy"><strong>${esc(player.name)}${player.id === state.myId ? ' · Sen' : ''}</strong><small>${player.alive ? `Masa ${String(index + 1).padStart(2, '0')}` : 'Elendi'}</small></span></span>`;
     }).join('');
     const addBotPill = canManageBots ? `<button id="vv-bot-add-pill" class="vv-player-pill vv-bot-add-pill" type="button" ${g.players.length >= MAX_PLAYERS ? 'disabled' : ''}>+ Yapay oyuncu ekle</button>` : '';
     const selectedBot = g.players.find(player => player.id === selectedBotId && player.isBot && (host() || player.operatorId === state.myId)) || null;

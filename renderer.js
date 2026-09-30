@@ -533,13 +533,15 @@ function setupInternetSignaling(roomId, myId, myName) {
       if (data.id === myId) return;
       
       if (data.type === 'hello') {
-        if (data.isRoomFounder && data.sfwMode) {
+        // Kurucu iddiası doğrulanmadan kabul edilmez (bkz. acceptFounderClaim).
+        const founderClaim = !!data.isRoomFounder && acceptFounderClaim(data.id);
+        if (founderClaim && data.sfwMode) {
            if (!state.sfwMode) {
                state.sfwMode = true;
                loadAIFilter();
            }
         }
-        if (data.isRoomFounder) {
+        if (founderClaim) {
           // Kurucunun otoritesi: oda adı ve yetkili listesi her hello'da
           // senkronize edilir — geç katılanlar da en geç 3 saniyede öğrenir.
           state.founderId = data.id;
@@ -611,17 +613,27 @@ function setupInternetSignaling(roomId, myId, myName) {
         const peer = state.peers.get(data.id);
         if (peer) peer.lastSeen = Date.now();
         handleDataMessage(data.id, data.payload);
-      } else if (data.type === 'room-private' && data.target === myId) {
-        console.log('📥 MQTT Private alındı:', data.id, data.payload.type, data.payload);
-        const peer = state.peers.get(data.id);
-        if (peer) peer.lastSeen = Date.now();
-        handleDataMessage(data.id, data.payload);
       }
     } catch(e) {}
   });
   };
 
   connectBroker(0);
+}
+
+// Oda kimliğini bilen herkes (şifreyi bilmese bile) hello'da isRoomFounder:true
+// gönderebilir. Eskiden bu iddia koşulsuz kabul ediliyordu: sahte "kurucu" tek
+// bir hello ile herkesi yasaklayabiliyor/atabiliyor/susturabiliyordu — gerçek
+// kurucunun kendi istemcisi bile founderId'yi saldırgana çeviriyordu.
+// Kural: ben kurucuysam başka iddia geçersiz (devir transfer_ownership ile
+// olur ve eski kurucu önce kendi bayrağını indirir); henüz kurucu bilinmiyorsa
+// ya da iddia eden zaten kurucuysa kabul; bilinen kurucu odadan ayrıldıysa
+// (halef seçimi yerelde yapılır, bkz. handleFounderLeft) yeni iddia kabul.
+function acceptFounderClaim(id) {
+  if (!isValidPeerId(id) || id === state.myId) return false;
+  if (state.isRoomFounder) return false;
+  if (!state.founderId || state.founderId === id) return true;
+  return !state.peers.has(state.founderId);
 }
 
 function sendInternetSignal(targetId, signal) {
@@ -1360,6 +1372,8 @@ window.requestJoinRoom = (fId) => {
       name: state.myName
     };
     clearInterval(joinReqRetryTimer);
+    // Yalnızca bu isteğe verilen "kabul" otomatik katılmayı tetikleyebilir.
+    state.pendingJoinTarget = { id: fId, at: Date.now() };
     let attempts = 0;
     const publishRequest = () => {
       if (attempts++ >= 8 || !publishJoinEvent(fId, request)) {
@@ -1373,6 +1387,7 @@ window.requestJoinRoom = (fId) => {
     clearTimeout(joinReqAnswerTimer);
     joinReqAnswerTimer = setTimeout(() => {
       clearInterval(joinReqRetryTimer);
+      state.pendingJoinTarget = null;
       showToast(t('toast.joinRequestNoResponse'), "warn");
     }, 40000);
   } else {
@@ -1424,6 +1439,9 @@ function closeJoinRequestNote() {
 
 window.acceptInvite = (idx) => {
   const req = state.friendRequests[idx];
+  // Liste çizildikten sonra değiştiyse (ör. aynı anda yeni istek geldi) bayat
+  // indeks undefined'a düşer; req.id erişimi TypeError fırlatıyordu.
+  if (!req || !req.id) return;
   state.friends[req.id] = { name: req.name, online: false };
   state.friendRequests.splice(idx, 1);
   saveProfile();
@@ -1440,11 +1458,17 @@ window.acceptInvite = (idx) => {
 };
 
 window.rejectInvite = (idx) => {
+  if (!state.friendRequests[idx]) return;
   state.friendRequests.splice(idx, 1);
   saveProfile();
 };
 
+// Açıkken ikinci bir onay istenirse ilki "hayır" ile kapanmalı: aksi halde
+// iki dinleyici de aynı Evet düğmesine bağlı kalıyor, ikinci pencerede Evet'e
+// basmak BİRİNCİ (artık görünmeyen) işlemi de onaylıyordu.
+let cancelOpenConfirm = null;
 window.showConfirm = (title, message) => {
+  if (cancelOpenConfirm) cancelOpenConfirm();
   return new Promise((resolve) => {
     let modal = document.getElementById('generic-confirm-modal');
     if (!modal) {
@@ -1476,6 +1500,7 @@ window.showConfirm = (title, message) => {
       modal.classList.add('hidden');
       yesBtn.removeEventListener('click', onYes);
       noBtn.removeEventListener('click', onNo);
+      if (cancelOpenConfirm === onNo) cancelOpenConfirm = null;
     };
 
     const onYes = () => { cleanup(); resolve(true); };
@@ -1483,6 +1508,7 @@ window.showConfirm = (title, message) => {
 
     yesBtn.addEventListener('click', onYes);
     noBtn.addEventListener('click', onNo);
+    cancelOpenConfirm = onNo;
   });
 };
 
@@ -1861,7 +1887,9 @@ function intendedPeerVolumeIsZero(peerId) {
 
 // showConfirm ile aynı görsel dili taşıyan tek satırlık metin giriş modalı.
 // Çözülen değer: girilen metin (boş olabilir) ya da iptalse null.
-window.showPrompt = (title, message, defaultValue = '', placeholder = '') => {
+let cancelOpenPrompt = null;
+window.showPrompt = (title, message, defaultValue = '', placeholder = '', maxLength = 120) => {
+  if (cancelOpenPrompt) cancelOpenPrompt();
   return new Promise((resolve) => {
     let modal = document.getElementById('generic-prompt-modal');
     if (!modal) {
@@ -1873,7 +1901,7 @@ window.showPrompt = (title, message, defaultValue = '', placeholder = '') => {
         <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 400px; padding: 24px; text-align: center;">
           <h3 id="generic-prompt-title" style="margin-top: 0; margin-bottom: 10px; font-size: 20px; color: #f8fafc;"></h3>
           <p id="generic-prompt-message" style="margin-bottom: 16px; color: #94a3b8; font-size: 14px; line-height: 1.5;"></p>
-          <input id="generic-prompt-input" type="text" maxlength="32" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(15,23,42,0.8); color: #f8fafc; font-size: 15px; outline: none;" />
+          <input id="generic-prompt-input" type="text" maxlength="120" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(15,23,42,0.8); color: #f8fafc; font-size: 15px; outline: none;" />
           <div style="display: flex; gap: 12px; justify-content: center;">
             <button id="generic-prompt-ok" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 8px; background: var(--acc, #6366f1); border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">Kaydet</button>
             <button id="generic-prompt-cancel" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">İptal</button>
@@ -1888,6 +1916,7 @@ window.showPrompt = (title, message, defaultValue = '', placeholder = '') => {
     const input = document.getElementById('generic-prompt-input');
     input.value = defaultValue || '';
     input.placeholder = placeholder || '';
+    input.maxLength = Number.isInteger(maxLength) && maxLength > 0 ? maxLength : 120;
     modal.classList.remove('hidden');
 
     const okBtn = document.getElementById('generic-prompt-ok');
@@ -1898,6 +1927,7 @@ window.showPrompt = (title, message, defaultValue = '', placeholder = '') => {
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
       input.removeEventListener('keydown', onKey);
+      if (cancelOpenPrompt === onCancel) cancelOpenPrompt = null;
     };
     const onOk = () => { cleanup(); resolve(input.value); };
     const onCancel = () => { cleanup(); resolve(null); };
@@ -1909,6 +1939,7 @@ window.showPrompt = (title, message, defaultValue = '', placeholder = '') => {
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
     input.addEventListener('keydown', onKey);
+    cancelOpenPrompt = onCancel;
     setTimeout(() => input.focus(), 50);
   });
 };
@@ -1931,6 +1962,17 @@ let pingInterval = null;
 function tsNotify(title, body) {
   if (window.TSStatus && window.TSStatus.isDnd()) return;
   if (window.electronAPI && window.electronAPI.notify) window.electronAPI.notify(title, body);
+}
+
+// Kişisel konuya (teamsync/user/<ben>/events) gelen arkadaşlık olaylarının
+// doğrulaması: herkese açık broker'da herkes bu konuya yazabilir.
+const MAX_PENDING_FRIEND_REQUESTS = 100;
+function isValidFriendEventId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{3,128}$/.test(id);
+}
+function cleanFriendEventName(name, fallback) {
+  const clean = typeof name === 'string' ? name.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 60) : '';
+  return clean || fallback;
 }
 
 function markFriendOffline(friend) {
@@ -2162,21 +2204,36 @@ function connectGlobalBroker(idx, session) {
         
         // ping_latency_req removed for serverless operation
 
-        if (data.type === 'friend_request') {
-          if (!state.friends[data.id] && !state.friendRequests.find(r => r.id === data.id)) {
-            state.friendRequests.push({ id: data.id, name: data.name });
+        if (data.type === 'friend_request' || data.type === 'friend_accepted') {
+          if (!isValidFriendEventId(data.id) || data.id === state.friendId) return;
+          const reqName = cleanFriendEventName(data.name, data.id);
+          // Odada DM açılınca oluşan geçici (temporary) kayıt gerçek arkadaşlık
+          // değildir: eskiden varlığı yüzünden gelen istek de, karşının kabulü
+          // de sessizce yok sayılıyordu (oda içinden eklenen arkadaşlık bir
+          // tarafta hiç tamamlanmıyordu).
+          const existing = state.friends[data.id];
+          if (existing && !existing.temporary) return;
+          // "Kabul edildi" yalnızca gerçekten istek gönderdiğimiz birinden kabul
+          // edilir. Aksi halde herkese açık broker'da herhangi biri tek bir
+          // mesajla kendini arkadaş listene ekleyebiliyordu (ve arkadaşlara
+          // açık olan grup davetleri gibi yolları kullanabiliyordu). İstenmemiş
+          // bir kabul, onaya düşen normal bir istek olarak gösterilir.
+          const requested = window.TSFriends && typeof window.TSFriends.wasRequested === 'function'
+            ? window.TSFriends.wasRequested(data.id) : false;
+          if (data.type === 'friend_accepted' && requested) {
+            state.friends[data.id] = { ...(existing || {}), name: reqName, online: false };
+            delete state.friends[data.id].temporary;
+            state.friendRequests = state.friendRequests.filter(r => r.id !== data.id);
             saveProfile();
-            showToast(`${data.name} ${t('toast.friendRequestReceived')}`, 'info');
-            tsNotify('Arkadaşlık İsteği', `${data.name} sana arkadaşlık isteği gönderdi!`);
-            renderFriends();
-          }
-        } else if (data.type === 'friend_accepted') {
-          if (!state.friends[data.id]) {
-            state.friends[data.id] = { name: data.name, online: false };
-            saveProfile();
-            showToast(`${data.name} ${t('toast.friendRequestAccepted')}`, 'ok');
-            tsNotify('İstek Kabul Edildi', `${data.name} arkadaşlık isteğini kabul etti!`);
+            showToast(`${reqName} ${t('toast.friendRequestAccepted')}`, 'ok');
+            tsNotify('İstek Kabul Edildi', `${reqName} arkadaşlık isteğini kabul etti!`);
             state.globalMqtt.subscribe(`teamsync/user/${data.id}/presence`);
+            renderFriends();
+          } else if (!state.friendRequests.find(r => r.id === data.id) && state.friendRequests.length < MAX_PENDING_FRIEND_REQUESTS) {
+            state.friendRequests.push({ id: data.id, name: reqName });
+            saveProfile();
+            showToast(`${reqName} ${t('toast.friendRequestReceived')}`, 'info');
+            tsNotify('Arkadaşlık İsteği', `${reqName} sana arkadaşlık isteği gönderdi!`);
             renderFriends();
           }
         } else if (data.type === 'room_join_request') {
@@ -2192,7 +2249,14 @@ function connectGlobalBroker(idx, session) {
             }), { qos: 1 });
           }
         } else if (data.type === 'room_join_accepted') {
+          // Yalnızca BİZİM bu kişiye gönderdiğimiz bekleyen katılma isteğinin
+          // yanıtı kabul edilir. Eskiden herhangi biri tek bir mesajla uygulamayı
+          // kendi odasına otomatik katılmaya (ve mikrofonu açmaya) zorlayabiliyordu.
+          const pendingJoin = state.pendingJoinTarget;
+          if (!pendingJoin || pendingJoin.id !== data.id || Date.now() - pendingJoin.at > 60000) return;
+          if (typeof data.roomId !== 'string' || !data.roomId.trim() || data.roomId.length > 128) return;
           if (state.joinAcceptanceRoom === data.roomId) return;
+          state.pendingJoinTarget = null;
           state.joinAcceptanceRoom = data.roomId;
           clearInterval(joinReqRetryTimer);
           clearTimeout(joinReqAnswerTimer);
@@ -2211,6 +2275,9 @@ function connectGlobalBroker(idx, session) {
              setTimeout(() => btnJoin.click(), 0);
           }
         } else if (data.type === 'room_join_declined') {
+          const pendingJoin = state.pendingJoinTarget;
+          if (!pendingJoin || pendingJoin.id !== data.id) return;
+          state.pendingJoinTarget = null;
           clearInterval(joinReqRetryTimer);
           clearTimeout(joinReqAnswerTimer);
           showToast(`${data.name} ${t('toast.joinRequestDeclined')}`, 'warn');
@@ -3601,8 +3668,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     // almasını/CPU'sunu kısmasını engelle (alt+tab'da ses bozulması).
     setVoiceSessionActive(true);
     state.password = pw;
-    // RNNoise kiÅŸisel bir mikrofondur: oda/kurucu ayarÄ±ndan baÄŸÄ±msÄ±z olarak
-    // yalnÄ±zca bu kullanÄ±cÄ±nÄ±n gÃ¶nderdiÄŸi sesi filtreler.
+    // RNNoise kişisel bir mikrofondur: oda/kurucu ayarından bağımsız olarak
+    // yalnızca bu kullanıcının gönderdiği sesi filtreler.
     state.useAI = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
     state.pttMode = pttMode;
     state.isRoomFounder = !isJoining;
@@ -4301,6 +4368,15 @@ async function setupDeviceList() {
   } catch (e) {}
 }
 
+// "Sadece arkadaşlar" modu: arkadaşlar KALICI kimlikle (KNK-...) tutulur, oda
+// eşleri ise oturum kimliğiyle gelir. Eskiden kontrol oturum kimliğiyle
+// yapıldığı için hiçbir eşleşme olmuyor ve mod açıkken herkes atılıyordu.
+const friendCheckTimers = new Map();
+function isRealFriendPeer(peerId, friendId) {
+  const isFriend = id => !!(id && state.friends[id] && !state.friends[id].temporary);
+  return isFriend(friendId) || isFriend(peerId);
+}
+
 async function handlePeerDiscovered(peer) {
   if (!peer || !isValidPeerId(peer.id) || peer.id === state.myId) return;
   peer.name = typeof peer.name === 'string' ? peer.name.slice(0, 120) : 'Bilinmeyen';
@@ -4356,20 +4432,29 @@ async function handlePeerDiscovered(peer) {
   console.log('🔍 Peer bulundu:', peer.name, peer.ip);
   
   if (state.isRoomFounder && state.friendsOnlyMode) {
-    if (state.friends[peer.id]) {
+    if (isRealFriendPeer(peer.id, peer.friendId)) {
       console.log('✅ Peer is founder\'s friend, allowing.');
     } else {
       console.log('⏳ Checking if peer is anyone\'s friend...');
       broadcast({ type: 'check_friend', targetId: peer.id });
-      peer.friendCheckTimeout = setTimeout(() => {
+      // Zamanlayıcı ayrı bir haritada tutulur: `peer` buradaki keşif nesnesidir,
+      // state.peers'a createPeerConnection YENİ bir nesne koyar — eskiden
+      // friend_confirmed onu bulamadığı için onaylanan arkadaş da atılıyordu.
+      clearTimeout(friendCheckTimers.get(peer.id));
+      friendCheckTimers.set(peer.id, setTimeout(() => {
+        friendCheckTimers.delete(peer.id);
+        if (!state.isRoomFounder || !state.friendsOnlyMode) return;
+        // Kalıcı kimlik keşiften sonra hello ile gelmiş olabilir.
+        const current = state.peers.get(peer.id);
+        if (current && isRealFriendPeer(peer.id, current.friendId)) return;
         console.log('❌ Peer is no one\'s friend, kicking:', peer.name);
         broadcast({ type: 'kick_peer', targetId: peer.id, reason: 'Sadece arkadaşlar katılabilir.' });
         removePeer(peer.id);
-      }, 3000);
+      }, 5000));
     }
   }
 
-  if (peer.isFounder) state.founderId = peer.id;
+  if (peer.isFounder && acceptFounderClaim(peer.id)) state.founderId = peer.id;
   if (peer.isModerator) state.moderators.add(peer.id);
 
   addUser({ id: peer.id, name: peer.name, mic: true, deaf: false, sharing: false, ip: peer.ip, avatar: peer.avatar, isFounder: peer.isFounder });
@@ -5309,9 +5394,11 @@ function setupDataChannel(peerId, dc) {
         if (activeAct) {
           if (activeAct === 'wt') {
             const url = document.getElementById('wt-url')?.value || '';
-            const match = url.match(/(?:v=|youtu\.be\/)([^&]+)/);
-            if (match) {
-              dc.send(JSON.stringify({ type: 'wt-load', vid: match[1] }));
+            // Aynı ayrıştırıcı (js/watch-together.js): "youtu.be/ID?si=..." gibi
+            // bağlantılarda eski desen geçersiz kimlik gönderiyordu.
+            const vid = typeof parseYouTubeId === 'function' ? parseYouTubeId(url) : null;
+            if (vid) {
+              dc.send(JSON.stringify({ type: 'wt-load', vid }));
             }
           } else if (activeAct === 'sb' && state.sb.host === state.myId) {
             const currentUrl = document.getElementById('sb-url')?.value || '';
@@ -5320,21 +5407,9 @@ function setupDataChannel(peerId, dc) {
           } else if (activeAct === 'uno') {
             if (typeof unoSyncNewPeer === 'function') unoSyncNewPeer(peerId);
           } else if (activeAct === 'poll') {
-            if (window.pollState) {
-              dc.send(JSON.stringify({ 
-                type: 'poll_start', 
-                q: window.pollState.q, 
-                opts: window.pollState.opts, 
-                id: window.pollState.id 
-              }));
-              // Also send current votes
-              Object.keys(window.pollState.votes).forEach(opt => {
-                const count = window.pollState.votes[opt] || 0;
-                for (let i = 0; i < count; i++) {
-                  dc.send(JSON.stringify({ type: 'poll_vote', pollId: window.pollState.id, opt }));
-                }
-              });
-            }
+            // Anketin tamamı (oylar dahil) tek pakette gider (js/lucky-wheel.js).
+            const pollPayload = typeof window.pollSyncPayload === 'function' ? window.pollSyncPayload() : null;
+            if (pollPayload) dc.send(JSON.stringify(pollPayload));
           } else if (activeAct === 'wheel') {
             if (window.wheelItems && window.wheelItems.length > 0) {
               dc.send(JSON.stringify({ type: 'wheel_items', items: window.wheelItems }));
@@ -5451,17 +5526,20 @@ async function handleDataMessage(peerId, msg) {
     }
     return;
   } else if (msg.type === 'check_friend') {
-    if (state.friends[msg.targetId]) {
+    if (!isValidPeerId(msg.targetId)) return;
+    const target = state.peers.get(msg.targetId);
+    if (isRealFriendPeer(msg.targetId, target && target.friendId)) {
       broadcast({ type: 'friend_confirmed', targetId: msg.targetId, byId: state.myId });
     }
     return;
   } else if (msg.type === 'friend_confirmed') {
-    if (state.isRoomFounder) {
-      const peer = state.peers.get(msg.targetId);
-      if (peer && peer.friendCheckTimeout) {
-        clearTimeout(peer.friendCheckTimeout);
-        peer.friendCheckTimeout = null;
-        console.log(`✅ Peer ${peer.name} is confirmed as friend by ${msg.byId}, allowing.`);
+    if (state.isRoomFounder && isValidPeerId(msg.targetId)) {
+      const timer = friendCheckTimers.get(msg.targetId);
+      if (timer) {
+        clearTimeout(timer);
+        friendCheckTimers.delete(msg.targetId);
+        const peer = state.peers.get(msg.targetId);
+        console.log(`✅ Peer ${peer ? peer.name : msg.targetId} is confirmed as friend by ${msg.byId}, allowing.`);
       }
     }
     return;
@@ -5560,7 +5638,22 @@ async function handleDataMessage(peerId, msg) {
 
   // Lobby system protocols - handle immediately without peer connection dependency
   if (msg.type === 'lobby-list-sync') {
-    const incomingLobbies = msg.lobbies || [];
+    // Eşten gelen lobiler doğrulanır: players/spectators dizi değilse
+    // removePeer içindeki lob.spectators.some(...) TypeError fırlatıp
+    // kurucu devri gibi sonraki temizlik adımlarını atlatıyordu.
+    const cleanMember = p => p && typeof p === 'object' && isValidPeerId(p.id)
+      ? { id: p.id, name: typeof p.name === 'string' ? p.name.slice(0, 120) : '' } : null;
+    const incomingLobbies = (Array.isArray(msg.lobbies) ? msg.lobbies : []).slice(0, 50)
+      .filter(l => l && typeof l === 'object' && typeof l.id === 'string' && l.id.length <= 128
+        && typeof l.activity === 'string' && isValidPeerId(l.hostId))
+      .map(l => ({
+        ...l,
+        name: typeof l.name === 'string' ? l.name.slice(0, 120) : '',
+        hostName: typeof l.hostName === 'string' ? l.hostName.slice(0, 120) : '',
+        players: (Array.isArray(l.players) ? l.players : []).map(cleanMember).filter(Boolean).slice(0, 50),
+        spectators: (Array.isArray(l.spectators) ? l.spectators : []).map(cleanMember).filter(Boolean).slice(0, 50),
+        status: l.status === 'playing' ? 'playing' : 'waiting'
+      }));
     
     // Keep our own hosted lobbies, and replace everything else with incoming lobbies hosted by others
     const myHostedLobbies = (state.lobbies || []).filter(l => l.hostId === state.myId);
@@ -5627,20 +5720,8 @@ async function handleDataMessage(peerId, msg) {
             broadcastTo(msg.peerId, { type: 'sb-nav', url: currentUrl, ts: Date.now() });
           }
         } else if (lob.activity === 'poll') {
-          if (window.pollState) {
-            broadcastTo(msg.peerId, { 
-              type: 'poll_start', 
-              q: window.pollState.q, 
-              opts: window.pollState.opts, 
-              id: window.pollState.id 
-            });
-            Object.keys(window.pollState.votes).forEach(opt => {
-              const count = window.pollState.votes[opt] || 0;
-              for (let i = 0; i < count; i++) {
-                broadcastTo(msg.peerId, { type: 'poll_vote', pollId: window.pollState.id, opt });
-              }
-            });
-          }
+          const pollPayload = typeof window.pollSyncPayload === 'function' ? window.pollSyncPayload() : null;
+          if (pollPayload) broadcastTo(msg.peerId, pollPayload);
         } else if (lob.activity === 'wheel') {
           if (window.wheelItems && window.wheelItems.length > 0) {
             broadcastTo(msg.peerId, { type: 'wheel_items', items: window.wheelItems });
@@ -5697,7 +5778,7 @@ async function handleDataMessage(peerId, msg) {
                         msg.type.startsWith('vv-') ||
                         msg.type.startsWith('sb-') ||
                         msg.type.startsWith('namecity-') ||
-                        ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type);
+                        ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'poll_reset', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin', 'wheel_result_close'].includes(msg.type);
 
   if (isActivityMsg) {
     // Lobisiz (doğrudan butonla açılan) aktivitelerde msg.lobbyId undefined,
@@ -6003,7 +6084,7 @@ async function handleDataMessage(peerId, msg) {
     if (window.vampireVillagerHandler) window.vampireVillagerHandler(msg, peerId);
   } else if (msg.type.startsWith('sb-')) {
     handleSBMessage(peerId, msg);
-  } else if (msg.type.startsWith('namecity-') || ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin'].includes(msg.type)) {
+  } else if (msg.type.startsWith('namecity-') || ['activity_change', 'poll_start', 'poll_vote', 'poll_end', 'poll_reset', 'lvs_sync', 'wheel_items', 'wheel_ready', 'wheel_reset', 'wheel_spin', 'wheel_result_close'].includes(msg.type)) {
     if (window.activityHandler) window.activityHandler(msg);
   }
 }
@@ -6374,6 +6455,9 @@ function sendRoomFriendRequest(targetId) {
       name: state.myName
     }));
     showToast(t('toast.friendRequestSent'), 'ok');
+    // Giden istek kaydı: karşının "kabul edildi" yanıtı yalnızca bununla eşleşirse
+    // arkadaşlığa dönüşür (bkz. global MQTT friend_accepted).
+    if (window.TSFriends) window.TSFriends.onFriendRequestSent(friendId);
   } else {
     showToast(t('toast.connectionNotReady'), 'warn');
   }
@@ -6546,7 +6630,8 @@ function showUserContextMenu(e, targetId, targetName) {
       '✏️ Lakap Koy',
       `"${targetName}" için bir lakap belirle. Lakabı sadece sen görürsün; boş bırakıp kaydedersen lakap silinir.`,
       nick || '',
-      'Lakap yaz...'
+      'Lakap yaz...',
+      32
     );
     if (result === null) return; // iptal edildi
     setNickname(targetId, result);
@@ -8531,8 +8616,6 @@ Object.assign(LEGACY_TEXT_EN, {
   'Savaş alanı kuruluyor...': 'Preparing the battlefield...',
   'Senin sıran! Bir saldırı seç!': 'Your turn! Choose an attack!',
   'Saldırılar gerçekleşiyor...': 'Attacks are being resolved...',
-  'Güç:': 'Power:',
-  'Hız:': 'Speed:',
   'Öncelik:': 'Priority:',
   'Durum': 'Status',
   'ETKİSİZ': 'NO EFFECT',
@@ -9907,14 +9990,14 @@ function initUserSettings() {
   const settingsModal = document.getElementById('settings-modal');
   if (settingsModal && settingsModal.parentElement !== document.body) document.body.appendChild(settingsModal);
   state.useAI = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
-  // RNNoise artÄ±k sunucu/oda politikasÄ± deÄŸil, kiÅŸisel ses ayarÄ±dÄ±r.
-  // Eski kurulumlardan kalan oda ve katÄ±l ekranÄ± kontrollerini gÃ¶stermeyip
-  // tek kaynaÄŸÄ± normal Ayarlar > Ses ve GÃ¶rÃ¼ntÃ¼ panelinde tutuyoruz.
+  // RNNoise artık sunucu/oda politikası değil, kişisel ses ayarıdır.
+  // Eski kurulumlardan kalan oda ve katıl ekranı kontrollerini göstermeyip
+  // tek kaynağı normal Ayarlar > Ses ve Görüntü panelinde tutuyoruz.
   ['join-useAI', 'create-useAI'].forEach(id => {
     const input = document.getElementById(id);
     const option = input?.closest('.premium-option');
-    // DOM dÄ±ÅŸÄ±na Ã§Ä±karmÄ±yoruz; eski olay baÄŸlayÄ±cÄ±larÄ± bu referanslarÄ±
-    // kullanÄ±yor. GÃ¶rsel olarak gizleyip kiÅŸisel ayarÄ± tek kaynak tutuyoruz.
+    // DOM dışına çıkarmıyoruz; eski olay bağlayıcıları bu referansları
+    // kullanıyor. Görsel olarak gizleyip kişisel ayarı tek kaynak tutuyoruz.
     if (option) option.style.display = 'none';
   });
   const legacyFounderNoise = document.getElementById('founder-noise-suppression');
@@ -10792,14 +10875,31 @@ function stopScreenShare() {
 }
 
 function startRecording() {
-  const tracks = [...state.localStream.getAudioTracks()];
-  state.peers.forEach(peer => {
-    if (peer.audioEl.srcObject) {
-      peer.audioEl.srcObject.getAudioTracks().forEach(t => tracks.push(t));
-    }
-  });
-  const stream = new MediaStream(tracks);
+  if (!state.localStream) return;
+  // MediaRecorder bir akıştaki YALNIZCA İLK ses parçasını kaydeder. Eskiden
+  // mikrofon + tüm katılımcıların parçaları tek MediaStream'e konuyordu; kayıtta
+  // sadece kendi mikrofonun vardı, diğerlerinin sesi hiç yoktu. Sesler önce bir
+  // AudioContext'te tek parçaya karıştırılır.
+  let mixCtx = null;
+  let stream;
+  try {
+    mixCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const dest = mixCtx.createMediaStreamDestination();
+    const addTrack = track => {
+      try { mixCtx.createMediaStreamSource(new MediaStream([track])).connect(dest); } catch (e) {}
+    };
+    state.localStream.getAudioTracks().forEach(addTrack);
+    state.peers.forEach(peer => {
+      const src = peer.rawAudioStream || (peer.audioEl && peer.audioEl.srcObject);
+      if (src) src.getAudioTracks().forEach(addTrack);
+    });
+    stream = dest.stream;
+  } catch (e) {
+    if (mixCtx) { try { mixCtx.close(); } catch (err) {} mixCtx = null; }
+    stream = new MediaStream(state.localStream.getAudioTracks());
+  }
   state.recordingStream = stream;
+  state.recordingMixCtx = mixCtx;
 
   try {
     state.recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
@@ -10814,16 +10914,19 @@ function startRecording() {
       a.href = url;
       a.download = `record-${Date.now()}.webm`;
       a.click();
-      URL.revokeObjectURL(url);
+      // İndirme blob'u eşzamansız okur; hemen revoke edilirse dosya boş inebilir.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
       // Kayıt indirildi; chunk'lar tutulursa kaydın tamamı bellekte kalır
       state.recordedChunks = [];
       state.recorder = null;
       state.recordingStream = null;
+      if (state.recordingMixCtx) { try { state.recordingMixCtx.close(); } catch (e) {} state.recordingMixCtx = null; }
     };
     state.recorder.start(1000);
     state.isRecording = true;
     document.getElementById('rec').classList.add('rec');
   } catch (e) {
+    if (state.recordingMixCtx) { try { state.recordingMixCtx.close(); } catch (err) {} state.recordingMixCtx = null; }
     alert('Kayıt başlatılamadı: ' + e.message);
   }
 }
@@ -11373,16 +11476,20 @@ function showToast(msg, type = 'info') {
   if (!container) return;
 
   if (lastToast && lastToast.msg === msg && lastToast.type === type && document.body.contains(lastToast.el)) {
-    lastToast.count++;
-    lastToast.el.textContent = `${msg} (${lastToast.count})`;
-    lastToast.el.classList.remove('show');
-    void lastToast.el.offsetWidth; // reflow: tekrar tetiklemek için animasyonu sıfırla
-    lastToast.el.classList.add('show');
-    clearTimeout(lastToast.hideTimeout);
-    clearTimeout(lastToast.removeTimeout);
-    lastToast.hideTimeout = setTimeout(() => {
-      lastToast.el.classList.remove('show');
-      lastToast.removeTimeout = setTimeout(() => lastToast.el.remove(), 300);
+    // Zamanlayıcılar bu girdiyi yakalamalı: `lastToast` sonradan başka bir
+    // toast'a dönerse eski kod YENİ toast'ı erken kapatıyor, bu toast'ı ise
+    // ekranda sonsuza dek bırakıyordu.
+    const entry = lastToast;
+    entry.count++;
+    entry.el.textContent = `${msg} (${entry.count})`;
+    entry.el.classList.remove('show');
+    void entry.el.offsetWidth; // reflow: tekrar tetiklemek için animasyonu sıfırla
+    entry.el.classList.add('show');
+    clearTimeout(entry.hideTimeout);
+    clearTimeout(entry.removeTimeout);
+    entry.hideTimeout = setTimeout(() => {
+      entry.el.classList.remove('show');
+      entry.removeTimeout = setTimeout(() => entry.el.remove(), 300);
     }, 3000);
     return;
   }
@@ -11587,6 +11694,9 @@ function disconnectApp() {
   // GİZLENİYOR; webview boşaltılmazsa izlenen videonun sesi odadan
   // çıktıktan sonra da arka planda çalmaya devam ediyordu.
   resetSharedBrowserState();
+  // Kayıt sürüyorsa önce düzgünce bitir: aksi halde izler durduruluyor ama
+  // MediaRecorder hiç stop edilmediği için kayıt dosyası asla inmiyordu.
+  if (state.isRecording) stopRecording();
   if (window.electronAPI && window.electronAPI.stopCloudflared) window.electronAPI.stopCloudflared();
   if (state.localStream) state.localStream.getTracks().forEach(t => t.stop());
   const tb = document.querySelector('.top-bar'); if(tb) tb.style.display = 'none';
@@ -12301,23 +12411,10 @@ window.sendDMText = async (text) => {
   pushDmMessage(friendId, { id: mid, sender: 'me', type: 'text', content: textToSend, isCensored: isCensored, timestamp: Date.now() });
   saveDMs();
   renderDMs();
-  
-  // Supabase Kayıt (Giden DM)
-  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-    supabaseClient.from('mesaj').insert([
-      {
-        gonderen_id: state.friendId || 'Anonim',
-        gonderen_adi: state.myName || 'Anonim',
-        alici_id: friendId,
-        alici_adi: state.friends[friendId]?.name || 'Arkadaş',
-        tip: 'dm',
-        icerik: textToSend,
-        is_censored: isCensored
-      }
-    ]).then(({ error }) => {
-      if (error) console.error('Supabase DM send error:', error);
-    });
-  }
+
+  // NOT: DM metinleri Supabase'e (eski 'mesaj' tablosu) YAZILMAZ. Karar:
+  // Supabase yalnızca cihaz girişi, profil satırı ve avatar kovası içindir;
+  // sohbet içeriği bulutta düz metin olarak tutulmaz (bkz. HANDOFF.md).
 
   // MQTT send
   const dmPayload = {
@@ -12434,7 +12531,10 @@ window.receiveDM = async (fromId, data) => {
     if (!['text', 'image', 'video', 'file'].includes(data.msgType) || typeof data.content !== 'string' || data.content.length > (data.msgType === 'text' ? 20_000 : 30 * 1024 * 1024)) return;
     let isCensored = data.isCensored || false;
     let safeContent = data.content;
-    if (!isCensored && data.content) {
+    // Yalnızca metin denetlenir: base64 görsel/dosya içeriği küfür filtresinden
+    // geçirilince rastgele harf dizileri ("aq", "sg"...) eşleşip medya
+    // "sansürlü" metne dönüşüyordu.
+    if (!isCensored && data.content && data.msgType === 'text') {
        const res = await checkTextWithAI(data.content);
        if (!res.ok) {
          isCensored = true;
@@ -12452,23 +12552,7 @@ window.receiveDM = async (fromId, data) => {
     if (state.activeDM === fromId) renderDMs();
     if (!viewing && !(window.TSStatus && window.TSStatus.isDnd())) showToast(`${state.friends[fromId]?.name || t('toast.defaultSomeone')} ${t('toast.friendSentMessage')}`, 'info');
     if (window.TSDM) window.TSDM.onReceived(fromId);
-
-    // Supabase Kayıt (Gelen DM)
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      supabaseClient.from('mesaj').insert([
-        {
-          gonderen_id: fromId,
-          gonderen_adi: state.friends[fromId]?.name || 'Arkadaş',
-          alici_id: state.friendId || 'Anonim',
-          alici_adi: state.myName || 'Anonim',
-          tip: 'dm',
-          icerik: safeContent,
-          is_censored: isCensored
-        }
-      ]).then(({ error }) => {
-        if (error) console.error('Supabase DM receive error:', error);
-      });
-    }
+    // Gelen DM de buluta kopyalanmaz (bkz. sendDMText notu).
   }
   else if (data.type === 'dm_file_start') {
     const maxChunks = Math.ceil(MAX_DM_FILE_SIZE * 1.4 / 60000);

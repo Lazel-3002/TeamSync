@@ -161,6 +161,27 @@ module.exports = async () => {
   assert.strictEqual(S.derive(events.concat(fake)).owner, 'MALLORY', 'sabitleme olmadan en eski kuruluş kazanır');
   assert.strictEqual(S.derive(events.concat(fake), { genesis: 'e00001' }).owner, 'OWNER', 'sabitlenmiş kuruluş korunur');
 
+  // Kanal geçersiz kılmaları da "sahip olmadığın izni veremezsin" kuralına tabi:
+  // Kanalları+Rolleri Yönet yetkili biri kendine Mesajları Yönet veremez.
+  {
+    const ev2 = [];
+    const add2 = (...a) => { const e = ev(...a); ev2.push(e); return e; };
+    add2('OWNER', 'srv.create', { name: 'Deneme', member: { name: 'Lazel', ik: K(1), ek: K(2) } });
+    add2('OWNER', 'ch.create', { id: 'ch-a', name: 'a', kind: 'text' });
+    add2('OWNER', 'invite.create', { code: 'HJKLMNPQ23', exp: 0, max: 0 });
+    add2('DAVE', 'member.join', { name: 'Dave', ik: K(20), ek: K(21), inv: 'HJKLMNPQ23' });
+    add2('OWNER', 'role.create', { id: 'r-chan', name: 'Kanalci', perms: P.MANAGE_CHANNELS | P.MANAGE_ROLES });
+    add2('OWNER', 'member.roles', { fid: 'DAVE', add: ['r-chan'] });
+    add2('DAVE', 'ch.update', { id: 'ch-a', overrides: { 'u:DAVE': { a: P.MANAGE_MESSAGES, d: 0 } } });
+    add2('DAVE', 'ch.create', { id: 'ch-b', name: 'b', kind: 'text', overrides: { 'u:DAVE': { a: P.MANAGE_MESSAGES, d: 0 } } });
+    const st2 = S.derive(ev2);
+    assert.ok(!S.has(S.channelPerms(st2, 'DAVE', 'ch-a'), P.MANAGE_MESSAGES), 'override ile sahip olmadığı izni kendine veremez');
+    assert.ok(st2.channels['ch-b'], 'kanalı yine de açabilir');
+    assert.ok(!S.has(S.channelPerms(st2, 'DAVE', 'ch-b'), P.MANAGE_MESSAGES), 'yeni kanalda da override ile yetki alamaz');
+    add2('DAVE', 'ch.update', { id: 'ch-a', overrides: { everyone: { a: 0, d: P.SEND_MESSAGES } } });
+    assert.ok(S.derive(ev2).channels['ch-a'].overrides.everyone, 'sahip olduğu izni kısıtlayabilir');
+  }
+
   // Sunucuyu yalnızca sahip silebilir; silindikten sonra hiçbir olay uygulanmaz
   add('ALICE', 'srv.delete', {});
   st = S.derive(events);

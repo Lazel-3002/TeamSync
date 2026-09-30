@@ -194,6 +194,7 @@
     afterRender: render,
     setTab,
     onFriendRequestSent,
+    wasRequested: id => outgoing().some(r => r.id === id),
     addFriendError: text => showAddMessage(text, 'error'),
     renderBadges
   };

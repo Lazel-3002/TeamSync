@@ -88,6 +88,22 @@ function initLuckyWheel() {
   };
   setPollState(null);
 
+  // Geç katılan / lobiye sonradan giren eşe gönderilecek TAM anket durumu
+  // (renderer.js çağırır). Eski senkron kodu yeniden tasarımdan önceki
+  // pollState.q/opts/votes alanlarını okuyordu: votes artık olmadığı için
+  // TypeError fırlıyor, soru da boş gittiği için karşı taraf anketi hiç görmüyordu.
+  window.pollSyncPayload = () => (pollState ? {
+    type: 'poll_start',
+    id: pollState.id,
+    question: pollState.question,
+    q: pollState.question,
+    options: pollState.options.slice(),
+    opts: pollState.options.slice(),
+    allowChange: pollState.allowChange,
+    voters: { ...pollState.voters },
+    ended: pollState.ended
+  } : null);
+
   const pollEditorRows = () => Array.from(pollEls.editor.querySelectorAll('.poll-option-editor'));
   const pollEditorOptions = () => pollEditorRows()
     .map(row => sanitizePollText(row.querySelector('input').value, 56))
@@ -506,6 +522,8 @@ function initLuckyWheel() {
   lvsPlayer.addEventListener('seeked', () => sendLvsSync('seeked'));
 
   const handleLvsSync = (data) => {
+    // currentTime'a NaN atamak TypeError fırlatır; bozuk paket yok sayılır.
+    if (!data || !Number.isFinite(data.time)) return;
     lvsSyncing = true;
     if(Math.abs(lvsPlayer.currentTime - data.time) > 1) {
       lvsPlayer.currentTime = data.time;

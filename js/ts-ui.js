@@ -172,19 +172,27 @@
     };
     const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); closePopover(); } };
     const onResize = () => closePopover();
-    setTimeout(() => document.addEventListener('mousedown', onDown, true), 0);
+    let closed = false;
+    // Dış tıklama dinleyicisi bir tur sonra eklenir (açan tıklama kapatmasın).
+    // Popover o arada kapandıysa EKLENMEMELİ: yoksa sahipsiz kalan dinleyici
+    // sonraki her popover'ı ilk tıklamada (içine bile olsa) kapatıyordu.
+    setTimeout(() => { if (!closed) document.addEventListener('mousedown', onDown, true); }, 0);
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('resize', onResize);
     openPopover = {
       el,
       onClose: opts.onClose,
       cleanup: () => {
+        closed = true;
         document.removeEventListener('mousedown', onDown, true);
         document.removeEventListener('keydown', onKey, true);
         window.removeEventListener('resize', onResize);
       }
     };
-    return { el, close: closePopover, reposition: place };
+    // Yalnızca BU popover'ı kapatır: async bir işlem sonunda çağrılan close(),
+    // araya açılmış başka bir popover'ı kapatmasın.
+    const close = () => { if (openPopover && openPopover.el === el) closePopover(); };
+    return { el, close, reposition: place };
   }
 
   function copyText(text) {

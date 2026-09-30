@@ -23,8 +23,11 @@ const UNO_GLYPH = { skip: '⊘', reverse: '⇄', draw2: '+2', wild: '★', wild4
 function unoIsWild(card) { return card.value === 'wild' || card.value === 'wild4'; }
 
 function unoLabel(card) {
-  if (card.value in UNO_GLYPH) return UNO_GLYPH[card.value];
-  return card.value; // 0-9
+  const value = card && card.value;
+  if (typeof value === 'string' && Object.prototype.hasOwnProperty.call(UNO_GLYPH, value)) return UNO_GLYPH[value];
+  // Yalnızca 0-9: değer innerHTML'e yazılıyor ve kartlar ağdan (kurucudan)
+  // geliyor; bilinmeyen bir değer olduğu gibi basılırsa HTML/betik enjekte edilebilirdi.
+  return /^[0-9]$/.test(String(value)) ? String(value) : '?';
 }
 
 // Bir kartın yüz HTML'i: renkli kartlarda çapraz beyaz oval + değer + köşeler.
@@ -657,7 +660,7 @@ function unoHostApplyPlay(pid, card, chosenColor) {
   if (!unoIsHost() || !state.uno.started) return;
   if (state.uno.turnId !== pid) return;
   const hand = state.uno.hands[pid];
-  if (!hand) return;
+  if (!hand || !card || typeof card !== 'object') return;
 
   const idx = hand.findIndex(c => c.color === card.color && c.value === card.value);
   if (idx === -1) return;
@@ -956,6 +959,9 @@ function handleUnoMessage(peerId, msg) {
     case 'uno-lobby': {
       // Kurucu bir lobi açtı/güncelledi.
       if (state.uno.host === state.myId) return; // ben zaten hostum
+      // Lobi duyurusunu yalnızca kurucunun kendisi yapabilir: başkası adına
+      // "host" iddia edip oyunu ele geçiremesin.
+      if (msg.host !== peerId) return;
       state.uno.host = msg.host;
       state.uno.started = msg.started;
       if (msg.maxPlayers) state.uno.maxPlayers = msg.maxPlayers;
@@ -1000,6 +1006,9 @@ function handleUnoMessage(peerId, msg) {
       break;
     case 'uno-state': {
       if (state.uno.host === state.myId) return; // kendi yayınım
+      // Oyun durumu yalnızca kurucudan kabul edilir (eskiden odadaki herkes
+      // sahte durum/el gönderebiliyordu).
+      if (state.uno.host && peerId !== state.uno.host) return;
       state.uno.started = msg.started;
       state.uno.players = msg.players || [];
       state.uno.turnId = msg.turnId;
@@ -1024,13 +1033,15 @@ function handleUnoMessage(peerId, msg) {
     }
     case 'uno-hand':
       if (state.uno.host === state.myId) return;
-      state.uno.hand = msg.hand || [];
+      if (state.uno.host && peerId !== state.uno.host) return;
+      state.uno.hand = Array.isArray(msg.hand) ? msg.hand.filter(c => c && typeof c === 'object').slice(0, 120) : [];
       if (state.uno.started) unoRenderGame();
       break;
     case 'uno-uno':
       showToast(`${escapeHtml(msg.name || unoNameOf(msg.id))}: UNO!`, 'ok');
       break;
     case 'uno-over':
+      if (state.uno.host && peerId !== state.uno.host) return;
       state.uno.started = false;
       state.uno.winnerId = msg.winnerId;
       unoOpenCard();

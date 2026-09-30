@@ -1409,7 +1409,19 @@
     try { sayBye(); } catch (e) {}
     timers.forEach(t => clearInterval(t));
     timers = [];
-    servers.forEach(rt => { unsubscribe(rt); rt.pending.forEach(p => clearTimeout(p.timer)); });
+    // Sunucu başına zamanlayıcılar da durmalı: hesap değiştirildikten sonra
+    // tetiklenen bir anahtar yenileme (rotateTimer) eski hesabın sunucu kaydını
+    // yeni hesabın deposuna yazabiliyordu. Bekleyen gönderimler de reddedilir
+    // ki onları bekleyen arayüz sonsuza dek asılı kalmasın.
+    servers.forEach(rt => {
+      unsubscribe(rt);
+      clearTimeout(rt.rotateTimer);
+      clearTimeout(rt.dirTimer);
+      clearTimeout(rt.presenceTimer);
+      rt.removed = true;
+      rt.pending.forEach(p => { clearTimeout(p.timer); p.reject(Object.assign(new Error('gone'), { reason: 'gone' })); });
+      rt.pending.clear();
+    });
     servers.clear();
     byTopic.clear();
     invTopics.clear();

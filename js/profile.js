@@ -521,6 +521,8 @@
 
   // ---------- Profil düzenleyici (Ayarlar > Profil) ----------
   let draft = null;
+  let editorPreview = () => {};
+  let editorPick = () => {};
 
   function editorDirty() {
     if (!draft) return false;
@@ -651,16 +653,24 @@
       preview();
     });
 
+    editorPreview = preview;
+    editorPick = pick;
+    // root kalıcı bir öğe (yalnızca içi yeniden yazılıyor): dinleyici bir kez
+    // bağlanmalı. Her renderEditor'da yeniden eklendiğinde Ayarlar > Profil N
+    // kez açıldıktan sonra "Kaydet" saveMine'ı N kez çağırıyor, her kayıt da
+    // dinleyici sayısını katlıyordu.
+    if (root.dataset.peBound) return;
+    root.dataset.peBound = '1';
     root.addEventListener('click', e => {
       const btn = e.target.closest('[data-pe]');
-      if (!btn) return;
+      if (!btn || !draft) return;
       const a = btn.dataset.pe;
       if (a === 'edit-name') document.getElementById('btn-edit-name')?.click();
       else if (a === 'change-avatar') document.getElementById('my-avatar-input')?.click();
-      else if (a === 'upload-gif') pick('gif');
-      else if (a === 'remove-gif') { draft.avatarAnimUrl = ''; preview(); }
-      else if (a === 'upload-banner') pick('banner');
-      else if (a === 'remove-banner') { draft.bannerUrl = ''; preview(); }
+      else if (a === 'upload-gif') editorPick('gif');
+      else if (a === 'remove-gif') { draft.avatarAnimUrl = ''; editorPreview(); }
+      else if (a === 'upload-banner') editorPick('banner');
+      else if (a === 'remove-banner') { draft.bannerUrl = ''; editorPreview(); }
       else if (a === 'reset') renderEditor();
       else if (a === 'save') {
         saveMine(draft);

@@ -87,6 +87,9 @@
       identity = { fid, sign: rec.sign, dh: rec.dh, ik: rec.ik, ek: rec.ek };
       return identity;
     })();
+    // Başarısız bir deneme (ör. IndexedDB geçici hatası) önbellekte kalırsa bu
+    // hesapta hiçbir imza/şifre işlemi uygulama yeniden başlayana dek çalışmaz.
+    p.catch(() => { if (identityPromise && identityPromise.p === p) identityPromise = null; });
     identityPromise = { fid, p };
     return p;
   }

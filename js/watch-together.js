@@ -25,16 +25,25 @@ function initWatchTogether() {
   
   document.getElementById('wt-load').addEventListener('click', (e) => {
     e.stopPropagation();
-    const url = document.getElementById('wt-url').value;
-    const match = url.match(/(?:v=|youtu\.be\/)([^&]+)/);
-    if (match) {
-      const vid = match[1];
+    const vid = parseYouTubeId(document.getElementById('wt-url').value);
+    if (vid) {
       broadcast({ type: 'wt-load', vid });
       loadWTVideo(vid);
     } else {
       showToast('Geçerli bir YouTube linki girin', 'warn');
     }
   });
+}
+
+// YouTube video kimliği her zaman 11 karakterdir. Eski desen ([^&]+) paylaş
+// düğmesinin ürettiği "youtu.be/ID?si=..." bağlantısında "?si=..." kısmını da
+// kimliğe katıyordu (video yüklenmiyordu); /shorts/ ve /embed/ hiç tanınmıyordu.
+const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+function parseYouTubeId(input) {
+  const text = String(input || '').trim();
+  if (YT_ID_RE.test(text)) return text;
+  const m = text.match(/(?:[?&]v=|youtu\.be\/|\/shorts\/|\/embed\/|\/live\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/);
+  return m ? m[1] : null;
 }
 
 window.onYouTubeIframeAPIReady = function() {
@@ -77,7 +86,10 @@ function onWTStateChange(event) {
 }
 
 function handleWTMessage(peerId, msg) {
+  if ((msg.type === 'wt-play' || msg.type === 'wt-pause') && !Number.isFinite(msg.time)) return;
   if (msg.type === 'wt-load') {
+    // Eşten gelen kimlik doğrulanmadan oynatıcıya verilmez.
+    if (typeof msg.vid !== 'string' || !YT_ID_RE.test(msg.vid)) return;
     document.getElementById('activities-modal').classList.add('hidden');
     closeAllCards(false, 'wt-card'); // ALWAYS CLOSE ALL CARDS FIRST TO AVOID OVERLAP
     const wtCard = document.getElementById('wt-card');

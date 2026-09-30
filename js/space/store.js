@@ -39,8 +39,18 @@
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
+    // Açılış hatası önbellekte kalmasın; sonraki çağrı yeniden denesin.
+    const p = dbPromise;
+    p.catch(() => { if (dbPromise === p) { dbPromise = null; dbFor = null; } });
     return dbPromise;
   }
+
+  // Aynı partide aynı id iki kez gelirse (ör. iki barındırıcının yanıtı
+  // birleşince) ikisi de "eklendi" sayılıp ekranda çift mesaj oluşuyordu.
+  const uniqueById = records => {
+    const seen = new Set();
+    return records.filter(r => r && !seen.has(r.id) && seen.add(r.id));
+  };
 
   function tx(store, mode, fn) {
     return open().then(db => new Promise((resolve, reject) => {
@@ -79,6 +89,7 @@
 
   // Yeni olayları ekler; zaten varsa atlar. Eklenenleri döner.
   function addEvents(records) {
+    records = uniqueById(records);
     if (!records.length) return Promise.resolve([]);
     return tx('events', 'readwrite', (s, done) => {
       const added = [];
@@ -130,6 +141,7 @@
 
   // ---------- sunucu: kontrol olayları ----------
   function addControl(records) {
+    records = uniqueById(records);
     if (!records.length) return Promise.resolve([]);
     return tx('ctl', 'readwrite', (s, done) => {
       const added = [];

@@ -1123,6 +1123,22 @@ ipcMain.on('window-close', (event) => {
   if (mainWindow) mainWindow.close();
 });
 function forceQuit() {
+  // İndirilmiş bir güncelleme varsa: electron-updater "çıkışta kur"u app'in
+  // 'quit' olayına bağlıyor, ama aşağıdaki app.exit()+process.exit() o olay
+  // gelmeden süreci bitiriyordu — tepsiden "Tamamen Çıkış" yapan kullanıcıda
+  // güncelleme hiç kurulmuyordu. Bu durumda sessiz kurulumu doğrudan başlat;
+  // normal çıkış (will-quit) temizliği yapar. Takılırsa 8 sn sonra zorla çık.
+  if (autoUpdater && updateStatus.state === 'downloaded' && !forceQuit.installing) {
+    forceQuit.installing = true;
+    isQuitting = true;
+    try {
+      autoUpdater.quitAndInstall(true, false);
+      setTimeout(forceQuit, 8000);
+      return;
+    } catch (e) {
+      console.warn('Güncelleme çıkışta kurulamadı:', e && e.message);
+    }
+  }
   if (cloudflaredProcess) {
     try { cloudflaredProcess.kill(); } catch (e) {}
   }
@@ -1297,6 +1313,12 @@ ipcMain.on('unregister-ptt', (event) => {
   syncControlKillSwitch();
 });
 
+// Bildirim penceresi şeffaf ve hep üstte; notification.html kartı 3 sn sonra
+// yalnızca CSS ile gizliyor. Pencere açık kalırsa ekranın sağ altında görünmez
+// bir alan kalıcı olarak üstte durur — bu yüzden kart kaybolunca pencere de
+// gizlenir (3 sn gösterim + 0.4 sn çıkış animasyonu + pay).
+const NOTIFICATION_HIDE_MS = 3600;
+let notificationHideTimer = null;
 ipcMain.on('notify', (event, payload = {}) => {
   if (!isMainWindowSender(event)) return;
   const title = boundedString(payload.title, 200);
@@ -1306,6 +1328,10 @@ ipcMain.on('notify', (event, payload = {}) => {
     if (notificationWindow && !notificationWindow.isDestroyed()) {
       notificationWindow.showInactive();
       notificationWindow.webContents.send('show-notification', { title, body });
+      clearTimeout(notificationHideTimer);
+      notificationHideTimer = setTimeout(() => {
+        try { if (notificationWindow && !notificationWindow.isDestroyed()) notificationWindow.hide(); } catch (e) {}
+      }, NOTIFICATION_HIDE_MS);
     }
   } catch (e) {}
 });
@@ -1749,11 +1775,17 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Calculate position: bottom right corner, slightly above taskbar
+  // Bildirim tıklanabilir bir şey içermiyor; şeffaf pencere altındaki
+  // uygulamaların tıklamalarını yutmasın.
+  notificationWindow.setIgnoreMouseEvents(true);
+
+  // Calculate position: bottom right corner, slightly above taskbar.
+  // workArea'nın x/y'si de hesaba katılır (görev çubuğu solda/üstteyse
+  // workAreaSize tek başına yanlış köşeyi verir).
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-  notificationWindow.setPosition(width - 360, height - 130);
-  
+  const { x: workX, y: workY, width, height } = primaryDisplay.workArea;
+  notificationWindow.setPosition(workX + width - 360, workY + height - 130);
+
   notificationWindow.loadFile(path.join(__dirname, 'electron', 'notification.html'));
 
   app.on('activate', () => {
