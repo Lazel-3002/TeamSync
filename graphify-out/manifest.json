@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1790761834.1151981,
-    "ast_hash": "7af54d5129c4d0363aeba21239cb87f8",
+    "mtime": 1791998959.8109207,
+    "ast_hash": "68bf0ea2faf5bfa772b729582c0b5d12",
     "semantic_hash": ""
   },
   "preload.js": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1791994192.8631172,
-    "ast_hash": "4e316cd2b15bf2e5adacef678822c404",
+    "mtime": 1792000806.267079,
+    "ast_hash": "a3a5cebd22c7ebad7192034beaf66616",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -755,23 +755,23 @@
     "semantic_hash": ""
   },
   "js/teams/direct-call.js": {
-    "mtime": 1791996856.275136,
-    "ast_hash": "aadd169863488381fa1e52254f406037",
+    "mtime": 1792000806.2685874,
+    "ast_hash": "571ac7cb1392b60ef3d35e34905c3044",
     "semantic_hash": ""
   },
   "js/teams/shell-teams.js": {
-    "mtime": 1791994282.0041125,
-    "ast_hash": "6579cda6be73504a2dff39948274b36a",
+    "mtime": 1792000806.2685874,
+    "ast_hash": "c95b3c762531bf211bc97da351680f1e",
     "semantic_hash": ""
   },
   "resources/localization/teams-strings.js": {
-    "mtime": 1791994282.0056267,
-    "ast_hash": "07296970d006348fe2eeaa87ff334c63",
+    "mtime": 1792000806.2685874,
+    "ast_hash": "0eaa9e462202905acbccd458b5219a66",
     "semantic_hash": ""
   },
   "test/e2e/teams-shell.test.js": {
-    "mtime": 1791996856.6184125,
-    "ast_hash": "a0d52eab78f2686a2e448044a824a5c5",
+    "mtime": 1792000815.7231653,
+    "ast_hash": "06924c78f4b0667e0f3bf359141f7d65",
     "semantic_hash": ""
   }
 }

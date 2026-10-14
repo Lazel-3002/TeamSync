@@ -155,8 +155,8 @@
     "semantic_hash": ""
   },
   "test/e2e/lib/harness.js": {
-    "mtime": 1790283520.1735017,
-    "ast_hash": "77adeb5ea767dfadfff51f619f929ec9",
+    "mtime": 1791996742.8435526,
+    "ast_hash": "d09adaf08f8a795334497b636ab5171c",
     "semantic_hash": ""
   },
   "test/e2e/peer-cleanup.test.js": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "test/e2e/settings-language.test.js": {
-    "mtime": 1790283520.1765969,
-    "ast_hash": "f35fe11f6eec24b1967eea9d067f3f1f",
+    "mtime": 1791998303.8445444,
+    "ast_hash": "8dc8b8338208ef4d93160a04ddc3f274",
     "semantic_hash": ""
   },
   "test/e2e/vampire-villager.test.js": {
@@ -755,8 +755,8 @@
     "semantic_hash": ""
   },
   "js/teams/direct-call.js": {
-    "mtime": 1791994282.0041125,
-    "ast_hash": "ac017168f974933cfbf46a695ab595c2",
+    "mtime": 1791996856.275136,
+    "ast_hash": "aadd169863488381fa1e52254f406037",
     "semantic_hash": ""
   },
   "js/teams/shell-teams.js": {
@@ -770,8 +770,8 @@
     "semantic_hash": ""
   },
   "test/e2e/teams-shell.test.js": {
-    "mtime": 1791994289.416084,
-    "ast_hash": "1bccaf1486c03738a32d0edac0ccb849",
+    "mtime": 1791996856.6184125,
+    "ast_hash": "a0d52eab78f2686a2e448044a824a5c5",
     "semantic_hash": ""
   }
 }

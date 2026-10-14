@@ -72,7 +72,6 @@
       return true;
     }
     if (!mqttOk()) { window.showToast(tr('call.connectionIssue'), 'warn'); return false; }
-    if (opts.video) window.showToast(tr('call.videoSoon'), 'info');
     const kind = opts.kind || 'direct';
     const f0 = friend(fids[0]);
     if (kind === 'direct' && fids.length === 1 && !f0.online) {

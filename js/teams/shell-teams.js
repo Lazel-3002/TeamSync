@@ -589,6 +589,8 @@
   // Bağlama
   // =====================================================================
   function bind() {
+    // Logo = ana sayfa (Kişiler)
+    $('rail-brand')?.addEventListener('click', () => window.TSShell.setView('friends'));
     $('rail-calendar')?.addEventListener('click', () => window.TSShell.setView('calendar'));
     $('rail-calls')?.addEventListener('click', () => window.TSShell.setView('calls'));
     $('rail-meet')?.addEventListener('click', e => openMeetMenu(e.currentTarget));
@@ -597,7 +599,6 @@
     $('side-meet-now')?.addEventListener('click', () => meetNow());
 
     $('dmh-voice-call')?.addEventListener('click', () => { const fid = activeFid(); if (fid && window.TSDirectCall) window.TSDirectCall.call(fid); });
-    $('dmh-video-call')?.addEventListener('click', () => { const fid = activeFid(); if (fid && window.TSDirectCall) window.TSDirectCall.call(fid, { video: true }); });
     $('dmh-add-people')?.addEventListener('click', e => {
       const fid = activeFid();
       if (window.TSGroupUI) window.TSGroupUI.openCreate(e.currentTarget, fid ? [fid] : []);

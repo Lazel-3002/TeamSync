@@ -7,6 +7,7 @@
   extra.tr = extra.tr || {};
   extra.en = extra.en || {};
   Object.assign(extra.tr, {
+    'app.home': 'Ana sayfa',
     'app.chat': 'Sohbet',
     'app.people': 'Kişiler',
     'app.calendar': 'Takvim',
@@ -36,7 +37,6 @@
     'dmh.tabChat': 'Sohbet',
     'dmh.tabFiles': 'Dosyalar',
     'dmh.tabPhotos': 'Fotoğraflar',
-    'dmh.videoCall': 'Görüntülü arama',
     'dmh.voiceCall': 'Sesli arama',
     'dmh.addPeople': 'Kişi ekle (grup sohbeti başlat)',
     'dmh.searchChat': 'Sohbette ara',
@@ -97,7 +97,6 @@
     'call.friendOffline': '{name} şu an çevrimdışı.',
     'call.connectionIssue': 'Sunucu bağlantısı yok, arama başlatılamadı.',
     'call.withName': '{a} ve {b}',
-    'call.videoSoon': 'Kamera desteği henüz yok; sesli arama başlatılıyor.',
 
     'meet.title': 'Toplantı',
     'meet.lead': 'Yeni bir oda kur ya da sana verilen oda ID’siyle katıl.',
@@ -180,6 +179,7 @@
     'acc.status': 'Durum'
   });
   Object.assign(extra.en, {
+    'app.home': 'Home',
     'app.chat': 'Chat',
     'app.people': 'People',
     'app.calendar': 'Calendar',
@@ -209,7 +209,6 @@
     'dmh.tabChat': 'Chat',
     'dmh.tabFiles': 'Files',
     'dmh.tabPhotos': 'Photos',
-    'dmh.videoCall': 'Video call',
     'dmh.voiceCall': 'Audio call',
     'dmh.addPeople': 'Add people (start a group chat)',
     'dmh.searchChat': 'Search this chat',
@@ -270,7 +269,6 @@
     'call.friendOffline': '{name} is offline right now.',
     'call.connectionIssue': 'No server connection, couldn’t start the call.',
     'call.withName': '{a} and {b}',
-    'call.videoSoon': 'Camera isn’t supported yet; starting an audio call.',
 
     'meet.title': 'Meet',
     'meet.lead': 'Start a new room or join one with a room ID.',

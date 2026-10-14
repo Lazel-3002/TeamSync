@@ -42,8 +42,13 @@ body.shell-active #user-panel { display: none; }
   align-items: center;
   justify-content: center;
   border-radius: 12px;
+  padding: 0;
+  border: 0;
   background: var(--tm-acc-soft);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
+.rail-brand:hover, .rail-brand:focus-visible { background: color-mix(in srgb, var(--acc) 28%, transparent); }
 .rail-brand img { width: 28px; height: 28px; border-radius: 7px; }
 
 .rail-btn.rail-app {

@@ -36,6 +36,10 @@ module.exports = async function run() {
     await evalJS(A, `document.getElementById('rail-calls').click(); 1`);
     assert.strictEqual(await evalJS(A, `document.body.dataset.view`), 'calls');
     assert.strictEqual(await evalJS(A, `!!document.querySelector('#view-calls .calls-empty')`), true);
+    // Logo ana sayfaya (Kişiler) götürür; görüntülü arama düğmesi yok.
+    await evalJS(A, `document.getElementById('rail-brand').click(); 1`);
+    assert.strictEqual(await evalJS(A, `document.body.dataset.view`), 'friends');
+    assert.strictEqual(await evalJS(A, `!!document.getElementById('dmh-video-call')`), false);
 
     // --- Sohbet listesi: önizleme, saat, sabitleme, filtre ---
     await evalJS(A, `(() => {
