@@ -159,7 +159,7 @@
     setBadge('side-requests-badge', pendingIn);
     setBadge('ftab-pending-badge', pendingIn);
     const dmUnread = window.TSDM ? window.TSDM.totalUnread() : 0;
-    setBadge('rail-home-badge', pendingIn + dmUnread);
+    setBadge('rail-home-badge', dmUnread);
   }
 
   function bind() {

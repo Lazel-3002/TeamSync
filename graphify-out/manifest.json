@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1790285656.946742,
-    "ast_hash": "6dfba2479e0d36d8c012bf677c457959",
+    "mtime": 1790761834.1151981,
+    "ast_hash": "7af54d5129c4d0363aeba21239cb87f8",
     "semantic_hash": ""
   },
   "preload.js": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1790758502.7973866,
-    "ast_hash": "546d4e75641df0f29ca235c9e0fd3825",
+    "mtime": 1791994044.3152869,
+    "ast_hash": "e4b81416ea0ae6431f6ef1dc0a333fbe",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1790283520.140846,
-    "ast_hash": "b2d4506e2636984ee4111dc2adbdeb6e",
+    "mtime": 1791994192.8631172,
+    "ast_hash": "4e316cd2b15bf2e5adacef678822c404",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -155,8 +155,8 @@
     "semantic_hash": ""
   },
   "test/e2e/lib/harness.js": {
-    "mtime": 1790283520.1735017,
-    "ast_hash": "77adeb5ea767dfadfff51f619f929ec9",
+    "mtime": 1791996742.8435526,
+    "ast_hash": "d09adaf08f8a795334497b636ab5171c",
     "semantic_hash": ""
   },
   "test/e2e/peer-cleanup.test.js": {
@@ -325,8 +325,8 @@
     "semantic_hash": ""
   },
   "test/e2e/focus-minimize-responsive.test.js": {
-    "mtime": 1785262590.1309657,
-    "ast_hash": "0b1d145a1b791f8afce933ebe7497578",
+    "mtime": 1791994310.0600386,
+    "ast_hash": "79f53568df609fe5759c1143a9edc04f",
     "semantic_hash": ""
   },
   "test/e2e/lucky-wheel-redesign.test.js": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "test/e2e/settings-language.test.js": {
-    "mtime": 1790283520.1765969,
-    "ast_hash": "f35fe11f6eec24b1967eea9d067f3f1f",
+    "mtime": 1791998303.8445444,
+    "ast_hash": "8dc8b8338208ef4d93160a04ddc3f274",
     "semantic_hash": ""
   },
   "test/e2e/vampire-villager.test.js": {
@@ -520,8 +520,8 @@
     "semantic_hash": ""
   },
   "test/e2e/focus-sidebar-visible.test.js": {
-    "mtime": 1790283520.1714993,
-    "ast_hash": "96a52afe71741bae99a6d36e39fdfa13",
+    "mtime": 1791994212.8262377,
+    "ast_hash": "5b826931052363c8a3838fbd36ae1efa",
     "semantic_hash": ""
   },
   "test/e2e/media-collect-resize.test.js": {
@@ -580,18 +580,18 @@
     "semantic_hash": ""
   },
   "js/shell-core.js": {
-    "mtime": 1790283520.1453884,
-    "ast_hash": "07940d5751c1f7ba622103da00b3c184",
+    "mtime": 1791993175.1484544,
+    "ast_hash": "6947cad14dc2ec79954cddfb7ad3206f",
     "semantic_hash": ""
   },
   "js/shell-dm.js": {
-    "mtime": 1790283520.146389,
-    "ast_hash": "7a4fe85c0cc10e5620052db316c9d5ec",
+    "mtime": 1791993096.6059084,
+    "ast_hash": "e2fd7fde4f00fc5a0868978956ccc5d6",
     "semantic_hash": ""
   },
   "js/shell-friends.js": {
-    "mtime": 1790746411.9379692,
-    "ast_hash": "d9aedf44938fcb562e4a430c459560d2",
+    "mtime": 1791992947.4520295,
+    "ast_hash": "8b23bc2a945d9e6ba4adcfc313695bc4",
     "semantic_hash": ""
   },
   "js/status.js": {
@@ -680,8 +680,8 @@
     "semantic_hash": ""
   },
   "js/ui/group-view.js": {
-    "mtime": 1790284576.2121415,
-    "ast_hash": "93efa4bd6d4b6b9a61c3b68b7a914d6d",
+    "mtime": 1791992947.556815,
+    "ast_hash": "99aeaba649755a4a17ec0441a4384f75",
     "semantic_hash": ""
   },
   "js/ui/server-dialogs.js": {
@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "HANDOFF.md": {
-    "mtime": 1790283520.0981455,
-    "ast_hash": "3b7e7fa5a9ff39cd7ce8438f8441ad0a",
+    "mtime": 1791994369.7383068,
+    "ast_hash": "9d9bdfd053d1bb2fe23717ec37df983e",
     "semantic_hash": ""
   },
   "resources/emoji/LICENSE-emojibase.txt": {
@@ -737,6 +737,41 @@
   "docs/assets/screenshot-dm.png": {
     "mtime": 1790286450.9674861,
     "ast_hash": "7041fba441f11d8279a4d01cc9d7c6ae",
+    "semantic_hash": ""
+  },
+  "js/teams/calendar.js": {
+    "mtime": 1791993315.7350092,
+    "ast_hash": "9c12878de40f471cd23777f985a07338",
+    "semantic_hash": ""
+  },
+  "js/teams/call-log.js": {
+    "mtime": 1791993169.217177,
+    "ast_hash": "0c93f41d767d3022f3dc9edc21e5f762",
+    "semantic_hash": ""
+  },
+  "js/teams/calls.js": {
+    "mtime": 1791993360.7218282,
+    "ast_hash": "61f5d2adb1ee1866178b30daf92b10a0",
+    "semantic_hash": ""
+  },
+  "js/teams/direct-call.js": {
+    "mtime": 1791996856.275136,
+    "ast_hash": "aadd169863488381fa1e52254f406037",
+    "semantic_hash": ""
+  },
+  "js/teams/shell-teams.js": {
+    "mtime": 1791994282.0041125,
+    "ast_hash": "6579cda6be73504a2dff39948274b36a",
+    "semantic_hash": ""
+  },
+  "resources/localization/teams-strings.js": {
+    "mtime": 1791994282.0056267,
+    "ast_hash": "07296970d006348fe2eeaa87ff334c63",
+    "semantic_hash": ""
+  },
+  "test/e2e/teams-shell.test.js": {
+    "mtime": 1791996856.6184125,
+    "ast_hash": "a0d52eab78f2686a2e448044a824a5c5",
     "semantic_hash": ""
   }
 }

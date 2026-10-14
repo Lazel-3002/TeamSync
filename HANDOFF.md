@@ -206,3 +206,47 @@ Real Electron instances over CDP (`test/e2e/lib/harness.js`): `spawnPeer`,
 screenshots with `Page.captureScreenshot` and look at them. Run
 `npm run test:e2e` before every commit. After code changes run
 `graphify update .`.
+
+## Phase 4 — Teams-inspired shell (branch `feat/teams-tarzi-arayuz`)
+The owner asked for an MS Teams-like layout (screenshots: call screen, chat
+list, app bar, chat header, chat view) but "not a copy — keep it original and
+high quality". Discord-era features (servers, groups, profiles) all remain.
+- **App rail** (`#srv-rail`, index.html): TeamSync logo, labelled apps
+  Sohbet (`#rail-home` → last chat), Kişiler (`#side-friends`, moved here
+  from the side column), Takvim (`#rail-calendar`), Aramalar (`#rail-calls`),
+  Toplantı (`#rail-meet` popover: create room / join by ID / schedule /
+  legacy form), then server icons, Ayarlar (`#rail-settings`) and the account
+  button (`#rail-account`: profile/status, copy ID, settings, **Hesap
+  değiştir** = `#btn-logout` → device account list). `#user-panel` is hidden.
+- **Chat list** (`js/shell-dm.js`): filter chips (Okunmamış/Gruplar/
+  Çevrimiçi), sections Sabitlenenler/Sohbetler (pins in
+  `teamsync_chat_pins_<me>`), last-message preview + short time, "…" row menu.
+- **Chat header**: presence line (Çevrimiçi / Uzakta / "Son görülme 3 saat
+  önce" from `TSLastSeen`, stored per device in `teamsync_last_seen_<me>`),
+  tabs Sohbet/Dosyalar/Fotoğraflar (`#dm-media-pane`), audio/video call, add
+  people (group create), in-chat search (`#dm-find`, Ctrl+F), more menu.
+  Messages are bubbles (them left + avatar, me right in accent colour).
+- **Direct calls** (`js/teams/direct-call.js`): caller opens room `dc-<hex>`
+  and sends the existing `server_invite_received` with extra `call`, `cid`,
+  `title` (old clients just see the normal invite toast). New clients show a
+  ringing card (`.dc-ring`) → accept / decline (`call_decline`); caller
+  cancelling sends `call_cancel`. 35 s no answer → ends. In a `dc-` room the
+  call ends 4 s after the other side leaves. No real camera yet (video button
+  starts an audio call with a toast).
+- **Call screen** (`js/teams/shell-teams.js`): `.bar` is MOVED into `.top-bar`
+  (`.call-topbar`): timer `#call-timer`, room title, ID chip | Sohbet,
+  Kişiler, Davet | Diğer (`#btn-call-more` → `#call-more-panel` holding
+  wb-btn/act-btn/rec/vol/founder/settings) | Mikrofon, Kulaklık, Paylaş |
+  Ayrıl. `.main.stage-solo` = big avatar + "Aranıyor…"/"bekleniyor" in
+  `#call-stage`, own tile as bottom-right preview; `.stage-duo` = remote big,
+  own tile PIP. Never use `classList.remove` on observed elements for no-op
+  changes (it rewrites the attribute and loops MutationObservers) — use
+  `toggle(cls, false)`.
+- **Calendar** (`js/teams/calendar.js`, `#view-calendar`) and **call history**
+  (`js/teams/call-log.js` + `js/teams/calls.js`, `#view-calls`) are local
+  per account (`teamsync_calendar_<me>`, `teamsync_call_log_<me>`). Saving a
+  meeting DMs each attendee one line; "Başlat" opens a room and rings them.
+  Shell dispatches `ts:call {active}` on call start/end (call log hooks it).
+- Strings: `resources/localization/teams-strings.js`. CSS: `css/teams.css`.
+- Test: `test/e2e/teams-shell.test.js` (2 peers: rail views, chat list,
+  last seen, call → ring → accept → duo stage → log; decline; calendar DM).

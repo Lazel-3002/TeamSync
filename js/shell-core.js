@@ -1,5 +1,7 @@
-// Discord tarzı kabuk: sunucu rayı + DM sütunu + kullanıcı paneli + görünüm
-// yönlendiricisi (Arkadaşlar / DM / Arama).
+// Uygulama kabuğu: etiketli uygulama rayı (Sohbet / Kişiler / Takvim /
+// Aramalar / Toplantı + sunucular) + sohbet listesi + görünüm yönlendiricisi
+// (Kişiler / DM / Grup / Sunucu / Takvim / Aramalar / Arama). Teams'ten
+// esinlenen yerleşimin geri kalanı js/teams/*.js'te.
 //
 // Eski akışlar (giriş adımları, oda kurma/katılma formları, disconnectApp)
 // DEĞİŞMEDEN çalışmaya devam eder; kabuk onların bıraktığı izleri (hangi adım
@@ -15,18 +17,24 @@
   const MIC_PREF = 'teamsync_prejoin_mute';
   const DEAF_PREF = 'teamsync_prejoin_deaf';
   const LAST_VIEW = 'teamsync_shell_last_view';
+  const LAST_CHAT = 'teamsync_shell_last_chat';
 
   let active = false;
   let inCall = false;
   let view = 'friends';
   let viewParam = null;
   let lastHome = { view: 'friends', param: null };
+  let lastChat = null;
   let chatUnread = 0;
 
   function readLastHome() {
     try {
+      const chat = JSON.parse(localStorage.getItem(LAST_CHAT) || 'null');
+      if (chat && ['dm', 'group'].includes(chat.view)) lastChat = chat;
+    } catch (e) {}
+    try {
       const saved = JSON.parse(localStorage.getItem(LAST_VIEW) || 'null');
-      if (saved && ['friends', 'dm', 'group', 'server'].includes(saved.view)) lastHome = saved;
+      if (saved && ['friends', 'dm', 'group', 'server', 'calendar', 'calls'].includes(saved.view)) lastHome = saved;
     } catch (e) {}
   }
 
@@ -57,14 +65,16 @@
       const input = $('friend-id-input');
       if (input) input.setAttribute('data-i18n-placeholder', 'friends.addPlaceholder');
     }
-    // Güncelleme düğmeleri rayın altına (eski ana menü kabukta gizli)
-    move('update-btn', 'rail-bottom');
+    // Güncelleme düğmeleri rayın altına, Ayarlar'ın üstüne (eski ana menü kabukta gizli)
+    const railBottom = $('rail-bottom');
+    const updateBtn = $('update-btn');
+    if (railBottom && updateBtn) railBottom.prepend(updateBtn);
     const updatesBtn = $('btn-show-updates');
-    if (updatesBtn) {
+    if (updatesBtn && railBottom) {
       updatesBtn.removeAttribute('style');
       updatesBtn.className = 'rail-btn rail-action rail-updates';
       updatesBtn.innerHTML = `<span class="rail-icon">${updatesBtn.innerHTML}</span>`;
-      $('rail-bottom')?.appendChild(updatesBtn);
+      railBottom.insertBefore(updatesBtn, $('rail-settings'));
     }
     // Oda üst çubuğu: oda adı + bağlantı noktası solda, sohbet düğmesi sağda
     const topBar = document.querySelector('#app .top-bar');
@@ -122,6 +132,17 @@
     }
   }
 
+  // Sohbet uygulaması: en son açılan sohbet; o artık yoksa listedeki ilk satır.
+  function openChatHome() {
+    const ok = c => c && ((c.view === 'dm' && window.state.friends && window.state.friends[c.param])
+      || (c.view === 'group' && window.TSGroups && window.TSGroups.get(c.param)));
+    if (ok(lastChat)) { setView(lastChat.view, lastChat.param); return; }
+    const first = document.querySelector('#dm-list .dm-row[data-fid], #dm-list .dm-row[data-gid]');
+    if (first && first.dataset.gid) setView('group', first.dataset.gid);
+    else if (first && first.dataset.fid) setView('dm', first.dataset.fid);
+    else setView('friends');
+  }
+
   // ---------- Görünüm yönlendiricisi ----------
   function setView(next, param) {
     if (next === 'call' && !inCall) {
@@ -150,6 +171,8 @@
     $('view-dm')?.classList.toggle('hidden', next !== 'dm');
     $('view-group')?.classList.toggle('hidden', next !== 'group');
     $('view-server')?.classList.toggle('hidden', next !== 'server');
+    $('view-calendar')?.classList.toggle('hidden', next !== 'calendar');
+    $('view-calls')?.classList.toggle('hidden', next !== 'calls');
     $('view-call')?.classList.toggle('is-bg', next !== 'call');
     document.body.dataset.view = next;
     // Sol sütun: DM listesi mi, sunucunun kanal listesi mi? Sunucu ses
@@ -158,9 +181,15 @@
     const homeServer = next === 'server' ? viewParam : (voiceIn ? voiceIn.sid : null);
     document.body.dataset.home = homeServer ? 'server' : 'dm';
     if (window.TSServerUI) window.TSServerUI.setActiveServer(homeServer);
-    $('rail-home')?.classList.toggle('active', next !== 'call' && !homeServer);
+    $('rail-home')?.classList.toggle('active', next === 'dm' || next === 'group');
     $('rail-call')?.classList.toggle('active', next === 'call');
     $('side-friends')?.classList.toggle('active', next === 'friends');
+    $('rail-calendar')?.classList.toggle('active', next === 'calendar');
+    $('rail-calls')?.classList.toggle('active', next === 'calls');
+    if (next === 'dm' || next === 'group') {
+      lastChat = { view: next, param: viewParam };
+      try { localStorage.setItem(LAST_CHAT, JSON.stringify(lastChat)); } catch (e) {}
+    }
     document.body.classList.remove('shell-drawer-open');
     if (next === 'dm' && window.TSDM) window.TSDM.show(viewParam);
     if (next === 'group' && window.TSGroupUI) window.TSGroupUI.show(viewParam);
@@ -221,6 +250,7 @@
     updateVoiceMini();
     applyPrejoinPrefs();
     setView('call');
+    document.dispatchEvent(new CustomEvent('ts:call', { detail: { active: true } }));
   }
 
   function onCallEnd() {
@@ -236,6 +266,7 @@
     if (window.TSTiles) window.TSTiles.clear();
     setView(lastHome.view, lastHome.param);
     renderUserPanel();
+    document.dispatchEvent(new CustomEvent('ts:call', { detail: { active: false } }));
   }
 
   function applyPrejoinPrefs() {
@@ -266,6 +297,15 @@
       src: window.state.myAvatar, name: window.state.myName, seed: window.state.friendId,
       size: 32, status: st, frame: prof.frame, color: prof.avatarColor
     });
+    // Raydaki hesap düğmesi (hesap menüsü: js/teams/shell-teams.js)
+    const railAcc = $('rail-account');
+    if (railAcc) {
+      railAcc.innerHTML = window.TSUI.avatarHtml({
+        src: window.state.myAvatar, name: window.state.myName, seed: window.state.friendId,
+        size: 34, status: st, frame: prof.frame, color: prof.avatarColor
+      });
+      railAcc.title = window.state.myName || window.TSUI.tr('acc.title');
+    }
     const nameEl = $('up-name');
     if (nameEl) nameEl.textContent = window.state.myName || '';
     const sub = $('up-sub');
@@ -487,7 +527,7 @@
 
   // ---------- Bağlama ----------
   function bind() {
-    $('rail-home')?.addEventListener('click', () => setView(lastHome.view === 'call' ? 'friends' : lastHome.view, lastHome.param));
+    $('rail-home')?.addEventListener('click', openChatHome);
     $('rail-call')?.addEventListener('click', () => setView('call'));
     $('rail-add')?.addEventListener('click', e => showAddMenu(e.currentTarget));
     $('rail-search')?.addEventListener('click', () => {
@@ -547,7 +587,7 @@
   }
 
   window.TSShell = {
-    setView, enter, exit, isCallVisible, openQuickCall, closeQuickCall,
+    setView, enter, exit, isCallVisible, openQuickCall, closeQuickCall, openChatHome, showAddMenu,
     renderUserPanel, onRoomChat, setCallSide, openSwitcher,
     isActive: () => active,
     inCall: () => inCall,

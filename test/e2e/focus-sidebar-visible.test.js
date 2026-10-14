@@ -50,7 +50,10 @@ async function inspectFocusLayout(peer) {
        const barRect = bar.getBoundingClientRect();
        const contentLeft = Math.min(...groupRects.map(r => r.left));
        const contentRight = Math.max(...groupRects.map(r => r.right));
-       const controlIds = ['mic', 'deaf', 'share', 'wb-btn', 'act-btn', 'rec', 'vol', 'settings', 'leave'];
+       // Üst araç çubuğu: Sohbet/Kişiler/Davet | Diğer | Mikrofon/Kulaklık/Paylaş | Ayrıl.
+       // Tahta, Etkinlik, Kayıt, Ses ve Ayarlar "Diğer" menüsünde (js/teams/shell-teams.js).
+       const controlIds = ['btn-call-chat', 'btn-call-people', 'btn-call-more', 'mic', 'deaf', 'share', 'leave'];
+       const moreIds = ['wb-btn', 'act-btn', 'rec', 'vol', 'settings'];
        return {
          viewport,
          focusMode: document.querySelector('.main').classList.contains('focus-mode'),
@@ -70,6 +73,7 @@ async function inspectFocusLayout(peer) {
            barCenter: (barRect.left + barRect.right) / 2,
            overflowing: contentRight - contentLeft > barRect.width,
          },
+         inMoreMenu: moreIds.filter(id => !!document.querySelector('#call-more-panel #' + id)),
          controls: controlIds.map(id => {
            const element = document.getElementById(id);
            if (!element) return { id, missing: true };
@@ -168,12 +172,10 @@ module.exports = async function run() {
     assert.strictEqual(focused.card.insideViewport, true, dump);
     assert.ok(focused.card.width >= 240 && focused.card.height >= 180, dump);
 
-    // 5) Alt çubuktaki düğmeler sola yapışmıyor; hepsi tıklanabilir.
+    // 5) Üst araç çubuğu taşmıyor, sağa yaslı; az kullanılanlar "Diğer" menüsünde.
     assert.strictEqual(focused.barContent.overflowing, false, dump);
-    assert.ok(
-      Math.abs(focused.barContent.center - focused.barContent.barCenter) <= 24,
-      'alt çubuk ortalı değil: ' + dump
-    );
+    assert.ok(focused.barContent.right <= focused.viewport.width + 0.5, 'araç çubuğu ekran dışı: ' + dump);
+    assert.deepStrictEqual(focused.inMoreMenu, ['wb-btn', 'act-btn', 'rec', 'vol', 'settings'], dump);
     assert.deepStrictEqual(unavailableControls(focused), [], dump);
 
     await shot(peer, 'teamsync-focus-sidebar-wide.png');

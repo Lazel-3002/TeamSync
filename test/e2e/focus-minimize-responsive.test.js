@@ -16,7 +16,8 @@ async function inspectControls(peer) {
          width: document.documentElement.clientWidth,
          height: document.documentElement.clientHeight,
        };
-       const ids = ['mic', 'deaf', 'share', 'wb-btn', 'act-btn', 'rec', 'vol', 'settings', 'leave'];
+       // Tahta, Etkinlik, Kayıt, Ses ve Ayarlar üst araç çubuğundaki "Diğer" menüsünde (js/teams/shell-teams.js).
+       const ids = ['btn-call-chat', 'btn-call-more', 'mic', 'deaf', 'share', 'leave'];
        const controls = ids.map(id => {
          const element = document.getElementById(id);
          if (!element) return { id, missing: true };

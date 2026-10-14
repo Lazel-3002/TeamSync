@@ -496,5 +496,5 @@
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  window.TSGroupUI = { show, isViewing, listItems, openCreate, ring, current: () => current, renderMessages };
+  window.TSGroupUI = { show, isViewing, listItems, stackHtml, openCreate, ring, current: () => current, renderMessages };
 })();

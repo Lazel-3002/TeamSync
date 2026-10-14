@@ -86,6 +86,7 @@
   "84": "showToast",
   "85": "enterFocus",
   "86": "emoji.js",
+  "87": "shell-teams.js",
   "88": "setRemoteControlEnabled",
   "89": "seed_machine_draft.py",
   "90": "TeamSync redesign — handoff prompt for Claude Code",
@@ -95,5 +96,12 @@
   "94": "renderVirtualCursor",
   "95": "media-collect-resize.test.js",
   "96": "getBroadcastAddresses",
-  "97": "shortcodes.js"
+  "97": "shortcodes.js",
+  "98": "direct-call.js",
+  "99": "calendar.js",
+  "100": "calls.js",
+  "101": "shared-browser.test.js",
+  "102": "friend-list-responsive.test.js",
+  "103": "shell-navigation.test.js",
+  "104": "teams-strings.js"
 }

@@ -101,7 +101,8 @@ async function spawnPeer({ port, name }) {
   await client.ready;
   await client.send('Runtime.enable');
 
-  await waitFor(client, `document.readyState === 'complete'`, 15000, 'page load');
+  // Yük altındaki makinede ilk açılış 15 sn'yi aşabiliyor (yanlış FAIL üretiyordu).
+  await waitFor(client, `document.readyState === 'complete'`, 40000, 'page load');
   // Let the async DOMContentLoaded setup (getLocalIPs await, listener binding) finish.
   await new Promise(r => setTimeout(r, 2500));
   await setValueWhenReady(client, 'name', name, 15000);

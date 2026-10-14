@@ -1214,7 +1214,10 @@ function renderFriends() {
       } else if (presence && presence.cs) {
         subHtml = `<span class="friend-sub">${escapeHtml(`${presence.cs.e ? presence.cs.e + ' ' : ''}${presence.cs.t || ''}`)}</span>`;
       } else {
-        subHtml = `<span class="friend-sub">${escapeHtml(t(`status.${status}`))}</span>`;
+        // Çevrimdışıysa "Son görülme 3 saat önce" (js/teams/shell-teams.js TSLastSeen).
+        const seen = status === 'offline' && window.TSLastSeen ? window.TSLastSeen.label(fId) : '';
+        const label = seen ? t('presence.lastSeen', { when: seen }) : t(`status.${status}`);
+        subHtml = `<span class="friend-sub fs-text s-${escapeHtml(status)}">${escapeHtml(label)}</span>`;
       }
 
       const li = document.createElement('li');
@@ -2282,6 +2285,9 @@ function connectGlobalBroker(idx, session) {
           clearTimeout(joinReqAnswerTimer);
           showToast(`${data.name} ${t('toast.joinRequestDeclined')}`, 'warn');
         } else if (data.type === 'server_invite_received') {
+          // Birebir / toplantı araması (js/teams/direct-call.js): zil çalan kart.
+          // Eski istemciler 'call' alanını yok sayıp aşağıdaki davet bildirimini gösterir.
+          if (data.call && window.TSDirectCall && window.TSDirectCall.onIncoming(data)) return;
           // Davet spamı koruması: aynı kişiden 5 sn içinde gelen tekrar davetleri yok say
           const inviteNow = Date.now();
           if (!state.lastInviteReceivedAt) state.lastInviteReceivedAt = {};
@@ -2289,6 +2295,8 @@ function connectGlobalBroker(idx, session) {
             state.lastInviteReceivedAt[data.id] = inviteNow;
             showServerInviteNotification({ id: data.id, name: data.name, roomId: data.roomId, password: data.password });
           }
+        } else if (data.type === 'call_decline' || data.type === 'call_cancel') {
+          if (window.TSDirectCall) window.TSDirectCall.onEvent(data);
         } else if (data.type === 'req_profile' || data.type === 'res_profile') {
           if (window.TSProfile) window.TSProfile.onEvent(data);
         } else if (data.type === 'req_avatar') {

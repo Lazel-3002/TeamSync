@@ -145,7 +145,8 @@ module.exports = async function run() {
     assert.strictEqual(english.documentLanguage, 'en', JSON.stringify(english, null, 2));
     assert.strictEqual(english.title, 'Language & Time', JSON.stringify(english, null, 2));
     assert.strictEqual(english.menuSettings, 'Settings', JSON.stringify(english, null, 2));
-    assert.strictEqual(english.toolbarVoice, 'Voice', JSON.stringify(english, null, 2));
+    // Üst araç çubuğu etiketi (js/teams/shell-teams.js): call.toolMic
+    assert.strictEqual(english.toolbarVoice, 'Mic', JSON.stringify(english, null, 2));
     assert.strictEqual(english.broadcast, 'Broadcast', JSON.stringify(english, null, 2));
     assert.strictEqual(english.mediaNav, 'GIF & Media', JSON.stringify(english, null, 2));
     assert.strictEqual(english.mediaTitle, 'GIF & Media', JSON.stringify(english, null, 2));
