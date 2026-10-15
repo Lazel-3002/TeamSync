@@ -1655,11 +1655,14 @@ app.whenReady().then(async () => {
   // microphone, camera or display permissions from the application shell.
   const trustedMainContents = webContents => Boolean(mainWindow && !mainWindow.isDestroyed() && webContents === mainWindow.webContents);
   const trustedMainFrame = frame => Boolean(mainWindow && !mainWindow.isDestroyed() && frame === mainWindow.webContents.mainFrame);
+  // 'clipboard-sanitized-write': navigator.clipboard.writeText/write (ID ve
+  // resim kopyalama). Pano OKUMA izni bilerek verilmiyor.
+  const MAIN_WINDOW_PERMISSIONS = ['media', 'display-capture', 'clipboard-sanitized-write'];
   session.defaultSession.setPermissionCheckHandler((webContents, permission) =>
-    trustedMainContents(webContents) && ['media', 'display-capture'].includes(permission)
+    trustedMainContents(webContents) && MAIN_WINDOW_PERMISSIONS.includes(permission)
   );
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(trustedMainContents(webContents) && ['media', 'display-capture'].includes(permission));
+    callback(trustedMainContents(webContents) && MAIN_WINDOW_PERMISSIONS.includes(permission));
   });
 
   ipcMain.on('set-screen-share-source', (event, id) => {
