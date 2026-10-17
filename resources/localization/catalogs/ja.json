@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "デバイスID APIが見つかりません（プリロードが古い可能性があります）。",
     "auth.emailConfirmationPending": "サーバーがメール確認を待っています。Supabaseダッシュボードで「Confirm email」を無効にしてください。",
     "auth.loginFailed": "ログインに失敗しました: ",
+    "auth.serverUnreachable": "サーバーに接続できません。インターネット接続を確認して、しばらくしてからもう一度お試しください。",
     "auth.profileLoadFailed": "プロフィールの読み込みに失敗しました: ",
     "auth.retry": "再試行",
     "auth.serverConfigMissing": "サーバー設定が見つかりません（.envファイルを確認してください）。",

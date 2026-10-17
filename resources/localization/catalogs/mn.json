@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "Төхөөрөмжийн ID API олдсонгүй (preload хуучирсан).",
     "auth.emailConfirmationPending": "Сервер имэйл баталгаажуулалт хүлээж байна; Supabase хяналтын самбар дээрх «Confirm email»-г идэвхгүй болгоно уу.",
     "auth.loginFailed": "Нэвтрэх амжилтгүй боллоо: ",
+    "auth.serverUnreachable": "Сервертэй холбогдож чадсангүй. Интернэт холболтоо шалгаад хэсэг хугацааны дараа дахин оролдоно уу.",
     "auth.profileLoadFailed": "Профайлыг ачаалж чадсангүй: ",
     "auth.retry": "Дахин оролдох",
     "auth.serverConfigMissing": "Серверийн тохиргоо олдсонгүй (.env файлыг шалгана уу).",

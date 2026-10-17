@@ -393,6 +393,7 @@
     "auth.creatingAccount": "Bu cihaz için yeni hesap oluşturuluyor...",
     "auth.emailConfirmationPending": "Sunucu e-posta onayı bekliyor; Supabase panelinden \"Confirm email\" kapatılmalı.",
     "auth.loginFailed": "Giriş yapılamadı: ",
+    "auth.serverUnreachable": "Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edip birazdan tekrar deneyin.",
     "auth.profileLoadFailed": "Profil yüklenemedi: ",
     "room.creatingTitle": "{room} Odası Oluşturuluyor",
     "room.joiningTitle": "{room} Odasına Katılıyor",

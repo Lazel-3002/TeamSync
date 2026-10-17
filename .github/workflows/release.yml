@@ -73,8 +73,44 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         run: npm ci
 
-      - name: Derle ve yayınla
+      # electron-builder'a yayınlatmıyoruz: .exe ve .blockmap'i paralel yüklerken
+      # ikisi de "release yok" görüp aynı etikete AYRI AYRI release açıyordu
+      # (v1.0.6, 1.0.8, 1.0.9, 1.0.10). GitHub etiket sayfasında ve indirme
+      # bağlantılarında yalnızca .blockmap'li kopyayı gösterdiği için kullanıcılar
+      # exe'yi göremiyor, latest.yml de 404 verdiği için güncelleme gelmiyordu.
+      # Bu yüzden yalnızca derliyoruz; yükleme aşağıda tek bir komutla yapılıyor.
+      - name: Derle
         if: steps.check.outputs.exists == 'false'
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Tek release olarak yayınla
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run release
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          FILES=("dist/TeamSync-Setup-$VERSION.exe" "dist/TeamSync-Setup-$VERSION.exe.blockmap" "dist/latest.yml")
+          for f in "${FILES[@]}"; do
+            [ -f "$f" ] || { echo "Eksik dosya: $f"; exit 1; }
+          done
+          gh release create "v$VERSION" "${FILES[@]}" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "$VERSION" --notes ""
+
+      # Workflow'un yeşil olması indirmenin çalıştığını göstermiyordu; burada
+      # gerçekten indirilebildiğini doğrula.
+      - name: İndirme bağlantılarını doğrula
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          BASE="https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION"
+          for f in "TeamSync-Setup-$VERSION.exe" "latest.yml"; do
+            for i in 1 2 3 4 5 6; do
+              CODE=$(curl -s -o /dev/null -I -L -w '%{http_code}' "$BASE/$f")
+              [ "$CODE" = "200" ] && break
+              sleep 20
+            done
+            echo "$f -> $CODE"
+            [ "$CODE" = "200" ] || exit 1
+          done

@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "No se encontró la API de identidad del dispositivo (el preload está desactualizado).",
     "auth.emailConfirmationPending": "El servidor está esperando la confirmación por correo electrónico; desactiva \"Confirm email\" en el panel de Supabase.",
     "auth.loginFailed": "Error al iniciar sesión: ",
+    "auth.serverUnreachable": "No se puede conectar con el servidor. Comprueba tu conexión a internet y vuelve a intentarlo en un momento.",
     "auth.profileLoadFailed": "No se pudo cargar el perfil: ",
     "auth.retry": "Reintentar",
     "auth.serverConfigMissing": "Falta la configuración del servidor (revisa el archivo .env).",

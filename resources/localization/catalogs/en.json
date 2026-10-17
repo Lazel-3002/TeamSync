@@ -393,6 +393,7 @@
     "auth.creatingAccount": "Creating a new account for this device...",
     "auth.emailConfirmationPending": "The server is waiting for email confirmation; disable \"Confirm email\" in the Supabase dashboard.",
     "auth.loginFailed": "Login failed: ",
+    "auth.serverUnreachable": "Can't reach the server. Check your internet connection and try again in a moment.",
     "auth.profileLoadFailed": "Failed to load profile: ",
     "room.creatingTitle": "{room} — Creating Room",
     "room.joiningTitle": "{room} — Joining Room",

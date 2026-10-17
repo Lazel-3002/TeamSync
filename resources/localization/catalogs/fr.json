@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "API d'identité de l'appareil introuvable (le préchargement est obsolète).",
     "auth.emailConfirmationPending": "Le serveur attend la confirmation par e-mail ; désactivez « Confirm email » dans le tableau de bord Supabase.",
     "auth.loginFailed": "Échec de la connexion : ",
+    "auth.serverUnreachable": "Impossible de joindre le serveur. Vérifiez votre connexion Internet et réessayez dans un instant.",
     "auth.profileLoadFailed": "Échec du chargement du profil : ",
     "auth.retry": "Réessayer",
     "auth.serverConfigMissing": "Configuration du serveur manquante (vérifiez le fichier .env).",

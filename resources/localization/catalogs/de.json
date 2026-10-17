@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "Geräte-Identitäts-API nicht gefunden (Preload ist veraltet).",
     "auth.emailConfirmationPending": "Der Server wartet auf die E-Mail-Bestätigung; deaktiviere „Confirm email\" im Supabase-Dashboard.",
     "auth.loginFailed": "Anmeldung fehlgeschlagen: ",
+    "auth.serverUnreachable": "Der Server ist nicht erreichbar. Prüfe deine Internetverbindung und versuche es gleich noch einmal.",
     "auth.profileLoadFailed": "Profil konnte nicht geladen werden: ",
     "auth.retry": "Erneut versuchen",
     "auth.serverConfigMissing": "Serverkonfiguration fehlt (bitte die .env-Datei prüfen).",

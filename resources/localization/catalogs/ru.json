@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "API идентификации устройства не найден (preload устарел).",
     "auth.emailConfirmationPending": "Сервер ожидает подтверждения по электронной почте; отключите «Confirm email» в панели Supabase.",
     "auth.loginFailed": "Не удалось войти: ",
+    "auth.serverUnreachable": "Не удаётся связаться с сервером. Проверьте подключение к интернету и повторите попытку чуть позже.",
     "auth.profileLoadFailed": "Не удалось загрузить профиль: ",
     "auth.retry": "Повторить",
     "auth.serverConfigMissing": "Отсутствует конфигурация сервера (проверьте файл .env).",

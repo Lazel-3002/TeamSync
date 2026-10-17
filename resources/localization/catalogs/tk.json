@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "Enjam kimlik API tapylmady (preload köne).",
     "auth.emailConfirmationPending": "Server e-poçta tassyklamasyna garaşýar; Supabase panelinde \"Confirm email\" öçüriň.",
     "auth.loginFailed": "Giriş başa barmady: ",
+    "auth.serverUnreachable": "Serwere birigip bolmady. Internet baglanyşygyňyzy barlaň we biraz wagtdan soň gaýtadan synanyşyň.",
     "auth.profileLoadFailed": "Profil ýüklenip bilmedi: ",
     "auth.retry": "Gaýtadan synanyş",
     "auth.serverConfigMissing": "Server konfigurasiýasy ýok (.env faýlyny barlaň).",

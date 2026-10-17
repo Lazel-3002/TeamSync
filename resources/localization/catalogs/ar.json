@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "لم يتم العثور على واجهة برمجة هوية الجهاز (الإصدار قديم).",
     "auth.emailConfirmationPending": "الخادم بانتظار تأكيد البريد الإلكتروني؛ عطّل خيار \"Confirm email\" من لوحة Supabase.",
     "auth.loginFailed": "فشل تسجيل الدخول: ",
+    "auth.serverUnreachable": "تعذّر الوصول إلى الخادم. تحقّق من اتصالك بالإنترنت وحاول مرة أخرى بعد قليل.",
     "auth.profileLoadFailed": "فشل تحميل الملف الشخصي: ",
     "auth.retry": "إعادة المحاولة",
     "auth.serverConfigMissing": "إعدادات الخادم مفقودة (تحقق من ملف .env).",

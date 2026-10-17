@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "未找到设备身份 API（预加载脚本已过期）。",
     "auth.emailConfirmationPending": "服务器正在等待邮箱确认；请在 Supabase 控制台中关闭“Confirm email”。",
     "auth.loginFailed": "登录失败：",
+    "auth.serverUnreachable": "无法连接到服务器。请检查网络连接，稍后再试。",
     "auth.profileLoadFailed": "加载个人资料失败：",
     "auth.retry": "重试",
     "auth.serverConfigMissing": "缺少服务器配置（请检查 .env 文件）。",

@@ -390,6 +390,7 @@
     "auth.deviceApiMissing": "Құрылғы жеке басы API табылмады (preload ескірген).",
     "auth.emailConfirmationPending": "Сервер электрондық пошта растауын күтуде; Supabase панелінде «Confirm email» опциясын өшіріңіз.",
     "auth.loginFailed": "Кіру сәтсіз аяқталды: ",
+    "auth.serverUnreachable": "Серверге қосылу мүмкін емес. Интернет байланысын тексеріп, біраздан кейін қайталап көріңіз.",
     "auth.profileLoadFailed": "Профильді жүктеу мүмкін болмады: ",
     "auth.retry": "Қайталау",
     "auth.serverConfigMissing": "Сервер конфигурациясы жоқ (.env файлын тексеріңіз).",

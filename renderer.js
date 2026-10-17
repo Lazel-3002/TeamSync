@@ -3071,6 +3071,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar, id: state.friendId });
   };
 
+  // Sunucu kapalıysa (ör. Supabase projesi uykuda) ya da internet yoksa
+  // supabase-js ağ hatasını AuthRetryableFetchError / status 0 olarak döner.
+  // Bu durumda "hesap yok" sanıp kayıt denemek anlamsız; kullanıcıya da
+  // ham "Failed to fetch" yerine anlaşılır bir mesaj gösterilir.
+  function isServerUnreachable(err) {
+    if (!err) return false;
+    if (err.name === 'AuthRetryableFetchError') return true;
+    if (typeof err.status === 'number' && (err.status === 0 || err.status >= 500)) return true;
+    return /failed to fetch|networkerror|load failed/i.test(String(err.message || ''));
+  }
+
   async function deviceLogin(slot) {
     if (!Number.isInteger(slot) || slot < 0) {
       const defaultAccount = getDefaultAccount();
@@ -3095,6 +3106,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         password: creds.password
       });
       if (error) {
+        if (isServerUnreachable(error)) throw error;
         // Bu slotun hesabı henüz yok — bir kez oluşturulur.
         setAuthStatus(t('auth.creatingAccount'));
         const signUpRes = await supabaseClient.auth.signUp({
@@ -3112,7 +3124,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       await loadSupabaseProfile(data.user.id);
     } catch (e) {
       console.error('Device login error:', e);
-      setAuthStatus(t('auth.loginFailed') + (e.message || e), true);
+      setAuthStatus(isServerUnreachable(e)
+        ? t('auth.serverUnreachable')
+        : t('auth.loginFailed') + (e.message || e), true);
     }
   }
 
@@ -7721,6 +7735,7 @@ const I18N = {
     'auth.creatingAccount': 'Bu cihaz için yeni hesap oluşturuluyor...',
     'auth.emailConfirmationPending': 'Sunucu e-posta onayı bekliyor; Supabase panelinden "Confirm email" kapatılmalı.',
     'auth.loginFailed': 'Giriş yapılamadı: ',
+    'auth.serverUnreachable': 'Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edip birazdan tekrar deneyin.',
     'auth.profileLoadFailed': 'Profil yüklenemedi: ',
     'room.creatingTitle': '{room} Odası Oluşturuluyor',
     'room.joiningTitle': '{room} Odasına Katılıyor',
@@ -7960,6 +7975,7 @@ const I18N = {
     'auth.creatingAccount': 'Creating a new account for this device...',
     'auth.emailConfirmationPending': 'The server is waiting for email confirmation; disable "Confirm email" in the Supabase dashboard.',
     'auth.loginFailed': 'Login failed: ',
+    'auth.serverUnreachable': "Can't reach the server. Check your internet connection and try again in a moment.",
     'auth.profileLoadFailed': 'Failed to load profile: ',
     'room.creatingTitle': '{room} — Creating Room',
     'room.joiningTitle': '{room} — Joining Room',

@@ -1,0 +1,31 @@
+# Supabase uyandırma:
+# Ücretsiz Supabase projesi 7 gün istek almazsa duraklatılır. Duraklayınca
+# sunucu adresi DNS'te bile çözülmez ve uygulamada herkes "Giriş yapılamadı"
+# hatası alır (2026-10-17'de tam olarak bu oldu). Bu görev 3 günde bir
+# veritabanına tek satırlık, yalnızca id okuyan bir istek atarak projeyi
+# uyanık tutar. Kullanıcı verisi okunmaz, yanıt hiçbir yere kaydedilmez.
+name: Supabase uyandırma
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Veritabanına istek at
+        env:
+          # main.js'teki gömülü değerlerle aynı; anon key herkese açık bir anahtardır.
+          SUPABASE_URL: https://zperyrjpfumtblossyod.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZXJ5cmpwZnVtdGJsb3NzeW9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NjU5ODAsImV4cCI6MjA5OTU0MTk4MH0.BwA7IabSS3qySc0EF3XI__a4J8RlBSa5cLf1HhT4Bc4
+        run: |
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "Supabase yanıtı: $CODE"
+          # Proje zaten duraklamışsa istek bunu düzeltmez; görevin kırmızı
+          # olması GitHub'dan e-posta gelmesini sağlar, panelden "Restore" gerekir.
+          [ "$CODE" = "200" ] || exit 1
