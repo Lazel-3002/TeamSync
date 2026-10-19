@@ -401,51 +401,129 @@ const SIGNALING_BROKERS = [
 // broker rotasyonlarını geçersiz kılmak için bu kimliği artırır.
 let mqttSessionId = 0;
 
+// ÇOKLU BROKER İSTEMCİSİ. Eskiden her istemci listeden TEK broker'a bağlanıyor,
+// art arda 3 yeniden bağlanma denemesinde sıradakine geçiyor ve bir daha geri
+// dönmüyordu. Broker gerçekten ölmese bile 3-4 saniyelik bir Wi-Fi kopması,
+// uyku modu ya da tek seferlik bir zaman aşımı istemciyi kalıcı olarak yedek
+// broker'a taşıyordu; karşı taraf ilk broker'da kaldığı için iki kişi FARKLI
+// broker'larda kalıyor, ne DM ne arama sinyali (offer/answer/ICE) ulaşıyordu
+// ("ikimiz de birbirimizi duymuyoruz, mesajlar da gitmiyor").
+// Artık bütün broker'lara aynı anda bağlanılır, her yayın bağlı olan HER
+// broker'a gider ve gelen kopyalar ayıklanır. En az bir ortak broker ayakta
+// olduğu sürece iki taraf buluşur. Dışarıya mqtt.js istemcisinin kullanılan
+// alt kümesi (publish/subscribe/unsubscribe/end/on/connected) sunulur, böylece
+// çağıran kod değişmez. 'connect' yalnızca hiç bağlantı yokken ilk broker
+// bağlandığında yayılır; sonradan bağlanan broker'lara abonelikler sessizce
+// kopyalanır.
+const MQTT_DEDUPE_MS = 2000; // oda hello'su 3 sn'de bir aynı içerikle gidiyor; bundan kısa olmalı
+
+function createMultiBrokerClient(tag, makeClientId) {
+  const handlers = {};
+  const subs = new Map();   // konu -> abonelik seçenekleri
+  const seen = new Map();   // içerik özeti -> ilk görülme zamanı
+  let anyConnected = false;
+  let ended = false;
+
+  const emit = (ev, ...args) => (handlers[ev] || []).forEach(fn => {
+    try { fn(...args); } catch (e) { console.error(`MQTT [${tag}] ${ev} işleyicisi hata verdi:`, e); }
+  });
+
+  // Aynı mesaj her broker'dan bir kez gelir. Konu + baytların FNV-1a özeti ve
+  // uzunluk anahtar olarak tutulur; kısa pencerede ikinci kopya yutulur.
+  const isDuplicate = (topic, message) => {
+    const now = Date.now();
+    if (seen.size > 500) seen.forEach((ts, k) => { if (now - ts > MQTT_DEDUPE_MS) seen.delete(k); });
+    let h = 2166136261;
+    for (let i = 0; i < topic.length; i++) { h ^= topic.charCodeAt(i); h = Math.imul(h, 16777619); }
+    const len = message ? message.length : 0;
+    for (let i = 0; i < len; i++) { h ^= message[i]; h = Math.imul(h, 16777619); }
+    const key = topic.length + ':' + len + ':' + (h >>> 0);
+    const ts = seen.get(key);
+    if (ts != null && now - ts < MQTT_DEDUPE_MS) return true;
+    seen.set(key, now);
+    return false;
+  };
+
+  const clients = SIGNALING_BROKERS.map((url) => {
+    const c = mqtt.connect(url, {
+      clientId: makeClientId(),
+      keepalive: 60,
+      reconnectPeriod: 2000,
+      connectTimeout: 6000
+    });
+    c.on('connect', () => {
+      if (ended) { try { c.end(true); } catch (e) {} return; }
+      console.log(`🔗 MQTT [${tag}] bağlandı: ${url}`);
+      subs.forEach((opts, topic) => { try { c.subscribe(topic, opts); } catch (e) {} });
+      if (!anyConnected) { anyConnected = true; emit('connect'); }
+    });
+    c.on('close', () => {
+      if (ended) return;
+      if (anyConnected && !clients.some(x => x.connected)) { anyConnected = false; emit('close'); }
+    });
+    c.on('error', (err) => {
+      if (ended) return;
+      console.warn(`MQTT [${tag}] ${url} hatası:`, err && err.message ? err.message : err);
+    });
+    c.on('message', (topic, message, packet) => {
+      if (ended || isDuplicate(topic, message)) return;
+      emit('message', topic, message, packet);
+    });
+    return c;
+  });
+
+  const live = () => clients.filter(c => c.connected);
+
+  return {
+    get connected() { return !ended && clients.some(c => c.connected); },
+    on(ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return this; },
+    publish(topic, message, opts, cb) {
+      if (typeof opts === 'function') { cb = opts; opts = undefined; }
+      const targets = live();
+      // Hiçbiri bağlı değilse mqtt.js'in çevrimdışı kuyruğuna bırak (eski davranış).
+      (targets.length ? targets : clients).forEach(c => { try { c.publish(topic, message, opts || {}); } catch (e) {} });
+      if (cb) setTimeout(() => cb(null), 0);
+      return this;
+    },
+    subscribe(topic, opts, cb) {
+      if (typeof opts === 'function') { cb = opts; opts = undefined; }
+      const list = Array.isArray(topic) ? topic : [topic];
+      list.forEach(t => subs.set(t, opts || { qos: 0 }));
+      // Geri çağrı ilk onaylayan broker'da bir kez çağrılır. Hiçbiri bağlı
+      // değilse çağrılmaz; abonelik bağlanınca uygulanır (çağıranlar zaten
+      // zaman aşımıyla bekliyor).
+      let done = false;
+      const finish = (err, granted) => { if (!done) { done = true; if (cb) cb(err || null, granted); } };
+      live().forEach(c => { try { c.subscribe(topic, opts || { qos: 0 }, finish); } catch (e) {} });
+      return this;
+    },
+    unsubscribe(topic, opts, cb) {
+      if (typeof opts === 'function') { cb = opts; opts = undefined; }
+      const list = Array.isArray(topic) ? topic : [topic];
+      list.forEach(t => subs.delete(t));
+      live().forEach(c => { try { c.unsubscribe(topic); } catch (e) {} });
+      if (cb) setTimeout(() => cb(null), 0);
+      return this;
+    },
+    end(force) {
+      ended = true;
+      clients.forEach(c => { try { c.end(force); } catch (e) {} });
+      return this;
+    }
+  };
+}
+
 function setupInternetSignaling(roomId, myId, myName) {
   if (mqttClient) { try { mqttClient.end(true); } catch (e) {} }
   const session = ++mqttSessionId;
-  let brokerIndex = 0;
-  let reconnectAttempts = 0;
 
-  const connectBroker = (idx) => {
+  const connectBroker = () => {
     if (session !== mqttSessionId) return; // oturum kapandı ya da yenilendi
-    brokerIndex = idx % SIGNALING_BROKERS.length;
-    const brokerUrl = SIGNALING_BROKERS[brokerIndex];
-    console.log(`🌐 Sinyalleşme broker'ı deneniyor (${brokerIndex + 1}/${SIGNALING_BROKERS.length}): ${brokerUrl}`);
-
-    const client = mqtt.connect(brokerUrl, {
-      clientId: 'sig-' + myId + '-' + Math.random().toString(16).slice(2, 8),
-      keepalive: 60,
-      reconnectPeriod: 1000,
-      connectTimeout: 6000
-    });
+    const client = createMultiBrokerClient('oda', () => 'sig-' + myId + '-' + Math.random().toString(16).slice(2, 8));
     mqttClient = client;
-    reconnectAttempts = 0;
-
-    // Aktif broker birkaç kez üst üste bağlanamazsa sıradakine geç. mqtt.js her
-    // yeniden deneme öncesi 'reconnect' yayar; art arda 3 deneme (~ilk timeout +
-    // 3sn) başarısız olursa bu broker'ı ölü sayıp döndürüyoruz.
-    const rotate = () => {
-      if (session !== mqttSessionId || mqttClient !== client) return;
-      console.warn(`⚠️ Broker yanıt vermiyor (${brokerUrl}), sıradaki broker'a geçiliyor...`);
-      try { client.end(true); } catch (e) {}
-      connectBroker(brokerIndex + 1);
-    };
-
-    client.on('reconnect', () => {
-      if (mqttClient !== client) return;
-      reconnectAttempts++;
-      if (reconnectAttempts >= 3) rotate();
-    });
-
-    client.on('error', (err) => {
-      if (mqttClient !== client) return;
-      console.error('MQTT signaling connection error:', err && err.message ? err.message : err);
-    });
 
     client.on('connect', () => {
       if (mqttClient !== client) return; // bayat istemci geri çağrısı yok sayılır
-      reconnectAttempts = 0;
     console.log('🌐 İnternet sunucusuna bağlanıldı (MQTT)');
     // qos:1 istenir: broker, publish tarafında QoS 1 ile gönderilen dosya/GIF
     // chunk'larını (teamsync/room/<id>/file) yine de min(pub,sub) kuralıyla
@@ -618,7 +696,7 @@ function setupInternetSignaling(roomId, myId, myName) {
   });
   };
 
-  connectBroker(0);
+  connectBroker();
 }
 
 // Oda kimliğini bilen herkes (şifreyi bilmese bile) hello'da isRoomFounder:true
@@ -2023,9 +2101,8 @@ function publishPresence() {
 // Arkadaşlık/presence kanalı da oda sinyalleşmesiyle aynı zaafı taşıyordu:
 // TEK sabit broker (broker.emqx.io) down/hız-sınırlı/engelli olduğunda
 // arkadaşlık isteği, sunucuya katılma isteği ve DM'ler sessizce HİÇ
-// iletilmiyordu ("istek atılmıyor" şikayetinin kök nedeni). Aynı deterministik
-// SIGNALING_BROKERS listesi ve rotasyon deseni burada da kullanılır — tam
-// kesintide tüm istemciler sıradaki aynı yedek broker'da yeniden buluşur.
+// iletilmiyordu ("istek atılmıyor" şikayetinin kök nedeni). Oda sinyalleşmesiyle
+// aynı çoklu broker istemcisi kullanılır (bkz. createMultiBrokerClient).
 let globalMqttSessionId = 0;
 
 // Hangi kimlikle bağlanıldığını tutar. Abonelik konusu (teamsync/user/<id>/
@@ -2055,43 +2132,13 @@ function setupGlobalMQTT() {
   }
 
   globalMqttIdentity = state.friendId;
-  connectGlobalBroker(0, ++globalMqttSessionId);
+  connectGlobalBroker(++globalMqttSessionId);
 }
 
-function connectGlobalBroker(idx, session) {
-  if (session !== globalMqttSessionId) return; // çıkış/hesap değişimi: bayat rotasyon
-  const brokerIndex = idx % SIGNALING_BROKERS.length;
-  const brokerUrl = SIGNALING_BROKERS[brokerIndex];
-  console.log(`🔗 Arkadaşlık broker'ı deneniyor (${brokerIndex + 1}/${SIGNALING_BROKERS.length}): ${brokerUrl}`);
-
-  const client = mqtt.connect(brokerUrl, {
-    clientId: 'glob-' + state.friendId + '-' + state.myId,
-    keepalive: 60,
-    reconnectPeriod: 1000,
-    connectTimeout: 6000
-  });
+function connectGlobalBroker(session) {
+  if (session !== globalMqttSessionId) return; // çıkış/hesap değişimi: bayat oturum
+  const client = createMultiBrokerClient('arkadaşlık', () => 'glob-' + state.friendId + '-' + state.myId);
   state.globalMqtt = client;
-  let reconnectAttempts = 0;
-
-  // Aktif broker art arda 3 denemede bağlanamazsa ölü sayıp sıradakine geç
-  // (setupInternetSignaling'deki rotate deseninin birebir karşılığı).
-  const rotate = () => {
-    if (session !== globalMqttSessionId || state.globalMqtt !== client) return;
-    console.warn(`⚠️ Arkadaşlık broker'ı yanıt vermiyor (${brokerUrl}), sıradakine geçiliyor...`);
-    try { client.end(true); } catch (e) {}
-    connectGlobalBroker(brokerIndex + 1, session);
-  };
-
-  client.on('reconnect', () => {
-    if (state.globalMqtt !== client) return;
-    reconnectAttempts++;
-    if (reconnectAttempts >= 3) rotate();
-  });
-
-  client.on('error', (err) => {
-    if (state.globalMqtt !== client) return;
-    console.error('MQTT global connection error:', err);
-  });
 
   client.on('connect', () => {
     // Hesap değiştirme yarışı: çıkışta state.globalMqtt null'lanır ama eski
@@ -2100,8 +2147,7 @@ function connectGlobalBroker(idx, session) {
       try { client.end(true); } catch (e) {}
       return;
     }
-    reconnectAttempts = 0;
-    console.log(`🔗 Global MQTT (Arkadaşlık) bağlandı: ${brokerUrl}`);
+    console.log('🔗 Global MQTT (Arkadaşlık) bağlandı');
     // qos:1: dm_file_start/dm_file_chunk publish'leri QoS 1 ile atılıyor;
     // abonelik QoS 0 kalırsa broker teslimde min(pub,sub)=0'a düşürür ve
     // büyük GIF/dosya transferlerinde tek chunk kaybı yine sessizce oluşur.
@@ -2827,18 +2873,39 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (upBtn && window.electronAPI && window.electronAPI.updateGetStatus) {
       let upState = { state: 'idle' };
       let upResetTimer = null;
+      // Raydaki düğme Ayarlar ile aynı kalıpta: simge + kısa etiket; uzun
+      // açıklama ipucunda (title). İndirme sırasında simgenin çevresinde
+      // ilerleme halkası döner, güncelleme hazır olunca düğme vurgulanır.
+      const UP_ICONS = {
+        refresh: '<path d="M21 12a9 9 0 0 1-15.36 6.36L3 16"/><path d="M3 12a9 9 0 0 1 15.36-6.36L21 8"/><polyline points="21 3 21 8 16 8"/><polyline points="3 21 3 16 8 16"/>',
+        download: '<path d="M12 4v11"/><polyline points="7 10 12 15 17 10"/><path d="M5 20h14"/>',
+        install: '<path d="M12 20V9"/><polyline points="7 13 12 8 17 13"/><path d="M5 4h14"/>',
+        check: '<polyline points="5 12.5 10 17.5 19 7"/>',
+        alert: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="7.5" x2="12" y2="12.5"/><line x1="12" y1="16.2" x2="12.01" y2="16.2"/>'
+      };
+      const RING_LEN = 2 * Math.PI * 13; // ilerleme halkasının çevresi (r=13)
       const renderUpdateBtn = () => {
         const s = upState.state;
         if (s === 'dev') { upBtn.classList.add('hidden'); return; }
         upBtn.classList.remove('hidden');
         upBtn.disabled = (s === 'checking' || s === 'downloading');
+        upBtn.classList.add('rail-btn', 'rail-app', 'rail-update');
         upBtn.classList.toggle('update-ready', s === 'downloaded');
-        if (s === 'checking') upBtn.textContent = 'Denetleniyor…';
-        else if (s === 'downloading') upBtn.textContent = 'Güncelleme indiriliyor… %' + (upState.percent || 0);
-        else if (s === 'downloaded') upBtn.textContent = '🔄 Güncelle ve Yeniden Başlat' + (upState.version ? ' (v' + upState.version + ')' : '');
-        else if (s === 'none') upBtn.textContent = '✓ Uygulama güncel';
-        else if (s === 'error') upBtn.textContent = 'Güncelleme hatası — tekrar dene';
-        else upBtn.textContent = 'Güncellemeleri Denetle';
+        upBtn.dataset.state = s;
+        const ver = upState.version ? ' v' + upState.version : '';
+        const pct = Math.max(0, Math.min(100, upState.percent || 0));
+        let icon = 'refresh', label = 'Güncelle', tip = 'Güncellemeleri denetle';
+        if (s === 'checking') { label = 'Bakılıyor'; tip = 'Yeni sürüm denetleniyor'; }
+        else if (s === 'downloading') { icon = 'download'; label = '%' + pct; tip = 'Yeni sürüm indiriliyor' + ver + ' (%' + pct + ')'; }
+        else if (s === 'downloaded') { icon = 'install'; label = 'Yükle'; tip = 'Yeni sürüm hazır' + ver + ' — tıkla, kurup yeniden başlatsın'; }
+        else if (s === 'none') { icon = 'check'; label = 'Güncel'; tip = 'En güncel sürümü kullanıyorsun'; }
+        else if (s === 'error') { icon = 'alert'; label = 'Tekrar'; tip = 'Güncelleme denetlenemedi — tekrar denemek için tıkla'; }
+        const ring = s === 'downloading'
+          ? `<svg class="rail-update-ring" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" class="ring-bg"/><circle cx="16" cy="16" r="13" class="ring-fg" stroke-dasharray="${RING_LEN.toFixed(2)}" stroke-dashoffset="${(RING_LEN * (1 - pct / 100)).toFixed(2)}"/></svg>`
+          : '';
+        upBtn.innerHTML = `<span class="rail-icon">${ring}<svg class="rail-update-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UP_ICONS[icon]}</svg>${s === 'downloaded' ? '<span class="rail-update-dot"></span>' : ''}</span><span class="rail-label">${label}</span>`;
+        upBtn.title = tip;
+        upBtn.setAttribute('aria-label', tip);
         // "Güncel" bilgisi birkaç saniye görünüp normal etikete dönsün.
         if (upResetTimer) { clearTimeout(upResetTimer); upResetTimer = null; }
         if (s === 'none') {
@@ -3002,6 +3069,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   const DEVICE_ACCOUNTS_KEY = 'teamsync_device_accounts';
   const ACTIVE_SLOT_KEY = 'teamsync_active_slot';
   const DEFAULT_ACCOUNT_KEY = 'teamsync_default_account';
+  // Bir cihazda en fazla 3 hesap (bu cihazda açılanlar + giriş koduyla
+  // eklenenler). Kodla eklenen hesaplar main.js'te 1000 ve sonrası slotlarda.
+  const MAX_DEVICE_ACCOUNTS = 3;
+  const IMPORTED_SLOT_BASE = 1000;
+  const isImportedSlot = slot => slot >= IMPORTED_SLOT_BASE;
 
   function getDeviceAccounts() {
     try { return JSON.parse(localStorage.getItem(DEVICE_ACCOUNTS_KEY)) || []; } catch (e) { return []; }
@@ -3021,6 +3093,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const remaining = accounts.filter(item => item.slot !== slot);
     saveDeviceAccounts(remaining);
+    if (isImportedSlot(slot) && window.electronAPI.forgetImportedAccount) {
+      try { await window.electronAPI.forgetImportedAccount(slot); } catch (e) {}
+    }
     if (getActiveSlot() === slot) {
       if (remaining.length) {
         remaining.sort((a, b) => a.slot - b.slot);
@@ -3070,6 +3145,37 @@ window.addEventListener('DOMContentLoaded', async () => {
   window.syncActiveDeviceAccount = () => {
     upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar, id: state.friendId });
   };
+  // Ayarlar > Hesap ve Cihaz paneli (renderAccountSettings) buradan okur.
+  window.TSAccounts = {
+    activeSlot: () => getActiveSlot(),
+    count: () => getDeviceAccounts().length,
+    max: MAX_DEVICE_ACCOUNTS
+  };
+
+  // Hangi hesabın hangi cihazda açıldığı Supabase'de tutulur (public.
+  // device_accounts, bkz. supabase/device_accounts.sql). Kayıt başarısız olsa
+  // bile giriş etkilenmez.
+  async function registerDeviceAccount(userId) {
+    if (!supabaseClient || !userId || !window.electronAPI || !window.electronAPI.getDeviceId) return;
+    try {
+      const deviceId = await window.electronAPI.getDeviceId();
+      if (!deviceId) return;
+      let appVersion = null;
+      try { appVersion = await window.electronAPI.getAppVersion(); } catch (e) {}
+      const { error } = await supabaseClient.from('device_accounts').upsert({
+        device_id: deviceId,
+        user_id: userId,
+        friend_id: state.friendId || null,
+        account_name: state.myName || null,
+        kind: isImportedSlot(getActiveSlot()) ? 'code' : 'local',
+        app_version: appVersion || null,
+        last_seen: new Date().toISOString()
+      }, { onConflict: 'device_id,user_id' });
+      if (error) console.warn('Cihaz kaydı yazılamadı:', error.message);
+    } catch (e) {
+      console.warn('Cihaz kaydı yazılamadı:', e && e.message ? e.message : e);
+    }
+  }
 
   // Sunucu kapalıysa (ör. Supabase projesi uykuda) ya da internet yoksa
   // supabase-js ağ hatasını AuthRetryableFetchError / status 0 olarak döner.
@@ -3101,12 +3207,22 @@ window.addEventListener('DOMContentLoaded', async () => {
     setAuthStatus(t('auth.verifyingDevice'));
     try {
       const creds = await window.electronAPI.getDeviceCredentials(slot);
+      if (!creds) throw new Error(t('auth.codeInvalid'));
       let { data, error } = await supabaseClient.auth.signInWithPassword({
         email: creds.email,
         password: creds.password
       });
       if (error) {
         if (isServerUnreachable(error)) throw error;
+        // Kodla eklenen hesap başka bir cihaza ait: burada YENİ hesap açmak
+        // yanlış olur. Kod geçersizse unutulur, kullanıcı listeye döner.
+        if (isImportedSlot(slot)) {
+          const known = getDeviceAccounts().some(a => a.slot === slot);
+          if (!known && window.electronAPI.forgetImportedAccount) {
+            try { await window.electronAPI.forgetImportedAccount(slot); } catch (e) {}
+          }
+          throw new Error(t('auth.codeNotFound'));
+        }
         // Bu slotun hesabı henüz yok — bir kez oluşturulur.
         setAuthStatus(t('auth.creatingAccount'));
         const signUpRes = await supabaseClient.auth.signUp({
@@ -3142,6 +3258,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     container.innerHTML = '';
 
     const deviceList = getDeviceAccounts();
+    updateAccountLimitUi(deviceList.length);
     const legacyList = (await getAccounts()).filter(acc => acc && acc.id && !deviceList.some(device => device.id === acc.id));
     const list = [
       ...deviceList.map(acc => ({ ...acc, accountType: 'device' })),
@@ -3172,7 +3289,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         ${avatarHtml}
         <div class="account-row-info">
           <div class="account-row-name">${escapeHtml(acc.name || 'Anonim')}</div>
-          <div class="account-row-id">Bu cihazın kimliği · Hesap #${acc.slot + 1}${idSuffix}</div>
+          <div class="account-row-id">${acc.accountType === 'device' && isImportedSlot(acc.slot) ? 'Giriş koduyla eklendi' : 'Bu cihazın kimliği · Hesap #' + (acc.slot + 1)}${idSuffix}</div>
         </div>
         <div class="account-row-actions">
           <button class="account-row-star-btn${isDefaultAccount ? ' is-default' : ''}" type="button" title="${isDefaultAccount ? 'Ana hesap (kaldırmak için tıkla)' : 'Ana hesap yap'}" aria-label="Ana hesap yap"></button>
@@ -3367,6 +3484,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.querySelector('.login-card').classList.add('expanded');
 
     upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar, id: state.friendId });
+    registerDeviceAccount(profile.id);
 
     renderFriends();
     setupGlobalMQTT();
@@ -3389,17 +3507,84 @@ window.addEventListener('DOMContentLoaded', async () => {
     stepAction.classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
   });
 
+  function updateAccountLimitUi(count) {
+    const full = count >= MAX_DEVICE_ACCOUNTS;
+    const note = document.getElementById('accounts-limit-note');
+    if (note) note.textContent = t('auth.accountCount', { n: count, max: MAX_DEVICE_ACCOUNTS });
+    const newBtn = document.getElementById('btn-new-account');
+    if (newBtn) newBtn.classList.toggle('is-limit', full);
+  }
+
   document.getElementById('btn-new-account').addEventListener('click', () => {
     if (supabaseClient) {
-      // Aynı cihaz kimliği altında yeni slot aç
       const list = getDeviceAccounts();
-      const nextSlot = list.length ? Math.max(...list.map(a => a.slot)) + 1 : 0;
+      if (list.length >= MAX_DEVICE_ACCOUNTS) {
+        showToast(t('auth.accountLimit'), 'warn');
+        return;
+      }
+      // Aynı cihaz kimliği altında yeni slot aç (kodla eklenenler sayılmaz)
+      const local = list.filter(a => !isImportedSlot(a.slot));
+      const nextSlot = local.length ? Math.max(...local.map(a => a.slot)) + 1 : 0;
       deviceLogin(nextSlot);
       return;
     }
     document.getElementById('step-accounts').classList.add('hidden');
     document.getElementById('step-name').classList.remove('hidden');
     document.getElementById('btn-back-accounts').classList.remove('hidden');
+  });
+
+  // Kodla giriş: başka cihazdaki bir hesabın Ayarlar > Hesap ve Cihaz'dan
+  // kopyalanan giriş kodu yapıştırılır, hesap bu cihaza eklenir.
+  const codeBox = document.getElementById('code-login-box');
+  const codeInput = document.getElementById('code-login-input');
+  const codeError = document.getElementById('code-login-error');
+  const showCodeError = (msg) => {
+    if (!codeError) return;
+    codeError.textContent = msg || '';
+    codeError.classList.toggle('hidden', !msg);
+  };
+  document.getElementById('btn-code-login')?.addEventListener('click', () => {
+    if (!codeBox) return;
+    const open = codeBox.classList.toggle('hidden') === false;
+    showCodeError('');
+    if (open && codeInput) codeInput.focus();
+  });
+  async function submitCodeLogin() {
+    if (!codeInput || !window.electronAPI || !window.electronAPI.importAccountCode) return;
+    if (!supabaseClient) { showCodeError(t('auth.serverConfigMissing')); return; }
+    const code = codeInput.value.replace(/\s+/g, '');
+    if (!code) return;
+    const res = await window.electronAPI.importAccountCode(code).catch(() => null);
+    if (!res || !res.ok) {
+      showCodeError(res && res.error === 'storage' ? t('auth.codeStorageFailed') : t('auth.codeInvalid'));
+      return;
+    }
+    const list = getDeviceAccounts();
+    if (!list.some(a => a.slot === res.slot) && list.length >= MAX_DEVICE_ACCOUNTS) {
+      if (!res.local && window.electronAPI.forgetImportedAccount) {
+        try { await window.electronAPI.forgetImportedAccount(res.slot); } catch (e) {}
+      }
+      showCodeError(t('auth.accountLimit'));
+      return;
+    }
+    codeInput.value = '';
+    showCodeError('');
+    codeBox.classList.add('hidden');
+    await deviceLogin(res.slot);
+    // Giriş başarısızsa (kod bulunamadı) hata mesajı auth ekranında görünür;
+    // "Tekrar dene" yerine listeye dönebilmesi için hesap listesini göster.
+    if (!document.getElementById('step-auth').classList.contains('hidden') &&
+        !btnRetryAuth.classList.contains('hidden') && isImportedSlot(res.slot) &&
+        !getDeviceAccounts().some(a => a.slot === res.slot)) {
+      const msg = authStatusText ? authStatusText.textContent : '';
+      await renderDeviceAccounts();
+      codeBox.classList.remove('hidden');
+      showCodeError(msg);
+    }
+  }
+  document.getElementById('code-login-submit')?.addEventListener('click', submitCodeLogin);
+  codeInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitCodeLogin(); }
   });
 
   document.getElementById('btn-back-accounts').addEventListener('click', async () => {
@@ -7736,6 +7921,25 @@ const I18N = {
     'auth.emailConfirmationPending': 'Sunucu e-posta onayı bekliyor; Supabase panelinden "Confirm email" kapatılmalı.',
     'auth.loginFailed': 'Giriş yapılamadı: ',
     'auth.serverUnreachable': 'Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edip birazdan tekrar deneyin.',
+    'auth.codeLogin': "Kodla Giriş Yap",
+    'auth.codePlaceholder': "Diğer cihazdaki hesap giriş kodunu yapıştır (TS1-…)",
+    'auth.codeSubmit': "Giriş Yap",
+    'auth.codeInvalid': "Bu kod geçerli değil. Kodu eksiksiz kopyaladığından emin ol.",
+    'auth.codeNotFound': "Bu koda ait bir hesap bulunamadı.",
+    'auth.codeStorageFailed': "Kod bu cihaza kaydedilemedi.",
+    'auth.accountLimit': "Bu cihazda en fazla 3 hesap olabilir. Yeni hesap eklemek için önce birini sil.",
+    'auth.accountCount': "Bu cihazdaki hesaplar: {n}/{max}",
+    'settings.account': "Hesap ve Cihaz",
+    'settings.accountLead': "Bu cihazın kimliği ve hesabına başka cihazlardan girmek için kullanılan giriş kodu.",
+    'settings.deviceId': "Cihaz Kimliği",
+    'settings.deviceIdDesc': "Bu bilgisayara özel kimlik. Destek isterken gönderebilirsin; tek başına hesabına giriş sağlamaz.",
+    'settings.loginCode': "Hesap Giriş Kodu",
+    'settings.loginCodeDesc': "Bu hesaba başka bir cihazdan girmenin tek yolu: diğer cihazda hesap seçme ekranında \"Kodla Giriş Yap\"a yapıştır. Kodu alan herkes hesabına girebilir; yalnızca kendi cihazlarında kullan.",
+    'settings.show': "Göster",
+    'settings.hide': "Gizle",
+    'settings.copy': "Kopyala",
+    'settings.copied': "Panoya kopyalandı.",
+    'settings.copyFailed': "Kopyalanamadı.",
     'auth.profileLoadFailed': 'Profil yüklenemedi: ',
     'room.creatingTitle': '{room} Odası Oluşturuluyor',
     'room.joiningTitle': '{room} Odasına Katılıyor',
@@ -7846,7 +8050,7 @@ const I18N = {
     'settings.themeDeletePalette': 'Paleti sil',
     'settings.themeUsePalette': 'renk paletini kullan',
     'settings.themeHint': 'Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.',
-    'settings.voice': 'Ses ve Görüntü',
+    'settings.voice': 'Ses',
     'settings.voiceLead': 'Mikrofon ve hoparlör cihazlarını, ses seviyelerini ve konuşma biçimini ayarla.',
     'settings.microphone': 'Mikrofon',
     'settings.speaker': 'Konuşmacı',
@@ -7934,7 +8138,7 @@ const I18N = {
     'settings.hwaccelDesc': 'Daha akıcı arayüz ve efektler için GPU kullanır. Değişiklik yeniden başlatınca uygulanır.',
     'settings.ptt': 'Bas-Konuş',
     'settings.pttDesc': 'Yalnızca SPACE tuşuna basılıyken ses iletir.',
-    'settings.quality': 'Kamera / Ekran Kalitesi',
+    'settings.quality': 'Ekran Kalitesi',
     'settings.qualityHigh': 'Yüksek (1080p)',
     'settings.qualityMedium': 'Orta (720p)',
     'settings.qualityLow': 'Düşük (480p)',
@@ -7976,6 +8180,25 @@ const I18N = {
     'auth.emailConfirmationPending': 'The server is waiting for email confirmation; disable "Confirm email" in the Supabase dashboard.',
     'auth.loginFailed': 'Login failed: ',
     'auth.serverUnreachable': "Can't reach the server. Check your internet connection and try again in a moment.",
+    'auth.codeLogin': "Sign in with code",
+    'auth.codePlaceholder': "Paste the account sign-in code from your other device (TS1-…)",
+    'auth.codeSubmit': "Sign in",
+    'auth.codeInvalid': "This code isn't valid. Make sure you copied all of it.",
+    'auth.codeNotFound': "No account was found for this code.",
+    'auth.codeStorageFailed': "The code couldn't be saved on this device.",
+    'auth.accountLimit': "A device can have at most 3 accounts. Remove one before adding another.",
+    'auth.accountCount': "Accounts on this device: {n}/{max}",
+    'settings.account': "Account & Device",
+    'settings.accountLead': "This device's ID and the sign-in code that opens your account on other devices.",
+    'settings.deviceId': "Device ID",
+    'settings.deviceIdDesc': "An ID unique to this computer. You can share it when asking for support; it can't be used to sign in.",
+    'settings.loginCode': "Account sign-in code",
+    'settings.loginCodeDesc': "The only way to open this account on another device: paste it under \"Sign in with code\" on that device's account screen. Anyone with the code can sign in as you, so use it only on your own devices.",
+    'settings.show': "Show",
+    'settings.hide': "Hide",
+    'settings.copy': "Copy",
+    'settings.copied': "Copied to the clipboard.",
+    'settings.copyFailed': "Couldn't copy.",
     'auth.profileLoadFailed': 'Failed to load profile: ',
     'room.creatingTitle': '{room} — Creating Room',
     'room.joiningTitle': '{room} — Joining Room',
@@ -8086,7 +8309,7 @@ const I18N = {
     'settings.themeDeletePalette': 'Delete palette',
     'settings.themeUsePalette': 'color palette, apply',
     'settings.themeHint': 'Preview your choice, then select Save to keep it.',
-    'settings.voice': 'Voice & Video',
+    'settings.voice': 'Voice',
     'settings.voiceLead': 'Choose microphone and speaker devices, volume levels, and voice behavior.',
     'settings.microphone': 'Microphone',
     'settings.speaker': 'Speaker',
@@ -8174,7 +8397,7 @@ const I18N = {
     'settings.hwaccelDesc': 'Uses the GPU for smoother visuals and effects. Applied after restarting the app.',
     'settings.ptt': 'Push to Talk',
     'settings.pttDesc': 'Transmits your voice only while the SPACE key is held.',
-    'settings.quality': 'Camera / Screen Quality',
+    'settings.quality': 'Screen Quality',
     'settings.qualityHigh': 'High (1080p)',
     'settings.qualityMedium': 'Medium (720p)',
     'settings.qualityLow': 'Low (480p)',
@@ -8257,7 +8480,7 @@ Object.assign(I18N.tr, {
   'settings.shortcutsEscape': 'Esc — denetimden ve odak modundan çık',
   'settings.shortcutsPaused': 'Kısayollar duraklatıldı',
   'settings.shortcutsPausedDesc': 'Denetim, etkinlik ve yazı yazarken kısayollar otomatik olarak duraklatılır.',
-  'settings.shortcutsPttNote': 'Aç/kapat: Ses ve Görüntü sekmesi',
+  'settings.shortcutsPttNote': 'Aç/kapat: Ses sekmesi',
   'settings.shortcutsAllOn': 'Kısayollar açıldı.',
   'settings.shortcutsAllOff': 'Kısayollar kapatıldı.',
   'shortcut.mic': 'Mikrofonu aç/kapat',
@@ -8305,7 +8528,7 @@ Object.assign(I18N.en, {
   'settings.shortcutsEscape': 'Esc — leave remote control and focus mode',
   'settings.shortcutsPaused': 'Shortcuts paused',
   'settings.shortcutsPausedDesc': 'Shortcuts pause automatically while controlling a screen, during activities and while typing.',
-  'settings.shortcutsPttNote': 'On/off: Voice & Video tab',
+  'settings.shortcutsPttNote': 'On/off: Voice tab',
   'settings.shortcutsAllOn': 'Shortcuts enabled.',
   'settings.shortcutsAllOff': 'Shortcuts disabled.',
   'shortcut.mic': 'Toggle microphone',
@@ -8333,35 +8556,35 @@ I18N.de = makeLocale({
   'menu.join': 'Server beitreten', 'menu.joinDesc': 'Einem bestehenden Raum beitreten', 'menu.create': 'Server erstellen', 'menu.createDesc': 'Eigenen Raum starten', 'menu.friends': 'Freunde', 'menu.addFriend': 'Freund hinzufügen', 'menu.sendFriendRequest': 'Freundschaftsanfrage senden', 'menu.serverId': 'Server-ID',
   'room.users': 'BENUTZER', 'room.voiceTest': 'SPRACHTEST', 'room.chat': 'CHAT', 'toolbar.voice': 'Sprache', 'toolbar.deafen': 'Stummschalten', 'toolbar.screen': 'Bildschirm', 'toolbar.activity': 'Aktivität', 'toolbar.record': 'Aufnehmen', 'toolbar.volume': 'Lautstärke',
   'settings.languageTime': 'Sprache & Zeit', 'settings.languageLead': 'Wähle die Sprache der Oberfläche und die Zeitanzeige.', 'settings.chooseLanguage': 'Sprache auswählen', 'settings.timeFormat': 'Zeitformat', 'settings.timeAuto': 'Automatisch', 'settings.preview': 'Vorschau',
-  'settings.general': 'Allgemein', 'settings.voice': 'Sprache & Video', 'settings.broadcast': 'Übertragung', 'settings.connections': 'Verbindungen', 'settings.mediaLibrary': 'GIFs & Medien'
+  'settings.general': 'Allgemein', 'settings.voice': 'Sprache', 'settings.broadcast': 'Übertragung', 'settings.connections': 'Verbindungen', 'settings.mediaLibrary': 'GIFs & Medien'
 });
 I18N.es = makeLocale({
   'common.settings': 'Ajustes', 'common.settingsShort': 'Ajustes', 'common.close': 'Cerrar', 'common.save': 'Guardar cambios', 'common.back': 'Volver', 'common.cancel': 'Cancelar', 'common.send': 'Enviar', 'common.join': 'Unirse', 'common.create': 'Crear',
   'menu.join': 'Unirse a un servidor', 'menu.joinDesc': 'Entrar a una sala existente', 'menu.create': 'Crear un servidor', 'menu.createDesc': 'Iniciar tu propia sala', 'menu.friends': 'Amigos', 'menu.addFriend': 'Añadir amigo', 'menu.sendFriendRequest': 'Enviar solicitud de amistad', 'menu.serverId': 'ID del servidor',
   'room.users': 'USUARIOS', 'room.voiceTest': 'PRUEBA DE VOZ', 'room.chat': 'CHAT', 'toolbar.voice': 'Voz', 'toolbar.deafen': 'Ensordecer', 'toolbar.screen': 'Pantalla', 'toolbar.activity': 'Actividad', 'toolbar.record': 'Grabar', 'toolbar.volume': 'Volumen',
   'settings.languageTime': 'Idioma y hora', 'settings.languageLead': 'Elige el idioma de la interfaz y el formato de hora.', 'settings.chooseLanguage': 'Elige un idioma', 'settings.timeFormat': 'Formato de hora', 'settings.timeAuto': 'Automático', 'settings.preview': 'Vista previa',
-  'settings.general': 'General', 'settings.voice': 'Voz y vídeo', 'settings.broadcast': 'Transmisión', 'settings.connections': 'Conexiones', 'settings.mediaLibrary': 'GIF y medios'
+  'settings.general': 'General', 'settings.voice': 'Voz', 'settings.broadcast': 'Transmisión', 'settings.connections': 'Conexiones', 'settings.mediaLibrary': 'GIF y medios'
 });
 I18N.fr = makeLocale({
   'common.settings': 'Paramètres', 'common.settingsShort': 'Paramètres', 'common.close': 'Fermer', 'common.save': 'Enregistrer les modifications', 'common.back': 'Retour', 'common.cancel': 'Annuler', 'common.send': 'Envoyer', 'common.join': 'Rejoindre', 'common.create': 'Créer',
   'menu.join': 'Rejoindre un serveur', 'menu.joinDesc': 'Entrer dans une salle existante', 'menu.create': 'Créer un serveur', 'menu.createDesc': 'Créer votre propre salle', 'menu.friends': 'Amis', 'menu.addFriend': 'Ajouter un ami', 'menu.sendFriendRequest': 'Envoyer une demande d’ami', 'menu.serverId': 'ID du serveur',
   'room.users': 'UTILISATEURS', 'room.voiceTest': 'TEST VOCAL', 'room.chat': 'CHAT', 'toolbar.voice': 'Voix', 'toolbar.deafen': 'Assourdir', 'toolbar.screen': 'Écran', 'toolbar.activity': 'Activité', 'toolbar.record': 'Enregistrer', 'toolbar.volume': 'Volume',
   'settings.languageTime': 'Langue et heure', 'settings.languageLead': 'Choisissez la langue de l’interface et le format de l’heure.', 'settings.chooseLanguage': 'Choisir une langue', 'settings.timeFormat': 'Format de l’heure', 'settings.timeAuto': 'Automatique', 'settings.preview': 'Aperçu',
-  'settings.general': 'Général', 'settings.voice': 'Voix et vidéo', 'settings.broadcast': 'Diffusion', 'settings.connections': 'Connexions', 'settings.mediaLibrary': 'GIF et médias'
+  'settings.general': 'Général', 'settings.voice': 'Voix', 'settings.broadcast': 'Diffusion', 'settings.connections': 'Connexions', 'settings.mediaLibrary': 'GIF et médias'
 });
 I18N.pt = makeLocale({
   'common.settings': 'Configurações', 'common.settingsShort': 'Configurações', 'common.close': 'Fechar', 'common.save': 'Salvar alterações', 'common.back': 'Voltar', 'common.cancel': 'Cancelar', 'common.send': 'Enviar', 'common.join': 'Entrar', 'common.create': 'Criar',
   'menu.join': 'Entrar em um servidor', 'menu.joinDesc': 'Entrar em uma sala existente', 'menu.create': 'Criar um servidor', 'menu.createDesc': 'Iniciar sua própria sala', 'menu.friends': 'Amigos', 'menu.addFriend': 'Adicionar amigo', 'menu.sendFriendRequest': 'Enviar pedido de amizade', 'menu.serverId': 'ID do servidor',
   'room.users': 'USUÁRIOS', 'room.voiceTest': 'TESTE DE VOZ', 'room.chat': 'CHAT', 'toolbar.voice': 'Voz', 'toolbar.deafen': 'Silenciar', 'toolbar.screen': 'Tela', 'toolbar.activity': 'Atividade', 'toolbar.record': 'Gravar', 'toolbar.volume': 'Volume',
   'settings.languageTime': 'Idioma e hora', 'settings.languageLead': 'Escolha o idioma da interface e o formato da hora.', 'settings.chooseLanguage': 'Escolha um idioma', 'settings.timeFormat': 'Formato da hora', 'settings.timeAuto': 'Automático', 'settings.preview': 'Prévia',
-  'settings.general': 'Geral', 'settings.voice': 'Voz e vídeo', 'settings.broadcast': 'Transmissão', 'settings.connections': 'Conexões', 'settings.mediaLibrary': 'GIFs e mídia'
+  'settings.general': 'Geral', 'settings.voice': 'Voz', 'settings.broadcast': 'Transmissão', 'settings.connections': 'Conexões', 'settings.mediaLibrary': 'GIFs e mídia'
 });
 I18N.ru = makeLocale({
   'common.settings': 'Настройки', 'common.settingsShort': 'Настройки', 'common.close': 'Закрыть', 'common.save': 'Сохранить изменения', 'common.back': 'Назад', 'common.cancel': 'Отмена', 'common.send': 'Отправить', 'common.join': 'Войти', 'common.create': 'Создать',
   'menu.join': 'Войти на сервер', 'menu.joinDesc': 'Войти в существующую комнату', 'menu.create': 'Создать сервер', 'menu.createDesc': 'Создать свою комнату', 'menu.friends': 'Друзья', 'menu.addFriend': 'Добавить друга', 'menu.sendFriendRequest': 'Отправить запрос в друзья', 'menu.serverId': 'ID сервера',
   'room.users': 'ПОЛЬЗОВАТЕЛИ', 'room.voiceTest': 'ПРОВЕРКА ГОЛОСА', 'room.chat': 'ЧАТ', 'toolbar.voice': 'Голос', 'toolbar.deafen': 'Отключить звук', 'toolbar.screen': 'Экран', 'toolbar.activity': 'Активность', 'toolbar.record': 'Запись', 'toolbar.volume': 'Громкость',
   'settings.languageTime': 'Язык и время', 'settings.languageLead': 'Выберите язык интерфейса и формат времени.', 'settings.chooseLanguage': 'Выберите язык', 'settings.timeFormat': 'Формат времени', 'settings.timeAuto': 'Автоматически', 'settings.preview': 'Предпросмотр',
-  'settings.general': 'Общие', 'settings.voice': 'Голос и видео', 'settings.broadcast': 'Трансляция', 'settings.connections': 'Подключения', 'settings.mediaLibrary': 'GIF и медиа'
+  'settings.general': 'Общие', 'settings.voice': 'Голос', 'settings.broadcast': 'Трансляция', 'settings.connections': 'Подключения', 'settings.mediaLibrary': 'GIF и медиа'
 });
 
 const LEGACY_TEXT_EN = {
@@ -9836,6 +10059,54 @@ function setSettingsPanel(name) {
   else window.releaseMediaLibrarySettingsUrls?.();
   if (name === 'profile') window.TSProfile?.renderEditor();
   if (name === 'activity') window.TSActivity?.renderSettings();
+  if (name === 'account') renderAccountSettings();
+}
+
+// Ayarlar > Hesap ve Cihaz: cihaz kimliği ve etkin hesabın giriş kodu.
+// Kod varsayılan olarak gizli durur; Göster/Kopyala ile alınır.
+let accountCodeCache = null;
+async function renderAccountSettings() {
+  const idEl = document.getElementById('settings-device-id');
+  const codeEl = document.getElementById('settings-login-code');
+  const toggle = document.getElementById('settings-login-code-toggle');
+  const countEl = document.getElementById('settings-device-accounts');
+  const api = window.electronAPI;
+  if (!idEl || !codeEl || !api || !api.getDeviceId) return;
+  accountCodeCache = null;
+  codeEl.classList.add('is-masked');
+  codeEl.textContent = '•'.repeat(32);
+  if (toggle) { toggle.setAttribute('data-i18n', 'settings.show'); toggle.textContent = t('settings.show'); }
+  try { idEl.textContent = (await api.getDeviceId()) || '—'; } catch (e) { idEl.textContent = '—'; }
+  const accounts = window.TSAccounts;
+  if (countEl && accounts) countEl.textContent = t('auth.accountCount', { n: accounts.count(), max: accounts.max });
+  try {
+    accountCodeCache = accounts ? await api.getAccountCode(accounts.activeSlot()) : null;
+  } catch (e) { accountCodeCache = null; }
+}
+
+function copySettingsText(text) {
+  if (!text) return;
+  navigator.clipboard.writeText(text)
+    .then(() => showToast(t('settings.copied'), 'ok'))
+    .catch(() => showToast(t('settings.copyFailed'), 'danger'));
+}
+
+function initAccountSettings() {
+  document.getElementById('settings-device-id-copy')?.addEventListener('click', () => {
+    const text = document.getElementById('settings-device-id')?.textContent || '';
+    if (/^[0-9a-f]{40}$/.test(text)) copySettingsText(text);
+  });
+  document.getElementById('settings-login-code-copy')?.addEventListener('click', () => copySettingsText(accountCodeCache));
+  document.getElementById('settings-login-code-toggle')?.addEventListener('click', (e) => {
+    const codeEl = document.getElementById('settings-login-code');
+    if (!codeEl || !accountCodeCache) return;
+    const show = codeEl.classList.contains('is-masked');
+    codeEl.classList.toggle('is-masked', !show);
+    codeEl.textContent = show ? accountCodeCache : '•'.repeat(32);
+    const key = show ? 'settings.hide' : 'settings.show';
+    e.currentTarget.setAttribute('data-i18n', key);
+    e.currentTarget.textContent = t(key);
+  });
 }
 
 function openUserSettings(panel = 'general') {
@@ -10006,6 +10277,12 @@ async function saveUserSettings() {
   // Ayarlar onayı seçili temanın vurgu rengini kullanır: sabit yeşil "ok"
   // çubuğu mor/beyaz gibi temalarda arayüzden kopuk duruyordu.
   showToast(t('settings.saved'), 'info');
+  // Kaydedince pencere kapanır. Önizlemeler artık kalıcı olduğundan
+  // revertUnsavedSettingsPreview çağrılmaz; yalnızca mikrofon testi ve medya
+  // önizleme adresleri serbest bırakılır (Kapat düğmesiyle aynı temizlik).
+  stopSettingsMicTest();
+  window.releaseMediaLibrarySettingsUrls?.();
+  document.getElementById('settings-modal')?.classList.add('hidden');
 }
 
 function initUserSettings() {
@@ -10016,7 +10293,7 @@ function initUserSettings() {
   state.useAI = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
   // RNNoise artık sunucu/oda politikası değil, kişisel ses ayarıdır.
   // Eski kurulumlardan kalan oda ve katıl ekranı kontrollerini göstermeyip
-  // tek kaynağı normal Ayarlar > Ses ve Görüntü panelinde tutuyoruz.
+  // tek kaynağı normal Ayarlar > Ses panelinde tutuyoruz.
   ['join-useAI', 'create-useAI'].forEach(id => {
     const input = document.getElementById(id);
     const option = input?.closest('.premium-option');
@@ -10054,6 +10331,7 @@ function initUserSettings() {
     document.getElementById('settings-modal').classList.add('hidden');
   });
   document.getElementById('settings-v2-save')?.addEventListener('click', saveUserSettings);
+  initAccountSettings();
   document.getElementById('user-mic-test')?.addEventListener('click', toggleSettingsMicTest);
   // Aşağıdaki kontroller yalnızca canlı önizleme yapar; kalıcı yazma
   // saveUserSettings() içindedir (bkz. settingsPreview).
@@ -13604,7 +13882,7 @@ const SHORTCUT_DEFS = [
     run: () => { if (typeof focusedCard !== 'undefined' && focusedCard) toggleFocusFullscreen(); }
   },
   // Bas-Konuş main süreçte globalShortcut ile kayıtlı; burada yalnızca tuşu
-  // saklanır. Aç/kapat anahtarı Ses ve Görüntü sekmesindeki "Bas-Konuş"tur.
+  // saklanır. Aç/kapat anahtarı Ses sekmesindeki "Bas-Konuş"tur.
   {
     id: 'ptt', nameKey: 'shortcut.ptt', descKey: 'shortcut.pttDesc',
     def: { code: 'Space' }, global: true, toggleable: false, run: null

@@ -1055,17 +1055,117 @@ function loadOrCreateDeviceSecret() {
 
 // slot: aynı cihazda birden çok hesap. Hepsi aynı cihaz kimliğini (deviceId)
 // paylaşır; slot 0'ın türetimi ilk sürümle birebir aynı kalmalı (geriye uyum).
+//
+// HESAP GİRİŞ KODU. Bir hesabı başka bir cihazda açmanın tek yolu: kod,
+// hesabın Supabase giriş bilgilerini (kaynak cihaz kimliği + slot + parola
+// özeti) taşır: TS1-<40 hex cihaz kimliği>-<slot>-<43 karakter base64url>.
+// Başka cihazdan alınan kodlar IMPORTED_SLOT_BASE ve sonrasındaki slotlarda,
+// cihaz kimliği gibi DPAPI ile şifreli bir dosyada saklanır; renderer hesap
+// listesinde onları da sıradan slotlar gibi kullanır.
+const IMPORTED_SLOT_BASE = 1000;
+const importedAccountsFile = path.join(baseUserData, 'imported-accounts.bin');
+const ACCOUNT_CODE_RE = /^TS1-([0-9a-f]{40})-(\d{1,3})-([A-Za-z0-9_-]{43})$/;
+
+function deriveDeviceId(secret) {
+  return nodeCrypto.createHash('sha256').update('teamsync-device-id:' + secret).digest('hex').slice(0, 40);
+}
+
+function credentialsFor(deviceId, slot, password) {
+  const emailLocal = slot === 0 ? 'd-' + deviceId : 'd-' + deviceId + '-' + slot;
+  return { email: emailLocal + '@device.teamsync.app', password, deviceId, slot };
+}
+
+function localCredentials(slot) {
+  const secret = loadOrCreateDeviceSecret();
+  const pwSource = slot === 0
+    ? 'teamsync-device-pw:' + secret
+    : 'teamsync-device-pw:' + slot + ':' + secret;
+  const password = nodeCrypto.createHash('sha256').update(pwSource).digest('base64');
+  return credentialsFor(deriveDeviceId(secret), slot, password);
+}
+
+function loadImportedAccounts() {
+  try {
+    if (!fs.existsSync(importedAccountsFile)) return {};
+    const raw = fs.readFileSync(importedAccountsFile);
+    const text = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+    const data = JSON.parse(text);
+    return data && typeof data === 'object' ? data : {};
+  } catch (e) {
+    console.error('Kodla eklenen hesaplar okunamadı:', e.message);
+    return {};
+  }
+}
+
+function saveImportedAccounts(map) {
+  const text = JSON.stringify(map);
+  const payload = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : Buffer.from(text, 'utf8');
+  fs.writeFileSync(importedAccountsFile, payload);
+}
+
+function parseAccountCode(code) {
+  const m = ACCOUNT_CODE_RE.exec(String(code || '').replace(/\s+/g, ''));
+  if (!m) return null;
+  const slot = parseInt(m[2], 10);
+  if (slot >= IMPORTED_SLOT_BASE) return null;
+  const password = Buffer.from(m[3], 'base64url').toString('base64');
+  return { code: m[0], deviceId: m[1], slot, password };
+}
+
 ipcMain.handle('get-device-credentials', (event, slot) => {
   if (!isMainWindowSender(event)) return null;
   const s = Number.isInteger(slot) && slot > 0 ? slot : 0;
-  const secret = loadOrCreateDeviceSecret();
-  const deviceId = nodeCrypto.createHash('sha256').update('teamsync-device-id:' + secret).digest('hex').slice(0, 40);
-  const pwSource = s === 0
-    ? 'teamsync-device-pw:' + secret
-    : 'teamsync-device-pw:' + s + ':' + secret;
-  const password = nodeCrypto.createHash('sha256').update(pwSource).digest('base64');
-  const emailLocal = s === 0 ? 'd-' + deviceId : 'd-' + deviceId + '-' + s;
-  return { email: emailLocal + '@device.teamsync.app', password, deviceId, slot: s };
+  if (s >= IMPORTED_SLOT_BASE) {
+    const parsed = parseAccountCode(loadImportedAccounts()[String(s)]);
+    if (!parsed) return null;
+    return { ...credentialsFor(parsed.deviceId, parsed.slot, parsed.password), slot: s, imported: true };
+  }
+  return localCredentials(s);
+});
+
+ipcMain.handle('get-device-id', (event) => {
+  if (!isMainWindowSender(event)) return null;
+  return deriveDeviceId(loadOrCreateDeviceSecret());
+});
+
+ipcMain.handle('get-account-code', (event, slot) => {
+  if (!isMainWindowSender(event)) return null;
+  const s = Number.isInteger(slot) && slot > 0 ? slot : 0;
+  if (s >= IMPORTED_SLOT_BASE) {
+    const parsed = parseAccountCode(loadImportedAccounts()[String(s)]);
+    return parsed ? parsed.code : null;
+  }
+  const creds = localCredentials(s);
+  const pw = Buffer.from(creds.password, 'base64').toString('base64url');
+  return `TS1-${creds.deviceId}-${s}-${pw}`;
+});
+
+// Dönüş: { ok, slot, local } — kod bu cihazın kendi hesabıysa yerel slot,
+// daha önce eklenmişse aynı slot döner; aksi halde yeni slot ayrılır.
+ipcMain.handle('import-account-code', (event, code) => {
+  if (!isMainWindowSender(event)) return { ok: false, error: 'invalid' };
+  const parsed = parseAccountCode(code);
+  if (!parsed) return { ok: false, error: 'invalid' };
+  if (parsed.deviceId === deriveDeviceId(loadOrCreateDeviceSecret())) {
+    return { ok: true, slot: parsed.slot, local: true };
+  }
+  const map = loadImportedAccounts();
+  const existing = Object.keys(map).find(k => map[k] === parsed.code);
+  if (existing) return { ok: true, slot: parseInt(existing, 10), local: false };
+  let slot = IMPORTED_SLOT_BASE;
+  while (map[String(slot)]) slot++;
+  map[String(slot)] = parsed.code;
+  try { saveImportedAccounts(map); } catch (e) { return { ok: false, error: 'storage' }; }
+  return { ok: true, slot, local: false };
+});
+
+ipcMain.handle('forget-imported-account', (event, slot) => {
+  if (!isMainWindowSender(event) || !Number.isInteger(slot) || slot < IMPORTED_SLOT_BASE) return false;
+  const map = loadImportedAccounts();
+  if (!map[String(slot)]) return false;
+  delete map[String(slot)];
+  try { saveImportedAccounts(map); } catch (e) { return false; }
+  return true;
 });
 
 ipcMain.handle('start-cloudflared', async (event, port) => {

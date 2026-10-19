@@ -9753,3 +9753,47 @@ body.no-hw-accel .media-collect-btn {
 .fp-search-case:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 55%, transparent); }
 .fp-hit { background: rgba(250, 204, 21, 0.45); color: inherit; border-radius: 2px; }
 .fp-hit-active { background: #facc15; color: #1a1400; }
+
+/* Hesap seçimi: kodla giriş + 3 hesap sınırı (renderer.js submitCodeLogin) */
+.code-login-toggle { width: 100%; margin-top: 8px; }
+#btn-new-account.is-limit { opacity: 0.55; }
+.code-login-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.code-login-box.hidden { display: none; }
+.code-login-box textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  resize: none;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: var(--txt-main);
+  font: 12.5px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  word-break: break-all;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.code-login-box textarea:focus {
+  border-color: var(--acc);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 20%, transparent);
+}
+.code-login-error { color: #f87171; font-size: 12.5px; line-height: 1.4; }
+.code-login-error.hidden { display: none; }
+.accounts-limit-note { margin-top: 10px; text-align: center; font-size: 12px; color: var(--txt-mut); }
+
+/* Ayarlar > Hesap ve Cihaz */
+.settings-code-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.settings-code {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--txt-main) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--txt-main) 12%, transparent);
+  color: var(--txt-main);
+  font: 12.5px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  word-break: break-all;
+  user-select: all;
+}
+.settings-code.is-masked { letter-spacing: 0.12em; color: var(--txt-mut); user-select: none; }
+.settings-code-row .settings-test-button { flex: 0 0 auto; }

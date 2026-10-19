@@ -159,15 +159,6 @@ body.shell-active.qc-open .login-status-footer { display: none; }
 .rail-bottom { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .rail-updates .rail-icon { color: var(--txt-mut); }
 .rail-updates:hover .rail-icon { background: var(--sh-panel); color: var(--txt-main); border-radius: 50%; }
-.rail-bottom #update-btn {
-  width: 48px;
-  min-height: 0;
-  padding: 6px 4px;
-  font-size: 10px;
-  line-height: 1.2;
-  border-radius: 12px;
-  white-space: normal;
-}
 
 /* ---------- Yan sütun (DM listesi) ---------- */
 .shell-side {

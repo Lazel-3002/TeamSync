@@ -94,6 +94,13 @@
           <!-- Dinamik Liste -->
         </div>
         <button id="btn-new-account" class="btn-pri" style="margin-top: 5px;">Yeni Hesap Oluştur</button>
+        <button id="btn-code-login" class="btn-sec code-login-toggle" type="button" data-i18n="auth.codeLogin">Kodla Giriş Yap</button>
+        <div id="code-login-box" class="code-login-box hidden">
+          <textarea id="code-login-input" rows="3" spellcheck="false" autocomplete="off" data-i18n-placeholder="auth.codePlaceholder" placeholder="Diğer cihazdaki hesap giriş kodunu yapıştır (TS1-…)"></textarea>
+          <div id="code-login-error" class="code-login-error hidden" role="alert"></div>
+          <button id="code-login-submit" class="btn-pri" type="button" data-i18n="auth.codeSubmit">Giriş Yap</button>
+        </div>
+        <div id="accounts-limit-note" class="accounts-limit-note"></div>
       </div>
 
       <!-- Adım 1: İsim -->
@@ -1620,8 +1627,11 @@
           <button class="settings-nav-item" type="button" data-settings-panel="profile">
             <span class="settings-nav-icon">☺</span><span data-i18n="profile.settingsNav">Profil</span>
           </button>
+          <button class="settings-nav-item" type="button" data-settings-panel="account">
+            <span class="settings-nav-icon">◇</span><span data-i18n="settings.account">Hesap ve Cihaz</span>
+          </button>
           <button class="settings-nav-item" type="button" data-settings-panel="voice">
-            <span class="settings-nav-icon">♫</span><span data-i18n="settings.voice">Ses ve Görüntü</span>
+            <span class="settings-nav-icon">♫</span><span data-i18n="settings.voice">Ses</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="broadcast">
             <span class="settings-nav-icon">▣</span><span data-i18n="settings.broadcast">Yayın</span>
@@ -1801,8 +1811,31 @@
               <div id="settings-activity-root" data-i18n-ignore></div>
             </div>
 
+            <div class="settings-panel" data-settings-content="account">
+              <h2 data-i18n="settings.account">Hesap ve Cihaz</h2>
+              <p class="settings-lead" data-i18n="settings.accountLead">Bu cihazın kimliği ve hesabına başka cihazlardan girmek için kullanılan giriş kodu.</p>
+              <div class="settings-card">
+                <label class="settings-field-label" for="settings-device-id" data-i18n="settings.deviceId">Cihaz Kimliği</label>
+                <div class="settings-code-row">
+                  <code id="settings-device-id" class="settings-code" data-i18n-ignore>—</code>
+                  <button id="settings-device-id-copy" class="settings-test-button" type="button" data-i18n="settings.copy">Kopyala</button>
+                </div>
+                <p class="settings-help" data-i18n="settings.deviceIdDesc">Bu bilgisayara özel kimlik. Destek isterken gönderebilirsin; tek başına hesabına giriş sağlamaz.</p>
+              </div>
+              <div class="settings-card">
+                <label class="settings-field-label" for="settings-login-code" data-i18n="settings.loginCode">Hesap Giriş Kodu</label>
+                <div class="settings-code-row">
+                  <code id="settings-login-code" class="settings-code is-masked" data-i18n-ignore>••••••••••••••••••••••••••••••••</code>
+                  <button id="settings-login-code-toggle" class="settings-test-button" type="button" data-i18n="settings.show">Göster</button>
+                  <button id="settings-login-code-copy" class="settings-test-button" type="button" data-i18n="settings.copy">Kopyala</button>
+                </div>
+                <p class="settings-help" data-i18n="settings.loginCodeDesc">Bu hesaba başka bir cihazdan girmenin tek yolu: diğer cihazda hesap seçme ekranında "Kodla Giriş Yap"a yapıştır. Kodu alan herkes hesabına girebilir; yalnızca kendi cihazlarında kullan.</p>
+              </div>
+              <p class="settings-help" id="settings-device-accounts" data-i18n-ignore></p>
+            </div>
+
             <div class="settings-panel" data-settings-content="voice">
-              <h2 data-i18n="settings.voice">Ses ve Görüntü</h2>
+              <h2 data-i18n="settings.voice">Ses</h2>
               <p class="settings-lead" data-i18n="settings.voiceLead">Mikrofon ve hoparlör cihazlarını, ses seviyelerini ve konuşma biçimini ayarla.</p>
               <div class="settings-audio-grid">
                 <div>
@@ -1880,7 +1913,7 @@
               </button>
               <div id="user-broadcast-advanced" class="settings-broadcast-advanced hidden">
                 <div>
-                  <label class="settings-field-label" for="user-quality-select" data-i18n="settings.quality">Kamera / Ekran Kalitesi</label>
+                  <label class="settings-field-label" for="user-quality-select" data-i18n="settings.quality">Ekran Kalitesi</label>
                   <select id="user-quality-select" class="settings-select">
                     <option value="high" data-i18n="settings.qualityHigh">Yüksek (1080p)</option>
                     <option value="medium" selected data-i18n="settings.qualityMedium">Orta (720p)</option>
@@ -2188,7 +2221,7 @@
         </div>
         <div class="muted" style="font-size: 12px; margin-bottom: 16px;">Açık: daha akıcı arayüz ve buzlu cam efektleri (GPU kullanır). Kapalı: oyun sırasında daha hafif. <b>Değişiklik uygulamayı yeniden başlatınca etkin olur.</b></div>
 
-        <label class="lbl-block">Kamera / Ekran Kalitesi</label>
+        <label class="lbl-block">Ekran Kalitesi</label>
         <select id="quality-select" class="sel-block" style="margin-bottom: 12px; width: 100%;">
           <option value="high">Yüksek (1080p, 60 FPS)</option>
           <option value="medium" selected>Orta (720p, 30 FPS)</option>

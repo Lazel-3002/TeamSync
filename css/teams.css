@@ -121,6 +121,62 @@ body.shell-active #user-panel { display: none; }
 
 .rail-bottom { gap: 4px; padding-top: 6px; }
 .rail-bottom .rail-settings { height: 52px; flex-basis: 52px; }
+/* Raydaki güncelleme düğmesi (renderer.js renderUpdateBtn): Ayarlar ile aynı
+   simge + etiket kalıbı; style.css'teki eski metin düğmesi biçimi sıfırlanır. */
+.rail-bottom #update-btn.rail-update {
+  height: 52px;
+  flex-basis: 52px;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  animation: none;
+  white-space: nowrap;
+}
+.rail-bottom #update-btn.rail-update:hover { background: var(--sh-hover); color: var(--txt-main); }
+.rail-bottom #update-btn.rail-update:disabled { opacity: 1; cursor: default; }
+.rail-update .rail-icon { position: relative; }
+.rail-btn.rail-app.rail-update .rail-icon svg.rail-update-glyph { width: 20px; height: 20px; position: relative; z-index: 1; }
+.rail-update[data-state="checking"] .rail-update-glyph { animation: rail-update-spin 1s linear infinite; }
+.rail-update[data-state="downloading"] { color: var(--tm-acc); }
+.rail-btn.rail-app.rail-update[data-state="downloading"] .rail-icon svg.rail-update-glyph { width: 14px; height: 14px; }
+.rail-btn.rail-app.rail-update .rail-icon svg.rail-update-ring {
+  position: absolute;
+  inset: 0;
+  width: 28px;
+  height: 28px;
+  transform: rotate(-90deg);
+}
+.rail-update-ring circle { fill: none; stroke-width: 2.5; }
+.rail-update-ring .ring-bg { stroke: var(--sh-border); }
+.rail-update-ring .ring-fg { stroke: currentColor; stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
+.rail-update[data-state="none"] { color: var(--status-online); }
+.rail-update[data-state="error"] { color: var(--status-dnd, #f23f43); }
+.rail-bottom #update-btn.rail-update.update-ready { color: var(--tm-acc); background: var(--tm-acc-soft); }
+.rail-bottom #update-btn.rail-update.update-ready:hover { background: color-mix(in srgb, var(--acc) 26%, transparent); }
+.rail-update.update-ready .rail-label { font-weight: 700; }
+.rail-update-dot {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--tm-acc);
+  box-shadow: 0 0 0 2px var(--sh-rail);
+  animation: rail-update-ping 1.8s ease-out infinite;
+}
+@keyframes rail-update-spin { to { transform: rotate(360deg); } }
+@keyframes rail-update-ping {
+  0% { box-shadow: 0 0 0 2px var(--sh-rail), 0 0 0 2px color-mix(in srgb, var(--acc) 60%, transparent); }
+  80%, 100% { box-shadow: 0 0 0 2px var(--sh-rail), 0 0 0 9px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-update[data-state="checking"] .rail-update-glyph,
+  .rail-update-dot { animation: none; }
+}
 .rail-account {
   width: 44px;
   height: 44px;
