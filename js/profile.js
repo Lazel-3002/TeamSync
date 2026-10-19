@@ -109,6 +109,7 @@
   async function syncToSupabase() {
     try {
       if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+      if (window.state && window.state.accountKind !== 'cloud') return; // eski tip hesap: bulut hesabı başkasının olabilir
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) return;
       // Ayrı güncelleme: profile_ext sütunu yoksa (SQL kurulmadı) yalnızca bu

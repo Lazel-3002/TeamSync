@@ -26,3 +26,15 @@ create policy "device_accounts_insert_own" on public.device_accounts
   for insert to authenticated with check (user_id = (select auth.uid()));
 create policy "device_accounts_update_own" on public.device_accounts
   for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+
+-- Cihaz ayrıntıları (main.js get-device-info). Seri numarası gibi donanım
+-- tanımlayıcıları toplanmaz.
+alter table public.device_accounts
+  add column if not exists device_name text,
+  add column if not exists os_name text,
+  add column if not exists os_release text,
+  add column if not exists arch text,
+  add column if not exists cpu text,
+  add column if not exists cpu_cores integer,
+  add column if not exists ram_gb numeric(6,1),
+  add column if not exists device_first_seen timestamptz;

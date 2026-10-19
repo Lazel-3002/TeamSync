@@ -1007,6 +1007,9 @@ window.deleteAccount = async function(id) {
 };
 
 window.loginWithAccount = function(acc) {
+  // Eski tip profil: yalnızca bu cihazdaki accounts.json'da yaşar, Supabase
+  // hesabı yoktur. Bayrak, profil kaydının bulut hesabına yazılmasını önler.
+  state.accountKind = 'legacy';
   state.myName = acc.name;
   state.friendId = acc.id;
   if (window.TSProfile && acc.profileExt) window.TSProfile.importExt(acc.profileExt);
@@ -1136,10 +1139,13 @@ async function saveProfile() {
   };
   localStorage.setItem('teamsync_profile', JSON.stringify(profileData));
   await updateAccountInList(profileData);
-  if (window.syncActiveDeviceAccount) window.syncActiveDeviceAccount();
+  // Eski tip hesap açıkken bulut hesabına ve cihaz hesap listesine yazılmaz:
+  // önceki oturumdan kalan Supabase oturumu başka bir hesaba ait olabilir.
+  const isCloud = state.accountKind === 'cloud';
+  if (isCloud && window.syncActiveDeviceAccount) window.syncActiveDeviceAccount();
   renderFriends();
 
-  if (supabaseClient) {
+  if (supabaseClient && isCloud) {
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
@@ -3149,29 +3155,118 @@ window.addEventListener('DOMContentLoaded', async () => {
   window.TSAccounts = {
     activeSlot: () => getActiveSlot(),
     count: () => getDeviceAccounts().length,
-    max: MAX_DEVICE_ACCOUNTS
+    max: MAX_DEVICE_ACCOUNTS,
+    // Bu cihazdaki tüm hesaplar (bulut + eski tip), panelde listelenir.
+    async list() {
+      const device = getDeviceAccounts().map(a => ({
+        name: a.name || 'Anonim',
+        id: a.id || '',
+        kind: isImportedSlot(a.slot) ? 'code' : 'local',
+        active: state.accountKind === 'cloud' && a.slot === getActiveSlot()
+      }));
+      let legacy = [];
+      try {
+        legacy = (await getAccounts())
+          .filter(acc => acc && acc.id && !device.some(d => d.id === acc.id))
+          .map(acc => ({ name: acc.name || 'Anonim', id: acc.id, kind: 'legacy', active: state.accountKind === 'legacy' && acc.id === state.friendId }));
+      } catch (e) {}
+      return [...device, ...legacy];
+    },
+    migrateLegacy: () => migrateLegacyAccount()
   };
+
+  // ESKİ TİP HESABI BULUTA TAŞIMA. Eski profiller yalnızca bu cihazdaki
+  // accounts.json'da durur; Supabase hesabı olmadığı için giriş kodu da
+  // yoktur. Bu adım hiç kullanılmamış bir cihaz slotunda Supabase hesabı açar
+  // ve profilin adını, arkadaş ID'sini ve arkadaş listesini oraya kopyalar.
+  // Arkadaş ID'si değişmediği için arkadaşlıklar kopmaz.
+  async function migrateLegacyAccount() {
+    if (state.accountKind !== 'legacy' || !state.friendId) throw new Error(t('settings.migrateNotLegacy'));
+    if (!supabaseClient) throw new Error(t('auth.serverConfigMissing'));
+    const list = getDeviceAccounts();
+    if (list.length >= MAX_DEVICE_ACCOUNTS) throw new Error(t('auth.accountLimit'));
+    const legacy = {
+      name: state.myName || 'Anonim',
+      id: state.friendId,
+      avatar: state.myAvatar || null,
+      friends: state.friends || {},
+      requests: state.friendRequests || [],
+      ext: window.TSProfile ? window.TSProfile.exportExt() : undefined
+    };
+    // Supabase'de hesabı OLMAYAN ilk yerel slot aranır: listeden silinmiş ama
+    // bulutta duran bir hesabın profili asla ezilmez.
+    const used = new Set(list.map(a => a.slot));
+    let slot = -1;
+    let userId = null;
+    for (let s = 0; s < 50 && slot < 0; s++) {
+      if (used.has(s)) continue;
+      const creds = await window.electronAPI.getDeviceCredentials(s);
+      const signIn = await supabaseClient.auth.signInWithPassword({ email: creds.email, password: creds.password });
+      if (!signIn.error) continue;
+      if (isServerUnreachable(signIn.error)) throw new Error(t('auth.serverUnreachable'));
+      const signUp = await supabaseClient.auth.signUp({
+        email: creds.email,
+        password: creds.password,
+        options: { data: { display_name: legacy.name } }
+      });
+      if (signUp.error) throw signUp.error;
+      if (!signUp.data.session) throw new Error(t('auth.emailConfirmationPending'));
+      slot = s;
+      userId = signUp.data.user.id;
+    }
+    if (slot < 0) throw new Error(t('auth.accountLimit'));
+
+    const row = {
+      id: userId,
+      name: legacy.name,
+      friend_id: legacy.id,
+      avatar: legacy.avatar,
+      friends: legacy.friends,
+      requests: legacy.requests,
+      updated_at: new Date().toISOString()
+    };
+    if (legacy.ext) row.profile_ext = legacy.ext;
+    const { error } = await supabaseClient.from('profiles').upsert(row, { onConflict: 'id' });
+    if (error) {
+      if (error.code === '23505') throw new Error(t('settings.migrateIdTaken'));
+      throw error;
+    }
+
+    state.accountKind = 'cloud';
+    localStorage.setItem(ACTIVE_SLOT_KEY, String(slot));
+    localStorage.setItem(DEFAULT_ACCOUNT_KEY, JSON.stringify({ type: 'device', slot }));
+    upsertDeviceAccount(slot, { name: legacy.name, avatar: legacy.avatar, id: legacy.id });
+    await registerDeviceAccount(userId);
+    return slot;
+  }
 
   // Hangi hesabın hangi cihazda açıldığı Supabase'de tutulur (public.
   // device_accounts, bkz. supabase/device_accounts.sql). Kayıt başarısız olsa
   // bile giriş etkilenmez.
   async function registerDeviceAccount(userId) {
-    if (!supabaseClient || !userId || !window.electronAPI || !window.electronAPI.getDeviceId) return;
+    if (!supabaseClient || !userId || !window.electronAPI || !window.electronAPI.getDeviceInfo) return;
     try {
-      const deviceId = await window.electronAPI.getDeviceId();
-      if (!deviceId) return;
-      let appVersion = null;
-      try { appVersion = await window.electronAPI.getAppVersion(); } catch (e) {}
+      const info = await window.electronAPI.getDeviceInfo();
+      if (!info || !info.deviceId) return;
       const { error } = await supabaseClient.from('device_accounts').upsert({
-        device_id: deviceId,
+        device_id: info.deviceId,
         user_id: userId,
         friend_id: state.friendId || null,
         account_name: state.myName || null,
         kind: isImportedSlot(getActiveSlot()) ? 'code' : 'local',
-        app_version: appVersion || null,
+        app_version: info.appVersion || null,
+        device_name: info.deviceName || null,
+        os_name: info.osName || null,
+        os_release: info.osRelease || null,
+        arch: info.arch || null,
+        cpu: info.cpu || null,
+        cpu_cores: info.cpuCores || null,
+        ram_gb: info.ramGb || null,
+        device_first_seen: info.firstSeen || null,
         last_seen: new Date().toISOString()
       }, { onConflict: 'device_id,user_id' });
       if (error) console.warn('Cihaz kaydı yazılamadı:', error.message);
+      else console.log('🖥️ Cihaz kaydı Supabase\'e yazıldı:', info.deviceId);
     } catch (e) {
       console.warn('Cihaz kaydı yazılamadı:', e && e.message ? e.message : e);
     }
@@ -3448,6 +3543,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   function loginWithProfileData(profile) {
+    state.accountKind = 'cloud';
     state.myName = profile.name;
     state.friendId = profile.friend_id;
     if (window.TSProfile && profile.profile_ext) window.TSProfile.importExt(profile.profile_ext);
@@ -3495,6 +3591,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   btnNextName.addEventListener('click', () => {
     const n = nameInp.value.trim() || 'Anonim';
+    state.accountKind = 'legacy';
     state.myName = n;
     state.friendId = `KNK-${crypto.randomUUID().toUpperCase()}`;
     displayName.textContent = n;
@@ -3634,6 +3731,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     localStorage.removeItem('teamsync_profile');
     
+    state.accountKind = '';
     state.myName = '';
     state.friendId = '';
     state.myAvatar = null;
@@ -7940,6 +8038,31 @@ const I18N = {
     'settings.copy': "Kopyala",
     'settings.copied': "Panoya kopyalandı.",
     'settings.copyFailed': "Kopyalanamadı.",
+    'settings.thisDevice': "Bu Cihaz",
+    'settings.deviceName': "Cihaz adı",
+    'settings.os': "İşletim sistemi",
+    'settings.cpu': "İşlemci",
+    'settings.cpuCores': "{n} çekirdek",
+    'settings.ram': "Bellek",
+    'settings.appVersion': "Uygulama sürümü",
+    'settings.firstSeen': "İlk kurulum",
+    'settings.cloudStatus': "Bulut kaydı",
+    'settings.cloudRegistered': "Supabase'de kayıtlı · son görülme {time}",
+    'settings.cloudNotRegistered': "Kayıtlı değil",
+    'settings.cloudLegacy': "Kayıtlı değil — eski tip hesap",
+    'settings.copyAll': "Tüm cihaz bilgilerini kopyala",
+    'settings.accountsOnDevice': "Bu cihazdaki hesaplar",
+    'settings.accountKindLocal': "Bu cihazda açıldı",
+    'settings.accountKindCode': "Kodla eklendi",
+    'settings.accountKindLegacy': "Eski tip · yalnızca bu cihazda",
+    'settings.accountActive': "Etkin",
+    'settings.legacyCodeDesc': "Bu hesap eski tip: yalnızca bu bilgisayarda saklanıyor, bu yüzden giriş kodu yok. Buluta taşırsan adın, arkadaş ID'n ve arkadaş listen korunur; sonra başka cihazlarda kodla girebilirsin.",
+    'settings.migrateLegacy': "Hesabı Buluta Taşı",
+    'settings.migrateConfirm': "Adın, arkadaş ID'n ve arkadaş listen buluta (Supabase) kopyalanacak ve bu cihazda bir hesap yeri kullanılacak. Devam edilsin mi?",
+    'settings.migrateDone': "Hesap buluta taşındı. Giriş kodun hazır.",
+    'settings.migrateFailed': "Hesap taşınamadı: ",
+    'settings.migrateIdTaken': "Bu arkadaş ID'si bulutta başka bir hesapta kayıtlı.",
+    'settings.migrateNotLegacy': "Açık hesap eski tip değil.",
     'auth.profileLoadFailed': 'Profil yüklenemedi: ',
     'room.creatingTitle': '{room} Odası Oluşturuluyor',
     'room.joiningTitle': '{room} Odasına Katılıyor',
@@ -8199,6 +8322,31 @@ const I18N = {
     'settings.copy': "Copy",
     'settings.copied': "Copied to the clipboard.",
     'settings.copyFailed': "Couldn't copy.",
+    'settings.thisDevice': "This device",
+    'settings.deviceName': "Device name",
+    'settings.os': "Operating system",
+    'settings.cpu': "Processor",
+    'settings.cpuCores': "{n} cores",
+    'settings.ram': "Memory",
+    'settings.appVersion': "App version",
+    'settings.firstSeen': "First installed",
+    'settings.cloudStatus': "Cloud record",
+    'settings.cloudRegistered': "Registered in Supabase · last seen {time}",
+    'settings.cloudNotRegistered': "Not registered",
+    'settings.cloudLegacy': "Not registered — legacy account",
+    'settings.copyAll': "Copy all device info",
+    'settings.accountsOnDevice': "Accounts on this device",
+    'settings.accountKindLocal': "Created on this device",
+    'settings.accountKindCode': "Added with code",
+    'settings.accountKindLegacy': "Legacy · this device only",
+    'settings.accountActive': "Active",
+    'settings.legacyCodeDesc': "This is a legacy account: it is stored only on this computer, so it has no sign-in code. Move it to the cloud to keep your name, friend ID and friends list, then sign in on other devices with a code.",
+    'settings.migrateLegacy': "Move account to cloud",
+    'settings.migrateConfirm': "Your name, friend ID and friends list will be copied to the cloud (Supabase), and one account slot on this device will be used. Continue?",
+    'settings.migrateDone': "Account moved to the cloud. Your sign-in code is ready.",
+    'settings.migrateFailed': "Couldn't move the account: ",
+    'settings.migrateIdTaken': "This friend ID is already registered to another cloud account.",
+    'settings.migrateNotLegacy': "The open account is not a legacy account.",
     'auth.profileLoadFailed': 'Failed to load profile: ',
     'room.creatingTitle': '{room} — Creating Room',
     'room.joiningTitle': '{room} — Joining Room',
@@ -10062,26 +10210,120 @@ function setSettingsPanel(name) {
   if (name === 'account') renderAccountSettings();
 }
 
-// Ayarlar > Hesap ve Cihaz: cihaz kimliği ve etkin hesabın giriş kodu.
-// Kod varsayılan olarak gizli durur; Göster/Kopyala ile alınır.
+// Ayarlar > Hesap ve Cihaz: cihazın ayrıntıları, bulut kaydı, bu cihazdaki
+// hesaplar ve etkin hesabın giriş kodu. Kod varsayılan olarak gizli durur.
 let accountCodeCache = null;
+let deviceInfoText = '';
+
+function formatUserDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return '—';
+  const locale = LANGUAGE_META[getUserLanguage()]?.locale || undefined;
+  return `${date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })} ${formatUserTime(date)}`;
+}
+
+// 40 haneli kimliği okunur dörtlü gruplara böler (kopyalama ham hâliyle yapılır).
+function groupDeviceId(id) {
+  return String(id || '').replace(/(.{4})(?=.)/g, '$1 ');
+}
+
 async function renderAccountSettings() {
+  const api = window.electronAPI;
   const idEl = document.getElementById('settings-device-id');
   const codeEl = document.getElementById('settings-login-code');
-  const toggle = document.getElementById('settings-login-code-toggle');
+  if (!idEl || !codeEl || !api || !api.getDeviceInfo) return;
+  const accounts = window.TSAccounts;
+  const isLegacy = (typeof state !== 'undefined') && state.accountKind === 'legacy';
+
+  // Cihaz ayrıntıları
+  let info = null;
+  try { info = await api.getDeviceInfo(); } catch (e) {}
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text || '—'; };
+  if (info) {
+    idEl.dataset.raw = info.deviceId;
+    idEl.textContent = groupDeviceId(info.deviceId);
+    set('settings-device-name', info.deviceName);
+    set('settings-device-os', [info.osName, info.osRelease && `(${info.osRelease})`, info.arch].filter(Boolean).join(' '));
+    set('settings-device-cpu', info.cpu ? `${info.cpu} · ${t('settings.cpuCores', { n: info.cpuCores })}` : '');
+    set('settings-device-ram', info.ramGb ? `${info.ramGb} GB` : '');
+    set('settings-device-app', `${info.appVersion}${info.electronVersion ? ' · Electron ' + info.electronVersion : ''}`);
+    set('settings-device-first', info.firstSeen ? formatUserDateTime(info.firstSeen) : '');
+  }
+
+  // Bulut kaydı: Supabase'deki satır gerçekten okunarak gösterilir.
+  const cloudEl = document.getElementById('settings-device-cloud');
+  let cloudText = t('settings.cloudNotRegistered');
+  let cloudOk = false;
+  if (isLegacy) {
+    cloudText = t('settings.cloudLegacy');
+  } else if (info && typeof supabaseClient !== 'undefined' && supabaseClient) {
+    try {
+      const { data } = await supabaseClient.from('device_accounts')
+        .select('last_seen').eq('device_id', info.deviceId).order('last_seen', { ascending: false }).limit(1);
+      if (data && data[0]) {
+        cloudOk = true;
+        cloudText = t('settings.cloudRegistered', { time: formatUserDateTime(data[0].last_seen) });
+      }
+    } catch (e) {}
+  }
+  if (cloudEl) {
+    cloudEl.textContent = cloudText;
+    cloudEl.classList.toggle('is-ok', cloudOk);
+    cloudEl.classList.toggle('is-warn', !cloudOk);
+  }
+
+  deviceInfoText = info ? [
+    `${t('settings.deviceId')}: ${info.deviceId}`,
+    `${t('settings.deviceName')}: ${info.deviceName}`,
+    `${t('settings.os')}: ${info.osName} (${info.osRelease}) ${info.arch}`,
+    `${t('settings.cpu')}: ${info.cpu} (${t('settings.cpuCores', { n: info.cpuCores })})`,
+    `${t('settings.ram')}: ${info.ramGb} GB`,
+    `${t('settings.appVersion')}: ${info.appVersion} (Electron ${info.electronVersion})`,
+    `${t('settings.firstSeen')}: ${info.firstSeen || '—'}`,
+    `${t('settings.cloudStatus')}: ${cloudText}`
+  ].join('\n') : '';
+
+  // Bu cihazdaki hesaplar
+  const listEl = document.getElementById('settings-device-accounts-list');
   const countEl = document.getElementById('settings-device-accounts');
-  const api = window.electronAPI;
-  if (!idEl || !codeEl || !api || !api.getDeviceId) return;
+  if (countEl && accounts) countEl.textContent = `${accounts.count()}/${accounts.max}`;
+  if (listEl && accounts) {
+    const rows = await accounts.list().catch(() => []);
+    listEl.innerHTML = '';
+    rows.forEach(acc => {
+      const row = document.createElement('div');
+      row.className = 'settings-device-account' + (acc.active ? ' is-active' : '');
+      const main = document.createElement('div');
+      const name = document.createElement('strong');
+      name.textContent = acc.name;
+      const id = document.createElement('span');
+      id.textContent = acc.id;
+      main.append(name, id);
+      const badge = document.createElement('span');
+      badge.className = 'settings-account-kind kind-' + acc.kind;
+      badge.textContent = t(acc.kind === 'code' ? 'settings.accountKindCode' : acc.kind === 'legacy' ? 'settings.accountKindLegacy' : 'settings.accountKindLocal');
+      row.append(main, badge);
+      if (acc.active) {
+        const active = document.createElement('span');
+        active.className = 'settings-account-active';
+        active.textContent = t('settings.accountActive');
+        row.append(active);
+      }
+      listEl.append(row);
+    });
+  }
+
+  // Giriş kodu: eski tip hesapta kod yoktur, yerine buluta taşıma sunulur.
+  document.getElementById('settings-login-code-cloud')?.classList.toggle('hidden', isLegacy);
+  document.getElementById('settings-login-code-legacy')?.classList.toggle('hidden', !isLegacy);
   accountCodeCache = null;
   codeEl.classList.add('is-masked');
   codeEl.textContent = '•'.repeat(32);
+  const toggle = document.getElementById('settings-login-code-toggle');
   if (toggle) { toggle.setAttribute('data-i18n', 'settings.show'); toggle.textContent = t('settings.show'); }
-  try { idEl.textContent = (await api.getDeviceId()) || '—'; } catch (e) { idEl.textContent = '—'; }
-  const accounts = window.TSAccounts;
-  if (countEl && accounts) countEl.textContent = t('auth.accountCount', { n: accounts.count(), max: accounts.max });
-  try {
-    accountCodeCache = accounts ? await api.getAccountCode(accounts.activeSlot()) : null;
-  } catch (e) { accountCodeCache = null; }
+  if (!isLegacy && accounts) {
+    try { accountCodeCache = await api.getAccountCode(accounts.activeSlot()); } catch (e) { accountCodeCache = null; }
+  }
 }
 
 function copySettingsText(text) {
@@ -10093,8 +10335,24 @@ function copySettingsText(text) {
 
 function initAccountSettings() {
   document.getElementById('settings-device-id-copy')?.addEventListener('click', () => {
-    const text = document.getElementById('settings-device-id')?.textContent || '';
-    if (/^[0-9a-f]{40}$/.test(text)) copySettingsText(text);
+    const raw = document.getElementById('settings-device-id')?.dataset.raw || '';
+    if (/^[0-9a-f]{40}$/.test(raw)) copySettingsText(raw);
+  });
+  document.getElementById('settings-device-copy-all')?.addEventListener('click', () => copySettingsText(deviceInfoText));
+  document.getElementById('settings-migrate-legacy')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const ok = await window.showConfirm(t('settings.migrateLegacy'), t('settings.migrateConfirm'));
+    if (!ok || !window.TSAccounts) return;
+    btn.disabled = true;
+    try {
+      await window.TSAccounts.migrateLegacy();
+      showToast(t('settings.migrateDone'), 'ok');
+      await renderAccountSettings();
+    } catch (err) {
+      showToast(t('settings.migrateFailed') + (err && err.message ? err.message : err), 'danger');
+    } finally {
+      btn.disabled = false;
+    }
   });
   document.getElementById('settings-login-code-copy')?.addEventListener('click', () => copySettingsText(accountCodeCache));
   document.getElementById('settings-login-code-toggle')?.addEventListener('click', (e) => {

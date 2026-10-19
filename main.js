@@ -1128,6 +1128,35 @@ ipcMain.handle('get-device-id', (event) => {
   return deriveDeviceId(loadOrCreateDeviceSecret());
 });
 
+// Ayarlar > Hesap ve Cihaz ile Supabase device_accounts tablosu için cihazın
+// ayrıntıları. Donanım seri numarası gibi kalıcı tanımlayıcılar BİLEREK
+// toplanmaz; kimlik yalnızca uygulamanın ürettiği deviceId'dir.
+ipcMain.handle('get-device-info', (event) => {
+  if (!isMainWindowSender(event)) return null;
+  const deviceId = deriveDeviceId(loadOrCreateDeviceSecret());
+  const cpus = os.cpus() || [];
+  let firstSeen = null;
+  try {
+    const st = fs.statSync(deviceIdentityFile);
+    firstSeen = (st.birthtimeMs ? st.birthtime : st.mtime).toISOString();
+  } catch (e) {}
+  let osName = os.type();
+  try { osName = os.version() || osName; } catch (e) {}
+  return {
+    deviceId,
+    deviceName: os.hostname(),
+    osName,
+    osRelease: os.release(),
+    arch: os.arch(),
+    cpu: cpus.length ? String(cpus[0].model || '').replace(/\s+/g, ' ').trim() : '',
+    cpuCores: cpus.length,
+    ramGb: Math.round(os.totalmem() / (1024 ** 3) * 10) / 10,
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron,
+    firstSeen
+  };
+});
+
 ipcMain.handle('get-account-code', (event, slot) => {
   if (!isMainWindowSender(event)) return null;
   const s = Number.isInteger(slot) && slot > 0 ? slot : 0;

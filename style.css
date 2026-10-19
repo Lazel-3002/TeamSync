@@ -9797,3 +9797,53 @@ body.no-hw-accel .media-collect-btn {
 }
 .settings-code.is-masked { letter-spacing: 0.12em; color: var(--txt-mut); user-select: none; }
 .settings-code-row .settings-test-button { flex: 0 0 auto; }
+
+.settings-device-card { display: flex; flex-direction: column; gap: 10px; }
+.settings-device-head { display: flex; align-items: center; gap: 12px; }
+.settings-device-head svg { flex: 0 0 auto; color: var(--acc); }
+.settings-device-head strong { display: block; font-size: 14px; }
+.settings-device-head span { display: block; color: var(--txt-mut); font-size: 12.5px; }
+.settings-device-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 2px 0 6px;
+  font-size: 12.5px;
+}
+.settings-device-grid dt { color: var(--txt-mut); }
+.settings-device-grid dd { margin: 0; color: var(--txt-main); min-width: 0; overflow-wrap: anywhere; }
+.settings-cloud-status.is-ok { color: var(--status-online, #23a55a); }
+.settings-cloud-status.is-warn { color: #f0b232; }
+.settings-link-button {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--acc);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.settings-link-button:hover { text-decoration: underline; }
+.settings-device-accounts-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.settings-device-accounts-count { color: var(--txt-mut); font-size: 12px; }
+.settings-device-accounts { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.settings-device-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--txt-main) 10%, transparent);
+}
+.settings-device-account.is-active { border-color: var(--acc); }
+.settings-device-account > div { flex: 1; min-width: 0; }
+.settings-device-account strong { display: block; font-size: 13px; }
+.settings-device-account > div span { display: block; color: var(--txt-mut); font: 11.5px ui-monospace, 'Cascadia Mono', Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-account-kind { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 650; background: color-mix(in srgb, var(--txt-main) 8%, transparent); color: var(--txt-mut); }
+.settings-account-kind.kind-code { background: color-mix(in srgb, var(--acc) 18%, transparent); color: var(--acc); }
+.settings-account-kind.kind-legacy { background: color-mix(in srgb, #f0b232 18%, transparent); color: #f0b232; }
+.settings-account-active { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--acc); }
+.settings-legacy-box { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.settings-legacy-box.hidden, #settings-login-code-cloud.hidden { display: none; }

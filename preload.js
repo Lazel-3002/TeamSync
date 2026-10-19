@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDeviceCredentials: (slot) => ipcRenderer.invoke('get-device-credentials', slot),
   // Cihaz kimliği ve hesap giriş kodu (başka cihazdan aynı hesaba girmek için).
   getDeviceId: () => ipcRenderer.invoke('get-device-id'),
+  getDeviceInfo: () => ipcRenderer.invoke('get-device-info'),
   getAccountCode: (slot) => ipcRenderer.invoke('get-account-code', slot),
   importAccountCode: (code) => ipcRenderer.invoke('import-account-code', code),
   forgetImportedAccount: (slot) => ipcRenderer.invoke('forget-imported-account', slot),

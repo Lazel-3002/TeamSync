@@ -1814,24 +1814,55 @@
             <div class="settings-panel" data-settings-content="account">
               <h2 data-i18n="settings.account">Hesap ve Cihaz</h2>
               <p class="settings-lead" data-i18n="settings.accountLead">Bu cihazın kimliği ve hesabına başka cihazlardan girmek için kullanılan giriş kodu.</p>
-              <div class="settings-card">
+
+              <div class="settings-card settings-device-card">
+                <div class="settings-device-head">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+                  <div>
+                    <strong data-i18n="settings.thisDevice">Bu Cihaz</strong>
+                    <span id="settings-device-name" data-i18n-ignore>—</span>
+                  </div>
+                </div>
+                <dl class="settings-device-grid">
+                  <dt data-i18n="settings.os">İşletim sistemi</dt><dd id="settings-device-os" data-i18n-ignore>—</dd>
+                  <dt data-i18n="settings.cpu">İşlemci</dt><dd id="settings-device-cpu" data-i18n-ignore>—</dd>
+                  <dt data-i18n="settings.ram">Bellek</dt><dd id="settings-device-ram" data-i18n-ignore>—</dd>
+                  <dt data-i18n="settings.appVersion">Uygulama sürümü</dt><dd id="settings-device-app" data-i18n-ignore>—</dd>
+                  <dt data-i18n="settings.firstSeen">İlk kurulum</dt><dd id="settings-device-first" data-i18n-ignore>—</dd>
+                  <dt data-i18n="settings.cloudStatus">Bulut kaydı</dt><dd id="settings-device-cloud" class="settings-cloud-status" data-i18n-ignore>—</dd>
+                </dl>
                 <label class="settings-field-label" for="settings-device-id" data-i18n="settings.deviceId">Cihaz Kimliği</label>
                 <div class="settings-code-row">
                   <code id="settings-device-id" class="settings-code" data-i18n-ignore>—</code>
                   <button id="settings-device-id-copy" class="settings-test-button" type="button" data-i18n="settings.copy">Kopyala</button>
                 </div>
                 <p class="settings-help" data-i18n="settings.deviceIdDesc">Bu bilgisayara özel kimlik. Destek isterken gönderebilirsin; tek başına hesabına giriş sağlamaz.</p>
+                <button id="settings-device-copy-all" class="settings-link-button" type="button" data-i18n="settings.copyAll">Tüm cihaz bilgilerini kopyala</button>
               </div>
+
+              <div class="settings-card">
+                <div class="settings-device-accounts-head">
+                  <label class="settings-field-label" data-i18n="settings.accountsOnDevice">Bu cihazdaki hesaplar</label>
+                  <span id="settings-device-accounts" class="settings-device-accounts-count" data-i18n-ignore></span>
+                </div>
+                <div id="settings-device-accounts-list" class="settings-device-accounts" data-i18n-ignore></div>
+              </div>
+
               <div class="settings-card">
                 <label class="settings-field-label" for="settings-login-code" data-i18n="settings.loginCode">Hesap Giriş Kodu</label>
-                <div class="settings-code-row">
-                  <code id="settings-login-code" class="settings-code is-masked" data-i18n-ignore>••••••••••••••••••••••••••••••••</code>
-                  <button id="settings-login-code-toggle" class="settings-test-button" type="button" data-i18n="settings.show">Göster</button>
-                  <button id="settings-login-code-copy" class="settings-test-button" type="button" data-i18n="settings.copy">Kopyala</button>
+                <div id="settings-login-code-cloud">
+                  <div class="settings-code-row">
+                    <code id="settings-login-code" class="settings-code is-masked" data-i18n-ignore>••••••••••••••••••••••••••••••••</code>
+                    <button id="settings-login-code-toggle" class="settings-test-button" type="button" data-i18n="settings.show">Göster</button>
+                    <button id="settings-login-code-copy" class="settings-test-button" type="button" data-i18n="settings.copy">Kopyala</button>
+                  </div>
+                  <p class="settings-help" data-i18n="settings.loginCodeDesc">Bu hesaba başka bir cihazdan girmenin tek yolu: diğer cihazda hesap seçme ekranında "Kodla Giriş Yap"a yapıştır. Kodu alan herkes hesabına girebilir; yalnızca kendi cihazlarında kullan.</p>
                 </div>
-                <p class="settings-help" data-i18n="settings.loginCodeDesc">Bu hesaba başka bir cihazdan girmenin tek yolu: diğer cihazda hesap seçme ekranında "Kodla Giriş Yap"a yapıştır. Kodu alan herkes hesabına girebilir; yalnızca kendi cihazlarında kullan.</p>
+                <div id="settings-login-code-legacy" class="settings-legacy-box hidden">
+                  <p class="settings-help" data-i18n="settings.legacyCodeDesc">Bu hesap eski tip: yalnızca bu bilgisayarda saklanıyor, bu yüzden giriş kodu yok. Buluta taşırsan adın, arkadaş ID'n ve arkadaş listen korunur; sonra başka cihazlarda kodla girebilirsin.</p>
+                  <button id="settings-migrate-legacy" class="settings-test-button" type="button" data-i18n="settings.migrateLegacy">Hesabı Buluta Taşı</button>
+                </div>
               </div>
-              <p class="settings-help" id="settings-device-accounts" data-i18n-ignore></p>
             </div>
 
             <div class="settings-panel" data-settings-content="voice">
