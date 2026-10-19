@@ -1,16 +1,16 @@
 # Graph Report - TeamSync  (2026-10-19)
 
 ## Corpus Check
-- 134 files · ~644,716 words
+- 134 files · ~649,724 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2111 nodes · 5047 edges · 105 communities (90 shown, 15 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 171 edges (avg confidence: 0.6)
+- 2115 nodes · 5065 edges · 105 communities (90 shown, 15 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 172 edges (avg confidence: 0.6)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ec0f7666`
+- Built from commit: `efc59144`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -116,11 +116,11 @@
 - shell-navigation.test.js
 
 ## God Nodes (most connected - your core abstractions)
-1. `t()` - 66 edges
+1. `t()` - 67 edges
 2. `evalJS()` - 63 edges
 3. `handleDataMessage()` - 47 edges
 4. `bindUI()` - 42 edges
-5. `showToast()` - 39 edges
+5. `showToast()` - 40 edges
 6. `spawnPeer()` - 39 edges
 7. `render()` - 37 edges
 8. `waitFor()` - 34 edges
@@ -128,16 +128,16 @@
 10. `bindUI()` - 30 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `renderLanguageOptions()` --indirect_call--> `mark()`  [INFERRED]
-  renderer.js → js/teams/shell-teams.js
 - `updateProfile()` --semantically_similar_to--> `Shared Browser Card (#sb-card, webview)`  [INFERRED] [semantically similar]
   electron/cursor-overlay.html → index.html
 - `dragify()` --indirect_call--> `ev()`  [INFERRED]
   js/color-picker.js → test/e2e/server-state.test.js
 - `createPeerConnection()` --indirect_call--> `track()`  [INFERRED]
   renderer.js → js/dm-extras.js
-- `startRecording()` --indirect_call--> `track()`  [INFERRED]
-  renderer.js → js/dm-extras.js
+- `WebRTC()` --indirect_call--> `track()`  [INFERRED]
+  src/components/WebRTC.jsx → js/dm-extras.js
+- `WebRTC()` --indirect_call--> `answer()`  [INFERRED]
+  src/components/WebRTC.jsx → js/profile.js
 
 ## Import Cycles
 - None detected.
@@ -160,7 +160,7 @@ Nodes (39): App(), Chat(), Dashboard(), accountItemStyle, cardStyle, containerSt
 
 ### Community 2 - "Chat & Renderer Utilities"
 Cohesion: 0.02
-Nodes (109): ACTIVITY_CARD_IDS, ACTIVITY_COVER_LOCALES, adoptScreenAudioTransceiver(), appendFileMsg(), applyScreenAudioQuality(), AUDIO_CHANNEL_FIELDS, badWordsList, BUILT_IN_THEME_PRESETS (+101 more)
+Nodes (109): acceptServerInvite(), ACTIVITY_CARD_IDS, ACTIVITY_COVER_LOCALES, adoptScreenAudioTransceiver(), applyScreenAudioQuality(), AUDIO_CHANNEL_FIELDS, badWordsList, beginRoomOperation() (+101 more)
 
 ### Community 3 - "Electron Main Process"
 Cohesion: 0.05
@@ -192,8 +192,8 @@ Cohesion: 0.10
 Nodes (19): actionSectionStyle, avatarStyle, badgeStyle, baseActionBtn, btnCreateStyle, btnJoinStyle, emptyTextStyle, friendAvatarPlaceholder (+11 more)
 
 ### Community 9 - "WebRTC ICE & TURN"
-Cohesion: 0.09
-Nodes (43): acceptFounderClaim(), applyAudioBitrateToPeers(), applyAudioSdpParams(), applyIceEscalationPolicy(), applySharedTurn(), applySpeakerTo(), attachPeerScreenAudio(), attemptIceRestart() (+35 more)
+Cohesion: 0.10
+Nodes (28): acceptFounderClaim(), applyAudioBitrateToPeers(), applyAudioSdpParams(), canManageRoom(), censorProfaneText(), checkAvatar(), checkTextWithAI(), cleanText() (+20 more)
 
 ### Community 10 - "E2E Test: MQTT/First Run"
 Cohesion: 0.12
@@ -224,16 +224,16 @@ Cohesion: 0.07
 Nodes (59): actionButtons(), activityHtml(), answer(), bannerStyle(), bindCardActions(), cardHtml(), durationMenu(), editorDirty() (+51 more)
 
 ### Community 17 - "Pokemon Data Fetch Tool"
-Cohesion: 0.18
-Nodes (21): checkSession(), deleteDeviceAccount(), deviceLogin(), getActiveSlot(), getDefaultAccount(), getDeviceAccounts(), isDefaultAccountRef(), isServerUnreachable() (+13 more)
+Cohesion: 0.17
+Nodes (23): checkSession(), deleteDeviceAccount(), deviceLogin(), getActiveSlot(), getDefaultAccount(), getDeviceAccounts(), isDefaultAccountRef(), isServerUnreachable() (+15 more)
 
 ### Community 18 - "Build Tooling Dependencies"
 Cohesion: 0.15
 Nodes (13): concurrently, cross-env, electron, electron-builder, devDependencies, concurrently, cross-env, electron (+5 more)
 
 ### Community 19 - "Chat Messaging & Invites"
-Cohesion: 0.18
-Nodes (19): applyPeerLimiter(), applyPeerVolume(), AUDIO_CHANNELS, buildCardVolumeBox(), buildMenuVolumeBlock(), channelFields(), ensurePeerBoostChain(), getUserVolume() (+11 more)
+Cohesion: 0.19
+Nodes (18): applyPeerLimiter(), applyPeerVolume(), AUDIO_CHANNELS, buildCardVolumeBox(), buildMenuVolumeBlock(), channelFields(), ensurePeerBoostChain(), getUserVolume() (+10 more)
 
 ### Community 20 - "Diagnostics Tool"
 Cohesion: 0.35
@@ -252,8 +252,8 @@ Cohesion: 0.05
 Nodes (35): ActivityDetector, findExes(), fs, initActivityDetector(), P, path, readJson(), regQuery() (+27 more)
 
 ### Community 24 - "NPM Scripts"
-Cohesion: 0.15
-Nodes (28): bindUI(), canModerateTarget(), clearFocusInlineLayout(), createFounderBadge(), ensureFocusControlsVisible(), enterFocus(), exitFocus(), founderSuccessorId() (+20 more)
+Cohesion: 0.20
+Nodes (23): bindUI(), canModerateTarget(), clearFocusInlineLayout(), createFounderBadge(), ensureFocusControlsVisible(), enterFocus(), exitFocus(), founderSuccessorId() (+15 more)
 
 ### Community 25 - "RNNoise Noise Suppression"
 Cohesion: 0.43
@@ -316,12 +316,12 @@ Nodes (11): build, appId, directories, npmRebuild, productName, protocols, publi
 
 ### Community 38 - "HTML Patch Tool v1"
 Cohesion: 0.40
-Nodes (4): assert, fs, path, {
-  spawnPeer,
-  cleanupPeer,
-  createRoom,
-  evalJS,
-  waitFor,
+Nodes (4): assert, fs, path, {
+  spawnPeer,
+  cleanupPeer,
+  createRoom,
+  evalJS,
+  waitFor,
 }
 
 ### Community 39 - "color-picker.js"
@@ -333,8 +333,8 @@ Cohesion: 0.18
 Nodes (25): bind(), clearUnread(), currentDmView(), dayLabel(), ensureLoaded(), groupedHtml(), hideChat(), isPinned() (+17 more)
 
 ### Community 41 - "sendFile"
-Cohesion: 0.07
-Nodes (35): acceptServerInvite(), addVideoCard(), appendChat(), attachVideo(), beginRoomOperation(), censoredTextHtml(), cleanFriendEventName(), connectGlobalBroker() (+27 more)
+Cohesion: 0.11
+Nodes (43): applyIceEscalationPolicy(), applySharedTurn(), applySpeakerTo(), attachPeerScreenAudio(), attemptIceRestart(), clearControlOffer(), copySettingsText(), createPeerConnection() (+35 more)
 
 ### Community 42 - "E2E Test Runner"
 Cohesion: 0.33
@@ -349,8 +349,8 @@ Cohesion: 0.22
 Nodes (11): avatarHtml(), closePopover(), colorFromString(), formatElapsed(), gameArtHtml(), popover(), safeImg(), sinceHtml() (+3 more)
 
 ### Community 45 - "call-tiles.js"
-Cohesion: 0.14
-Nodes (28): add(), clear(), ensureInviteTile(), grid(), peerInfo(), remove(), render(), safeId() (+20 more)
+Cohesion: 0.13
+Nodes (29): add(), clear(), ensureInviteTile(), grid(), peerInfo(), remove(), render(), safeId() (+21 more)
 
 ### Community 46 - "shell-friends.js"
 Cohesion: 0.42
@@ -383,7 +383,7 @@ Nodes (49): activate(), activeCall(), applyEffects(), beaconLoop(), callRoom(), 
 
 ### Community 54 - "initCustomThemeEditor"
 Cohesion: 0.14
-Nodes (29): APP_THEMES, applyCustomThemeColors(), applyPaletteToEditor(), applyUserTheme(), createPaletteBadge(), createPaletteCard(), deleteSavedPalette(), getActiveTheme() (+21 more)
+Nodes (30): APP_THEMES, applyCustomThemeColors(), applyPaletteToEditor(), applyUserTheme(), createPaletteBadge(), createPaletteCard(), deleteSavedPalette(), getActiveTheme() (+22 more)
 
 ### Community 55 - "server-state.js"
 Cohesion: 0.14
@@ -398,20 +398,20 @@ Cohesion: 0.21
 Nodes (13): addControl(), addEvents(), allSpaces(), channelEvents(), controlOf(), countOf(), eventsOf(), getEvent() (+5 more)
 
 ### Community 58 - "server-dialogs.js"
-Cohesion: 0.28
-Nodes (14): expiryText(), fileToIcon(), flushPendingLink(), handleLink(), iconPicker(), modal(), openChannelSettings(), openCreate() (+6 more)
+Cohesion: 0.25
+Nodes (15): expiryText(), fileToIcon(), flushPendingLink(), handleLink(), iconPicker(), modal(), openChannelSettings(), openCreate() (+7 more)
 
 ### Community 60 - "Cross-Fetch Dependency"
-Cohesion: 0.10
-Nodes (51): applyMicrophoneVolume(), applyRoomNoiseSuppression(), applySimpleUi(), applySpeakerToAll(), applySpeakerVolume(), applyUserLanguage(), clearSettingsPreview(), copySettingsText() (+43 more)
+Cohesion: 0.11
+Nodes (44): mark(), applyMicrophoneVolume(), applyRoomNoiseSuppression(), applySimpleUi(), applySpeakerToAll(), applySpeakerVolume(), applyUserLanguage(), clearSettingsPreview() (+36 more)
 
 ### Community 66 - "handlePeerDiscovered"
-Cohesion: 0.25
-Nodes (16): lbApply(), lbClamp(), lbClose(), lbComputeFitScale(), lbEnsure(), lbFit(), lbKeyHandler(), lbRotate() (+8 more)
+Cohesion: 0.23
+Nodes (17): lbApply(), lbClamp(), lbClose(), lbComputeFitScale(), lbEnsure(), lbFit(), lbKeyHandler(), lbRotate() (+9 more)
 
 ### Community 68 - "Lucky Wheel Feature"
 Cohesion: 0.06
-Nodes (88): initLuckyWheel(), addBot(), addBotMemory(), addLobbyChatMessage(), addressedMessageFor(), afterNight(), analyzeChatClaim(), applyBotReward() (+80 more)
+Nodes (87): initLuckyWheel(), addBot(), addBotMemory(), addLobbyChatMessage(), addressedMessageFor(), afterNight(), analyzeChatClaim(), applyBotReward() (+79 more)
 
 ### Community 69 - "Poke Feature Init"
 Cohesion: 0.08
@@ -465,8 +465,8 @@ Cohesion: 0.25
 Nodes (7): author, description, license, main, name, releaseName, version
 
 ### Community 84 - "showToast"
-Cohesion: 0.09
-Nodes (46): addUser(), applyMicState(), broadcast(), broadcastTo(), clearControlOffer(), closeActiveControlSession(), closeCtrlModal(), closeCtrlOfferNote() (+38 more)
+Cohesion: 0.06
+Nodes (65): addUser(), addVideoCard(), appendChat(), appendFileMsg(), applyMicState(), attachVideo(), broadcast(), broadcastTo() (+57 more)
 
 ### Community 85 - "enterFocus"
 Cohesion: 0.33
@@ -477,8 +477,8 @@ Cohesion: 0.38
 Nodes (7): attach(), choose(), closePopup(), openPicker(), renderPopup(), search(), tokenAtCaret()
 
 ### Community 87 - "shell-teams.js"
-Cohesion: 0.22
-Nodes (20): activeFid(), bind(), buildCallToolbar(), clearFind(), closeFind(), inCall(), joinById(), mark() (+12 more)
+Cohesion: 0.24
+Nodes (19): activeFid(), bind(), buildCallToolbar(), clearFind(), closeFind(), inCall(), joinById(), meetNow() (+11 more)
 
 ### Community 88 - "setRemoteControlEnabled"
 Cohesion: 0.39
@@ -498,7 +498,7 @@ Nodes (6): applyDnsSettings(), createWindow(), getDnsProvider(), getTrayStrings(
 
 ### Community 92 - "i18n-coverage.test.js"
 Cohesion: 0.06
-Nodes (111): accentColor(), addOps(), announceRemoteActivity(), applyLive(), bboxOf(), bindUI(), buildSwatches(), call() (+103 more)
+Nodes (112): accentColor(), addOps(), announceRemoteActivity(), applyLive(), bboxOf(), bindUI(), buildSwatches(), call() (+104 more)
 
 ### Community 94 - "renderVirtualCursor"
 Cohesion: 0.40
@@ -550,12 +550,12 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `window.handlePokeImgError() sprite fallback chain` and `PokeAPI (pokeapi.co)`?**
   _Edge tagged AMBIGUOUS (relation: calls) - confidence is low._
-- **Why does `label()` connect `rnnoise-audio.test.js` to `Lucky Wheel Feature`, `Electron Builder Config`, `shell-dm.js`, `sendFile`, `E2E Test: MQTT/First Run`, `E2E Test: RNNoise Toggle`, `Whiteboard Feature`, `shell-teams.js`?**
-  _High betweenness centrality (0.168) - this node is a cross-community bridge._
+- **Why does `label()` connect `rnnoise-audio.test.js` to `Chat & Renderer Utilities`, `Lucky Wheel Feature`, `Electron Builder Config`, `shell-dm.js`, `E2E Test: MQTT/First Run`, `E2E Test: RNNoise Toggle`, `Whiteboard Feature`, `shell-teams.js`?**
+  _High betweenness centrality (0.169) - this node is a cross-community bridge._
 - **Why does `t()` connect `color-picker.js` to `rnnoise-audio.test.js`, `groups.js`, `E2E Test: Friend List`?**
-  _High betweenness centrality (0.133) - this node is a cross-community bridge._
-- **Why does `active()` connect `rnnoise-audio.test.js` to `createWindow`, `initCustomThemeEditor`?**
-  _High betweenness centrality (0.125) - this node is a cross-community bridge._
+  _High betweenness centrality (0.135) - this node is a cross-community bridge._
+- **Why does `active()` connect `rnnoise-audio.test.js` to `createWindow`, `Cross-Fetch Dependency`, `initCustomThemeEditor`?**
+  _High betweenness centrality (0.128) - this node is a cross-community bridge._
 - **What connects `fs`, `path`, `crypto` to the rest of the system?**
   _360 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `UNO Card Game` be split into smaller, more focused modules?**
