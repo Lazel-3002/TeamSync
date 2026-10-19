@@ -30,23 +30,23 @@
     "semantic_hash": ""
   },
   "main.js": {
-    "mtime": 1792077511.9336162,
-    "ast_hash": "b7ef16e137100c0df51a9051a6548369",
+    "mtime": 1792437875.5709937,
+    "ast_hash": "828540d15b48970c500f0ce7e7bfda81",
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1792216934.2051923,
+    "mtime": 1792437482.6715803,
     "ast_hash": "9874481b10d420b46c4ece27c1f5c7fc",
     "semantic_hash": ""
   },
   "preload.js": {
-    "mtime": 1790283520.162485,
-    "ast_hash": "5fbbc8c425242b8b37fea822ce572d03",
+    "mtime": 1792437875.3727949,
+    "ast_hash": "6857894519f9c28dbd2df4f8fdcbb837",
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1792216858.5211926,
-    "ast_hash": "a2ee3307ce29c1aabeb167f466a8e31e",
+    "mtime": 1792438322.4453473,
+    "ast_hash": "727c90af8dbac641a2fbef21132c73ac",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792000806.267079,
-    "ast_hash": "a3a5cebd22c7ebad7192034beaf66616",
+    "mtime": 1792437986.6944337,
+    "ast_hash": "a04fb785998b700913356ffbe2a10449",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -320,7 +320,7 @@
     "semantic_hash": ""
   },
   ".github/workflows/release.yml": {
-    "mtime": 1792216885.6742046,
+    "mtime": 1792437482.642524,
     "ast_hash": "ba459759964c5b6ba4904630109a3e67",
     "semantic_hash": ""
   },
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "test/e2e/settings-language.test.js": {
-    "mtime": 1791998303.8445444,
-    "ast_hash": "8dc8b8338208ef4d93160a04ddc3f274",
+    "mtime": 1792438372.865893,
+    "ast_hash": "b1a79ca4328be8a844bcd3f9ac81baf9",
     "semantic_hash": ""
   },
   "test/e2e/vampire-villager.test.js": {
@@ -385,73 +385,73 @@
     "semantic_hash": ""
   },
   "resources/localization/catalogs.bundle.js": {
-    "mtime": 1792216864.8826835,
-    "ast_hash": "42c041f8fed5c6b0efed6b1c5f4eec58",
+    "mtime": 1792438323.171615,
+    "ast_hash": "37bc40857e2dc293ad0b2f6e93fda498",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ar.json": {
-    "mtime": 1792216812.288891,
-    "ast_hash": "bcd9c91c5f92a7db3c2aeab287c28887",
+    "mtime": 1792438322.4543483,
+    "ast_hash": "e8bebb333fe6ce15c54f260e8c5a5786",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/de.json": {
-    "mtime": 1792216812.2902377,
-    "ast_hash": "374a9fe6f7ac3f5fcd5b3d72b1e42024",
+    "mtime": 1792438322.4493513,
+    "ast_hash": "85a6a933b5ffa4e8c721e1a4dd87e0bf",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/en.json": {
-    "mtime": 1792216812.2917237,
-    "ast_hash": "6d9fc7010fc4390107a30c4ccf6db2ba",
+    "mtime": 1792438322.44835,
+    "ast_hash": "bb4025c4fba086b082af1a631853d4ce",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/es.json": {
-    "mtime": 1792216812.2935758,
-    "ast_hash": "2c0869f9e2a4b97fda76d2332dae5edc",
+    "mtime": 1792438322.4503474,
+    "ast_hash": "66f424d4841d32a3d746f674e0a357dc",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/fr.json": {
-    "mtime": 1792216812.2945838,
-    "ast_hash": "32ac7276e3558f829dfcfde4dd2b1816",
+    "mtime": 1792438322.4513478,
+    "ast_hash": "6ac0db57cc36fe60379571399f8530cc",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ja.json": {
-    "mtime": 1792216812.2974005,
-    "ast_hash": "a4d53a56560439fcf7fd1da63c69296d",
+    "mtime": 1792438322.461243,
+    "ast_hash": "5ccd780948f02f260bdbbf0c2694f0a8",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/kk.json": {
-    "mtime": 1792216812.2988465,
-    "ast_hash": "b39cc4e0b852bffd3d10509cee077ebb",
+    "mtime": 1792438322.4563472,
+    "ast_hash": "9febcf3e954c59833e88cb152ec41d7c",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/mn.json": {
-    "mtime": 1792216812.300936,
-    "ast_hash": "751d7e48a14ccd1f1d79a2bec7a72d53",
+    "mtime": 1792438322.4582393,
+    "ast_hash": "1042edc12f39d05177ea47f2df30c89f",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/pt-BR.json": {
-    "mtime": 1792216812.3022268,
-    "ast_hash": "c0868f14645d08a91afcaa4ec29c1168",
+    "mtime": 1792438322.4523482,
+    "ast_hash": "80afe8664b4a56626b90ac01b4bd5647",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/ru.json": {
-    "mtime": 1792216812.3032362,
-    "ast_hash": "09e1bc1adbad791e8f2b1bdfa5dedb78",
+    "mtime": 1792438322.4533477,
+    "ast_hash": "d455bf763cde32d60a99e013ca444cea",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tk.json": {
-    "mtime": 1792216812.3047433,
-    "ast_hash": "c71ce4597c299eca146080cad13d22d8",
+    "mtime": 1792438322.4572365,
+    "ast_hash": "b3c252f87d26622ef61eddf444a5e55a",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/tr.json": {
-    "mtime": 1792216812.305994,
-    "ast_hash": "926f98b98a6c95c984f388f8c4318669",
+    "mtime": 1792438322.4473476,
+    "ast_hash": "ec5d8d6e2a1a2bd22a422ec0d66b1ac7",
     "semantic_hash": ""
   },
   "resources/localization/catalogs/zh-CN.json": {
-    "mtime": 1792216812.307995,
-    "ast_hash": "81a92d77ca4da7ddbdf5893d83782bd8",
+    "mtime": 1792438322.4592438,
+    "ast_hash": "2e5a599f1932313c7e3e433fc1cae63f",
     "semantic_hash": ""
   },
   "tools/i18n/audit-locales.js": {
@@ -775,8 +775,18 @@
     "semantic_hash": ""
   },
   ".github/workflows/supabase-keepalive.yml": {
-    "mtime": 1792216925.4741664,
-    "ast_hash": "06838c594046e8aab003b61b5409958a",
+    "mtime": 1792437482.642524,
+    "ast_hash": "7cbf8e5b06c532ff6516b0bc6d0cd9a0",
+    "semantic_hash": ""
+  },
+  "supabase/device_accounts.sql": {
+    "mtime": 1792437899.4023316,
+    "ast_hash": "bb343cc85b9cf6a69ef4a6e6d7f04bc4",
+    "semantic_hash": ""
+  },
+  "test/e2e/account-code-ui.test.js": {
+    "mtime": 1792438439.7143514,
+    "ast_hash": "e6e2f6340336e43eb34ec4d0304c7673",
     "semantic_hash": ""
   }
 }
