@@ -416,6 +416,12 @@ let mqttSessionId = 0;
 // bağlandığında yayılır; sonradan bağlanan broker'lara abonelikler sessizce
 // kopyalanır.
 const MQTT_DEDUPE_MS = 2000; // oda hello'su 3 sn'de bir aynı içerikle gidiyor; bundan kısa olmalı
+// Kopan broker'a yeniden bağlanma aralığı: başarısız her denemede ikiye
+// katlanır. Sabit 2 sn'de broker.hivemq.com bir süre sonra bağlantıyı
+// "Not authorized" ile reddetmeye başlıyor (hız sınırı) ve o broker oturum
+// boyunca bir daha kullanılamıyordu.
+const MQTT_RECONNECT_MIN_MS = 2000;
+const MQTT_RECONNECT_MAX_MS = 30000;
 
 function createMultiBrokerClient(tag, makeClientId) {
   const handlers = {};
@@ -448,10 +454,31 @@ function createMultiBrokerClient(tag, makeClientId) {
     const c = mqtt.connect(url, {
       clientId: makeClientId(),
       keepalive: 60,
-      reconnectPeriod: 2000,
+      // mqtt.js'in kendi yeniden bağlanması sabit aralıklı bir setInterval;
+      // aralık sonradan değiştirilemiyor. Zamanlamayı aşağıda biz yönetiyoruz.
+      reconnectPeriod: 0,
       connectTimeout: 6000
     });
+    let retryDelay = MQTT_RECONNECT_MIN_MS;
+    let retryTimer = null;
+    c.on('close', () => {
+      if (ended || retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (!ended && !c.connected) { try { c.reconnect(); } catch (e) {} }
+      }, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, MQTT_RECONNECT_MAX_MS);
+    });
+    // İnternet geri gelince uzun beklemeyi atla.
+    window.addEventListener('online', () => {
+      if (ended || c.connected || !retryTimer) return;
+      clearTimeout(retryTimer);
+      retryTimer = null;
+      retryDelay = MQTT_RECONNECT_MIN_MS;
+      try { c.reconnect(); } catch (e) {}
+    });
     c.on('connect', () => {
+      retryDelay = MQTT_RECONNECT_MIN_MS;
       if (ended) { try { c.end(true); } catch (e) {} return; }
       console.log(`🔗 MQTT [${tag}] bağlandı: ${url}`);
       subs.forEach((opts, topic) => { try { c.subscribe(topic, opts); } catch (e) {} });
