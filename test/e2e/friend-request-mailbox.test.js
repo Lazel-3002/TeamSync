@@ -112,6 +112,50 @@ module.exports = async function run() {
       return { err, requested: window.TSFriends.wasRequested('KNK-LEGACYPATH') };
     })()`, true);
     assert.deepStrictEqual(fallback, { err: null, requested: true });
+
+    // 6) Eski sürümden kalan bozuk giden kayıt ("E") listeden atılır; sunucuda
+    //    olmayan eski giden istek sunucuya taşınır, ID yoksa listeden düşer.
+    const legacy = await evalJS(peer.client, `(async () => {
+      const key = 'teamsync_outgoing_requests_' + state.friendId;
+      localStorage.setItem(key, JSON.stringify([
+        { id: 'E', at: Date.now() },
+        { id: 'KNK-OLDGHOST', at: Date.now() },
+        { id: 'KNK-OLDREAL', at: Date.now() }
+      ]));
+      window.__rpcCalls = [];
+      window.__rpcReplies.list_friend_requests = [];
+      window.__rpcReplies.send_friend_request = args => args.p_to === 'KNK-OLDGHOST' ? 'not_found' : 'ok';
+      await syncFriendRequests();
+      window.TSFriends.setTab('pending');
+      return {
+        ids: window.TSFriends.outgoingIds(),
+        sentTo: window.__rpcCalls.filter(c => c.fn === 'send_friend_request').map(c => c.args.p_to).sort(),
+        rows: document.querySelectorAll('#pending-list .pending-item[data-dir="out"]').length
+      };
+    })()`, true);
+    assert.deepStrictEqual(legacy, {
+      ids: ['KNK-OLDREAL'],
+      sentTo: ['KNK-OLDGHOST', 'KNK-OLDREAL'],
+      rows: 1
+    });
+
+    // 7) Sunucu üye kartı gizli formdan istek atar: hata toast olarak görünmeli.
+    const hiddenForm = await evalJS(peer.client, `(async () => {
+      window.TSFriends.setTab('online');
+      window.__rpcReplies.send_friend_request = 'not_found';
+      const toasts = [];
+      const orig = window.showToast;
+      window.showToast = (msg, kind) => { toasts.push(kind); return orig(msg, kind); };
+      try {
+        document.getElementById('friend-id-input').value = 'KNK-NOBODYHERE';
+        document.getElementById('btn-add-friend').click();
+        await new Promise(r => setTimeout(r, 300));
+      } finally {
+        window.showToast = orig;
+      }
+      return toasts;
+    })()`, true);
+    assert.deepStrictEqual(hiddenForm, ['warn']);
   } finally {
     cleanupPeer(peer);
   }

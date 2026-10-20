@@ -2095,6 +2095,7 @@ const FRIEND_SEND_ERRORS = {
 
 // İsteği gönderir. Başarıda null, aksi halde gösterilecek çeviri anahtarı döner.
 async function deliverFriendRequest(targetId) {
+  if (!isValidFriendEventId(targetId) || targetId === state.friendId) return 'friends.errorValidId';
   const res = await friendRequestRpc('send_friend_request', { p_to: targetId, p_name: state.myName });
   if (FRIEND_SEND_ERRORS[res]) return FRIEND_SEND_ERRORS[res];
   if (state.globalMqtt && state.globalMqtt.connected) {
@@ -2162,8 +2163,20 @@ async function syncFriendRequests() {
           friendRequestRpc('clear_friend_request', { p_to: r.to_id });
         } else if (!isFriend && window.TSFriends) {
           // Başka cihazdan gönderilen istekler de "Bekleyen"de görünsün.
-          window.TSFriends.rememberOutgoing(r.to_id, Date.parse(r.created_at) || Date.now());
+          window.TSFriends.rememberOutgoing(r.to_id, Date.parse(r.created_at) || Date.now(), r.to_name || undefined);
         }
+      }
+    }
+    // Posta kutusundan önce (eski sürümde ya da sunucuya ulaşılamazken)
+    // yalnız MQTT ile atılmış giden istekler: sunucuya taşınır ki alıcı
+    // çevrimdışıysa da görsün; var olmayan bir ID'ye gitmişse listeden düşer.
+    if (window.TSFriends && window.TSFriends.outgoingIds) {
+      const onServer = new Set(rows.filter(r => r.from_id === me).map(r => r.to_id));
+      for (const id of window.TSFriends.outgoingIds()) {
+        if (onServer.has(id)) continue;
+        const res = await friendRequestRpc('send_friend_request', { p_to: id, p_name: state.myName });
+        if (state.friendId !== me) return; // senkron sırasında hesap değişti
+        if (res === 'not_found' || res === 'self' || res === 'already_friends') window.TSFriends.dropOutgoing(id);
       }
     }
     if (added) {
@@ -3912,7 +3925,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-add-friend').addEventListener('click', async () => {
     const btn = document.getElementById('btn-add-friend');
     const targetId = document.getElementById('friend-id-input').value.trim().toUpperCase();
-    const addFriendError = (key, legacyKey) => window.TSFriends ? window.TSFriends.addFriendError(t(key)) : alert(t(legacyKey || key));
+    const addFriendError = (key, legacyKey) => {
+      if (!window.TSFriends) return alert(t(legacyKey || key));
+      window.TSFriends.addFriendError(t(key));
+      // Sunucu üye kartındaki "Arkadaş ekle" bu düğmeyi gizli formdan tetikler;
+      // satır içi mesaj görünmüyorsa hata sessizce kaybolmasın.
+      const msg = document.getElementById('add-friend-msg');
+      if (!msg || !msg.offsetParent) showToast(t(key), 'warn');
+    };
     // Kimlik deseniyle uyuşmayan girdi hiçbir konuya ulaşamaz.
     if (!targetId || targetId === state.friendId || !isValidFriendEventId(targetId)) return addFriendError('friends.errorValidId', 'alert.validId');
 

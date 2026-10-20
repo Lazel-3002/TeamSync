@@ -6,6 +6,7 @@
   const $ = id => document.getElementById(id);
   const TAB_KEY = 'teamsync_friends_tab';
   const OUT_KEY = fid => `teamsync_outgoing_requests_${fid}`;
+  const ID_RE = /^[A-Za-z0-9_-]{3,128}$/;
   let tab = 'online';
   try { tab = localStorage.getItem(TAB_KEY) || 'online'; } catch (e) {}
 
@@ -19,7 +20,9 @@
     if (!Array.isArray(list)) list = [];
     const now = Date.now();
     const friends = window.state.friends || {};
-    const pruned = list.filter(r => r && typeof r.id === 'string' && !(friends[r.id] && !friends[r.id].temporary) && now - (r.at || 0) < 30 * 24 * 3600 * 1000);
+    // Kimlik desenine uymayan kayıtlar (eski sürüm "E" gibi her girdiyi
+    // giden istek diye kaydediyordu) hiçbir kişiye ulaşamaz: atılır.
+    const pruned = list.filter(r => r && typeof r.id === 'string' && ID_RE.test(r.id) && !(friends[r.id] && !friends[r.id].temporary) && now - (r.at || 0) < 30 * 24 * 3600 * 1000);
     if (pruned.length !== list.length) saveOutgoing(pruned);
     return pruned;
   }
@@ -39,11 +42,21 @@
   }
 
   // Sunucudaki posta kutusundan gelen (ör. başka cihazdan gönderilmiş) istek.
-  function rememberOutgoing(id, at) {
+  function rememberOutgoing(id, at, name) {
     const list = outgoing();
-    if (list.some(r => r.id === id)) return;
-    list.push({ id, at: at || Date.now() });
+    const found = list.find(r => r.id === id);
+    if (found) {
+      if (!name || found.name === name) return;
+      found.name = name;
+    } else {
+      list.push({ id, at: at || Date.now(), name: name || undefined });
+    }
     saveOutgoing(list);
+    render();
+  }
+
+  function dropOutgoing(id) {
+    saveOutgoing(outgoing().filter(r => r.id !== id));
     render();
   }
 
@@ -106,7 +119,7 @@
     const host = $('pending-list');
     if (!host) return;
     const incoming = (window.state.friendRequests || []).map((r, idx) => ({ ...r, idx, dir: 'in' }));
-    const out = outgoing().map(r => ({ ...r, dir: 'out', name: (window.state.friends[r.id] && window.state.friends[r.id].name) || r.id }));
+    const out = outgoing().map(r => ({ ...r, dir: 'out', name: r.name || (window.state.friends[r.id] && window.state.friends[r.id].name) || r.id }));
     const all = [...incoming, ...out];
     const count = $('pending-count');
     if (count) count.textContent = tr('friends.countPending', { n: all.length });
@@ -209,6 +222,8 @@
     setTab,
     onFriendRequestSent,
     rememberOutgoing,
+    dropOutgoing,
+    outgoingIds: () => outgoing().map(r => r.id),
     wasRequested: id => outgoing().some(r => r.id === id),
     addFriendError: text => showAddMessage(text, 'error'),
     renderBadges
