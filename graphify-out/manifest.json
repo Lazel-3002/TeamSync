@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1792440101.074022,
-    "ast_hash": "9ba4b9fa0620c0bf5bc6c35d93257592",
+    "mtime": 1792526789.7795732,
+    "ast_hash": "722c6819ee079c72687a9e9dd3b37b52",
     "semantic_hash": ""
   },
   "preload.js": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1792526384.0256536,
-    "ast_hash": "9fb5c15dc3ae5d3e3166d6b4b1457c05",
+    "mtime": 1792527336.767274,
+    "ast_hash": "7510dd1817305b27a052d42bbff20ace",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -590,8 +590,8 @@
     "semantic_hash": ""
   },
   "js/shell-friends.js": {
-    "mtime": 1792526392.1694467,
-    "ast_hash": "c3699024c576399c3b3ca97291d87b4e",
+    "mtime": 1792527325.2677972,
+    "ast_hash": "7da725ca42d4fe1415c6305c8ad4da81",
     "semantic_hash": ""
   },
   "js/status.js": {
@@ -610,8 +610,8 @@
     "semantic_hash": ""
   },
   "resources/localization/shell-strings.js": {
-    "mtime": 1792526310.1878836,
-    "ast_hash": "661681d28d2f199d447400af9831923a",
+    "mtime": 1792527325.2677972,
+    "ast_hash": "99f76b943b204217fe074115faae9c5e",
     "semantic_hash": ""
   },
   "supabase/profile_media.sql": {
@@ -795,8 +795,13 @@
     "semantic_hash": ""
   },
   "test/e2e/friend-request-mailbox.test.js": {
-    "mtime": 1792526444.828909,
-    "ast_hash": "e380e2528924b8f00edbe80c01f0a10c",
+    "mtime": 1792527356.4558582,
+    "ast_hash": "3fb70afcafef5549986b2e9695666a4b",
+    "semantic_hash": ""
+  },
+  "test/e2e/friend-request-flow.test.js": {
+    "mtime": 1792527387.096189,
+    "ast_hash": "f42d4cc2fa9e8639c5ae3cc64b3ce798",
     "semantic_hash": ""
   }
 }
