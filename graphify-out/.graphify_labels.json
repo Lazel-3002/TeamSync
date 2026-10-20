@@ -100,8 +100,6 @@
   "98": "direct-call.js",
   "99": "calendar.js",
   "100": "calls.js",
-  "101": "shared-browser.test.js",
-  "102": "friend-list-responsive.test.js",
   "103": "shell-navigation.test.js",
   "104": "teams-strings.js"
 }
