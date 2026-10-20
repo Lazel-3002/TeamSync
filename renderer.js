@@ -1532,22 +1532,26 @@ window.acceptInvite = (idx) => {
   state.friends[req.id] = { name: req.name, online: false };
   state.friendRequests.splice(idx, 1);
   saveProfile();
-  
+  // Gönderen çevrimdışıysa MQTT kabulünü kaçırır; posta kutusundan öğrenir.
+  friendRequestRpc('respond_friend_request', { p_from: req.id, p_accept: true });
+
   if (state.globalMqtt && state.globalMqtt.connected) {
     state.globalMqtt.publish(`teamsync/user/${req.id}/events`, JSON.stringify({
       type: 'friend_accepted',
       id: state.friendId,
       name: state.myName
-    }));
+    }), { qos: 1 });
     state.globalMqtt.subscribe(`teamsync/user/${req.id}/presence`);
   }
   showToast(`${req.name} ${t('toast.becameFriends')}`, 'ok');
 };
 
 window.rejectInvite = (idx) => {
-  if (!state.friendRequests[idx]) return;
+  const req = state.friendRequests[idx];
+  if (!req) return;
   state.friendRequests.splice(idx, 1);
   saveProfile();
+  friendRequestRpc('respond_friend_request', { p_from: req.id, p_accept: false });
 };
 
 // Açıkken ikinci bir onay istenirse ilki "hayır" ile kapanmalı: aksi halde
@@ -2062,6 +2066,123 @@ function cleanFriendEventName(name, fallback) {
   return clean || fallback;
 }
 
+// Kalıcı istek posta kutusu (supabase/friend_requests.sql). MQTT yalnızca
+// anlık iletimdir: alıcı o an çevrimdışıysa istek sonsuza dek kayboluyordu ve
+// olmayan bir ID'ye gönderilen istek de "gönderildi" diyordu. null dönüşü =
+// sunucu/oturum yok ya da fonksiyon kurulmamış; çağıran eski yalnız-MQTT
+// akışına düşer.
+async function friendRequestRpc(fn, args) {
+  if (!supabaseClient || state.accountKind !== 'cloud') return null;
+  try {
+    const { data, error } = await supabaseClient.rpc(fn, args || {});
+    if (error) {
+      console.warn(`Arkadaşlık RPC ${fn} başarısız:`, error.message);
+      return null;
+    }
+    return data;
+  } catch (e) {
+    console.warn(`Arkadaşlık RPC ${fn} başarısız:`, e && e.message ? e.message : e);
+    return null;
+  }
+}
+
+const FRIEND_SEND_ERRORS = {
+  not_found: 'friends.errorNotFound',
+  self: 'friends.errorValidId',
+  already_friends: 'friends.errorAlreadyFriend',
+  rate_limited: 'friends.errorRateLimited'
+};
+
+// İsteği gönderir. Başarıda null, aksi halde gösterilecek çeviri anahtarı döner.
+async function deliverFriendRequest(targetId) {
+  const res = await friendRequestRpc('send_friend_request', { p_to: targetId, p_name: state.myName });
+  if (FRIEND_SEND_ERRORS[res]) return FRIEND_SEND_ERRORS[res];
+  if (state.globalMqtt && state.globalMqtt.connected) {
+    // Çevrimiçi alıcıya anında ulaşsın; çevrimdışıysa posta kutusundan alır.
+    state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
+      type: 'friend_request',
+      id: state.friendId,
+      name: state.myName
+    }), { qos: 1 });
+  } else if (res !== 'ok') {
+    return 'toast.waitingForConnection';
+  }
+  // Giden istek kaydı: karşının "kabul edildi" yanıtı yalnızca bununla eşleşirse
+  // arkadaşlığa dönüşür (bkz. global MQTT friend_accepted).
+  if (window.TSFriends) window.TSFriends.onFriendRequestSent(targetId);
+  return null;
+}
+
+// Gönderdiğimiz istek kabul edildi: karşı tarafı arkadaş listesine yaz.
+function completeOutgoingFriendship(id, name) {
+  const existing = state.friends[id];
+  state.friends[id] = { ...(existing || {}), name, online: false };
+  delete state.friends[id].temporary;
+  state.friendRequests = state.friendRequests.filter(r => r.id !== id);
+  saveProfile();
+  showToast(`${name} ${t('toast.friendRequestAccepted')}`, 'ok');
+  tsNotify('İstek Kabul Edildi', `${name} arkadaşlık isteğini kabul etti!`);
+  if (state.globalMqtt) state.globalMqtt.subscribe(`teamsync/user/${id}/presence`);
+  renderFriends();
+}
+
+window.clearOutgoingFriendRequest = id => friendRequestRpc('clear_friend_request', { p_to: id });
+
+// Posta kutusunu çeker: çevrimdışıyken gelen istekleri listeye ekler, biz
+// yokken kabul edilen isteklerimizi arkadaşlığa çevirir.
+let friendRequestSyncBusy = false;
+async function syncFriendRequests() {
+  if (friendRequestSyncBusy || !state.friendId) return;
+  friendRequestSyncBusy = true;
+  try {
+    const rows = await friendRequestRpc('list_friend_requests');
+    if (!Array.isArray(rows)) return;
+    const me = state.friendId;
+    let added = false;
+    for (const r of rows) {
+      if (r.to_id === me && r.status === 'pending') {
+        const existing = state.friends[r.from_id];
+        if (existing && !existing.temporary) {
+          // Zaten arkadaşız (ör. kabul eski sürümden yalnız MQTT ile gitti):
+          // gönderen de öğrensin diye satırı kabul edildi olarak işaretle.
+          friendRequestRpc('respond_friend_request', { p_from: r.from_id, p_accept: true });
+          continue;
+        }
+        if (!isValidFriendEventId(r.from_id) || state.friendRequests.some(q => q.id === r.from_id)) continue;
+        if (state.friendRequests.length >= MAX_PENDING_FRIEND_REQUESTS) continue;
+        const name = cleanFriendEventName(r.from_name, r.from_id);
+        state.friendRequests.push({ id: r.from_id, name });
+        showToast(`${name} ${t('toast.friendRequestReceived')}`, 'info');
+        added = true;
+      } else if (r.from_id === me && isValidFriendEventId(r.to_id)) {
+        const existing = state.friends[r.to_id];
+        const isFriend = existing && !existing.temporary;
+        if (r.status === 'accepted') {
+          if (!isFriend) completeOutgoingFriendship(r.to_id, cleanFriendEventName(r.to_name, r.to_id));
+          friendRequestRpc('clear_friend_request', { p_to: r.to_id });
+        } else if (!isFriend && window.TSFriends) {
+          // Başka cihazdan gönderilen istekler de "Bekleyen"de görünsün.
+          window.TSFriends.rememberOutgoing(r.to_id, Date.parse(r.created_at) || Date.now());
+        }
+      }
+    }
+    if (added) {
+      saveProfile();
+      tsNotify('Arkadaşlık İsteği', t('toast.friendRequestReceived'));
+    }
+  } finally {
+    friendRequestSyncBusy = false;
+  }
+}
+
+let friendRequestSyncTimer = null;
+function startFriendRequestSync() {
+  syncFriendRequests();
+  if (friendRequestSyncTimer) return;
+  friendRequestSyncTimer = setInterval(syncFriendRequests, 60000);
+  window.addEventListener('focus', () => syncFriendRequests());
+}
+
 function markFriendOffline(friend) {
   if (!friend) return;
   friend.online = false;
@@ -2139,6 +2260,8 @@ function setupGlobalMQTT() {
 
   globalMqttIdentity = state.friendId;
   connectGlobalBroker(++globalMqttSessionId);
+  // Broker'a ulaşılamasa bile kalıcı posta kutusundaki istekler gelsin.
+  startFriendRequestSync();
 }
 
 function connectGlobalBroker(session) {
@@ -2170,6 +2293,7 @@ function connectGlobalBroker(session) {
 
     // Kendi presence'ımı hemen yayınla ki arkadaşlar beklemeden görsün.
     publishPresence();
+    syncFriendRequests();
 
     if (presenceInterval) clearInterval(presenceInterval);
     presenceInterval = setInterval(publishPresence, 5000);
@@ -2276,14 +2400,8 @@ function connectGlobalBroker(session) {
           const requested = window.TSFriends && typeof window.TSFriends.wasRequested === 'function'
             ? window.TSFriends.wasRequested(data.id) : false;
           if (data.type === 'friend_accepted' && requested) {
-            state.friends[data.id] = { ...(existing || {}), name: reqName, online: false };
-            delete state.friends[data.id].temporary;
-            state.friendRequests = state.friendRequests.filter(r => r.id !== data.id);
-            saveProfile();
-            showToast(`${reqName} ${t('toast.friendRequestAccepted')}`, 'ok');
-            tsNotify('İstek Kabul Edildi', `${reqName} arkadaşlık isteğini kabul etti!`);
-            state.globalMqtt.subscribe(`teamsync/user/${data.id}/presence`);
-            renderFriends();
+            completeOutgoingFriendship(data.id, reqName);
+            friendRequestRpc('clear_friend_request', { p_to: data.id });
           } else if (!state.friendRequests.find(r => r.id === data.id) && state.friendRequests.length < MAX_PENDING_FRIEND_REQUESTS) {
             state.friendRequests.push({ id: data.id, name: reqName });
             saveProfile();
@@ -3791,27 +3909,32 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('invites-modal').classList.add('hidden');
   });
 
-  document.getElementById('btn-add-friend').addEventListener('click', () => {
+  document.getElementById('btn-add-friend').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-add-friend');
     const targetId = document.getElementById('friend-id-input').value.trim().toUpperCase();
-    const addFriendError = (key, legacyKey) => window.TSFriends ? window.TSFriends.addFriendError(t(key)) : alert(t(legacyKey));
-    if (!targetId || targetId === state.friendId) return addFriendError('friends.errorValidId', 'alert.validId');
+    const addFriendError = (key, legacyKey) => window.TSFriends ? window.TSFriends.addFriendError(t(key)) : alert(t(legacyKey || key));
+    // Kimlik deseniyle uyuşmayan girdi hiçbir konuya ulaşamaz.
+    if (!targetId || targetId === state.friendId || !isValidFriendEventId(targetId)) return addFriendError('friends.errorValidId', 'alert.validId');
 
     if (state.friends[targetId] && !state.friends[targetId].temporary) return addFriendError('friends.errorAlreadyFriend', 'alert.alreadyFriend');
-    
-    if (state.globalMqtt && state.globalMqtt.connected) {
-      state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
-        type: 'friend_request',
-        id: state.friendId,
-        name: state.myName
-      }));
-      showToast(t('toast.friendRequestSent'), "ok");
-      document.getElementById('friend-id-input').value = '';
-      if (window.TSFriends) window.TSFriends.onFriendRequestSent(targetId);
-      document.getElementById('step-add-friend').classList.add('hidden');
-      document.getElementById('step-action').classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
-    } else {
-      showToast(t('toast.waitingForConnection'), "warn");
+    if (btn.disabled) return;
+
+    btn.disabled = true;
+    let errorKey;
+    try {
+      errorKey = await deliverFriendRequest(targetId);
+    } finally {
+      btn.disabled = false;
     }
+    if (errorKey === 'toast.waitingForConnection') {
+      showToast(t(errorKey), "warn");
+      return;
+    }
+    if (errorKey) return addFriendError(errorKey);
+    showToast(t('toast.friendRequestSent'), "ok");
+    document.getElementById('friend-id-input').value = '';
+    document.getElementById('step-add-friend').classList.add('hidden');
+    document.getElementById('step-action').classList.remove('hidden'); document.querySelector('.login-card').classList.add('expanded');
   });
 
   document.querySelectorAll('.btn-back').forEach(btn => {
@@ -6747,25 +6870,16 @@ function openServerDM(targetId, targetName) {
   document.getElementById('server-dm-modal').classList.remove('hidden');
 }
 
-function sendRoomFriendRequest(targetId) {
+async function sendRoomFriendRequest(targetId) {
   const friendId = resolvePeerFriendId(targetId);
   if (!friendId) {
     showToast(t('toast.userIdNotReady'), 'warn');
     return;
   }
-  if (state.globalMqtt && state.globalMqtt.connected) {
-    state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify({
-      type: 'friend_request',
-      id: state.friendId,
-      name: state.myName
-    }));
-    showToast(t('toast.friendRequestSent'), 'ok');
-    // Giden istek kaydı: karşının "kabul edildi" yanıtı yalnızca bununla eşleşirse
-    // arkadaşlığa dönüşür (bkz. global MQTT friend_accepted).
-    if (window.TSFriends) window.TSFriends.onFriendRequestSent(friendId);
-  } else {
-    showToast(t('toast.connectionNotReady'), 'warn');
-  }
+  const errorKey = await deliverFriendRequest(friendId);
+  if (errorKey === 'toast.waitingForConnection') showToast(t('toast.connectionNotReady'), 'warn');
+  else if (errorKey) showToast(t(errorKey), 'warn');
+  else showToast(t('toast.friendRequestSent'), 'ok');
 }
 
 function showRoomUserProfile(targetId, targetName) {

@@ -38,6 +38,15 @@
     render();
   }
 
+  // Sunucudaki posta kutusundan gelen (ör. başka cihazdan gönderilmiş) istek.
+  function rememberOutgoing(id, at) {
+    const list = outgoing();
+    if (list.some(r => r.id === id)) return;
+    list.push({ id, at: at || Date.now() });
+    saveOutgoing(list);
+    render();
+  }
+
   function showAddMessage(text, kind) {
     const el = $('add-friend-msg');
     if (!el) return;
@@ -174,7 +183,12 @@
       const can = e.target.closest('[data-cancel]');
       if (acc && typeof window.acceptInvite === 'function') window.acceptInvite(Number(acc.dataset.accept));
       else if (rej && typeof window.rejectInvite === 'function') window.rejectInvite(Number(rej.dataset.reject));
-      else if (can) { saveOutgoing(outgoing().filter(r => r.id !== can.dataset.cancel)); render(); }
+      else if (can) {
+        const id = can.dataset.cancel;
+        saveOutgoing(outgoing().filter(r => r.id !== id));
+        if (typeof window.clearOutgoingFriendRequest === 'function') window.clearOutgoingFriendRequest(id);
+        render();
+      }
     });
     $('active-now-list')?.addEventListener('click', e => {
       const join = e.target.closest('[data-join]');
@@ -194,6 +208,7 @@
     afterRender: render,
     setTab,
     onFriendRequestSent,
+    rememberOutgoing,
     wasRequested: id => outgoing().some(r => r.id === id),
     addFriendError: text => showAddMessage(text, 'error'),
     renderBadges
