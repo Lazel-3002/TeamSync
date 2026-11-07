@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1792527584.8932638,
-    "ast_hash": "ed99afde539a5336dea383b3dbea2f88",
+    "mtime": 1794088841.505934,
+    "ast_hash": "445f0a402264933f3cdf9fa442ffb61e",
     "semantic_hash": ""
   },
   "preload.js": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1792528827.0716996,
-    "ast_hash": "28aed4eb60549db9cf687fac248e12c3",
+    "mtime": 1794088622.897153,
+    "ast_hash": "745f508d5a6e2755309f21f5b684d7a2",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792439318.6032915,
-    "ast_hash": "7422d791abbfd2ff7258e54ce239235d",
+    "mtime": 1794088473.7301939,
+    "ast_hash": "b29f5c019584d3e50f8b5a256f1999f7",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -775,8 +775,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/supabase-keepalive.yml": {
-    "mtime": 1792437482.642524,
-    "ast_hash": "7cbf8e5b06c532ff6516b0bc6d0cd9a0",
+    "mtime": 1794088408.508305,
+    "ast_hash": "cb006455db3fc324903e7cc9ea8cb5e9",
     "semantic_hash": ""
   },
   "supabase/device_accounts.sql": {

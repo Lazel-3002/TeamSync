@@ -1,16 +1,16 @@
-# Graph Report - TeamSync  (2026-10-20)
+# Graph Report - TeamSync  (2026-11-08)
 
 ## Corpus Check
-- 137 files · ~652,330 words
+- 137 files · ~652,593 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2129 nodes · 5116 edges · 103 communities (88 shown, 15 thin omitted)
+- 2129 nodes · 5117 edges · 104 communities (89 shown, 15 thin omitted)
 - Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 172 edges (avg confidence: 0.6)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `cf458fb1`
+- Built from commit: `aa9af92c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -111,10 +111,11 @@
 - direct-call.js
 - calendar.js
 - calls.js
+- createPeerConnection
 - shell-navigation.test.js
 
 ## God Nodes (most connected - your core abstractions)
-1. `t()` - 69 edges
+1. `t()` - 70 edges
 2. `evalJS()` - 65 edges
 3. `handleDataMessage()` - 47 edges
 4. `bindUI()` - 42 edges
@@ -146,7 +147,7 @@
 - **Create-Room premium options (RNNoise, SFW AI, Game Mode, Relay, Bitrate) configured together at room creation** — index_step_create_form, index_rnnoise_toggle_option, index_sfw_toggle_option, index_game_mode_toggle_option, index_relay_toggle_option, index_bitrate_select [EXTRACTED 0.90]
 - **TeamSync release pipeline: version bump in index/docs marketing pages triggers GitHub Actions build published to GitHub Releases** — github_workflows_release_release_workflow, docs_index_github_releases_link, index_teamsync_login_flow [INFERRED 0.65]
 
-## Communities (103 total, 15 thin omitted)
+## Communities (104 total, 15 thin omitted)
 
 ### Community 0 - "UNO Card Game"
 Cohesion: 0.11
@@ -158,7 +159,7 @@ Nodes (39): App(), Chat(), Dashboard(), accountItemStyle, cardStyle, containerSt
 
 ### Community 2 - "Chat & Renderer Utilities"
 Cohesion: 0.02
-Nodes (111): ACTIVITY_CARD_IDS, ACTIVITY_COVER_LOCALES, appendFileMsg(), AUDIO_CHANNEL_FIELDS, badWordsList, buildTurnUrlList(), BUILT_IN_THEME_PRESETS, censoredTextHtml() (+103 more)
+Nodes (123): acceptServerInvite(), ACTIVITY_CARD_IDS, ACTIVITY_COVER_LOCALES, appendChat(), appendFileMsg(), AUDIO_CHANNEL_FIELDS, badWordsList, beginRoomOperation() (+115 more)
 
 ### Community 3 - "Electron Main Process"
 Cohesion: 0.05
@@ -182,8 +183,8 @@ Cohesion: 0.15
 Nodes (10): catalogDir, EXPECTED_LOCALES, fs, path, renderer, report, requiredLegacy, requiredStructured (+2 more)
 
 ### Community 7 - "Electron Builder Config"
-Cohesion: 0.11
-Nodes (33): applyPttMode(), applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), getShortcutsMasterEnabled(), handleShortcutGateKeydown() (+25 more)
+Cohesion: 0.14
+Nodes (25): applyPttMode(), applyPttShortcut(), beginShortcutRebind(), cancelShortcutRebind(), getPttAccelerator(), getShortcutBinding(), handleShortcutGateKeydown(), LEGACY_SHORTCUT_CODES (+17 more)
 
 ### Community 8 - "Sidebar UI Components"
 Cohesion: 0.10
@@ -230,16 +231,16 @@ Cohesion: 0.07
 Nodes (59): actionButtons(), activityHtml(), answer(), bannerStyle(), bindCardActions(), cardHtml(), durationMenu(), editorDirty() (+51 more)
 
 ### Community 17 - "Pokemon Data Fetch Tool"
-Cohesion: 0.16
-Nodes (24): checkAvatar(), checkSession(), deleteDeviceAccount(), deviceLogin(), getActiveSlot(), getDefaultAccount(), getDeviceAccounts(), isDefaultAccountRef() (+16 more)
+Cohesion: 0.18
+Nodes (22): checkSession(), deleteDeviceAccount(), deviceLogin(), getActiveSlot(), getDefaultAccount(), getDeviceAccounts(), isDefaultAccountRef(), isServerUnreachable() (+14 more)
 
 ### Community 18 - "Build Tooling Dependencies"
 Cohesion: 0.15
 Nodes (13): concurrently, cross-env, electron, electron-builder, devDependencies, concurrently, cross-env, electron (+5 more)
 
 ### Community 19 - "Chat Messaging & Invites"
-Cohesion: 0.19
-Nodes (18): applyPeerLimiter(), applyPeerVolume(), AUDIO_CHANNELS, buildCardVolumeBox(), buildMenuVolumeBlock(), channelFields(), ensurePeerBoostChain(), getUserVolume() (+10 more)
+Cohesion: 0.18
+Nodes (19): applyPeerLimiter(), applyPeerVolume(), AUDIO_CHANNELS, buildCardVolumeBox(), buildMenuVolumeBlock(), channelFields(), ensurePeerBoostChain(), getUserVolume() (+11 more)
 
 ### Community 20 - "Diagnostics Tool"
 Cohesion: 0.35
@@ -258,8 +259,8 @@ Cohesion: 0.05
 Nodes (35): ActivityDetector, findExes(), fs, initActivityDetector(), P, path, readJson(), regQuery() (+27 more)
 
 ### Community 24 - "NPM Scripts"
-Cohesion: 0.18
-Nodes (25): bindUI(), canModerateTarget(), clearFocusInlineLayout(), ensureFocusControlsVisible(), enterFocus(), exitFocus(), founderSuccessorId(), getSfwChatBanThreshold() (+17 more)
+Cohesion: 0.20
+Nodes (23): bindUI(), canModerateTarget(), clearFocusInlineLayout(), createFounderBadge(), ensureFocusControlsVisible(), enterFocus(), exitFocus(), founderSuccessorId() (+15 more)
 
 ### Community 25 - "RNNoise Noise Suppression"
 Cohesion: 0.43
@@ -338,8 +339,8 @@ Cohesion: 0.18
 Nodes (25): bind(), clearUnread(), currentDmView(), dayLabel(), ensureLoaded(), groupedHtml(), hideChat(), isPinned() (+17 more)
 
 ### Community 41 - "sendFile"
-Cohesion: 0.07
-Nodes (63): adoptScreenAudioTransceiver(), applyAudioSdpParams(), applyIceEscalationPolicy(), applyScreenAudioQuality(), applySharedTurn(), applySpeakerTo(), attachPeerScreenAudio(), attemptIceRestart() (+55 more)
+Cohesion: 0.12
+Nodes (36): cleanFriendEventName(), completeOutgoingFriendship(), connectGlobalBroker(), copySettingsText(), deliverFriendRequest(), friendRequestRpc(), getNickname(), groupDeviceId() (+28 more)
 
 ### Community 42 - "E2E Test Runner"
 Cohesion: 0.33
@@ -470,8 +471,8 @@ Cohesion: 0.25
 Nodes (7): author, description, license, main, name, releaseName, version
 
 ### Community 84 - "showToast"
-Cohesion: 0.06
-Nodes (70): acceptFounderClaim(), acceptServerInvite(), addUser(), addVideoCard(), appendChat(), applyAudioBitrateToPeers(), applyMicState(), attachVideo() (+62 more)
+Cohesion: 0.09
+Nodes (46): addUser(), addVideoCard(), applyMicState(), attachVideo(), broadcast(), broadcastTo(), clearControlOffer(), closeActiveControlSession() (+38 more)
 
 ### Community 85 - "enterFocus"
 Cohesion: 0.33
@@ -528,6 +529,10 @@ Nodes (12): attendeesHtml(), bind(), dayKey(), eventCardHtml(), fmtWhen(), load(
 ### Community 100 - "calls.js"
 Cohesion: 0.42
 Nodes (8): bind(), bucket(), dirLabel(), entryHtml(), fmtDuration(), kindLabel(), render(), renderBadge()
+
+### Community 101 - "createPeerConnection"
+Cohesion: 0.07
+Nodes (50): acceptFounderClaim(), adoptScreenAudioTransceiver(), applyAudioBitrateToPeers(), applyAudioSdpParams(), applyIceEscalationPolicy(), applyScreenAudioQuality(), applySharedTurn(), applySpeakerTo() (+42 more)
 
 ### Community 103 - "shell-navigation.test.js"
 Cohesion: 0.50
