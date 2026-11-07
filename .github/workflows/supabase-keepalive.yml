@@ -1,14 +1,16 @@
 # Supabase uyandırma:
 # Ücretsiz Supabase projesi 7 gün istek almazsa duraklatılır. Duraklayınca
 # sunucu adresi DNS'te bile çözülmez ve uygulamada herkes "Giriş yapılamadı"
-# hatası alır (2026-10-17'de tam olarak bu oldu). Bu görev 3 günde bir
+# hatası alır (2026-10-17'de tam olarak bu oldu). Bu görev 6 saatte bir
 # veritabanına tek satırlık, yalnızca id okuyan bir istek atarak projeyi
 # uyanık tutar. Kullanıcı verisi okunmaz, yanıt hiçbir yere kaydedilmez.
+# 3 günde bir yetmedi: 2026-11-04'teki başarılı istekten sonra proje 3 gün
+# dolmadan yine duraklatıldı. Supabase "günde birkaç istek" öneriyor.
 name: Supabase uyandırma
 
 on:
   schedule:
-    - cron: '17 6 */3 * *'
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 jobs:

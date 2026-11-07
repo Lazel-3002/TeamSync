@@ -3225,6 +3225,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     if (authVisual) authVisual.classList.toggle('error', isError);
     if (btnRetryAuth) btnRetryAuth.classList.toggle('hidden', !isError);
+    const btnAuthAccounts = document.getElementById('btn-auth-accounts');
+    if (btnAuthAccounts) btnAuthAccounts.classList.toggle('hidden', !isError);
   }
 
   // Aynı cihazdaki hesaplar: hepsi tek cihaz kimliğini paylaşır, slot numarası
@@ -3441,7 +3443,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     return /failed to fetch|networkerror|load failed/i.test(String(err.message || ''));
   }
 
-  async function deviceLogin(slot) {
+  // auto: açılışta (checkSession / Tekrar Dene) kendiliğinden yapılan giriş.
+  // Bu cihazda hiç hesap yoksa yeni hesap SESSİZCE açılmaz; kullanıcıya
+  // "yeni hesap mı, diğer cihazdaki hesaba kodla giriş mi" seçtirilir.
+  // Aksi halde aynı hesabı ikinci cihazda kullanmak isteyen biri önce boş
+  // bir hesaba düşüyor, kod kutusuna da ancak çıkış yapınca ulaşabiliyordu.
+  async function deviceLogin(slot, { auto = false } = {}) {
     if (!Number.isInteger(slot) || slot < 0) {
       const defaultAccount = getDefaultAccount();
       slot = (defaultAccount && defaultAccount.type === 'device') ? defaultAccount.slot : getActiveSlot();
@@ -3476,6 +3483,14 @@ window.addEventListener('DOMContentLoaded', async () => {
           }
           throw new Error(t('auth.codeNotFound'));
         }
+        if (auto && !getDeviceAccounts().length) {
+          let legacyCount = 0;
+          try { legacyCount = (await getAccounts()).filter(acc => acc && acc.id).length; } catch (e) {}
+          if (!legacyCount) {
+            await renderDeviceAccounts();
+            return;
+          }
+        }
         // Bu slotun hesabı henüz yok — bir kez oluşturulur.
         setAuthStatus(t('auth.creatingAccount'));
         const signUpRes = await supabaseClient.auth.signUp({
@@ -3499,7 +3514,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  if (btnRetryAuth) btnRetryAuth.addEventListener('click', () => deviceLogin());
+  if (btnRetryAuth) btnRetryAuth.addEventListener('click', () => deviceLogin(undefined, { auto: true }));
+  // Hata ekranından hesap listesine (ve kodla girişe) dönüş; yoksa kullanıcı
+  // yalnızca "Tekrar Dene" ile baş başa kalıyordu.
+  document.getElementById('btn-auth-accounts')?.addEventListener('click', () => renderDeviceAccounts());
 
   // "Hesap Değiştir" ekranı: bu cihazda açılmış hesapların listesi
   async function renderDeviceAccounts() {
@@ -3518,7 +3536,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       ...legacyList.map(acc => ({ ...acc, accountType: 'legacy' }))
     ];
     if (!list.length) {
-      container.innerHTML = '<div class="muted" style="text-align:center; padding:16px;">Kayıtlı hesap bulunamadı.</div>';
+      const empty = document.createElement('div');
+      empty.className = 'muted';
+      empty.style.cssText = 'text-align:center; padding:16px; line-height:1.5;';
+      empty.textContent = t('auth.noAccountsHint');
+      container.appendChild(empty);
       return;
     }
     const activeSlot = getActiveSlot();
@@ -3624,11 +3646,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         console.log("Active Supabase session found.");
         await loadSupabaseProfile(session.user.id);
       } else {
-        await deviceLogin();
+        await deviceLogin(undefined, { auto: true });
       }
     } catch (e) {
       console.error("Session check error:", e);
-      await deviceLogin();
+      await deviceLogin(undefined, { auto: true });
     }
   }
 
@@ -8185,6 +8207,8 @@ const I18N = {
     'auth.codeSubmit': "Giriş Yap",
     'auth.codeInvalid': "Bu kod geçerli değil. Kodu eksiksiz kopyaladığından emin ol.",
     'auth.codeNotFound': "Bu koda ait bir hesap bulunamadı.",
+    'auth.noAccountsHint': "Bu cihazda henüz hesap yok. Yeni bir hesap oluştur ya da başka cihazındaki hesaba geçmek için oradaki Ayarlar > Hesap ve Cihaz'dan kopyaladığın giriş kodunu \"Kodla Giriş Yap\" ile yapıştır.",
+    'auth.toAccounts': 'Hesaplar / Kodla Giriş',
     'auth.codeStorageFailed': "Kod bu cihaza kaydedilemedi.",
     'auth.accountLimit': "Bu cihazda en fazla 3 hesap olabilir. Yeni hesap eklemek için önce birini sil.",
     'auth.accountCount': "Bu cihazdaki hesaplar: {n}/{max}",
@@ -8469,6 +8493,8 @@ const I18N = {
     'auth.codeSubmit': "Sign in",
     'auth.codeInvalid': "This code isn't valid. Make sure you copied all of it.",
     'auth.codeNotFound': "No account was found for this code.",
+    'auth.noAccountsHint': "There are no accounts on this device yet. Create a new account, or to use your account from another device, paste the login code from Settings > Account & Device there using \"Log in with code\".",
+    'auth.toAccounts': 'Accounts / Log in with code',
     'auth.codeStorageFailed': "The code couldn't be saved on this device.",
     'auth.accountLimit': "A device can have at most 3 accounts. Remove one before adding another.",
     'auth.accountCount': "Accounts on this device: {n}/{max}",
