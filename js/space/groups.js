@@ -17,6 +17,13 @@
   const HB_EVERY = 20000;
   const BEACON_EVERY = 5000;
   const CALL_STALE = 13000;
+  const CALL_PRUNE_EVERY = 2000; // ölü aramalar tetik beklemeden ≤15 sn'de kaybolur
+  const JOIN_WAIT = 12000;       // "Katıl": bu sürede kimse yoksa yeni arama sessizce başlar
+  const RING_FRESH = 45000;      // daha eski aramalar için zil çalmaz (geç gelen / yeniden açan)
+  const CALLRING_GAP = 30000;    // "Herkesi çağır" en sık 30 sn'de bir
+  const INVITE_RETRY_MIN = 60000;
+  const INVITE_RETRY_MAX = 30 * 60000;
+  const INVITE_RETRY_CAP = 40;
   const MAX_TEXT = 4000;
   const BATCH = 30;
   const SKEW = 5 * 60 * 1000;
@@ -29,6 +36,7 @@
 
   const groups = new Map();  // gid -> runtime
   const byTopic = new Map(); // T -> gid
+  const invitesInFlight = new Set();
   let started = false;
   let startPromise = null;
   let timers = [];
@@ -77,8 +85,13 @@
       call: old ? old.call : null,
       myCall: old ? old.myCall : null,
       seenCalls: old ? old.seenCalls : new Set(),
+      seenRings: old ? old.seenRings : new Set(),
+      lastCallRing: old ? old.lastCallRing : 0,
+      callKey: '',
       syncing: 0
     };
+    // Arama oda kimliği önbelleği: inMyCall her 2-5 sn'de sorulur.
+    rt.callRoomId = (await callRoom(rt)).id;
     if (old) byTopic.delete(old.T);
     groups.set(rec.gid, rt);
     byTopic.set(T, rec.gid);
@@ -274,7 +287,9 @@
     } catch (e) { return; }
     if (!inner || typeof inner !== 'object') return;
     if (kind === 'ev' && inner.k === 'ev') {
-      await ingest(rt, [inner.ev], 'live');
+      const added = await ingest(rt, [inner.ev], 'live');
+      // Güncel anahtarla imzalı olay yayınlayan davetli grubu almış demektir.
+      if (added.length && inner.ev) confirmMember(rt, inner.ev.author);
     } else if (kind === 'eph') {
       onEphemeral(rt, inner);
     } else if (kind === 'to' && inner.k === 'sres' && Array.isArray(inner.events)) {
@@ -287,6 +302,9 @@
     const fid = m.fid;
     if (!validFid(fid) || fid === me() || !memberOf(rt, fid)) return;
     rt.online.set(fid, Date.now());
+    // /eph zarfı güncel dönem anahtarıyla açıldı (onMqtt e === epoch denetler):
+    // gönderen grubu almış demektir → davet teslimi doğrulandı.
+    confirmMember(rt, fid);
     if (m.k === 'probe') {
       setTimeout(() => sendHeartbeat(rt), 100 + Math.random() * 900);
     } else if (m.k === 'hb') {
@@ -312,7 +330,51 @@
         rt.call.participants.delete(fid);
         refreshCall(rt);
       }
+    } else if (m.k === 'callring') {
+      onCallRing(rt, fid, m);
     }
+  }
+
+  // ---------- davet teslim onayı ----------
+  // Gönderilen davet (QoS 1) çevrimdışı arkadaşa hiç ulaşmayabilir: MQTT
+  // istemcisi rastgele clientId + temiz oturumla bağlanır, aracı saklamaz.
+  // Bu yüzden davetli, gruptan imzalı olay ya da /eph mesajı gelene kadar
+  // rec.unconfirmed içinde tutulur (kalıcı) ve yeniden gönderilir.
+  function markUnconfirmed(rt, fid) {
+    const list = rt.rec.unconfirmed || [];
+    if (!list.includes(fid)) rt.rec.unconfirmed = list.concat(fid);
+    rt.rec.inviteTries = rt.rec.inviteTries || {};
+    const prev = rt.rec.inviteTries[fid];
+    rt.rec.inviteTries[fid] = { n: prev ? prev.n + 1 : 1, at: Date.now() };
+  }
+
+  function confirmMember(rt, fid) {
+    if (!rt || !validFid(fid) || !(rt.rec.unconfirmed || []).includes(fid)) return;
+    rt.rec.unconfirmed = rt.rec.unconfirmed.filter(x => x !== fid);
+    if (rt.rec.inviteTries) delete rt.rec.inviteTries[fid];
+    saveRec(rt).catch(() => {});
+    emit('ts:group-presence', { gid: rt.rec.gid });
+  }
+
+  // Yeniden gönderim: arkadaş çevrimiçiyken, artan aralıkla (1 dk → 30 dk), en çok 40 kez.
+  async function resendInvites(rt, onlyFid, force) {
+    const list = (rt.rec.unconfirmed || []).slice();
+    let changed = false;
+    for (const fid of list) {
+      if (onlyFid && fid !== onlyFid) continue;
+      const m = rt.rec.members.find(x => x.fid === fid);
+      if (!m || !m.ek) { rt.rec.unconfirmed = rt.rec.unconfirmed.filter(x => x !== fid); changed = true; continue; }
+      const friend = window.state.friends && window.state.friends[fid];
+      if (!friend || !friend.online) continue;
+      const tries = (rt.rec.inviteTries || {})[fid] || { n: 0, at: 0 };
+      if (tries.n >= INVITE_RETRY_CAP) continue;
+      const gap = Math.min(INVITE_RETRY_MAX, INVITE_RETRY_MIN * Math.pow(2, Math.max(0, tries.n - 1)));
+      // Arkadaş yeni çevrimiçi olduysa (force) aralık 20 sn'ye iner.
+      if (Date.now() - tries.at < (force ? 20000 : gap)) continue;
+      if (await sendInvite(rt, fid, { ik: m.ik, ek: m.ek })) { markUnconfirmed(rt, fid); changed = true; }
+      await sleep(40);
+    }
+    if (changed) await saveRec(rt);
   }
 
   function sendHeartbeat(rt) {
@@ -350,111 +412,240 @@
     return { id, pw };
   }
 
+  // Arama yalnızca en az bir CANLI katılımcı varken vardır. Başkaları
+  // CALL_STALE boyunca işaret göndermezse düşer; ben ise yalnızca gerçekten o
+  // odadaysam ve aramam buysa katılımcıyım (kendi kaydım bayatlayamaz).
+  function inMyCallSync(rt) {
+    return !!(rt && rt.callRoomId && window.state.room && window.state.room === rt.callRoomId);
+  }
+
   function activeCall(rt) {
     if (!rt.call) return null;
     const now = Date.now();
-    rt.call.participants.forEach((seen, fid) => { if (now - seen > CALL_STALE) rt.call.participants.delete(fid); });
+    const mineLive = !!(rt.myCall && rt.myCall.callId === rt.call.callId && inMyCallSync(rt));
+    rt.call.participants.forEach((seen, fid) => {
+      if (fid === me() ? !mineLive : now - seen > CALL_STALE) rt.call.participants.delete(fid);
+    });
     if (!rt.call.participants.size) { rt.call = null; return null; }
     return rt.call;
   }
 
+  // Eşzamanlı iki aramadan hangisi kalır: daha eski olan; aynı milisaniyede
+  // başlatıldıysa küçük callId (herkeste aynı sonuç).
+  const callBefore = (x, y) => x.startedAt < y.startedAt || (x.startedAt === y.startedAt && x.callId < y.callId);
+
   function onCallBeacon(rt, fid, m) {
-    if (typeof m.callId !== 'string' || !Number.isFinite(m.startedAt) || !validFid(m.startedBy)) return;
+    if (typeof m.callId !== 'string' || m.callId.length > 64 || !Number.isFinite(m.startedAt) || !validFid(m.startedBy)) return;
     const fresh = !rt.call || rt.call.callId !== m.callId;
     if (fresh) {
-      // Aynı anda iki arama başlatılırsa daha eski olan kazanır.
-      if (rt.call && rt.call.participants.size && rt.call.startedAt <= m.startedAt) {
+      // Aynı anda iki arama başlatılırsa daha eski olan kazanır (gönderen de
+      // aynı kuralla eskisine geçer → herkes TEK aramada buluşur).
+      if (rt.call && rt.call.participants.size && !callBefore(m, rt.call)) {
         rt.call.participants.set(fid, Date.now());
+        rt.seenCalls.add(m.callId);
         refreshCall(rt);
         return;
       }
-      rt.call = { callId: m.callId, startedAt: Math.min(m.startedAt, Date.now()), startedBy: m.startedBy, participants: new Map() };
+      rt.call = { callId: m.callId, startedAt: Math.min(m.startedAt, Date.now()), startedBy: m.startedBy, ring: m.ring !== false, participants: new Map() };
     }
     rt.call.participants.set(fid, Date.now());
-    if (rt.myCall && rt.myCall.callId !== rt.call.callId && rt.call.startedAt < rt.myCall.startedAt) {
-      rt.myCall = { callId: rt.call.callId, startedAt: rt.call.startedAt, startedBy: rt.call.startedBy };
+    if (rt.myCall && rt.myCall.callId !== rt.call.callId && callBefore(rt.call, rt.myCall)) {
+      rt.myCall = { callId: rt.call.callId, startedAt: rt.call.startedAt, startedBy: rt.call.startedBy, ring: !!rt.call.ring };
     }
-    if (fresh && !rt.seenCalls.has(m.callId)) {
+    if (!rt.seenCalls.has(m.callId)) {
       rt.seenCalls.add(m.callId);
-      if (!rt.myCall && !window.state.room && window.TSGroupUI) window.TSGroupUI.ring(rt.rec.gid);
+      // Zil: yalnızca arayan "Herkesi ara" dediyse (ring:false = sessiz
+      // toplantı; eski istemcilerde alan yok → çalar) VE arama yeni
+      // başladıysa. Sonradan çevrimiçi olan / uygulamayı yeniden açan biri
+      // 20 dk'lık bir arama için zil duymaz, yalnızca başlığı görür.
+      const young = Date.now() - rt.call.startedAt < RING_FRESH;
+      if (m.ring !== false && young && !rt.myCall && !window.state.room && window.TSGroupUI) window.TSGroupUI.ring(rt.rec.gid);
     }
     refreshCall(rt);
   }
 
+  // "Herkesi çağır": aramadaki biri, aramada olmayan üyeleri çaldırır.
+  function onCallRing(rt, fid, m) {
+    if (typeof m.rid !== 'string' || m.rid.length > 64 || rt.seenRings.has(m.rid)) return;
+    rt.seenRings.add(m.rid);
+    if (rt.seenRings.size > 200) rt.seenRings.delete(rt.seenRings.values().next().value);
+    if (typeof m.callId === 'string' && Number.isFinite(m.startedAt) && validFid(m.startedBy)) {
+      onCallBeacon(rt, fid, { callId: m.callId, startedAt: m.startedAt, startedBy: m.startedBy, ring: false });
+    }
+    if (rt.myCall || window.state.room || !window.TSGroupUI) return;
+    window.TSGroupUI.ring(rt.rec.gid, { by: fid });
+  }
+
+  const callKeyOf = c => (c ? `${c.callId}|${Array.from(c.participants.keys()).sort().join(',')}` : '');
+
   function refreshCall(rt) {
-    activeCall(rt);
+    rt.callKey = callKeyOf(activeCall(rt));
     emit('ts:group-call', { gid: rt.rec.gid });
   }
 
+  // Ölü aramayı (son katılımcı işaret göndermeyi bıraktı) yeniden çizim
+  // tetiği beklemeden düşürür; yalnızca değişiklik olunca olay yayar.
+  function pruneCalls() {
+    for (const rt of groups.values()) {
+      const key = callKeyOf(activeCall(rt));
+      if (key !== rt.callKey) { rt.callKey = key; emit('ts:group-call', { gid: rt.rec.gid }); }
+    }
+  }
+
   async function inMyCall(rt) {
-    if (!window.state.room) return false;
-    const { id } = await callRoom(rt);
-    return window.state.room === id;
+    return inMyCallSync(rt);
+  }
+
+  const beaconOf = rt => ({ k: 'call', callId: rt.myCall.callId, startedAt: rt.myCall.startedAt, startedBy: rt.myCall.startedBy, ring: !!rt.myCall.ring, name: window.state.myName });
+
+  // Benim katılımımı bitiren TEK yol: callleave gönderir, yerel durumu temizler.
+  function endMyCall(rt) {
+    if (!rt || !rt.myCall) return;
+    const callId = rt.myCall.callId;
+    rt.myCall = null;
+    if (rt.joinTimer) { clearTimeout(rt.joinTimer); rt.joinTimer = null; }
+    sendEph(rt, { k: 'callleave', callId });
+    if (rt.call && rt.call.callId === callId) rt.call.participants.delete(me());
+    refreshCall(rt);
+  }
+
+  function announceMyCall(rt) {
+    if (!rt || !rt.myCall) return;
+    if (!rt.call || rt.call.callId !== rt.myCall.callId) rt.call = { ...rt.myCall, participants: new Map() };
+    rt.call.participants.set(me(), Date.now());
+    sendEph(rt, beaconOf(rt));
+    refreshCall(rt);
   }
 
   async function beaconLoop() {
-    for (const rt of groups.values()) {
-      if (rt.myCall && await inMyCall(rt)) {
-        await sendEph(rt, { k: 'call', ...rt.myCall, name: window.state.myName });
-        if (!rt.call || rt.call.callId !== rt.myCall.callId) {
-          rt.call = { ...rt.myCall, participants: new Map() };
-        }
-        rt.call.participants.set(me(), Date.now());
-      } else if (rt.myCall && !window.state.room) {
-        // Aramadan çıkıldı
-        await sendEph(rt, { k: 'callleave', callId: rt.myCall.callId });
-        if (rt.call) rt.call.participants.delete(me());
-        rt.myCall = null;
-      }
-      refreshCall(rt);
+    for (const gid of Array.from(groups.keys())) {
+      const rt = groups.get(gid);
+      if (!rt || !rt.myCall) continue;
+      if (!inMyCallSync(rt)) { endMyCall(rt); continue; } // aramadan çıkıldı / başka odaya geçildi
+      // Bağlanırken (henüz kimseye ulaşmadan) katılımcı ilan edilmez: aksi
+      // hâlde ölü bir aramaya "Katıl" diyen herkes hayalet katılımcı olurdu.
+      if (window.state.isJoining && !(window.state.peers && window.state.peers.size)) continue;
+      if (!rt.call || rt.call.callId !== rt.myCall.callId) rt.call = { ...rt.myCall, participants: new Map() };
+      rt.call.participants.set(me(), Date.now());
+      await sendEph(rt, beaconOf(rt));
     }
+    pruneCalls();
   }
 
-  async function startOrJoinCall(gid) {
+  function showCallScreenNow() {
+    // Katılan taraf ilk eş bağlanana kadar #app'i gizli tutuyordu (renderer
+    // startApp): arama ekranı "Bağlanıyor…" ile hemen açılsın.
+    const app = document.getElementById('app');
+    if (app && app.classList.contains('hidden')) app.classList.toggle('hidden', false);
+    const tb = document.querySelector('.top-bar');
+    if (tb) tb.style.display = 'flex';
+  }
+
+  // "Katıl" dendi ama JOIN_WAIT içinde odada kimse yok (bayat başlık): kullanıcıyı
+  // dışarı atma — aynı odada yeni bir aramanın ilk katılımcısı yap (zil yok).
+  function joinFallback(gid, roomId, callId) {
     const rt = groups.get(gid);
-    if (!rt || !window.TSRoom) return;
+    if (!rt) return;
+    rt.joinTimer = null;
+    if (!rt.myCall || rt.myCall.callId !== callId || window.state.room !== roomId) return;
+    if (!window.state.isJoining || (window.state.peers && window.state.peers.size)) return;
+    if (rt.call && rt.call.callId === callId) rt.call = null;
+    rt.myCall = { callId: crypto.randomUUID(), startedAt: Date.now(), startedBy: me(), ring: false };
+    if (window.TSRoom && typeof window.TSRoom.claimFounder === 'function') window.TSRoom.claimFounder();
+    else window.state.isJoining = false;
+    publishEvent(gid, 'call.start', { callId: rt.myCall.callId, ring: false }).catch(() => {});
+    announceMyCall(rt);
+  }
+
+  // opts.ring: true (varsayılan) = "Herkesi ara" (üyelerde zil çalar),
+  // false = "Toplantı başlat" (sessiz; üyeler yalnızca başlığı görür).
+  // Etkin bir arama varsa her iki durumda da ona katılınır.
+  const callBusy = new Set();
+  async function startOrJoinCall(gid, opts) {
+    if (!groups.get(gid) || !window.TSRoom || callBusy.has(gid)) return false;
+    callBusy.add(gid);
+    try { return await startOrJoinInner(gid, !(opts && opts.ring === false)); }
+    finally { callBusy.delete(gid); }
+  }
+
+  async function startOrJoinInner(gid, ringAll) {
+    let rt = groups.get(gid);
     const { id, pw } = await callRoom(rt);
-    if (window.state.room === id) { window.TSShell && window.TSShell.setView('call'); return; }
+    if (window.state.room === id) { if (window.TSShell) window.TSShell.setView('call'); return true; }
     if (window.state.room) {
       const ok = typeof window.showConfirm === 'function' ? await window.showConfirm(tr('groups.leaveCurrentTitle'), tr('groups.leaveCurrentBody')) : true;
-      if (!ok) return;
+      if (!ok) return false;
       window.disconnectApp();
       await sleep(400);
     }
+    // Her await'ten sonra çalışma zamanı yeniden alınır: anahtar yenilenince
+    // activate() rt nesnesini değiştirir, eskisine yazılanlar kaybolurdu.
+    rt = groups.get(gid);
+    if (!rt) return false;
     const ptt = localStorage.getItem('teamsync_ptt_enabled') === '1';
+    const title = groupTitle(rt);
     const current = activeCall(rt);
-    if (current && current.participants.size) {
-      rt.myCall = { callId: current.callId, startedAt: current.startedAt, startedBy: current.startedBy };
+    const others = current ? Array.from(current.participants.keys()).filter(f => f !== me()) : [];
+    if (others.length) {
+      const callId = current.callId;
+      const mine = { callId, startedAt: current.startedAt, startedBy: current.startedBy, ring: !!current.ring };
+      rt.myCall = mine;
       window.state.isJoining = true;
-      window.showToast(tr('groups.joiningCall'), 'info');
-      const ok = await window.TSRoom.start(id, pw, true, ptt, groupTitle(rt), true);
-      if (!ok) { rt.myCall = null; return; }
-      setTimeout(() => {
-        if (window.state.room === id && window.state.isJoining && window.state.peers.size === 0) {
-          window.state.isJoining = false;
-          window.disconnectApp();
-          rt.myCall = null;
-          window.showToast(tr('groups.callGone'), 'warn');
-        }
-      }, 15000);
-    } else {
-      rt.myCall = { callId: crypto.randomUUID(), startedAt: Date.now(), startedBy: me() };
-      window.state.isJoining = false;
-      const ok = await window.TSRoom.start(id, pw, true, ptt, groupTitle(rt), false);
-      if (!ok) { rt.myCall = null; return; }
-      publishEvent(gid, 'call.start', { callId: rt.myCall.callId }).catch(() => {});
+      const ok = await window.TSRoom.start(id, pw, true, ptt, title, true);
+      rt = groups.get(gid);
+      if (!ok || window.state.room !== id) {
+        if (rt && rt.myCall === mine) rt.myCall = null;
+        if (!window.state.room) window.state.isJoining = false;
+        if (rt) refreshCall(rt);
+        return false;
+      }
+      showCallScreenNow();
+      if (rt) {
+        if (rt.joinTimer) clearTimeout(rt.joinTimer);
+        rt.joinTimer = setTimeout(() => joinFallback(gid, id, callId), JOIN_WAIT);
+      }
+      return true;
     }
-    rt.call = { ...rt.myCall, participants: new Map([[me(), Date.now()]]) };
-    await sendEph(rt, { k: 'call', ...rt.myCall, name: window.state.myName });
-    refreshCall(rt);
+    const mine = { callId: crypto.randomUUID(), startedAt: Date.now(), startedBy: me(), ring: ringAll };
+    rt.myCall = mine;
+    window.state.isJoining = false;
+    const ok = await window.TSRoom.start(id, pw, true, ptt, title, false);
+    rt = groups.get(gid);
+    if (!rt) return false;
+    if (!ok || window.state.room !== id) {
+      if (rt.myCall === mine) rt.myCall = null;
+      refreshCall(rt);
+      return false;
+    }
+    if (!rt.myCall) rt.myCall = mine;
+    // Sessiz başlatmada da sohbete "arama başlattı" satırı düşer.
+    publishEvent(gid, 'call.start', { callId: mine.callId, ring: ringAll }).catch(() => {});
+    announceMyCall(rt);
+    return true;
   }
 
   function leaveCall(gid) {
     const rt = groups.get(gid);
-    if (rt && rt.myCall) sendEph(rt, { k: 'callleave', callId: rt.myCall.callId });
+    if (rt) endMyCall(rt);
     if (window.state.room) window.disconnectApp();
-    if (rt) { rt.myCall = null; if (rt.call) rt.call.participants.delete(me()); refreshCall(rt); }
   }
+
+  // Aramadayken, henüz katılmamış üyeleri çaldırır (gönderen 30 sn'de bir).
+  function ringMissing(gid) {
+    const rt = groups.get(gid);
+    if (!rt || !rt.myCall || !inMyCallSync(rt)) return 'nocall';
+    const now = Date.now();
+    if (now - (rt.lastCallRing || 0) < CALLRING_GAP) return 'wait';
+    rt.lastCallRing = now;
+    sendEph(rt, { k: 'callring', rid: crypto.randomUUID(), callId: rt.myCall.callId, startedAt: rt.myCall.startedAt, startedBy: rt.myCall.startedBy });
+    return 'sent';
+  }
+
+  // Arama ekranının "Ayrıl"ı (ya da başka bir yoldan çıkış) beni hemen düşürür.
+  document.addEventListener('ts:call', e => {
+    if (e.detail && e.detail.active) return;
+    groups.forEach(rt => { if (rt.myCall && !inMyCallSync(rt)) endMyCall(rt); });
+  });
 
   // ---------- oluşturma / davet ----------
   function memberEntryForMe() {
@@ -483,7 +674,10 @@
       await publishEvent(gid, 'member.add', { fid, name: cleanName(friend.name || fid), ik: keys.ik, ek: keys.ek });
       ready.push({ fid, keys });
     }
-    for (const { fid, keys } of ready) await sendInvite(rt, fid, keys);
+    for (const { fid, keys } of ready) {
+      await sendInvite(rt, fid, keys);
+      markUnconfirmed(rt, fid); // MQTT bağlı değilse de: çevrimiçi olunca yeniden gönderilir
+    }
     rt.rec.pendingInvites = pending.slice();
     await saveRec(rt);
     pending.forEach(fid => { if (window.TSProfile) window.TSProfile.request(fid, 0, true); });
@@ -499,7 +693,11 @@
     const rt = groups.get(gid);
     if (!rt || !validFid(fid) || fid === me()) return 'invalid';
     if (rt.rec.members.find(m => m.fid === fid)) return 'already';
-    if (rt.rec.members.length >= MAX_MEMBERS) return 'full';
+    // 25 sınırı: üyeler (onaylanmamış davetliler dahil; onlar zaten members'ta)
+    // + anahtarı beklenen davetliler (bu kişi hariç: retryPending onu yeniden dener).
+    const memberIds = new Set(rt.rec.members.map(m => m.fid));
+    const waiting = new Set([...(rt.rec.pendingInvites || []), ...(rt.rec.unconfirmed || [])].filter(f => f !== fid && !memberIds.has(f)));
+    if (memberIds.size + waiting.size >= MAX_MEMBERS) return 'full';
     const keys = C().peerKeys(fid);
     if (!keys) {
       if (!(rt.rec.pendingInvites || []).includes(fid)) rt.rec.pendingInvites = (rt.rec.pendingInvites || []).concat(fid);
@@ -510,9 +708,11 @@
     const friend = window.state.friends[fid] || {};
     // Önce günlüğe ekle (herkes yeni üyeyi ve anahtarlarını öğrensin)
     await publishEvent(gid, 'member.add', { fid, name: cleanName(friend.name || fid), ik: keys.ik, ek: keys.ek });
-    await sendInvite(rt, fid, keys);
-    rt.rec.pendingInvites = (rt.rec.pendingInvites || []).filter(x => x !== fid);
-    await saveRec(rt);
+    const cur = groups.get(gid) || rt;
+    await sendInvite(cur, fid, keys);
+    markUnconfirmed(cur, fid);
+    cur.rec.pendingInvites = (cur.rec.pendingInvites || []).filter(x => x !== fid);
+    await saveRec(cur);
     return 'sent';
   }
 
@@ -574,8 +774,18 @@
     const friend = window.state.friends[data.fromId];
     if (data.type === 'grp_invite') {
       // Yalnızca (engellenmemiş) arkadaşlardan davet kabul edilir.
-      if (!friend || friend.temporary || friend.isMuted) return;
+      // Sessize alınmış arkadaşın daveti kabul edilir (sessiz = yalnızca bildirim yok).
+      if (!friend || friend.temporary || (window.TSBlock && window.TSBlock.isBlocked(data.fromId))) return;
       if (!validMembers(data.members) || !data.members.find(m => m.fid === me())) return;
+      // Davet, teslim doğrulanana kadar yeniden gönderilir: aynı davetin
+      // kopyaları (eşzamanlı gelenler dahil) yalnızca bir kez işlenir.
+      const have = groups.get(data.gid);
+      if ((have && have.rec.epoch >= data.epoch && !have.rec.removed) || invitesInFlight.has(data.gid)) {
+        if (have) setTimeout(() => sendHeartbeat(have), 200 + Math.random() * 600); // davet edene "aldım" sinyali
+        return;
+      }
+      invitesInFlight.add(data.gid);
+      setTimeout(() => invitesInFlight.delete(data.gid), 10000);
       const sender = data.members.find(m => m.fid === data.fromId);
       if (!sender) return;
       const known = C().peerKeys(data.fromId);
@@ -625,16 +835,22 @@
   function onFriendOnline(fid) {
     if (!started) return;
     if (!C().peerKeys(fid) && window.TSProfile) setTimeout(() => window.TSProfile.request(fid, 0, true), 800 + Math.random() * 1500);
-    setTimeout(() => retryPending(fid).catch(() => {}), 2500);
+    setTimeout(() => retryPending(fid, true).catch(() => {}), 2500);
   }
 
-  async function retryPending(onlyFid) {
-    for (const rt of groups.values()) {
+  async function retryPending(onlyFid, cameOnline) {
+    for (const gid of Array.from(groups.keys())) {
+      let rt = groups.get(gid);
+      if (!rt) continue;
       for (const fid of (rt.rec.pendingInvites || []).slice()) {
         if (onlyFid && fid !== onlyFid) continue;
-        if (C().peerKeys(fid)) await invite(rt.rec.gid, fid);
+        if (C().peerKeys(fid)) await invite(gid, fid);
       }
-      if ((rt.rec.pendingKeys || []).length && rt.rec.owner === me()) await deliverKeys(rt, onlyFid);
+      rt = groups.get(gid);
+      if (!rt) continue;
+      if ((rt.rec.unconfirmed || []).length) await resendInvites(rt, onlyFid, !!cameOnline);
+      rt = groups.get(gid);
+      if (rt && (rt.rec.pendingKeys || []).length && rt.rec.owner === me()) await deliverKeys(rt, onlyFid);
     }
   }
 
@@ -715,6 +931,7 @@
       timers.push(setInterval(() => groups.forEach(rt => sendHeartbeat(rt)), HB_EVERY));
       timers.push(setInterval(() => beaconLoop().catch(() => {}), BEACON_EVERY));
       timers.push(setInterval(() => retryPending().catch(() => {}), 60000));
+      timers.push(setInterval(pruneCalls, CALL_PRUNE_EVERY));
       emit('ts:group', {});
     })().catch(e => { console.warn('Gruplar başlatılamadı:', e && e.message); startPromise = null; });
     return startPromise;
@@ -744,7 +961,10 @@
   function list() {
     return Array.from(groups.values()).filter(rt => !rt.rec.removed).map(rt => ({
       gid: rt.rec.gid, title: groupTitle(rt), members: rt.rec.members, owner: rt.rec.owner,
-      unread: rt.rec.unread || 0, lastTs: rt.lastTs || rt.rec.createdAt, call: activeCall(rt)
+      unread: rt.rec.unread || 0, lastTs: rt.lastTs || rt.rec.createdAt, call: activeCall(rt),
+      // Daveti gönderilmiş ama grubu aldığı henüz doğrulanmamış üyeler (fid[]).
+      unconfirmed: (rt.rec.unconfirmed || []).slice(),
+      inMyCall: !!(rt.myCall && inMyCallSync(rt))
     }));
   }
   const get = gid => groups.get(gid) || null;
@@ -753,7 +973,9 @@
   window.TSGroups = {
     start, stop, onConnect, onMqtt, onPersonalEvent, onFriendOnline,
     createGroup, invite, kick, leave, rename, sendMessage, react, deleteMessage, sendTyping,
-    startOrJoinCall, leaveCall, inMyCall, callRoom, activeCall: gid => { const rt = groups.get(gid); return rt ? activeCall(rt) : null; },
+    startOrJoinCall, leaveCall, ringMissing, inMyCall, callRoom, activeCall: gid => { const rt = groups.get(gid); return rt ? activeCall(rt) : null; },
+    myCall: gid => { const rt = groups.get(gid); return rt && rt.myCall && inMyCallSync(rt) ? { ...rt.myCall } : null; },
+    unconfirmed: gid => { const rt = groups.get(gid); return rt ? (rt.rec.unconfirmed || []).slice() : []; },
     loadEvents, markRead, list, get, groupTitle: gid => { const rt = groups.get(gid); return rt ? groupTitle(rt) : ''; },
     displayName: (gid, fid) => { const rt = groups.get(gid); return rt ? displayName(rt, fid) : fid; },
     totalUnread, MAX_MEMBERS,

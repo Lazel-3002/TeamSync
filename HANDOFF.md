@@ -250,3 +250,52 @@ high quality". Discord-era features (servers, groups, profiles) all remain.
 - Strings: `resources/localization/teams-strings.js`. CSS: `css/teams.css`.
 - Test: `test/e2e/teams-shell.test.js` (2 peers: rail views, chat list,
   last seen, call → ring → accept → duo stage → log; decline; calendar DM).
+
+## Phase 5 — integration (uncommitted working tree)
+- **Calendar / meeting scheduling removed** (`js/teams/calendar.js` deleted,
+  no `#rail-calendar` / `#view-calendar`). Call history stays.
+- **Group calls** (`js/space/groups.js`): `startOrJoinCall(gid, { ring })`
+  joins an active call or starts one; `ring:false` = header "Toplantı başlat"
+  (quiet), `ring:true` = "Herkesi ara". Ringing goes out as an `/eph` message
+  `{ k:'callring', rid, callId, startedAt, startedBy }` (max one per
+  `CALLRING_GAP` 30 s); beacons only ring for calls younger than
+  `RING_FRESH` 45 s. Joining an existing call arms `joinFallback` after
+  `JOIN_WAIT` 12 s (nobody there → quietly start a new call). The call timer
+  (`#call-timer`, `m:ss`) counts from your own join (`state.joinedAt`).
+- **1:1 calls** (`js/teams/direct-call.js`): hanging up in a `dc-` room sends
+  `call_end` (data channel + personal event) from `disconnectApp()` →
+  `TSDirectCall.announceEnd()`; the other side ends at once
+  (`onRemoteEnd`). The 4 s empty-room timeout remains the fallback.
+- **Founder protocol** (renderer.js): founder moves when they leave.
+  `founder_claim` carries a `term` (`state.founderTerm`, higher wins);
+  `conn_score` shares RTT/relay so every client picks the same successor
+  when `state.autoHost` ("best connection", default on except `sv-`/classic
+  rooms, `defaultAutoHost`). UI says "current founder" (`founder.panelHint`).
+- **Group invites**: an invitee stays in `rec.unconfirmed` (persisted) and is
+  re-invited with backoff until a signed event / `/eph` from them arrives.
+- **Removed / blocked are local lists** (`js/shell-friends.js`):
+  `teamsync_removed_friends_<me>`, `teamsync_blocked_<me>`; API
+  `window.TSBlock` (`isBlocked`, `list`, `block`…) and `TSFriends.confirmBlock`;
+  changes dispatch `ts:blocklist`. Personal events from blocked IDs are
+  dropped before any handler. Muted friends are ordinary friends.
+- **Profile media never reaches the server** (`js/profile-media.js`): images
+  live in IndexedDB `ts-pmedia-<owner>`; profiles carry `tsm:<fid>:<sha256>:<size>`
+  descriptors fetched P2P over personal events `req_pmedia` / `res_pmedia`
+  (chunked). Everything written to Supabase goes through
+  `serverSafeProfileRow` (renderer.js). Render avatars with `TSUI.avatarHtml`
+  (resolves `tsm:` refs). Wording: "Supabase" → "sunucu".
+- **Theme tokens**: colour identity comes only from `style.css`
+  `:root[data-theme=…]`; `css/refresh.css` `:root` only derives tokens
+  (`--acc-btn`, `--acc-btn-fg` auto contrast, `--acc-ink`, `--danger-btn`,
+  `--danger-btn-fg`). Filled primary buttons use `--acc-btn`; destructive
+  primaries use `.btn-pri.btn-danger`. `window.showConfirm(title, msg,
+  { danger = true, confirmText, cancelText })` — pass `danger:false` for
+  non-destructive confirms; labels come from strings.
+- **Push-to-talk** uses the shared `uiohook-napi` hook in main.js (same hook as
+  remote control): press AND release (`register-ptt` / `unregister-ptt`).
+- **Hidden games** (activity detector): settings keep objects
+  `{ id, name, steamAppId }`; `state().hidden` stays an id array for old code,
+  `hiddenGames` has the objects.
+- **Icons**: no emoji in app UI; use `TSUI.icon(name, size)` (js/ts-ui.js,
+  `uiIcon` in renderer.js). `TSUI.popover` toggles: a second click on the same
+  anchor closes it (returns `{ closed: true }`); pass `noToggle` to opt out.

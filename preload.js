@@ -11,9 +11,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   directConnect: (ip) => ipcRenderer.send('direct-connect', ip),
   getSources: () => ipcRenderer.invoke('get-sources'),
   setScreenShareSource: (id) => ipcRenderer.send('set-screen-share-source', id),
-  registerPTT: (key) => ipcRenderer.send('register-ptt', key),
+  registerPTT: (key, binding) => ipcRenderer.send('register-ptt', key, binding),
   unregisterPTT: () => ipcRenderer.send('unregister-ptt'),
   onPTT: (cb) => ipcRenderer.on('ptt-trigger', cb),
+  // uiohook ile algılanan tuş bırakma (pencere odakta değilken de).
+  onPTTRelease: (cb) => ipcRenderer.on('ptt-release', cb),
   notify: (title, body) => ipcRenderer.send('notify', { title, body }),
   setRemoteControl: (active) => ipcRenderer.send('set-remote-control', active),
   updateControlPointer: (data) => ipcRenderer.send('update-control-pointer', data),
@@ -88,8 +90,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   activityListRunning: () => ipcRenderer.invoke('activity-list-running'),
   activityAddCustom: (game) => ipcRenderer.invoke('activity-add-custom', game),
   activityRemoveCustom: (id) => ipcRenderer.invoke('activity-remove-custom', id),
-  activitySetHidden: (id, hidden) => ipcRenderer.invoke('activity-set-hidden', id, hidden),
+  activitySetHidden: (id, hidden, name) => ipcRenderer.invoke('activity-set-hidden', id, hidden, name),
   activityRescan: () => ipcRenderer.invoke('activity-rescan'),
-  onActivityChanged: (cb) => ipcRenderer.on('activity-changed', (_e, activity) => cb(activity))
+  onActivityChanged: (cb) => ipcRenderer.on('activity-changed', (_e, activity) => cb(activity)),
+  onActivityState: (cb) => ipcRenderer.on('activity-state-changed', (_e, state) => cb(state))
 });
 

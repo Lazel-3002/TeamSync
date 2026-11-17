@@ -246,6 +246,57 @@ module.exports = async function run() {
     await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').play()")`, true);
     await new Promise(r => setTimeout(r, 2000));
 
+    // Uzak senkrondan HEMEN sonra yapılan duraklatma da yayınlanmalı
+    // (deterministik; eskiden bu test bu iki yarışa göre rastgele düşüyordu).
+    // Host'un rutin senkronu misafire elle enjekte edilir; misafirin
+    // lastActionTs'si sıfırlanır ki rutin "yakın eylem" kalkanına takılmadan
+    // gerçekten işlensin. Sahte <video> play/pause olayı ateşlemediği için
+    // sayfa içi __sbLastUserAction kalkanı da devrede değil.
+    const pausedOnHost = async () => {
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        if (await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("window.__isPaused()")`, true) === true) return true;
+      }
+      return false;
+    };
+    const resumeBoth = async () => {
+      await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').play()")`, true);
+      await new Promise(r => setTimeout(r, 2500));
+      await evalJS(a.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').play()")`, true);
+    };
+    // (a) Yerel videoyu gerçekten değiştiren (sarma) bir uzak senkron uygulanır,
+    //     misafir 300 ms sonra durdurur. Eski 1.5 sn'lik kör yankı penceresi
+    //     bu duraklatmayı "uzak senkronun yankısı" sanıp hiç yayınlamıyordu.
+    const guestTBeforeInject = await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()")`, true);
+    await evalJS(b.client, `(() => {
+      state.sb.lastActionTs = 0;
+      handleSBMessage(${JSON.stringify(hostId)}, { type: 'sb-video-sync', routine: true, paused: false, currentTime: ${guestTBeforeInject + 40}, ts: Date.now() });
+      return 1;
+    })()`);
+    await waitFor(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__getT()").then(t => t >= ${guestTBeforeInject + 35} ? 'yes' : null)`,
+      5000, 'enjekte edilen uzak senkron misafire uygulanmadı');
+    await new Promise(r => setTimeout(r, 300));
+    await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').pause()")`, true);
+    assert.strictEqual(await pausedOnHost(), true,
+      'uzak senkrondan hemen sonra yapılan misafir duraklatması host\'a yayınlanmadı (yankı bastırması gerçek eylemi yuttu)');
+    await resumeBoth();
+    // (b) Misafir durdurur ve misafirin 1 sn'lik yoklaması bunu görmeden
+    //     host'un rutini (paused:false) gelir. Rutin, henüz yayınlanmamış
+    //     yerel duraklatmayı geri açıp yok etmemeli.
+    await evalJS(b.client, `(() => {
+      state.sb.lastActionTs = 0;
+      return document.getElementById('sb-webview').executeJavaScript("document.getElementById('v').pause(); window.__getT()").then(t => {
+        handleSBMessage(${JSON.stringify(hostId)}, { type: 'sb-video-sync', routine: true, paused: false, currentTime: t, ts: Date.now() });
+        return 1;
+      });
+    })()`, true);
+    assert.strictEqual(await pausedOnHost(), true,
+      'yoklamadan önce gelen host rutini misafirin duraklatmasını geri açtı, duraklatma hiç yayınlanmadı');
+    assert.strictEqual(await evalJS(b.client, `document.getElementById('sb-webview').executeJavaScript("window.__isPaused()")`, true), true,
+      'host rutini misafirin kendi duraklatmasını geri açtı');
+    await resumeBoth();
+    await new Promise(r => setTimeout(r, 2000));
+
     // İleri sarma senkronu ("5. dakikaya aldım ama ona alınmadı" şikayeti):
     // misafir 300 sn'ye sarar -> host takip etmeli. Eski kod video normal
     // oynarken bile herkesten ~3 sn'de bir "rutin ilerleme" yayınlıyordu ve

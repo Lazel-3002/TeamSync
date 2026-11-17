@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="css/groups.css?v=1" />
   <link rel="stylesheet" href="css/servers.css?v=1" />
   <link rel="stylesheet" href="css/teams.css?v=1" />
+  <link rel="stylesheet" href="css/refresh.css?v=3" />
   <script>
     try {
       var _theme = localStorage.getItem('teamsync_theme') || 'aurora';
@@ -55,10 +56,10 @@
       <div class="titlebar-title">TeamSync</div>
     </div>
     <div class="titlebar-right">
-      <button id="tb-forcequit" class="tb-btn tb-forcequit" title="Görev Sonlandır" style="font-family: serif; font-style: italic;">x<sup style="font-size: 10px;">x</sup></button>
-      <button id="tb-min" class="tb-btn" title="Küçült">&#x2014;</button>
-      <button id="tb-max" class="tb-btn" title="Büyüt/Küçült">&#x25A1;</button>
-      <button id="tb-close" class="tb-btn tb-close" title="Kapat">&#x2715;</button>
+      <button id="tb-forcequit" class="tb-btn tb-forcequit" title="Görev Sonlandır" aria-label="Görev Sonlandır"><svg class="tb-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M12 3v9M6 5.8a9 9 0 1 0 12 0"/></svg></button>
+      <button id="tb-min" class="tb-btn" title="Küçült" aria-label="Küçült"><svg class="tb-ico" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.1" aria-hidden="true" focusable="false"><path d="M1.5 6h9"/></svg></button>
+      <button id="tb-max" class="tb-btn" title="Büyüt/Küçült" aria-label="Büyüt/Küçült"><svg class="tb-ico" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.1" aria-hidden="true" focusable="false"><rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1"/></svg></button>
+      <button id="tb-close" class="tb-btn tb-close" title="Kapat" aria-label="Kapat"><svg class="tb-ico" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M2 2l8 8M10 2l-8 8"/></svg></button>
     </div>
   </div>
 
@@ -367,12 +368,6 @@
         <span class="rail-label" data-i18n="app.people">Kişiler</span>
         <span id="side-requests-badge" class="rail-badge hidden">0</span>
       </button>
-      <button id="rail-calendar" class="rail-btn rail-app" type="button" data-i18n-title="app.calendar" title="Takvim">
-        <span class="rail-pill"></span>
-        <span class="rail-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></span>
-        <span class="rail-label" data-i18n="app.calendar">Takvim</span>
-        <span id="rail-calendar-badge" class="rail-badge rail-badge-soft hidden">0</span>
-      </button>
       <button id="rail-calls" class="rail-btn rail-app" type="button" data-i18n-title="app.calls" title="Aramalar">
         <span class="rail-pill"></span>
         <span class="rail-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
@@ -410,9 +405,9 @@
       <div class="side-top chat-head">
         <h1 class="chat-head-title" data-i18n="app.chat">Sohbet</h1>
         <div class="chat-head-actions">
-          <button id="side-search-btn" class="side-icon-btn" type="button" data-i18n-title="chat.search" title="Sohbet bul (Ctrl+K)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
-          <button id="side-meet-now" class="side-icon-btn" type="button" data-i18n-title="chat.meetNow" title="Hemen toplantı başlat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="3"/><path d="M16 10.5 22 7v10l-6-3.5"/></svg></button>
-          <button id="side-new-dm" class="side-icon-btn" type="button" data-i18n-title="chat.newChat" title="Yeni sohbet"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+          <button id="side-search-btn" class="side-icon-btn side-labeled-btn" type="button" data-i18n-title="chat.search" title="Sohbet bul (Ctrl+K)" aria-label="Sohbet bul (Ctrl+K)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="side-btn-label" data-i18n="chat.searchShort">Ara</span></button>
+          <button id="side-meet-now" class="side-icon-btn side-labeled-btn" type="button" data-i18n-title="chat.meetNow" title="Hemen toplantı başlat" aria-label="Hemen toplantı başlat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="3"/><path d="M16 10.5 22 7v10l-6-3.5"/></svg><span class="side-btn-label" data-i18n="chat.meetShort">Toplantı</span></button>
+          <button id="side-new-dm" class="side-icon-btn side-labeled-btn" type="button" data-i18n-title="chat.newChat" title="Yeni grup sohbeti" aria-label="Yeni grup sohbeti" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg><span class="side-btn-label" data-i18n="chat.newGroupShort">Yeni grup</span></button>
         </div>
       </div>
       <div id="chat-filters" class="chat-filters" role="toolbar">
@@ -425,8 +420,12 @@
       </div>
       <!-- Sunucu seçiliyken DM listesinin yerine kanal listesi (js/ui/server-view.js) -->
       <div id="side-server" class="side-server" data-i18n-ignore>
-        <button id="ss-header" class="ss-header" type="button">
-          <span id="ss-name" class="ss-name"></span>
+        <button id="ss-header" class="ss-header" type="button" aria-haspopup="menu" aria-expanded="false" title="Sunucu menüsü" aria-label="Sunucu menüsü">
+          <span id="ss-icon" class="ss-icon" aria-hidden="true"></span>
+          <span class="ss-head-text">
+            <span id="ss-overline" class="ss-overline">Sunucu</span>
+            <span id="ss-name" class="ss-name"></span>
+          </span>
           <svg class="ss-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div id="ss-banner" class="ss-banner hidden"></div>
@@ -466,7 +465,8 @@
             <button type="button" data-ftab="online" class="active" data-i18n="friends.online">Çevrimiçi</button>
             <button type="button" data-ftab="all" data-i18n="friends.all">Tümü</button>
             <button type="button" data-ftab="pending"><span data-i18n="friends.pending">Bekleyen</span><span id="ftab-pending-badge" class="ts-count-badge hidden">0</span></button>
-            <button type="button" data-ftab="blocked" data-i18n="friends.blocked">Engellenen</button>
+            <button type="button" data-ftab="removed" data-i18n="friends.removed">Çıkarılanlar</button>
+            <button type="button" data-ftab="blocked" data-i18n="friends.blocked">Engellenenler</button>
             <button type="button" data-ftab="add" class="ftab-add" data-i18n="friends.addFriend">Arkadaş Ekle</button>
           </nav>
         </header>
@@ -477,6 +477,10 @@
               <div id="friends-count" class="friends-count" data-i18n-ignore></div>
               <div class="friends-list-host"></div>
               <div id="friends-empty" class="friends-empty hidden" data-i18n-ignore></div>
+            </div>
+            <div id="friends-pane-people" class="friends-pane hidden">
+              <div id="people-count" class="friends-count" data-i18n-ignore></div>
+              <ul id="people-list" class="people-list" data-i18n-ignore></ul>
             </div>
             <div id="friends-pane-pending" class="friends-pane hidden">
               <div id="pending-count" class="friends-count" data-i18n-ignore></div>
@@ -584,9 +588,6 @@
           <aside id="srv-members-panel" class="dm-profile-panel srv-members-panel" data-i18n-ignore></aside>
         </div>
       </div>
-
-      <!-- Takvim (js/teams/calendar.js) -->
-      <div id="view-calendar" class="shell-view view-calendar hidden" data-i18n-ignore></div>
 
       <!-- Arama geçmişi (js/teams/calls.js) -->
       <div id="view-calls" class="shell-view view-calls hidden" data-i18n-ignore></div>
@@ -820,7 +821,7 @@
           <div class="card-actions" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:rgba(0,0,0,0.35);">
             <span class="u-title">UNO</span>
             <div style="display:flex; gap:8px;">
-              <button id="uno-settings-btn" class="btn-sec btn-sm" style="background: rgba(0,0,0,0.5);">⚙ Kurallar</button>
+              <button id="uno-settings-btn" class="btn-sec btn-sm" style="background: color-mix(in srgb, var(--bg-dark) 50%, transparent); display:inline-flex; align-items:center; gap:6px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></svg><span>Kurallar</span></button>
               <button id="uno-close" class="btn-sec btn-sm" style="background: rgba(0,0,0,0.5);">Odadan Çık</button>
             </div>
           </div>
@@ -954,7 +955,7 @@
           <!-- Oyun sonu -->
           <div id="uno-over" class="u-view hidden">
             <div class="u-over-box">
-              <div class="u-over-trophy">🏆</div>
+              <div class="u-over-trophy" aria-hidden="true"><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></div>
               <div id="uno-over-winner" class="u-over-winner"></div>
               <button id="uno-replay" class="btn-pri hidden">Tekrar Oyna</button>
               <p id="uno-over-wait" class="u-hint hidden">Kurucunun yeni oyun başlatması bekleniyor…</p>
@@ -979,7 +980,7 @@
             <div class="vv-reveal-progress" aria-hidden="true"><i></i></div>
           </div>
           <div class="vv-card-header">
-            <div><span class="vv-card-kicker">SOSYAL ÇIKARIM OYUNU</span><h3>🧛 Vampir Köylü</h3></div>
+            <div><span class="vv-card-kicker">SOSYAL ÇIKARIM OYUNU</span><h3>Vampir Köylü</h3></div>
             <button id="vampire-close" class="btn-sec btn-sm">Odadan Çık</button>
           </div>
           <div class="vv-phase-track" aria-label="Oyun akışı">
@@ -1161,7 +1162,7 @@
                 </div>
                 <h2 id="poll-view-q">...</h2>
                 <div id="poll-finished-banner" class="poll-finished-banner hidden">
-                  <span>✓</span>
+                  <span aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                   <div><strong>Oylama tamamlandı</strong><small>Sonuçlar artık değiştirilemez.</small></div>
                 </div>
                 <div id="poll-opts-container" class="poll-options-live" role="radiogroup" aria-label="Anket seçenekleri"></div>
@@ -1268,7 +1269,7 @@
 
                 <div id="wheel-items-list" class="wheel-items-list" aria-label="Çark seçenekleri"></div>
                 <div id="wheel-empty-state" class="wheel-empty-state">
-                  <span class="wheel-empty-icon" aria-hidden="true">✦</span>
+                  <span class="wheel-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
                   <div><strong>Çarkın henüz boş</strong><span>Yukarıdan bir seçenek ekle veya hazır bir liste seç.</span></div>
                 </div>
 
@@ -1338,7 +1339,7 @@
             <div class="wheel-confetti wheel-confetti-left" aria-hidden="true"></div>
             <div class="wheel-confetti wheel-confetti-right" aria-hidden="true"></div>
             <div class="wheel-winner-card">
-              <div class="wheel-winner-badge" aria-hidden="true">✦</div>
+              <div class="wheel-winner-badge" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></div>
               <span>ÇARKIN SEÇİMİ</span>
               <h2 id="wheel-winner-text">...</h2>
               <p>Şans bugün bu seçenekten yana.</p>
@@ -1386,7 +1387,7 @@
           <span class="lbl" data-i18n="toolbar.board">Tahta</span>
         </button>
         <button id="act-btn" class="btn" title="Etkinlikler (E)" data-i18n-title="toolbar.activityTitle">
-          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 3.86-8.86c.41-.53.96-.86 1.57-.96h3.4v3.4c-.1.61-.43 1.16-.96 1.57A22 22 0 0 1 12 15z"/></svg>
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
           <span class="lbl" data-i18n="toolbar.activity">Etkinlik</span>
         </button>
         <button id="rec" class="btn" title="Kayıt (R)" data-i18n-title="toolbar.recordTitle">
@@ -1513,7 +1514,7 @@
     <div id="founder-settings-modal" class="modal hidden">
       <div class="mcard" style="width: 420px; max-width: 90vw;">
         <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fbbf24;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path><path d="M5 20h14"></path></svg> <span id="founder-modal-title-text">Kurucu Ayarları</span></h3>
-        <p class="muted" id="founder-modal-subtitle">Sadece sunucuyu kuran kişi bu ayarları görebilir.</p>
+        <p class="muted" id="founder-modal-subtitle">Bu ayarları yalnızca odanın şu anki kurucusu görebilir ve değiştirebilir.</p>
         <div id="founder-owner-only-settings">
           <div style="margin-top:20px; display:flex; align-items:center; justify-content:space-between;">
             <label style="font-weight:bold;">Sadece Arkadaşlar Katılabilir</label>
@@ -1623,40 +1624,40 @@
           </div>
           <div class="settings-nav-label" data-i18n="settings.userSettings">KULLANICI AYARLARI</div>
           <button class="settings-nav-item active" type="button" data-settings-panel="general">
-            <span class="settings-nav-icon">⚙</span><span data-i18n="settings.general">Genel</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></svg></span><span data-i18n="settings.general">Genel</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="profile">
-            <span class="settings-nav-icon">☺</span><span data-i18n="profile.settingsNav">Profil</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><span data-i18n="profile.settingsNav">Profil</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="account">
-            <span class="settings-nav-icon">◇</span><span data-i18n="settings.account">Hesap ve Cihaz</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M10 15v4"/><path d="M7 19h5"/><rect x="16" y="11" width="6" height="10" rx="2"/></svg></span><span data-i18n="settings.account">Hesap ve Cihaz</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="voice">
-            <span class="settings-nav-icon">♫</span><span data-i18n="settings.voice">Ses</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span><span data-i18n="settings.voice">Ses</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="broadcast">
-            <span class="settings-nav-icon">▣</span><span data-i18n="settings.broadcast">Yayın</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="m17 8 5-5"/><path d="M17 3h5v5"/></svg></span><span data-i18n="settings.broadcast">Yayın</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="network">
-            <span class="settings-nav-icon">⧉</span><span data-i18n="settings.connections">Bağlantılar</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></span><span data-i18n="settings.connections">Bağlantılar</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="shortcuts">
-            <span class="settings-nav-icon">⌨</span><span data-i18n="settings.shortcuts">Kısayollar</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg></span><span data-i18n="settings.shortcuts">Kısayollar</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="activity">
-            <span class="settings-nav-icon">◉</span><span data-i18n="activity.settingsNav">Oyun Etkinliği</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg></span><span data-i18n="activity.settingsNav">Oyun Etkinliği</span>
           </button>
           <div class="settings-nav-label" data-i18n="settings.appSettings">UYGULAMA AYARLARI</div>
           <button class="settings-nav-item" type="button" data-settings-panel="media">
-            <span class="settings-nav-icon">✦</span><span data-i18n="settings.mediaLibrary">GIF ve Medya</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span><span data-i18n="settings.mediaLibrary">GIF ve Medya</span>
           </button>
           <button class="settings-nav-item" type="button" data-settings-panel="language">
-            <span class="settings-nav-icon">A</span><span data-i18n="settings.languageTime">Dil ve Zaman</span>
+            <span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg></span><span data-i18n="settings.languageTime">Dil ve Zaman</span>
           </button>
         </aside>
 
         <section class="settings-content">
-          <button id="settings-v2-close" class="settings-close" type="button" data-i18n-title="common.close" aria-label="Kapat">×</button>
+          <button id="settings-v2-close" class="settings-close" type="button" data-i18n-title="common.close" aria-label="Kapat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           <div class="settings-scroll">
             <div class="settings-panel active" data-settings-content="general">
               <h2 id="settings-view-title" data-i18n="settings.general">Genel</h2>
@@ -1682,40 +1683,40 @@
                     <input type="radio" name="settings-theme" value="aurora">
                     <span class="settings-theme-preview theme-preview-aurora"><i></i><b></b></span>
                     <span class="settings-theme-copy"><strong data-i18n="settings.themeAurora">Mevcut Mor</strong><small data-i18n="settings.themeAuroraDesc">Canlı ve yumuşak</small></span>
-                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                    <span class="settings-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                   </label>
                   <label class="settings-theme-option" data-theme-option="black">
                     <input type="radio" name="settings-theme" value="black">
                     <span class="settings-theme-preview theme-preview-black"><i></i><b></b></span>
                     <span class="settings-theme-copy"><strong data-i18n="settings.themeBlack">Gece Siyahı</strong><small data-i18n="settings.themeBlackDesc">Saf ve dikkat dağıtmayan</small></span>
-                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                    <span class="settings-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                   </label>
                   <label class="settings-theme-option" data-theme-option="navy">
                     <input type="radio" name="settings-theme" value="navy">
                     <span class="settings-theme-preview theme-preview-navy"><i></i><b></b></span>
                     <span class="settings-theme-copy"><strong data-i18n="settings.themeNavy">Derin Lacivert</strong><small data-i18n="settings.themeNavyDesc">Sakin ve odaklı</small></span>
-                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                    <span class="settings-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                   </label>
                   <label class="settings-theme-option" data-theme-option="white">
                     <input type="radio" name="settings-theme" value="white">
                     <span class="settings-theme-preview theme-preview-white"><i></i><b></b></span>
                     <span class="settings-theme-copy"><strong data-i18n="settings.themeWhite">Temiz Beyaz</strong><small data-i18n="settings.themeWhiteDesc">Aydınlık ve ferah</small></span>
-                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                    <span class="settings-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                   </label>
                   <label class="settings-theme-option" data-theme-option="violet">
                     <input type="radio" name="settings-theme" value="violet">
                     <span class="settings-theme-preview theme-preview-violet"><i></i><b></b></span>
                     <span class="settings-theme-copy"><strong data-i18n="settings.themeViolet">Mor & Beyaz</strong><small data-i18n="settings.themeVioletDesc">Açık zemin, canlı mor</small></span>
-                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                    <span class="settings-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                   </label>
                   <label class="settings-theme-option" data-theme-option="custom">
                     <input type="radio" name="settings-theme" value="custom">
                     <span class="settings-theme-preview theme-preview-custom"><i></i><b></b></span>
                     <span class="settings-theme-copy"><strong data-i18n="settings.themeCustom">Kendi Teman</strong><small data-i18n="settings.themeCustomDesc">Renkleri sen seç</small></span>
-                    <span class="settings-theme-check" aria-hidden="true">✓</span>
+                    <span class="settings-theme-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                   </label>
                 </div>
-                <p class="settings-theme-hint"><span aria-hidden="true">✦</span><span data-i18n="settings.themeHint">Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.</span></p>
+                <p class="settings-theme-hint"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span><span data-i18n="settings.themeHint">Seçimini önizleyebilir, Kaydet ile kalıcı hale getirebilirsin.</span></p>
                 <div class="settings-card settings-theme-custom-editor hidden" id="settings-theme-custom-editor">
                   <div class="settings-theme-custom-heading">
                     <div>
@@ -1780,7 +1781,7 @@
                   <div class="settings-theme-save-row">
                     <input type="text" id="settings-palette-name" class="settings-theme-palette-name" maxlength="24" spellcheck="false" autocomplete="off" placeholder="Palet adı" data-i18n-placeholder="settings.themePaletteName" data-i18n-title="settings.themePaletteName">
                     <button type="button" id="settings-palette-save" class="settings-theme-save-btn">
-                      <span aria-hidden="true">★</span><span data-i18n="settings.themeSavePalette">Paleti kaydet</span>
+                      <span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span data-i18n="settings.themeSavePalette">Paleti kaydet</span>
                     </button>
                   </div>
                   <div id="settings-saved-block" hidden>
@@ -1830,7 +1831,7 @@
                   <dt data-i18n="settings.ram">Bellek</dt><dd id="settings-device-ram" data-i18n-ignore>—</dd>
                   <dt data-i18n="settings.appVersion">Uygulama sürümü</dt><dd id="settings-device-app" data-i18n-ignore>—</dd>
                   <dt data-i18n="settings.firstSeen">İlk kurulum</dt><dd id="settings-device-first" data-i18n-ignore>—</dd>
-                  <dt data-i18n="settings.cloudStatus">Bulut kaydı</dt><dd id="settings-device-cloud" class="settings-cloud-status" data-i18n-ignore>—</dd>
+                  <dt data-i18n="settings.cloudStatus">Sunucu kaydı</dt><dd id="settings-device-cloud" class="settings-cloud-status" data-i18n-ignore>—</dd>
                 </dl>
                 <label class="settings-field-label" for="settings-device-id" data-i18n="settings.deviceId">Cihaz Kimliği</label>
                 <div class="settings-code-row">
@@ -1841,27 +1842,31 @@
                 <button id="settings-device-copy-all" class="settings-link-button" type="button" data-i18n="settings.copyAll">Tüm cihaz bilgilerini kopyala</button>
               </div>
 
-              <div class="settings-card">
+              <div class="settings-card settings-accounts-card">
                 <div class="settings-device-accounts-head">
-                  <label class="settings-field-label" data-i18n="settings.accountsOnDevice">Bu cihazdaki hesaplar</label>
+                  <h3 class="settings-section-title" data-i18n="settings.accountsOnDevice">Bu cihazdaki hesaplar</h3>
                   <span id="settings-device-accounts" class="settings-device-accounts-count" data-i18n-ignore></span>
                 </div>
+                <!-- renderAccountSettings: "Sunucu hesapları" ve "Yalnızca bu cihazdaki eski hesaplar" grupları. -->
                 <div id="settings-device-accounts-list" class="settings-device-accounts" data-i18n-ignore></div>
               </div>
 
-              <div class="settings-card">
-                <label class="settings-field-label" for="settings-login-code" data-i18n="settings.loginCode">Hesap Giriş Kodu</label>
+              <div class="settings-card settings-login-code-card">
+                <h3 class="settings-section-title"><label for="settings-login-code" data-i18n="settings.loginCode">Hesap Giriş Kodu</label></h3>
                 <div id="settings-login-code-cloud">
                   <div class="settings-code-row">
                     <code id="settings-login-code" class="settings-code is-masked" data-i18n-ignore>••••••••••••••••••••••••••••••••</code>
                     <button id="settings-login-code-toggle" class="settings-test-button" type="button" data-i18n="settings.show">Göster</button>
                     <button id="settings-login-code-copy" class="settings-test-button" type="button" data-i18n="settings.copy">Kopyala</button>
                   </div>
-                  <p class="settings-help" data-i18n="settings.loginCodeDesc">Bu hesaba başka bir cihazdan girmenin tek yolu: diğer cihazda hesap seçme ekranında "Kodla Giriş Yap"a yapıştır. Kodu alan herkes hesabına girebilir; yalnızca kendi cihazlarında kullan.</p>
+                  <div class="settings-callout is-warn" role="note">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <p data-i18n="settings.loginCodeDesc">Bu hesaba başka bir cihazdan girmenin tek yolu: diğer cihazda hesap seçme ekranında "Kodla Giriş Yap"a yapıştır. Kodu alan herkes hesabına girebilir; yalnızca kendi cihazlarında kullan.</p>
+                  </div>
                 </div>
                 <div id="settings-login-code-legacy" class="settings-legacy-box hidden">
-                  <p class="settings-help" data-i18n="settings.legacyCodeDesc">Bu hesap eski tip: yalnızca bu bilgisayarda saklanıyor, bu yüzden giriş kodu yok. Buluta taşırsan adın, arkadaş ID'n ve arkadaş listen korunur; sonra başka cihazlarda kodla girebilirsin.</p>
-                  <button id="settings-migrate-legacy" class="settings-test-button" type="button" data-i18n="settings.migrateLegacy">Hesabı Buluta Taşı</button>
+                  <p class="settings-help" data-i18n="settings.legacyCodeDesc">Bu hesap eski tip: yalnızca bu bilgisayarda saklanıyor, bu yüzden giriş kodu yok. Sunucuya taşırsan adın, KNK kimliğin ve arkadaş listen korunur; sonra başka cihazlarda kodla girebilirsin.</p>
+                  <button id="settings-migrate-legacy" class="settings-test-button" type="button" data-i18n="settings.migrateLegacy">Hesabı Sunucuya Taşı</button>
                 </div>
               </div>
             </div>
@@ -1913,9 +1918,22 @@
               <div class="settings-card settings-row">
                 <div>
                   <strong data-i18n="settings.ptt">Bas-Konuş</strong>
-                  <p data-i18n="settings.pttDesc">Yalnızca SPACE tuşuna basılıyken ses iletir.</p>
+                  <!-- Metin tuşa göre syncPttKeyUi() ile yazılır (settings.pttDesc {key}). -->
+                  <p id="user-settings-ptt-desc">Yalnızca Space tuşuna basılıyken ses iletir.</p>
                 </div>
                 <label class="switch"><input type="checkbox" id="user-settings-ptt"><span class="slider round"></span></label>
+              </div>
+              <!-- Bas-Konuş tuşu: Kısayollar sayfasındaki "ptt" satırıyla aynı kayıt ve kaydedici. -->
+              <div class="settings-card settings-row settings-ptt-key-row" id="user-ptt-key-row">
+                <div>
+                  <strong data-i18n="settings.pttKey">Bas-Konuş tuşu</strong>
+                  <p data-i18n="settings.pttKeyHint">Değiştirmek için tuşa tıkla, sonra yeni tuşa bas. Esc iptal eder.</p>
+                  <p id="user-ptt-key-msg" class="settings-ptt-key-msg hidden" role="status" aria-live="polite"></p>
+                </div>
+                <div class="settings-ptt-key-controls">
+                  <button type="button" id="user-ptt-key" class="shortcut-key">Space</button>
+                  <button type="button" id="user-ptt-key-reset" class="shortcut-reset" data-i18n-title="settings.shortcutReset" title="Varsayılana döndür" aria-label="Varsayılana döndür"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 9 9 9"/></svg></button>
+                </div>
               </div>
               <div class="settings-card settings-row">
                 <div>
@@ -1941,7 +1959,11 @@
                   <strong data-i18n="settings.advancedBroadcast">Gelişmiş Yayın Ayarlarını Göster</strong>
                   <small data-i18n="settings.advancedBroadcastDesc">Yayın kalitesi, kare hızı ve sistem sesi</small>
                 </span>
-                <i aria-hidden="true">⌄</i>
+                <span class="settings-advanced-pill">
+                  <span class="settings-advanced-show" data-i18n="settings.advancedToggleShow">Gelişmiş ayarlar</span>
+                  <span class="settings-advanced-hide" data-i18n="settings.advancedToggleHide">Gizle</span>
+                  <svg class="settings-advanced-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6 9 12 15 18 9"/></svg>
+                </span>
               </button>
               <div id="user-broadcast-advanced" class="settings-broadcast-advanced hidden">
                 <div>
@@ -2047,14 +2069,14 @@
               </div>
               <input id="settings-media-input" class="hidden" type="file" accept="image/*,video/*,.gif" multiple />
               <button id="settings-media-dropzone" class="media-dropzone" type="button">
-                <span class="media-dropzone-icon" aria-hidden="true">✦</span>
+                <span class="media-dropzone-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
                 <span>
                   <strong data-i18n="settings.dropMedia">GIF, fotoğraf veya videonu buraya bırak</strong>
                   <small data-i18n="settings.dropMediaDesc">Dosya seçmek için tıklayabilirsin · Dosya başına en fazla 20 MB</small>
                 </span>
               </button>
               <div class="media-local-notice">
-                <span aria-hidden="true">✓</span>
+                <span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></span>
                 <span>
                   <strong data-i18n="settings.mediaLocalTitle">Yalnızca bu bilgisayarda</strong>
                   <small data-i18n="settings.mediaLocalDesc">Kütüphanendeki GIF, fotoğraf ve videolar yerel olarak saklanır; buluta yüklenmez.</small>
@@ -2074,7 +2096,7 @@
               </div>
               <div id="settings-media-grid" class="media-library-grid" aria-live="polite"></div>
               <div id="settings-media-empty" class="media-library-empty">
-                <span aria-hidden="true">✦</span>
+                <span aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>
                 <strong data-i18n="settings.mediaEmpty">Kütüphanen henüz boş</strong>
                 <p data-i18n="settings.mediaEmptyDesc">Eklediğin GIF ve görseller ataç menüsündeki “Kendi medyanı kullan” bölümünde görünecek.</p>
               </div>
@@ -2087,15 +2109,15 @@
               <div class="language-options">
                 <label class="language-option">
                   <input type="radio" name="settings-language" value="tr">
-                  <span class="language-flag">🇹🇷</span>
+                  <span class="language-flag">TR</span>
                   <span><strong>Türkçe</strong><small>Turkish</small></span>
-                  <i>✓</i>
+                  <i><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></i>
                 </label>
                 <label class="language-option">
                   <input type="radio" name="settings-language" value="en">
-                  <span class="language-flag">🇬🇧</span>
+                  <span class="language-flag">EN</span>
                   <span><strong>English</strong><small>İngilizce</small></span>
-                  <i>✓</i>
+                  <i><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg></i>
                 </label>
               </div>
               <h3 class="settings-section-title settings-time-title" data-i18n="settings.timeFormat">Zaman formatı</h3>
@@ -2123,7 +2145,7 @@
               <h3 id="media-picker-title" data-i18n="mediaPicker.title">Kendi medyanı kullan</h3>
               <p data-i18n="mediaPicker.lead">Kaydettiğin bir GIF, fotoğraf veya videoyu seçip gönder.</p>
             </div>
-            <button id="media-picker-close" class="settings-close media-picker-close" type="button" data-i18n-title="common.close" aria-label="Kapat">×</button>
+            <button id="media-picker-close" class="settings-close media-picker-close" type="button" data-i18n-title="common.close" aria-label="Kapat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
           <div class="media-picker-controls">
             <div class="media-picker-search">
@@ -2140,7 +2162,7 @@
           </div>
           <div id="media-picker-grid" class="media-picker-grid"></div>
           <div id="media-picker-empty" class="media-picker-empty hidden">
-            <span aria-hidden="true">✦</span>
+            <span aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>
             <strong data-i18n="mediaPicker.empty">Gönderebileceğin kayıtlı medya yok</strong>
             <p data-i18n="mediaPicker.emptyDesc">Ayarlar → GIF ve Medya bölümünden kütüphanene içerik ekleyebilirsin.</p>
             <button id="media-picker-open-settings" class="btn-pri" type="button" data-i18n="mediaPicker.openSettings">Medya Ayarlarını Aç</button>
@@ -2160,7 +2182,7 @@
               <h3 id="media-detail-title" data-i18n="mediaDetail.titleNew">Medyanı adlandır</h3>
               <p id="media-detail-lead" data-i18n="mediaDetail.lead">Bir ad ve #etiket ver; kütüphanende saniyede bulursun.</p>
             </div>
-            <button id="media-detail-close" class="settings-close" type="button" data-i18n-title="common.close" aria-label="Kapat">×</button>
+            <button id="media-detail-close" class="settings-close" type="button" data-i18n-title="common.close" aria-label="Kapat"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
           <div class="media-detail-body">
             <div class="media-detail-preview" id="media-detail-preview"></div>
@@ -2193,13 +2215,13 @@
 
       <div id="media-context-menu" class="media-context-menu hidden" role="menu">
         <button type="button" role="menuitem" data-media-action="send" class="media-context-send">
-          <span aria-hidden="true">➤</span><span data-i18n="mediaLibrary.send">Gönder</span>
+          <span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span><span data-i18n="mediaLibrary.send">Gönder</span>
         </button>
         <button type="button" role="menuitem" data-media-action="edit">
-          <span aria-hidden="true">✎</span><span data-i18n="mediaLibrary.edit">İsim ve etiketleri düzenle</span>
+          <span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span><span data-i18n="mediaLibrary.edit">İsim ve etiketleri düzenle</span>
         </button>
         <button type="button" role="menuitem" data-media-action="delete" class="media-context-danger">
-          <span aria-hidden="true">×</span><span data-i18n="mediaLibrary.delete">Sil</span>
+          <span aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span data-i18n="mediaLibrary.delete">Sil</span>
         </button>
       </div>
 
@@ -2209,15 +2231,15 @@
           <span data-i18n="attach.limit">En fazla 20 MB</span>
         </div>
         <button id="dm-attach-external" class="dm-attach-option" type="button" role="menuitem">
-          <span class="dm-attach-option-icon external" aria-hidden="true">↑</span>
+          <span class="dm-attach-option-icon external" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
           <span>
             <strong data-i18n="attach.external">Dışarıdan dosya seç</strong>
             <small data-i18n="attach.externalDesc">Fotoğraf, GIF, video veya dosya ekle</small>
           </span>
-          <i aria-hidden="true">›</i>
+          <i aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><polyline points="9 18 15 12 9 6"/></svg></i>
         </button>
         <button id="dm-attach-library" class="dm-attach-option" type="button" role="menuitem">
-          <span class="dm-attach-option-icon library" aria-hidden="true">✦</span>
+          <span class="dm-attach-option-icon library" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>
           <span>
             <strong data-i18n="attach.library">Kendi medyanı kullan</strong>
             <small data-i18n="attach.libraryDesc">Ayarlarda kaydettiğin GIF ve fotoğraflardan seç</small>
@@ -2239,7 +2261,7 @@
             <span class="slider round"></span>
           </label>
         </div>
-        <div class="muted" style="font-size: 12px; margin-bottom: 16px;">Sadece SPACE tuşuna basılıyken ses iletir. Tüm sunucularda geçerli olan kişisel bir tercihtir.</div>
+        <div id="settings-ptt-desc" class="muted" style="font-size: 12px; margin-bottom: 16px;">Yalnızca Space tuşuna basılıyken ses iletir.</div>
 
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 4px;">
           <label style="font-weight:bold; display: flex; align-items: center; gap: 8px;">
@@ -2279,7 +2301,7 @@
         <div class="activity-search-row">
           <label class="activity-search-box" for="activity-search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
-            <input id="activity-search" type="search" placeholder="Ara" autocomplete="off" spellcheck="false" />
+            <input id="activity-search" type="search" placeholder="Ara" data-i18n-placeholder="friends.search" autocomplete="off" spellcheck="false" />
           </label>
           <button id="act-close" class="activity-close-btn" type="button" aria-label="Etkinlikleri kapat" title="Kapat">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
@@ -2320,7 +2342,7 @@
 
           <div class="activity-section-label">
             <span>Etkinlikler</span>
-            <span class="activity-section-hint">8 etkinlik</span>
+            <span class="activity-section-hint" data-i18n-ignore></span>
           </div>
 
           <div class="sources activity-grid">
@@ -2346,7 +2368,7 @@
                 <span class="activity-cover-badge">POPÜLER</span>
                 <div class="activity-browser-art" aria-hidden="true">
                   <div class="browser-top"><i></i><i></i><i></i></div>
-                  <div class="browser-globe">◎</div>
+                  <div class="browser-globe"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
                   <span>teamsync://together</span>
                 </div>
               </div>
@@ -2378,7 +2400,7 @@
               <div class="activity-cover activity-cover-video">
                 <span class="activity-cover-badge">SENKRON</span>
                 <div class="activity-video-art" aria-hidden="true">
-                  <i></i><span>▶</span><i></i>
+                  <i></i><span><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" stroke="none" focusable="false"><path d="M8 5.5v13l10.5-6.5z"/></svg></span><i></i>
                   <strong data-activity-cover-label="watchParty">WATCH PARTY</strong>
                 </div>
               </div>
@@ -2614,7 +2636,7 @@
         <div class="server-dm-content">
           <div class="dm-header">
           <span id="server-dm-active-name" data-i18n="menu.selectFriend">Arkadaş Seçin</span>
-          <button id="server-dm-close" class="btn-sec btn-sm" style="border:none; background:transparent;">✕</button>
+          <button id="server-dm-close" class="btn-sec btn-sm" style="border:none; background:transparent;" aria-label="Kapat"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
           <div id="server-dm-messages" class="dm-messages">
           <div class="muted" style="text-align:center; margin-top:50px;" data-i18n="menu.selectFriend">Mesajlaşmaya başlamak için bir arkadaş seç.</div>
@@ -2727,6 +2749,7 @@
   <script src="js/ts-ui.js"></script>
   <script src="js/status.js"></script>
   <script src="js/activity.js"></script>
+  <script src="js/profile-media.js"></script>
   <script src="js/profile.js"></script>
   <script src="js/shell-core.js"></script>
   <script src="js/shell-friends.js"></script>
@@ -2746,7 +2769,6 @@
   <script src="js/ui/server-dialogs.js"></script>
   <script src="js/teams/call-log.js"></script>
   <script src="js/teams/direct-call.js"></script>
-  <script src="js/teams/calendar.js"></script>
   <script src="js/teams/calls.js"></script>
   <script src="js/teams/shell-teams.js"></script>
   <script src="js/media-library.js"></script>
@@ -2761,11 +2783,11 @@
   <script src="js/lucky-wheel.js"></script>
 
     <div id="generic-confirm-modal" class="modal hidden" style="z-index: 10000; align-items: center; justify-content: center;">
-      <div class="mcard" style="width: 400px; padding: 24px; text-align: center;">
-        <h3 id="generic-confirm-title" style="margin-bottom: 15px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Onay</h3>
-        <p id="generic-confirm-message" style="margin-bottom: 20px; color: #ccc;">Emin misiniz?</p>
+      <div class="mcard ts-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="generic-confirm-title" aria-describedby="generic-confirm-message" style="width: min(400px, calc(100vw - 32px)); padding: 24px; text-align: center;">
+        <h3 class="ts-confirm-head" style="margin-bottom: 12px;"><span class="ts-confirm-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span><span id="generic-confirm-title">Onay</span></h3>
+        <p id="generic-confirm-message" style="margin-bottom: 20px;">Emin misiniz?</p>
         <div style="display: flex; gap: 10px; justify-content: center;">
-          <button id="generic-confirm-yes" class="btn-pri" style="flex: 1; background: #ef4444; border-color: #ef4444; color: white;">Evet</button>
+          <button id="generic-confirm-yes" class="btn-pri ts-confirm-yes" style="flex: 1;">Evet</button>
           <button id="generic-confirm-no" class="btn-sec" style="flex: 1;">İptal</button>
         </div>
       </div>

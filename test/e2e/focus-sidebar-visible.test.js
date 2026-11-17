@@ -51,8 +51,8 @@ async function inspectFocusLayout(peer) {
        const contentLeft = Math.min(...groupRects.map(r => r.left));
        const contentRight = Math.max(...groupRects.map(r => r.right));
        // Üst araç çubuğu: Sohbet/Kişiler/Davet | Diğer | Mikrofon/Kulaklık/Paylaş | Ayrıl.
-       // Tahta, Etkinlik, Kayıt, Ses ve Ayarlar "Diğer" menüsünde (js/teams/shell-teams.js).
-       const controlIds = ['btn-call-chat', 'btn-call-people', 'btn-call-more', 'mic', 'deaf', 'share', 'leave'];
+       // Etkinlik çubukta; Tahta, Kayıt, Ses ve Ayarlar "Diğer" menüsünde (js/teams/shell-teams.js).
+       const controlIds = ['btn-call-chat', 'btn-call-people', 'act-btn', 'btn-call-more', 'mic', 'deaf', 'share', 'leave'];
        const moreIds = ['wb-btn', 'act-btn', 'rec', 'vol', 'settings'];
        return {
          viewport,
@@ -175,7 +175,7 @@ module.exports = async function run() {
     // 5) Üst araç çubuğu taşmıyor, sağa yaslı; az kullanılanlar "Diğer" menüsünde.
     assert.strictEqual(focused.barContent.overflowing, false, dump);
     assert.ok(focused.barContent.right <= focused.viewport.width + 0.5, 'araç çubuğu ekran dışı: ' + dump);
-    assert.deepStrictEqual(focused.inMoreMenu, ['wb-btn', 'act-btn', 'rec', 'vol', 'settings'], dump);
+    assert.deepStrictEqual(focused.inMoreMenu, ['wb-btn', 'rec', 'vol', 'settings'], dump);
     assert.deepStrictEqual(unavailableControls(focused), [], dump);
 
     await shot(peer, 'teamsync-focus-sidebar-wide.png');

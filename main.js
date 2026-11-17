@@ -423,12 +423,41 @@ function handleLocalMouseMove() {
   renderCursorForOwner();
 }
 
+// uiohook tek bir yerel kanca; uzak denetim (fare) ve Bas-Konuş (klavye) onu
+// paylaşır. Kanca, kullanan kalmayınca durdurulur.
+const inputHookUsers = new Set();
+let inputHookRunning = false;
+function acquireInputHook(user) {
+  if (!uIOhook) return false;
+  inputHookUsers.add(user);
+  if (inputHookRunning) return true;
+  try {
+    uIOhook.start();
+    inputHookRunning = true;
+    return true;
+  } catch (e) {
+    inputHookUsers.delete(user);
+    console.error('Yerel giriş kancası başlatılamadı:', e);
+    return false;
+  }
+}
+function releaseInputHook(user) {
+  inputHookUsers.delete(user);
+  if (!uIOhook || !inputHookRunning || inputHookUsers.size) return;
+  try { uIOhook.stop(); } catch (e) { console.warn('Yerel giriş kancası durdurulamadı:', e.message); }
+  inputHookRunning = false;
+}
+
 function startLocalInputHook() {
   if (!uIOhook || inputHookStarted) return;
   try {
     uIOhook.on('mousedown', handleLocalMouseDown);
     uIOhook.on('mousemove', handleLocalMouseMove);
-    uIOhook.start();
+    if (!acquireInputHook('mouse')) {
+      uIOhook.removeListener('mousedown', handleLocalMouseDown);
+      uIOhook.removeListener('mousemove', handleLocalMouseMove);
+      return;
+    }
     inputHookStarted = true;
   } catch (e) {
     console.error('Global fare dinleyicisi başlatılamadı:', e);
@@ -438,12 +467,12 @@ function startLocalInputHook() {
 function stopLocalInputHook() {
   if (!uIOhook || !inputHookStarted) return;
   try {
-    uIOhook.stop();
     uIOhook.removeListener('mousedown', handleLocalMouseDown);
     uIOhook.removeListener('mousemove', handleLocalMouseMove);
   } catch (e) {
     console.warn('Global fare dinleyicisi durdurulamadı:', e.message);
   }
+  releaseInputHook('mouse');
   inputHookStarted = false;
 }
 
@@ -976,7 +1005,7 @@ ipcMain.handle('set-hardware-acceleration', (event, enabled) => {
 // sırasında Chromium'un native arka planı görünür; tema değişiminde bunu da
 // güncellemezsek pencere kenarları eski (koyu) renkte kalır.
 const THEME_BG_COLORS = {
-  aurora: '#0f172a',
+  aurora: '#20162b', // style.css :root[data-theme="aurora"] --bg-dark
   black: '#0a0a0c',
   navy: '#081426',
   white: '#f3f6fb',
@@ -1407,9 +1436,74 @@ ipcMain.on('direct-connect', (event, ip) => {
   }
 });
 
-ipcMain.on('register-ptt', (event, key) => {
+// --- Bas-Konuş: uiohook ile basma + BIRAKMA ---------------------------------
+// globalShortcut yalnızca basmayı bildirir (bırakma olayı yoktur) ve tuşu tüm
+// sistemde yutar: TeamSync arka plandayken tuş bırakılınca mikrofon açık
+// kalıyor, Space atanmışsa başka uygulamalarda boşluk yazılamıyordu. uiohook
+// varsa tuş yutulmadan izlenir: ilk basışta 'ptt-trigger' {source:'hook'},
+// bırakınca 'ptt-release' gönderilir (otomatik tekrarlar yok sayılır).
+// uiohook yoksa ya da tuş eşlenemezse eski globalShortcut yoluna düşülür.
+const PTT_HOOK_KEYS = (() => {
+  let K = null;
+  try { K = require('uiohook-napi').UiohookKey; } catch (e) { return {}; }
+  const map = {
+    Space: K.Space, Enter: K.Enter, NumpadEnter: K.NumpadEnter, Tab: K.Tab, Backspace: K.Backspace,
+    Delete: K.Delete, Insert: K.Insert, Home: K.Home, End: K.End, PageUp: K.PageUp, PageDown: K.PageDown,
+    ArrowUp: K.ArrowUp, ArrowDown: K.ArrowDown, ArrowLeft: K.ArrowLeft, ArrowRight: K.ArrowRight,
+    Minus: K.Minus, Equal: K.Equal, BracketLeft: K.BracketLeft, BracketRight: K.BracketRight,
+    Backslash: K.Backslash, Semicolon: K.Semicolon, Quote: K.Quote, Comma: K.Comma, Period: K.Period,
+    Slash: K.Slash, Backquote: K.Backquote, CapsLock: K.CapsLock
+  };
+  for (let c = 65; c <= 90; c++) { const l = String.fromCharCode(c); map['Key' + l] = K[l]; }
+  for (let d = 0; d <= 9; d++) { map['Digit' + d] = K[d]; map['Numpad' + d] = K['Numpad' + d]; }
+  for (let f = 1; f <= 24; f++) map['F' + f] = K['F' + f];
+  Object.keys(map).forEach(k => { if (typeof map[k] !== 'number') delete map[k]; });
+  return map;
+})();
+let pttHook = null; // { keycode, ctrl, alt, shift, down }
+function pttHookKeydown(e) {
+  if (!pttHook || e.keycode !== pttHook.keycode) return;
+  if (pttHook.down) return; // basılı tutarken gelen otomatik tekrar
+  if (!!e.ctrlKey !== pttHook.ctrl || !!e.altKey !== pttHook.alt || !!e.shiftKey !== pttHook.shift) return;
+  pttHook.down = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ptt-trigger', { source: 'hook' });
+}
+function pttHookKeyup(e) {
+  if (!pttHook || e.keycode !== pttHook.keycode || !pttHook.down) return;
+  pttHook.down = false;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ptt-release', { source: 'hook' });
+}
+function stopPttHook() {
+  if (!pttHook) return;
+  try {
+    uIOhook.removeListener('keydown', pttHookKeydown);
+    uIOhook.removeListener('keyup', pttHookKeyup);
+  } catch (e) {}
+  const wasDown = pttHook.down;
+  pttHook = null;
+  releaseInputHook('ptt');
+  if (wasDown && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ptt-release', { source: 'hook' });
+}
+function startPttHook(binding) {
+  stopPttHook();
+  if (!uIOhook || !binding || typeof binding.code !== 'string') return false;
+  const keycode = PTT_HOOK_KEYS[binding.code];
+  if (typeof keycode !== 'number') return false;
+  if (!acquireInputHook('ptt')) return false;
+  pttHook = { keycode, ctrl: !!binding.ctrl, alt: !!binding.alt, shift: !!binding.shift, down: false };
+  uIOhook.on('keydown', pttHookKeydown);
+  uIOhook.on('keyup', pttHookKeyup);
+  return true;
+}
+
+ipcMain.on('register-ptt', (event, key, binding) => {
   if (!isMainWindowSender(event) || typeof key !== 'string' || key.length > 64) return;
   globalShortcut.unregisterAll();
+  if (startPttHook(binding && typeof binding === 'object' ? binding : null)) {
+    // Kanca yolu: tuş yutulmaz, globalShortcut kaydı yapılmaz.
+    syncControlKillSwitch();
+    return;
+  }
   // Tuş artık kullanıcı tarafından yeniden atanabiliyor (Ayarlar → Kısayollar).
   // Geçersiz/başka uygulamaca kapılmış bir accelerator gelirse register() atar
   // ya da false döner; her iki durumda Space'e düşülür ki bas-konuş ölmesin.
@@ -1437,6 +1531,7 @@ ipcMain.on('register-ptt', (event, key) => {
 });
 ipcMain.on('unregister-ptt', (event) => {
   if (!isMainWindowSender(event)) return;
+  stopPttHook();
   globalShortcut.unregisterAll();
   // unregisterAll kill-switch'i de sildiği için geri yükle
   syncControlKillSwitch();
@@ -1931,6 +2026,7 @@ app.on('before-quit', () => { isQuitting = true; });
 app.on('will-quit', () => {
   setVoiceSessionActive(false);
   if (cloudflaredProcess) cloudflaredProcess.kill();
+  stopPttHook();
   stopLocalInputHook();
   if (cursorOverlayWindow && !cursorOverlayWindow.isDestroyed()) cursorOverlayWindow.destroy();
   globalShortcut.unregisterAll();

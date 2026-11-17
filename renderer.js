@@ -239,8 +239,28 @@ function censorProfaneText(text) {
 
 function censoredTextHtml(text) {
   const safeText = escapeHtml(String(text || ''));
-  const badge = '<span style="color:#f87171;font-size:11px;font-style:italic;margin-left:6px;">🛡 Sansürlendi</span>';
+  const badge = `<span class="censored-badge" style="color:var(--danger);font-size:11px;font-style:italic;margin-left:6px;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;">${uiIcon('shield', 12)}<span>Sansürlendi</span></span>`;
   return safeText ? `<span class="censored-text">${safeText}</span>${badge}` : badge;
+}
+
+// Arayüz simgeleri (emoji yerine): ts-ui.js renderer'dan sonra yüklenir,
+// bu yüzden çağrı anında aranır.
+function uiIcon(name, size = 16, strokeWidth = 2) {
+  return (window.TSUI && typeof window.TSUI.icon === 'function') ? window.TSUI.icon(name, size, strokeWidth) : '';
+}
+
+// Oda başlığı: "# ad" düz metin, şifreli odada yanında kilit simgesi (emoji değil).
+function setRoomTitle(titleEl) {
+  if (!titleEl) return;
+  titleEl.textContent = '# ' + state.roomName;
+  if (state.cryptoKey) {
+    const lock = document.createElement('span');
+    lock.className = 'room-title-lock';
+    lock.setAttribute('aria-label', t('room.encrypted'));
+    lock.title = t('room.encrypted');
+    lock.innerHTML = uiIcon('lock', 14);
+    titleEl.appendChild(lock);
+  }
 }
 
 function cleanText(text, isUsername = false) {
@@ -293,19 +313,22 @@ async function loadAIFilter() {
   });
 }
 
+// Saklanacak değeri (tanımlayıcı / eski adres) döndürür; denetim çözülmüş
+// resim üzerinde yapılır. Baytları henüz gelmemiş tanımlayıcı denetlenemez.
 async function checkAvatar(base64Str) {
-  const safeAvatar = safeAvatarUrl(base64Str);
-  if (!safeAvatar || !state.sfwMode || !state.aiModel) return safeAvatar;
+  const safeRef = safeAvatarRef(base64Str);
+  const safeAvatar = safeAvatarUrl(safeRef);
+  if (!safeRef || !safeAvatar || !state.sfwMode || !state.aiModel) return safeRef;
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = async () => {
       try {
         const preds = await state.aiModel.classify(img);
         const bad = preds.some(p => (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') && p.probability > 0.6);
-        resolve(bad ? null : safeAvatar);
-      } catch(e) { resolve(safeAvatar); }
+        resolve(bad ? null : safeRef);
+      } catch(e) { resolve(safeRef); }
     };
-    img.onerror = () => resolve(safeAvatar);
+    img.onerror = () => resolve(safeRef);
     img.src = safeAvatar;
   });
 }
@@ -659,7 +682,7 @@ function setupInternetSignaling(roomId, myId, myName) {
           if (!state.isRoomFounder && data.roomName && state.roomName !== data.roomName) {
             state.roomName = state.sfwMode ? censorProfaneText(data.roomName) : data.roomName;
             const titleEl = document.getElementById('room-title');
-            if (titleEl) titleEl.textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
+            setRoomTitle(titleEl);
           }
           if (Array.isArray(data.moderators)) {
             const incoming = new Set(data.moderators.filter(isValidPeerId).slice(0, 200));
@@ -717,7 +740,7 @@ function setupInternetSignaling(roomId, myId, myName) {
         console.log('📥 MQTT Broadcast alındı:', data.id, data.payload.type, data.payload);
         const peer = state.peers.get(data.id);
         if (peer) peer.lastSeen = Date.now();
-        handleDataMessage(data.id, data.payload);
+        handleDataMessage(data.id, data.payload, 'mqtt');
       }
     } catch(e) {}
   });
@@ -989,6 +1012,12 @@ window.getAccounts = async function() {
   }
 };
 
+// "Eski tip" (yalnızca bu cihazdaki) hesap listesine girecek kayıtlar: sunucuya
+// taşınmış profillerin yedeği ve sunucu hesaplarının yerel yansıması hariç.
+window.isListedLegacyAccount = function(acc) {
+  return !!(acc && acc.id && !acc.migrated && !acc.cloudMirror);
+};
+
 window.saveAccounts = async function(accounts) {
   try {
     await window.electronAPI.saveAccounts(accounts);
@@ -1000,6 +1029,16 @@ window.updateAccountInList = async function(profile) {
   const idx = accounts.findIndex(acc => acc.id === profile.id);
   const isDefault = idx !== -1 ? accounts[idx].isDefault : false;
   const accData = { ...profile, isDefault };
+  // Sunucuya taşınmış eski profilin işareti korunur (yedek olarak kalır ama
+  // "Eski tip" listesinde bir daha görünmez).
+  if (idx !== -1 && accounts[idx].migrated) {
+    accData.migrated = true;
+    accData.migratedAt = accounts[idx].migratedAt;
+  }
+  // Sunucu hesabının yerel yansıması eski tip hesap değildir; cihaz satırı
+  // silinince "Eski tip" diye geri gelmesin.
+  if (typeof state !== 'undefined' && state.accountKind === 'cloud') accData.cloudMirror = true;
+  else if (idx !== -1 && accounts[idx].cloudMirror && !accData.migrated) accData.cloudMirror = true;
   if (idx !== -1) {
     accounts[idx] = accData;
   } else {
@@ -1037,14 +1076,16 @@ window.loginWithAccount = function(acc) {
   // Eski tip profil: yalnızca bu cihazdaki accounts.json'da yaşar, Supabase
   // hesabı yoktur. Bayrak, profil kaydının bulut hesabına yazılmasını önler.
   state.accountKind = 'legacy';
+  state.deviceSlot = null;
   state.myName = acc.name;
   state.friendId = acc.id;
+  switchDMAccount();
   if (window.TSProfile && acc.profileExt) window.TSProfile.importExt(acc.profileExt);
-  state.myAvatar = safeAvatarUrl(acc.avatar);
+  state.myAvatar = safeAvatarRef(acc.avatar);
   state.myAvatarHash = acc.avatarHash || null;
   state.friends = acc.friends || {};
   state.friendRequests = acc.requests || [];
-  
+
   // Set in localStorage as active profile
   localStorage.setItem('teamsync_profile', JSON.stringify({
     name: state.myName,
@@ -1058,8 +1099,8 @@ window.loginWithAccount = function(acc) {
   document.getElementById('display-name').textContent = state.myName;
   document.getElementById('my-friend-id').textContent = state.friendId;
   
-  if (state.myAvatar) {
-    document.getElementById('my-avatar-img').src = state.myAvatar;
+  if (safeAvatarUrl(state.myAvatar)) {
+    document.getElementById('my-avatar-img').src = safeAvatarUrl(state.myAvatar);
     document.getElementById('my-avatar-img').style.display = 'block';
     document.getElementById('my-avatar-default').style.display = 'none';
   } else {
@@ -1097,7 +1138,7 @@ window.renderAccountsList = async function() {
     const row = document.createElement('div');
     row.className = 'account-row';
     
-    let avatarHtml = `<div class="account-row-avatar">👤</div>`;
+    let avatarHtml = `<div class="account-row-avatar">${uiIcon('user', 20)}</div>`;
     const safeAccountAvatar = safeAvatarUrl(acc.avatar);
     if (safeAccountAvatar) {
       avatarHtml = `<img class="account-row-avatar" src="${escapeHtml(safeAccountAvatar)}" />`;
@@ -1107,14 +1148,14 @@ window.renderAccountsList = async function() {
       ${avatarHtml}
       <div class="account-row-info">
         <div class="account-row-name">${escapeHtml(acc.name)}</div>
-        <div class="account-row-id">${acc.id}</div>
+        <div class="account-row-id">${escapeHtml(acc.id)}</div>
       </div>
       <div class="account-row-actions">
         <label class="account-row-checkbox-label" onclick="event.stopPropagation();">
           <input type="checkbox" class="default-chk" ${acc.isDefault ? 'checked' : ''} />
-          Otomatik
+          ${escapeHtml(t('accpick.auto'))}
         </label>
-        <button class="account-row-delete-btn" title="Hesabı Sil" onclick="event.stopPropagation();">🗑️</button>
+        <button class="account-row-delete-btn" title="${escapeHtml(t('accpick.delete'))}" aria-label="${escapeHtml(t('accpick.delete'))}" onclick="event.stopPropagation();">${uiIcon('trash', 16)}</button>
       </div>
     `;
     
@@ -1138,7 +1179,7 @@ window.renderAccountsList = async function() {
     const delBtn = row.querySelector('.account-row-delete-btn');
     delBtn.onclick = async (e) => {
       e.stopPropagation();
-      if (await window.showConfirm('⚠️ Hesabı Sil', `"${acc.name}" hesabını bu cihazdan silmek istediğinize emin misiniz?`)) {
+      if (await window.showConfirm(t('accpick.delete'), t('accpick.deleteConfirm', { name: acc.name || t('accpick.anon') }))) {
         await deleteAccount(acc.id);
         await renderAccountsList();
       }
@@ -1152,6 +1193,27 @@ window.renderAccountsList = async function() {
     container.appendChild(row);
   });
 };
+
+// Aynı hesap iki cihazda açıkken her saveProfile kendi bellekteki arkadaş
+// listesini buluta olduğu gibi yazıyordu: dizüstünde eklenen arkadaş, tepside
+// açık duran masaüstünün bir sonraki kaydında siliniyordu. Artık son eşitlenen
+// liste (taban) hatırlanır ve yazmadan önce buluttaki güncel listeyle üç yönlü
+// birleştirilir: öbür cihazın eklediği/çıkardığı korunur, bu cihazın
+// eklediği/çıkardığı uygulanır. Her iki yerde olan arkadaşın yerel kaydı geçer.
+function mergeFriendMaps(baseIds, server, local) {
+  const base = new Set(baseIds || Object.keys(local || {}));
+  const out = {};
+  Object.keys(local || {}).forEach(id => {
+    if (base.has(id) && !(id in server)) return; // öbür cihazda çıkarıldı
+    out[id] = local[id];
+  });
+  Object.keys(server || {}).forEach(id => {
+    if (id in out || base.has(id)) return; // bu cihazda çıkarıldı
+    out[id] = server[id];                  // öbür cihazda eklendi
+  });
+  return out;
+}
+window.setFriendSyncBase = friends => { state.friendSyncBase = Object.keys(friends || {}); };
 
 async function saveProfile() {
   const profileData = {
@@ -1176,13 +1238,30 @@ async function saveProfile() {
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
-        await supabaseClient.from('profiles').update({
+        try {
+          const { data: row } = await supabaseClient.from('profiles')
+            .select('friends').eq('id', session.user.id).single();
+          if (row && row.friends && typeof row.friends === 'object') {
+            const merged = mergeFriendMaps(state.friendSyncBase, row.friends, state.friends);
+            const changed = Object.keys(merged).length !== Object.keys(state.friends).length
+              || Object.keys(merged).some(id => !(id in state.friends));
+            state.friends = merged;
+            if (changed) {
+              localStorage.setItem('teamsync_profile', JSON.stringify({ ...profileData, friends: merged }));
+              renderFriends();
+            }
+          }
+        } catch (e) { console.warn('[profil] buluttaki arkadaş listesi okunamadı', e); }
+        // Sunucuya yalnızca metin: avatar = eski kova adresi (eski sürüm
+        // arkadaşlar için, resim değişene dek) ya da null. Resim verisi asla.
+        await supabaseClient.from('profiles').update(serverSafeProfileRow({
           name: state.myName,
-          avatar: state.myAvatar,
+          avatar: window.TSProfileMedia ? window.TSProfileMedia.serverAvatar() : null,
           friends: state.friends,
           requests: state.friendRequests,
           updated_at: new Date().toISOString()
-        }).eq('id', session.user.id);
+        })).eq('id', session.user.id);
+        window.setFriendSyncBase(state.friends);
       }
     } catch (e) {
       console.error("Supabase profile sync error:", e);
@@ -1190,34 +1269,56 @@ async function saveProfile() {
   }
 }
 
-// Profil fotoğrafını Supabase Storage'daki "avatars" bucket'ına yükler ve
-// herkesin erişebileceği kalıcı bir public URL döner. Yükleme başarısız olursa
-// null döner; çağıran taraf base64'e geri düşebilir.
-async function uploadAvatarToStorage(blob) {
-  if (!supabaseClient || !blob) return null;
-  try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) return null;
-    const path = `${session.user.id}.jpg`;
-    const { error } = await supabaseClient.storage
-      .from('avatars')
-      .upload(path, blob, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' });
-    if (error) throw error;
-    const { data } = supabaseClient.storage.from('avatars').getPublicUrl(path);
-    // Aynı yol üzerine yazıldığı için <img> önbelleğini kırmak üzere zaman damgası ekliyoruz.
-    return `${data.publicUrl}?t=${Date.now()}`;
-  } catch (e) {
-    console.error('Avatar Supabase Storage yükleme hatası:', e);
-    return null;
+// Profil görselleri sunucuya YÜKLENMEZ (eski Supabase Storage yüklemesi
+// kaldırıldı): bu cihazda saklanır, arkadaşlara P2P gider (js/profile-media.js).
+// `profiles` satırına yazılan her şey bu korumadan geçer: data:/blob: ile
+// başlayan ya da makul adres uzunluğunu aşan metinler atılır + uyarı.
+function serverSafeProfileRow(row) {
+  if (window.TSProfileMedia) return window.TSProfileMedia.serverSafe(row, 'profiles');
+  const out = { ...row };
+  if (typeof out.avatar === 'string' && !/^https:\/\//.test(out.avatar)) out.avatar = null;
+  if (out.friends) {
+    out.friends = Object.fromEntries(Object.entries(out.friends).map(([id, f]) => [id, f && typeof f === 'object' && typeof f.avatar === 'string' && f.avatar.length > 2048 ? { ...f, avatar: null } : f]));
+  }
+  return out;
+}
+
+// DM geçmişi hesap başına ayrı anahtarda tutulur. Eskiden tek bir
+// 'teamsync_dms' anahtarı vardı: aynı cihazdaki ikinci hesap, ortak bir
+// arkadaşla olan sohbette ilk hesabın mesajlarını kendi mesajı gibi görüyordu.
+const LEGACY_DM_KEY = 'teamsync_dms';
+const dmStorageKey = id => `teamsync_dms_${id}`;
+let dmsLoadedFor = null;
+
+function loadDMs() {
+  const id = state.friendId || '';
+  dmsLoadedFor = id;
+  state.dms = {};
+  if (!id) return;
+  let raw = localStorage.getItem(dmStorageKey(id));
+  if (raw == null) {
+    // Eski ortak geçmiş, onu ilk açan hesaba taşınır.
+    const legacy = localStorage.getItem(LEGACY_DM_KEY);
+    if (legacy) {
+      raw = legacy;
+      try {
+        localStorage.setItem(dmStorageKey(id), legacy);
+        localStorage.removeItem(LEGACY_DM_KEY);
+      } catch (e) {}
+    }
+  }
+  if (raw) {
+    try { state.dms = JSON.parse(raw) || {}; } catch (e) { state.dms = {}; }
   }
 }
 
-function loadDMs() {
-  const savedDMs = localStorage.getItem('teamsync_dms');
-  if (savedDMs) {
-    try { state.dms = JSON.parse(savedDMs); } catch(e) {}
-  }
+// Hesap değişince (giriş, çıkış, yeni hesap) o hesabın geçmişi yüklenir.
+function switchDMAccount() {
+  if (dmsLoadedFor === (state.friendId || '')) return;
+  state.activeDM = null;
+  loadDMs();
 }
+window.switchDMAccount = switchDMAccount;
 
 function saveDMs() {
   // DM geçmişi (base64 dosya içerikleriyle birlikte) sınırsız büyüyordu:
@@ -1225,6 +1326,17 @@ function saveDMs() {
   // mesaj tutulur; kota yine dolarsa en eski dosya/görsel içerikleri
   // düşürülür (metin mesajlarına dokunulmaz).
   const DM_LIMIT = 100;
+  if (!state.friendId) return;
+  if (dmsLoadedFor !== state.friendId) {
+    // Hesap kimliği yükleme kancası dışında bir yoldan değiştiyse: hesapsız
+    // açılışta biriken mesajlar yeni hesabın geçmişine katılır; başka bir
+    // hesabın bellekteki geçmişi ise bu hesaba yazılmaz.
+    const carry = dmsLoadedFor === '' ? state.dms : {};
+    loadDMs();
+    Object.keys(carry).forEach(fId => {
+      state.dms[fId] = (state.dms[fId] || []).concat(carry[fId] || []);
+    });
+  }
   Object.keys(state.dms).forEach(fId => {
     if (Array.isArray(state.dms[fId]) && state.dms[fId].length > DM_LIMIT) {
       state.dms[fId] = state.dms[fId].slice(-DM_LIMIT);
@@ -1241,7 +1353,7 @@ function saveDMs() {
   );
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      localStorage.setItem('teamsync_dms', JSON.stringify(persistedDMs));
+      localStorage.setItem(dmStorageKey(state.friendId), JSON.stringify(persistedDMs));
       return;
     } catch (e) {
       const fileMsgs = [];
@@ -1287,8 +1399,8 @@ function renderFriends() {
       li.innerHTML = `
         <div style="font-size: 13px;"><b>${escapeHtml(req.name)}</b><br><span class="muted">${escapeHtml(req.id)}</span></div>
         <div class="invite-actions">
-          <button class="icon-btn sm" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);" onclick="acceptInvite(${idx})" title="Kabul Et">✓</button>
-          <button class="icon-btn sm" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);" onclick="rejectInvite(${idx})" title="Reddet">✕</button>
+          <button class="icon-btn sm" style="background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent);" onclick="acceptInvite(${idx})" title="Kabul Et" aria-label="Kabul Et">${uiIcon('check', 16, 2.5)}</button>
+          <button class="icon-btn sm" style="background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent);" onclick="rejectInvite(${idx})" title="Reddet" aria-label="Reddet">${uiIcon('x', 16, 2.5)}</button>
         </div>
       `;
       invitesList.appendChild(li);
@@ -1345,7 +1457,7 @@ function renderFriends() {
             <div class="friend-status fs-dot s-${status} ${isOnline}" id="${safeDomId('status-', fId)}"></div>
           </div>
           <div class="friend-copy">
-            <b class="friend-name">${escapeHtml(f.name)}</b>
+            <b class="friend-name">${escapeHtml(f.name)}</b>${f.isMuted ? `<span class="friend-muted-tag" title="${escapeHtml(t('friends.mutedBadge'))}">${window.TSUI && window.TSUI.icon ? window.TSUI.icon('bellOff', 12) : ''}<span>${escapeHtml(t('friends.mutedBadge'))}</span></span>` : ''}
             ${subHtml}
             ${inRoom ? `<div class="friend-presence"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="12"></circle></svg><span>${escapeHtml(t('friends.inVoice'))}</span></div>` : ''}
           </div>
@@ -1354,6 +1466,13 @@ function renderFriends() {
           <button class="icon-btn sm friend-action-chat" style="display: flex; align-items: center; justify-content: center;" onclick="openDM(${friendArg})" title="${escapeHtml(t('friends.message'))}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           </button>
+          ${isOnline && !inRoom && fId !== state.friendId && window.TSDM && window.TSDM.callFriend ? (() => {
+            // Hızlı sesli arama (js/shell-dm.js). Aramadaki arkadaş için "Katıl" düğmesi var.
+            const busy = Boolean(window.TSShell && window.TSShell.inCall && window.TSShell.inCall());
+            return `<button type="button" class="icon-btn sm friend-action-call" style="display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); TSDM.callFriend(${friendArg})" title="${escapeHtml(t(busy ? 'chat.callBusy' : 'chat.call'))}" aria-label="${escapeHtml(t('chat.call'))}"${busy ? ' aria-disabled="true"' : ''}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          </button>`;
+          })() : ''}
           ${inRoom ? `<button class="icon-btn sm friend-action-join" style="display: flex; align-items: center; justify-content: center;" onclick="requestJoinRoom(${friendArg})" title="${escapeHtml(t('friends.joinRoom'))}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h4"></path><path d="M8 10v4"></path><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line></svg>
           </button>` : ''}
@@ -1362,8 +1481,8 @@ function renderFriends() {
               ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
               : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`}
           </button>
-          <button class="icon-btn sm friend-action-remove" style="display: flex; align-items: center; justify-content: center;" onclick="removeFriend(${friendArg})" title="${escapeHtml(t('profile.removeFriend'))}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+          <button type="button" class="icon-btn sm friend-action-more" style="display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); window.TSFriends && TSFriends.openRowMenu(${friendArg}, this)" title="${escapeHtml(t('friends.more'))}" aria-label="${escapeHtml(t('friends.more'))}" aria-haspopup="menu">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>
           </button>
         </div>
       `;
@@ -1421,9 +1540,9 @@ window.showFriendProfile = (fId) => {
   const f = state.friends[fId];
   if (!f) return;
   const badges = [];
-  if (f.online && f.room) badges.push({ text: '🟢 Sunucuda', color: '#10b981' });
-  else if (f.online) badges.push({ text: '🟢 Çevrimiçi', color: '#10b981' });
-  else badges.push({ text: '⚪ Çevrimdışı', color: '#94a3b8' });
+  if (f.online && f.room) badges.push({ text: 'Sunucuda', color: 'var(--status-online)', icon: 'volume' });
+  else if (f.online) badges.push({ text: 'Çevrimiçi', color: 'var(--status-online)' });
+  else badges.push({ text: 'Çevrimdışı', color: 'var(--txt-mut)' });
 
   window.showProfileModal({
     name: f.name,
@@ -1431,16 +1550,21 @@ window.showFriendProfile = (fId) => {
     idLabel: `ID: ${fId}`,
     badges,
     actions: [
-      { label: '💬 Mesaj Gönder', onClick: () => openDM(fId) },
-      { label: '❌ Arkadaşlıktan Çıkar', danger: true, onClick: () => window.removeFriend(fId) }
+      { label: t('profile.sendMessage'), onClick: () => openDM(fId) },
+      { label: t('friends.removeTitle'), danger: true, onClick: () => window.removeFriend(fId) },
+      { label: t('friends.block'), danger: true, onClick: () => window.TSFriends && window.TSFriends.confirmBlock(fId, f.name) }
     ]
   });
 };
 
+// Sessize alma yalnızca bildirimleri susturur; kişi arkadaş olarak kalır
+// (artık "Engellenenler" sekmesinde görünmez — gerçek engel: js/shell-friends.js TSBlock).
 window.toggleMuteFriend = (fId) => {
   if (!state.friends[fId]) return;
   state.friends[fId].isMuted = !state.friends[fId].isMuted;
   saveProfile();
+  const name = state.friends[fId].name || fId;
+  showToast(t(state.friends[fId].isMuted ? 'friends.mutedToast' : 'friends.unmutedToast', { name }), 'info');
 };
 
 // Gönderilen katılma isteği yanıtsız kalırsa kullanıcıya haber ver: karşı taraf
@@ -1585,7 +1709,10 @@ window.rejectInvite = (idx) => {
 // iki dinleyici de aynı Evet düğmesine bağlı kalıyor, ikinci pencerede Evet'e
 // basmak BİRİNCİ (artık görünmeyen) işlemi de onaylıyordu.
 let cancelOpenConfirm = null;
-window.showConfirm = (title, message) => {
+// opts: { danger = true, confirmText, cancelText }. Yıkıcı olmayan onaylar
+// (yetki ver, engeli kaldır, eski hesabı taşı…) danger:false geçer ve normal
+// birincil düğmeyi alır; düğme metinleri her açılışta uygulama dilinden gelir.
+window.showConfirm = (title, message, opts = {}) => {
   if (cancelOpenConfirm) cancelOpenConfirm();
   return new Promise((resolve) => {
     let modal = document.getElementById('generic-confirm-modal');
@@ -1593,26 +1720,32 @@ window.showConfirm = (title, message) => {
       modal = document.createElement('div');
       modal.id = 'generic-confirm-modal';
       modal.className = 'hidden';
-      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: color-mix(in srgb, var(--bg-dark) 82%, transparent); z-index: 10000; display: flex; align-items: center; justify-content: center;';
       modal.innerHTML = `
-        <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 400px; padding: 24px; text-align: center;">
-          <h3 id="generic-confirm-title" style="margin-top: 0; margin-bottom: 15px; font-size: 20px; color: #f8fafc;">⚠️ Onay</h3>
-          <p id="generic-confirm-message" style="margin-bottom: 24px; color: #94a3b8; font-size: 15px; line-height: 1.5;">Emin misiniz?</p>
+        <div class="mcard ts-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="generic-confirm-title" aria-describedby="generic-confirm-message" style="background: var(--bg-card); color: var(--txt-main); border: 1px solid color-mix(in srgb, var(--txt-main) 14%, transparent); border-radius: 8px; box-shadow: none; width: min(400px, calc(100vw - 32px)); padding: 24px; text-align: center;">
+          <h3 style="margin: 0 0 12px; font-size: 18px; color: var(--txt-main); display: flex; align-items: center; justify-content: center; gap: 8px;"><span class="ts-confirm-ico" aria-hidden="true" style="display: inline-flex; color: var(--danger);">${uiIcon('alert', 20)}</span><span id="generic-confirm-title">Onay</span></h3>
+          <p id="generic-confirm-message" style="margin-bottom: 24px; color: var(--txt-mut); font-size: 14px; line-height: 1.5;">Emin misiniz?</p>
           <div style="display: flex; gap: 12px; justify-content: center;">
-            <button id="generic-confirm-yes" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 8px; background: #ef4444; border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">Evet</button>
-            <button id="generic-confirm-no" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">İptal</button>
+            <button id="generic-confirm-yes" class="btn-pri ts-confirm-yes" style="flex: 1; padding: 10px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s;">Evet</button>
+            <button id="generic-confirm-no" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 6px; background: var(--bg-hover); border: 1px solid color-mix(in srgb, var(--txt-main) 16%, transparent); color: var(--txt-main); font-weight: 600; cursor: pointer; transition: 0.2s;">İptal</button>
           </div>
         </div>
       `;
       document.body.appendChild(modal);
     }
-    
-    document.getElementById('generic-confirm-title').innerText = title;
+
+    // Başlıktaki eski emoji önekleri ("⚠️ Hesabı Sil") metinden atılır; simge ayrı öğede.
+    document.getElementById('generic-confirm-title').innerText = String(title || '').replace(/^[\p{Extended_Pictographic}️‍\s]+/u, '') || 'Onay';
     document.getElementById('generic-confirm-message').innerText = message;
-    modal.classList.remove('hidden');
 
     const yesBtn = document.getElementById('generic-confirm-yes');
     const noBtn = document.getElementById('generic-confirm-no');
+    const danger = opts.danger !== false;
+    yesBtn.classList.toggle('btn-danger', danger);
+    modal.querySelector('.ts-confirm-card')?.classList.toggle('is-danger', danger);
+    yesBtn.textContent = opts.confirmText || t('confirm.yes');
+    noBtn.textContent = opts.cancelText || t('common.cancel');
+    modal.classList.remove('hidden');
 
     const cleanup = () => {
       modal.classList.add('hidden');
@@ -1640,18 +1773,18 @@ window.showProfileModal = ({ name, avatar, idLabel, badges = [], actions = [] })
     modal = document.createElement('div');
     modal.id = 'profile-view-modal';
     modal.className = 'hidden';
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: color-mix(in srgb, var(--bg-dark) 82%, transparent); z-index: 10000; display: flex; align-items: center; justify-content: center;';
     modal.innerHTML = `
-      <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 320px; padding: 24px; text-align: center;">
+      <div class="mcard" style="background: var(--bg-card); color: var(--txt-main); border: 1px solid color-mix(in srgb, var(--txt-main) 14%, transparent); border-radius: 8px; box-shadow: none; width: 320px; padding: 24px; text-align: center;">
         <div style="width: 84px; height: 84px; margin: 0 auto 14px; position: relative;">
-          <img id="profile-view-avatar-img" style="display:none; width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(255,255,255,0.1);" />
-          <div id="profile-view-avatar-default" style="width: 84px; height: 84px; border-radius: 50%; background: rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size: 34px; border: 3px solid rgba(255,255,255,0.1);">👤</div>
+          <img id="profile-view-avatar-img" style="display:none; width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid color-mix(in srgb, var(--txt-main) 12%, transparent);" />
+          <div id="profile-view-avatar-default" style="width: 84px; height: 84px; border-radius: 50%; background: var(--bg-hover); color: var(--txt-mut); display:flex; align-items:center; justify-content:center; border: 3px solid color-mix(in srgb, var(--txt-main) 12%, transparent);">${uiIcon('user', 36, 1.6)}</div>
         </div>
-        <h3 id="profile-view-name" style="margin: 0 0 6px; font-size: 19px; color: #f8fafc; word-break: break-word;"></h3>
+        <h3 id="profile-view-name" style="margin: 0 0 6px; font-size: 19px; color: var(--txt-main); word-break: break-word;"></h3>
         <div id="profile-view-badges" style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom: 8px;"></div>
         <div id="profile-view-id" class="muted" style="font-size: 12px; margin-bottom: 18px;"></div>
         <div id="profile-view-actions" style="display:flex; flex-direction:column; gap:8px;"></div>
-        <button id="profile-view-close" class="btn-sec" style="width:100%; margin-top:12px; padding:10px; border-radius:8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color:white; cursor:pointer;">Kapat</button>
+        <button id="profile-view-close" class="btn-sec" style="width:100%; margin-top:12px; padding:10px; border-radius:6px; background: var(--bg-hover); border: 1px solid color-mix(in srgb, var(--txt-main) 16%, transparent); color: var(--txt-main); cursor:pointer;">Kapat</button>
       </div>
     `;
     document.body.appendChild(modal);
@@ -1676,10 +1809,16 @@ window.showProfileModal = ({ name, avatar, idLabel, badges = [], actions = [] })
 
   const badgesEl = document.getElementById('profile-view-badges');
   badgesEl.innerHTML = '';
-  badges.forEach(({ text, color }) => {
+  // Rozet: { text, color, icon } — renk bir CSS rengi/teması (var(--...)),
+  // simge TSUI adı; metin düz (emoji yok), simge ayrı öğe.
+  badges.forEach(({ text, color, icon }) => {
     const b = document.createElement('span');
-    b.textContent = text;
-    b.style.cssText = `font-size: 11px; font-weight: bold; padding: 3px 9px; border-radius: 20px; background: ${color}22; color: ${color}; border: 1px solid ${color}55;`;
+    const c = color || 'var(--txt-mut)';
+    b.style.cssText = `display:inline-flex; align-items:center; gap:4px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; background: color-mix(in srgb, ${c} 14%, transparent); color: ${c}; border: 1px solid color-mix(in srgb, ${c} 35%, transparent);`;
+    if (icon) { const ic = document.createElement('span'); ic.style.display = 'inline-flex'; ic.setAttribute('aria-hidden', 'true'); ic.innerHTML = uiIcon(icon, 12); b.appendChild(ic); }
+    const tx = document.createElement('span');
+    tx.textContent = String(text || '').replace(/^[\p{Extended_Pictographic}️‍\s]+/u, '');
+    b.appendChild(tx);
     badgesEl.appendChild(b);
   });
 
@@ -1834,7 +1973,7 @@ function syncPeerVolumeControls(id, channel) {
       el.value = String(pct); // adım yuvarlaması slider'a da yansısın (snap)
       el.title = pct === 0 ? 'Sessiz' : `${label}: %${pct}`;
     } else if (role === 'icon') {
-      el.textContent = pct === 0 ? '🔇' : (pct > 100 ? '🔊' : '🔉');
+      el.innerHTML = uiIcon(pct === 0 ? 'volumeMute' : 'volume', 16);
       el.title = pct === 0 ? 'Sesi aç' : 'Sessize al';
     } else if (role === 'wrap') {
       el.classList.toggle('muted', pct === 0);
@@ -1888,7 +2027,7 @@ function ensurePeerBoostChain(peer, channel) {
   const F = channelFields(channel);
   if (peer[F.gain] || !peer[F.raw] || !peer[F.el]) return;
   try {
-    if (!state.remoteAudioCtx) state.remoteAudioCtx = new AudioContext();
+    if (!state.remoteAudioCtx || state.remoteAudioCtx.state === 'closed') state.remoteAudioCtx = new AudioContext();
     const ctx = state.remoteAudioCtx;
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const src = ctx.createMediaStreamSource(peer[F.raw]);
@@ -2014,15 +2153,15 @@ window.showPrompt = (title, message, defaultValue = '', placeholder = '', maxLen
       modal = document.createElement('div');
       modal.id = 'generic-prompt-modal';
       modal.className = 'hidden';
-      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: color-mix(in srgb, var(--bg-dark) 82%, transparent); z-index: 10000; display: flex; align-items: center; justify-content: center;';
       modal.innerHTML = `
-        <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 400px; padding: 24px; text-align: center;">
-          <h3 id="generic-prompt-title" style="margin-top: 0; margin-bottom: 10px; font-size: 20px; color: #f8fafc;"></h3>
-          <p id="generic-prompt-message" style="margin-bottom: 16px; color: #94a3b8; font-size: 14px; line-height: 1.5;"></p>
-          <input id="generic-prompt-input" type="text" maxlength="120" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(15,23,42,0.8); color: #f8fafc; font-size: 15px; outline: none;" />
+        <div class="mcard" style="background: var(--bg-card); color: var(--txt-main); border: 1px solid color-mix(in srgb, var(--txt-main) 14%, transparent); border-radius: 8px; box-shadow: none; width: min(400px, calc(100vw - 32px)); padding: 24px; text-align: center;">
+          <h3 id="generic-prompt-title" style="margin-top: 0; margin-bottom: 10px; font-size: 18px; color: var(--txt-main);"></h3>
+          <p id="generic-prompt-message" style="margin-bottom: 16px; color: var(--txt-mut); font-size: 14px; line-height: 1.5;"></p>
+          <input id="generic-prompt-input" type="text" maxlength="120" style="width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 20px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--txt-main) 16%, transparent); background: var(--bg-dark); color: var(--txt-main); font-size: 15px; outline: none;" />
           <div style="display: flex; gap: 12px; justify-content: center;">
-            <button id="generic-prompt-ok" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 8px; background: var(--acc, #6366f1); border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">Kaydet</button>
-            <button id="generic-prompt-cancel" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">İptal</button>
+            <button id="generic-prompt-ok" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s;"></button>
+            <button id="generic-prompt-cancel" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 6px; background: var(--bg-hover); border: 1px solid color-mix(in srgb, var(--txt-main) 16%, transparent); color: var(--txt-main); font-weight: 600; cursor: pointer; transition: 0.2s;"></button>
           </div>
         </div>
       `;
@@ -2035,10 +2174,12 @@ window.showPrompt = (title, message, defaultValue = '', placeholder = '', maxLen
     input.value = defaultValue || '';
     input.placeholder = placeholder || '';
     input.maxLength = Number.isInteger(maxLength) && maxLength > 0 ? maxLength : 120;
-    modal.classList.remove('hidden');
 
     const okBtn = document.getElementById('generic-prompt-ok');
     const cancelBtn = document.getElementById('generic-prompt-cancel');
+    okBtn.textContent = t('prompt.ok');
+    cancelBtn.textContent = t('common.cancel');
+    modal.classList.remove('hidden');
 
     const cleanup = () => {
       modal.classList.add('hidden');
@@ -2062,15 +2203,41 @@ window.showPrompt = (title, message, defaultValue = '', placeholder = '', maxLen
   });
 };
 
-window.removeFriend = async (id) => {
-  const confirmed = await window.showConfirm('⚠️ Arkadaşlıktan Çıkar', 'Bu kişiyi arkadaşlıktan çıkarmak istediğine emin misin?');
-  if (confirmed) {
-    delete state.friends[id];
-    saveProfile();
-    if (state.globalMqtt) {
-      state.globalMqtt.unsubscribe(`teamsync/user/${id}/presence`);
-    }
+// Arkadaşlıktan çıkarma: kişi yerel "Çıkarılanlar" listesine düşer (js/shell-friends.js).
+// Ortak gruplara DOKUNULMAZ — grup trafiği arkadaşlıktan bağımsızdır (js/space/groups.js).
+window.removeFriend = async (id, opts = {}) => {
+  const f = state.friends[id];
+  if (!f) return false;
+  const name = f.name || id;
+  if (!opts.skipConfirm) {
+    const confirmed = await window.showConfirm(t('friends.removeTitle'), t('friends.removeConfirm', { name }));
+    if (!confirmed || !state.friends[id]) return false;
   }
+  if (!f.temporary && window.TSFriends && window.TSFriends.recordRemoved) window.TSFriends.recordRemoved(id, name, f.avatar);
+  delete state.friends[id];
+  saveProfile();
+  if (state.globalMqtt) {
+    state.globalMqtt.unsubscribe(`teamsync/user/${id}/presence`);
+  }
+  if (!f.temporary) showToast(t('friends.removedToast', { name }), 'info');
+  return true;
+};
+
+// Tek giriş noktası: arkadaşlık isteği gönder (Çıkarılanlar > Tekrar ekle, grup
+// üyesi > Arkadaş ekle, profil kartı). { ok, key } döner, sonucu toast'la söyler.
+window.sendFriendRequestTo = async (rawId, opts = {}) => {
+  const id = window.TSFriends && window.TSFriends.normalizeId ? window.TSFriends.normalizeId(rawId) : String(rawId || '').trim().toUpperCase();
+  let key = null;
+  if (!id || !isValidFriendEventId(id) || id === state.friendId) key = 'friends.errorValidId';
+  else if (window.TSBlock && window.TSBlock.isBlocked(id)) key = 'friends.blockedNoAdd';
+  else if (state.friends[id] && !state.friends[id].temporary) key = 'friends.errorAlreadyFriend';
+  else key = await deliverFriendRequest(id);
+  if (!opts.quiet) {
+    if (key === 'toast.waitingForConnection') showToast(t('friends.errorOffline'), 'warn');
+    else if (key) showToast(t(key), 'warn');
+    else showToast(t('toast.friendRequestSent'), 'ok');
+  }
+  return { ok: !key, key, id };
 };
 
 let presenceInterval = null;
@@ -2177,6 +2344,8 @@ async function syncFriendRequests() {
           continue;
         }
         if (!isValidFriendEventId(r.from_id) || state.friendRequests.some(q => q.id === r.from_id)) continue;
+        // Engellenen gönderenin isteği "Bekleyen"e hiç düşmez (posta kutusu yolu).
+        if (window.TSBlock && window.TSBlock.isBlocked(r.from_id)) continue;
         if (state.friendRequests.length >= MAX_PENDING_FRIEND_REQUESTS) continue;
         const name = cleanFriendEventName(r.from_name, r.from_id);
         state.friendRequests.push({ id: r.from_id, name });
@@ -2253,9 +2422,9 @@ function publishPresence() {
       name: state.myName,
       room: state.room || null,
       avatarHash: state.myAvatarHash || null,
-      // Avatar bir Supabase URL'iyse presence ile paylaş (kısa); base64 ise
-      // gönderme, eski avatarHash/req_avatar akışına bırak.
-      avatar: (typeof state.myAvatar === 'string' && state.myAvatar.startsWith('http')) ? state.myAvatar : undefined
+      // avatar: eski sürümler için eski Supabase kova adresi (resim değişene
+      // dek); avr: yeni istemciler için P2P tanımlayıcısı (js/profile-media.js).
+      ...(window.TSProfileMedia ? window.TSProfileMedia.presenceFields() : {})
     };
     // Durum/özel durum/oyun/profil sürümü (js/status.js). Görünmezken null:
     // hiç yayın yapılmaz, arkadaşlar çevrimdışı görür.
@@ -2280,6 +2449,8 @@ let globalMqttIdentity = null;
 function setupGlobalMQTT() {
   // Kimliksiz bağlanmak, kimsenin dinlemediği bir konuya abone olmak demektir.
   if (!state.friendId) return;
+  // Hesabın yerel resim deposu + eski Supabase resimlerinin bir kerelik taşınması.
+  if (window.TSProfileMedia) window.TSProfileMedia.onAccount();
 
   if (state.globalMqtt) {
     // Aynı kimlik: mevcut bağlantı zaten doğru konuda, dokunma.
@@ -2383,10 +2554,16 @@ function connectGlobalBroker(session) {
           state.friends[data.id].room = data.room;
           state.friends[data.id].avatarHash = data.avatarHash;
 
-          // Presence bir Supabase avatar URL'i taşıyorsa doğrudan kullan;
-          // base64 P2P alışverişine (req_avatar) gerek kalmaz.
+          // Yeni istemci: `avr` P2P tanımlayıcısı (baytlar arkadaştan istenir,
+          // gelene dek eski resim kalır — js/profile-media.js). Eski istemci:
+          // Supabase kova adresi doğrudan; ikisi de yoksa eski req_avatar akışı.
           let avatarChanged = false;
-          if (typeof data.avatar === 'string' && data.avatar.startsWith('http') && data.avatar !== oldAvatar) {
+          const PMx = window.TSProfileMedia;
+          const avr = PMx && PMx.isRef(data.avr) && PMx.parse(data.avr).fid === data.id ? data.avr : '';
+          if (PMx) PMx.onPeerOnline(data.id);
+          if (avr) {
+            if (avr !== oldAvatar) PMx.adoptFriendAvatar(data.id, avr);
+          } else if (typeof data.avatar === 'string' && /^https:\/\//.test(data.avatar) && safeAvatarRef(data.avatar) && data.avatar !== oldAvatar) {
             state.friends[data.id].avatar = data.avatar;
             avatarChanged = true;
           } else if (data.avatarHash && oldAvatarHash !== data.avatarHash) {
@@ -2414,6 +2591,21 @@ function connectGlobalBroker(session) {
         }
       } else if (topic.endsWith('/events')) {
         let senderId = data.id || data.fromId;
+        // Engellenen kişi (js/shell-friends.js TSBlock): HİÇBİR işleyici çalışmadan
+        // düşürülür — DM/dosya/yazıyor/tepki/onay, arkadaşlık isteği, katılma isteği,
+        // oda/arama daveti (server_invite_received, call_cancel/decline), grup daveti,
+        // profil isteği. İstisna: ortak grup/sunucu anahtar trafiği (grp_key, srv_*)
+        // ve yalnızca bizim isteğimize gelen res_profile — paylaşılan alanlar çalışsın.
+        if (window.TSBlock && (window.TSBlock.isBlocked(data.id) || window.TSBlock.isBlocked(data.fromId))) {
+          const shared = ['grp_key', 'srv_kreq', 'srv_key', 'srv_gone', 'res_profile'];
+          if (!shared.includes(data.type)) return;
+        }
+        // Arkadaşlıktan çıkarılan (Çıkarılanlar) kişiden DM gelmez.
+        if (senderId && !(state.friends[senderId] && !state.friends[senderId].temporary)
+          && ['dm_msg', 'dm_file_start', 'dm_file_chunk', 'dm_typing', 'dm_react'].includes(data.type)
+          && window.TSFriends && window.TSFriends.wasRemoved && window.TSFriends.wasRemoved(senderId)) {
+          return;
+        }
         if (senderId && state.friends[senderId] && state.friends[senderId].isMuted) {
           const blockedEvents = ['dm_msg', 'dm_file_start', 'dm_file_chunk', 'room_join_request', 'server_invite_received'];
           if (blockedEvents.includes(data.type)) {
@@ -2505,21 +2697,30 @@ function connectGlobalBroker(session) {
             state.lastInviteReceivedAt[data.id] = inviteNow;
             showServerInviteNotification({ id: data.id, name: data.name, roomId: data.roomId, password: data.password });
           }
-        } else if (data.type === 'call_decline' || data.type === 'call_cancel') {
+        } else if (data.type === 'call_decline' || data.type === 'call_cancel' || data.type === 'call_end') {
           if (window.TSDirectCall) window.TSDirectCall.onEvent(data);
         } else if (data.type === 'req_profile' || data.type === 'res_profile') {
           if (window.TSProfile) window.TSProfile.onEvent(data);
+        } else if (data.type === 'req_pmedia' || data.type === 'res_pmedia') {
+          // Profil görselleri P2P (js/profile-media.js); sunucu hiç görmez.
+          if (window.TSProfileMedia) window.TSProfileMedia.onEvent(data);
         } else if (data.type === 'req_avatar') {
-          if (state.myAvatar && !(window.TSStatus && window.TSStatus.isInvisible())) {
+          // Eski sürüm istemciler sorar. Resim baytı (base64) artık gönderilmez:
+          // yalnızca eski Supabase kova adresi (resim değişmediyse) ya da null →
+          // eski istemci baş harfi gösterir. (Eskiden giden base64, eski istemcinin
+          // arkadaş listesiyle Supabase'e yazılıyordu.)
+          if (state.myAvatar && !(window.TSStatus && window.TSStatus.isInvisible()) && isValidFriendEventId(data.fromId)) {
             state.globalMqtt.publish(`teamsync/user/${data.fromId}/events`, JSON.stringify({
               type: 'res_avatar',
               fromId: state.friendId,
-              avatar: state.myAvatar
+              avatar: window.TSProfileMedia ? (window.TSProfileMedia.legacyAvatar() || null) : null
             }));
           }
         } else if (data.type === 'res_avatar') {
-          if (state.friends[data.fromId]) {
-            state.friends[data.fromId].avatar = data.avatar;
+          const cur = state.friends[data.fromId];
+          // P2P tanımlayıcısı olan (yeni sürüm) arkadaşın avatarı eski akışla ezilmez.
+          if (cur && !(window.TSProfileMedia && window.TSProfileMedia.isRef(cur.avatar))) {
+            state.friends[data.fromId].avatar = safeAvatarRef(data.avatar) || null;
             saveProfile();
             // Arkadaş listesini hemen yeniden çiz: yeni gelen profil fotoğrafı
             // uygulamayı yeniden başlatmadan görünür olsun (item 8).
@@ -3206,7 +3407,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const ips = await window.electronAPI.getLocalIPs();
     if (ips.length) {
       // Gerçek IP adresi ekranda gösterilmez (gizlilik); sadece keşif ipucu yazılır.
-      document.getElementById('my-ip').innerHTML = `🌐 ${t('network.discoveryHint')}`;
+      document.getElementById('my-ip').innerHTML = `${uiIcon('globe', 14)} ${escapeHtml(t('network.discoveryHint'))}`;
     }
   } catch (e) {}
 
@@ -3247,16 +3448,36 @@ window.addEventListener('DOMContentLoaded', async () => {
   function saveDeviceAccounts(list) {
     localStorage.setItem(DEVICE_ACCOUNTS_KEY, JSON.stringify(list));
   }
+  // Bu cihazda şimdiye dek açılmış en yüksek yerel slot. Silinen bir hesabın
+  // slotu yeniden verilirse signInWithPassword buluttaki eski hesaba giriyor,
+  // "Yeni hesap" diyen kullanıcı silinmiş hesabını (ad, kimlik, arkadaşlar)
+  // geri alıyordu. Silinen slotlar asla yeniden kullanılmaz.
+  const SLOT_HIGH_KEY = 'teamsync_device_slot_high';
+  function rememberSlotUsed(slot) {
+    if (!Number.isInteger(slot) || slot < 0 || isImportedSlot(slot)) return;
+    const high = parseInt(localStorage.getItem(SLOT_HIGH_KEY), 10);
+    if (!(Number.isInteger(high) && high >= slot)) {
+      try { localStorage.setItem(SLOT_HIGH_KEY, String(slot)); } catch (e) {}
+    }
+  }
+  function nextFreshSlot(list) {
+    const local = list.filter(a => !isImportedSlot(a.slot));
+    local.forEach(a => rememberSlotUsed(a.slot));
+    const high = parseInt(localStorage.getItem(SLOT_HIGH_KEY), 10);
+    return Number.isInteger(high) && high >= 0 ? high + 1 : 0;
+  }
+
   async function deleteDeviceAccount(slot) {
     const accounts = getDeviceAccounts();
     const account = accounts.find(item => item.slot === slot);
     if (!account) return;
     const confirmed = await window.showConfirm(
-      '⚠️ Hesabı Sil',
-      `"${account.name || 'Anonim'}" hesabını bu cihazdan silmek istediğinize emin misiniz?`
+      t('accpick.delete'),
+      t('accpick.deleteConfirm', { name: account.name || t('accpick.anon') })
     );
     if (!confirmed) return;
 
+    rememberSlotUsed(slot);
     const remaining = accounts.filter(item => item.slot !== slot);
     saveDeviceAccounts(remaining);
     if (isImportedSlot(slot) && window.electronAPI.forgetImportedAccount) {
@@ -3309,7 +3530,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     saveDeviceAccounts(list);
   }
   window.syncActiveDeviceAccount = () => {
-    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar, id: state.friendId });
+    // Girişte doğrulanan slot (state.deviceSlot); işaretçi sonradan
+    // değişse bile başka bir slotun satırı ezilmez.
+    const slot = Number.isInteger(state.deviceSlot) ? state.deviceSlot : getActiveSlot();
+    upsertDeviceAccount(slot, { name: state.myName, avatar: state.myAvatar, id: state.friendId });
   };
   // Ayarlar > Hesap ve Cihaz paneli (renderAccountSettings) buradan okur.
   window.TSAccounts = {
@@ -3318,16 +3542,30 @@ window.addEventListener('DOMContentLoaded', async () => {
     max: MAX_DEVICE_ACCOUNTS,
     // Bu cihazdaki tüm hesaplar (bulut + eski tip), panelde listelenir.
     async list() {
-      const device = getDeviceAccounts().map(a => ({
+      const activeSlot = Number.isInteger(state.deviceSlot) ? state.deviceSlot : getActiveSlot();
+      const all = getDeviceAccounts().map(a => ({
+        slot: a.slot,
         name: a.name || 'Anonim',
         id: a.id || '',
         kind: isImportedSlot(a.slot) ? 'code' : 'local',
-        active: state.accountKind === 'cloud' && a.slot === getActiveSlot()
+        lastUsed: a.lastUsed || 0,
+        active: state.accountKind === 'cloud' && a.slot === activeSlot
       }));
+      // Aynı kimlik iki slotta görünüyorsa (eski hatanın bıraktığı veri) tek
+      // satır gösterilir: etkin olan, yoksa en son kullanılan. Öteki slotun
+      // verisine dokunulmaz; o slota bir sonraki girişte satırı düzelir.
+      const device = [];
+      all.forEach(row => {
+        const dupIndex = row.id ? device.findIndex(d => d.id === row.id) : -1;
+        if (dupIndex === -1) { device.push(row); return; }
+        const kept = device[dupIndex];
+        const better = row.active || (!kept.active && row.lastUsed > kept.lastUsed);
+        if (better) device[dupIndex] = row;
+      });
       let legacy = [];
       try {
         legacy = (await getAccounts())
-          .filter(acc => acc && acc.id && !device.some(d => d.id === acc.id))
+          .filter(acc => isListedLegacyAccount(acc) && !all.some(d => d.id === acc.id))
           .map(acc => ({ name: acc.name || 'Anonim', id: acc.id, kind: 'legacy', active: state.accountKind === 'legacy' && acc.id === state.friendId }));
       } catch (e) {}
       return [...device, ...legacy];
@@ -3344,6 +3582,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (state.accountKind !== 'legacy' || !state.friendId) throw new Error(t('settings.migrateNotLegacy'));
     if (!supabaseClient) throw new Error(t('auth.serverConfigMissing'));
     const list = getDeviceAccounts();
+    // Bu kimlik zaten bir sunucu hesabında (bu cihazda): yeniden taşımak
+    // 23505 ile ham bir hatayla düşüyordu.
+    if (list.some(a => a.id && a.id === state.friendId)) throw new Error(t('settings.migrateAlready'));
     if (list.length >= MAX_DEVICE_ACCOUNTS) throw new Error(t('auth.accountLimit'));
     const legacy = {
       name: state.myName || 'Anonim',
@@ -3358,6 +3599,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     const used = new Set(list.map(a => a.slot));
     let slot = -1;
     let userId = null;
+    // Arama sırasında açılan oturumlar (boşta duran eski bir slot hesabı ya da
+    // yarıda kalan kayıt) taşıma başarısız olursa kapatılır; yoksa bir sonraki
+    // açılışta bu oturum yanlış slota yazılabiliyordu.
+    const abandonSession = async () => { try { await supabaseClient.auth.signOut(); } catch (e) {} };
+    try {
     for (let s = 0; s < 50 && slot < 0; s++) {
       if (used.has(s)) continue;
       const creds = await window.electronAPI.getDeviceCredentials(s);
@@ -3380,22 +3626,39 @@ window.addEventListener('DOMContentLoaded', async () => {
       id: userId,
       name: legacy.name,
       friend_id: legacy.id,
-      avatar: legacy.avatar,
+      // Yalnızca eski kova adresi; P2P tanımlayıcısı / base64 sunucuya yazılmaz.
+      avatar: window.TSProfileMedia && window.TSProfileMedia.isLegacyUrl(legacy.avatar) ? legacy.avatar : null,
       friends: legacy.friends,
       requests: legacy.requests,
       updated_at: new Date().toISOString()
     };
     if (legacy.ext) row.profile_ext = legacy.ext;
-    const { error } = await supabaseClient.from('profiles').upsert(row, { onConflict: 'id' });
+    const { error } = await supabaseClient.from('profiles').upsert(serverSafeProfileRow(row), { onConflict: 'id' });
     if (error) {
       if (error.code === '23505') throw new Error(t('settings.migrateIdTaken'));
       throw error;
     }
+    } catch (err) {
+      await abandonSession();
+      throw err;
+    }
 
     state.accountKind = 'cloud';
+    state.deviceSlot = slot;
     localStorage.setItem(ACTIVE_SLOT_KEY, String(slot));
     localStorage.setItem(DEFAULT_ACCOUNT_KEY, JSON.stringify({ type: 'device', slot }));
-    upsertDeviceAccount(slot, { name: legacy.name, avatar: legacy.avatar, id: legacy.id });
+    upsertDeviceAccount(slot, { name: legacy.name, avatar: legacy.avatar, id: legacy.id, lastUsed: Date.now() });
+    // Eski kayıt silinmez (yedek), "taşındı" diye işaretlenir ve listelerde
+    // bir daha görünmez; cihaz satırı silinse bile geri gelmez.
+    try {
+      const stored = await getAccounts();
+      const entry = stored.find(acc => acc && acc.id === legacy.id);
+      if (entry) {
+        entry.migrated = true;
+        entry.migratedAt = new Date().toISOString();
+        await saveAccounts(stored);
+      }
+    } catch (e) { console.warn('Eski hesap kaydı işaretlenemedi:', e); }
     await registerDeviceAccount(userId);
     return slot;
   }
@@ -3485,7 +3748,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         if (auto && !getDeviceAccounts().length) {
           let legacyCount = 0;
-          try { legacyCount = (await getAccounts()).filter(acc => acc && acc.id).length; } catch (e) {}
+          try { legacyCount = (await getAccounts()).filter(isListedLegacyAccount).length; } catch (e) {}
           if (!legacyCount) {
             await renderDeviceAccounts();
             return;
@@ -3505,7 +3768,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       }
       localStorage.setItem(ACTIVE_SLOT_KEY, String(slot));
-      await loadSupabaseProfile(data.user.id);
+      // Oturum bu slotun kimlik bilgileriyle açıldı: profil kesin bu slota yazılır.
+      await loadSupabaseProfile(data.user.id, slot);
     } catch (e) {
       console.error('Device login error:', e);
       setAuthStatus(isServerUnreachable(e)
@@ -3530,7 +3794,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     const deviceList = getDeviceAccounts();
     updateAccountLimitUi(deviceList.length);
-    const legacyList = (await getAccounts()).filter(acc => acc && acc.id && !deviceList.some(device => device.id === acc.id));
+    const legacyList = (await getAccounts()).filter(acc => isListedLegacyAccount(acc) && !deviceList.some(device => device.id === acc.id));
     const list = [
       ...deviceList.map(acc => ({ ...acc, accountType: 'device' })),
       ...legacyList.map(acc => ({ ...acc, accountType: 'legacy' }))
@@ -3551,24 +3815,25 @@ window.addEventListener('DOMContentLoaded', async () => {
       const safeAccountAvatar = safeAvatarUrl(acc.avatar);
       const avatarHtml = safeAccountAvatar
         ? `<img class="account-row-avatar" src="${escapeHtml(safeAccountAvatar)}" />`
-        : `<div class="account-row-avatar">👤</div>`;
+        : `<div class="account-row-avatar">${uiIcon('user', 20)}</div>`;
       const defaultRef = acc.accountType === 'device' ? { type: 'device', slot: acc.slot } : { type: 'legacy', id: acc.id };
       const isDefaultAccount = acc.accountType === 'device'
         ? (defaultAccount && defaultAccount.type === 'device' && defaultAccount.slot === acc.slot)
         : (defaultAccount && defaultAccount.type === 'legacy' && defaultAccount.id === acc.id);
       const idSuffixParts = [];
-      if (acc.accountType === 'device' && acc.slot === activeSlot) idSuffixParts.push('son kullanılan');
-      if (isDefaultAccount) idSuffixParts.push('ana hesap');
+      if (acc.accountType === 'device' && acc.slot === activeSlot) idSuffixParts.push(t('accpick.lastUsed'));
+      if (isDefaultAccount) idSuffixParts.push(t('accpick.main'));
       const idSuffix = idSuffixParts.length ? ` · ${idSuffixParts.join(' · ')}` : '';
+      const starLabel = t(isDefaultAccount ? 'accpick.mainUnset' : 'accpick.makeMain');
       row.innerHTML = `
         ${avatarHtml}
         <div class="account-row-info">
-          <div class="account-row-name">${escapeHtml(acc.name || 'Anonim')}</div>
-          <div class="account-row-id">${acc.accountType === 'device' && isImportedSlot(acc.slot) ? 'Giriş koduyla eklendi' : 'Bu cihazın kimliği · Hesap #' + (acc.slot + 1)}${idSuffix}</div>
+          <div class="account-row-name">${escapeHtml(acc.name || t('accpick.anon'))}</div>
+          <div class="account-row-id">${escapeHtml(acc.accountType === 'device' && isImportedSlot(acc.slot) ? t('accpick.imported') : t('accpick.deviceSlot', { n: acc.slot + 1 }))}${escapeHtml(idSuffix)}</div>
         </div>
         <div class="account-row-actions">
-          <button class="account-row-star-btn${isDefaultAccount ? ' is-default' : ''}" type="button" title="${isDefaultAccount ? 'Ana hesap (kaldırmak için tıkla)' : 'Ana hesap yap'}" aria-label="Ana hesap yap"></button>
-          <button class="account-row-delete-btn" type="button" title="Hesabı Sil" aria-label="Hesabı Sil">🗑️</button>
+          <button class="account-row-star-btn${isDefaultAccount ? ' is-default' : ''}" type="button" title="${escapeHtml(starLabel)}" aria-label="${escapeHtml(starLabel)}" aria-pressed="${isDefaultAccount}"></button>
+          <button class="account-row-delete-btn" type="button" title="${escapeHtml(t('accpick.delete'))}" aria-label="${escapeHtml(t('accpick.delete'))}">${uiIcon('trash', 16)}</button>
         </div>
       `;
       const deviceTrashButton = row.querySelector('.account-row-delete-btn');
@@ -3577,7 +3842,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (starButtonEl) starButtonEl.innerHTML = starIconSvg(isDefaultAccount);
       if (acc.accountType === 'legacy') {
         const idEl = row.querySelector('.account-row-id');
-        if (idEl) idEl.textContent = `Eski profil · ${acc.id}${idSuffix}`;
+        if (idEl) idEl.textContent = t('accpick.legacy', { id: acc.id }) + idSuffix;
       }
       if (acc.accountType === 'device' && acc.slot === activeSlot) {
         row.style.border = '1px solid var(--acc)';
@@ -3596,8 +3861,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         event.stopPropagation();
         if (acc.accountType === 'legacy') {
           const confirmed = await window.showConfirm(
-            '⚠️ Hesabı Sil',
-            `"${acc.name || 'Anonim'}" hesabını bu cihazdan silmek istediğinize emin misiniz?`
+            t('accpick.delete'),
+            t('accpick.deleteConfirm', { name: acc.name || t('accpick.anon') })
           );
           if (!confirmed) return;
           await deleteAccount(acc.id);
@@ -3615,7 +3880,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const defaultAccount = getDefaultAccount();
     if (defaultAccount && defaultAccount.type === 'legacy') {
       const accounts = await getAccounts();
-      const acc = accounts.find(a => a.id === defaultAccount.id);
+      const acc = accounts.find(a => a.id === defaultAccount.id && isListedLegacyAccount(a));
       if (acc) {
         loginWithAccount(acc);
         return;
@@ -3642,9 +3907,22 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
       if (error) throw error;
-      if (session) {
+      // Sabitlenmiş ana hesap, saklı oturumdan önce gelir: başka bir hesapla
+      // girip uygulamayı kapatınca bir sonraki açılış pini yok sayıyordu.
+      const pinnedSlot = defaultAccount && defaultAccount.type === 'device' ? defaultAccount.slot : null;
+      if (session && pinnedSlot !== null && pinnedSlot !== getActiveSlot()
+          && getDeviceAccounts().some(a => a.slot === pinnedSlot)) {
+        await deviceLogin(pinnedSlot, { auto: true });
+      } else if (session) {
         console.log("Active Supabase session found.");
-        await loadSupabaseProfile(session.user.id);
+        // Saklı oturum hangi slota ait? Eskiden "etkin slot" işaretçisine
+        // körü körüne yazılıyordu; işaretçi oturumla uyuşmazsa (ör. yarım
+        // kalan taşıma, eksik işaretçi → slot 0) aynı hesap iki slotta
+        // görünüyordu. Oturumun e-postası slotların kimlik bilgileriyle
+        // eşleştirilir; eşleşmezse o slota yeniden giriş yapılır.
+        const sessionSlot = await findSlotForSession(session);
+        if (sessionSlot === null) await deviceLogin(undefined, { auto: true });
+        else await loadSupabaseProfile(session.user.id, sessionSlot);
       } else {
         await deviceLogin(undefined, { auto: true });
       }
@@ -3654,7 +3932,21 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  async function loadSupabaseProfile(userId) {
+  async function findSlotForSession(session) {
+    const email = String(session?.user?.email || '').toLowerCase();
+    if (!email || !window.electronAPI?.getDeviceCredentials) return null;
+    const slots = [...new Set([getActiveSlot(), ...getDeviceAccounts().map(a => a.slot)])]
+      .filter(s => Number.isInteger(s) && s >= 0);
+    for (const s of slots) {
+      try {
+        const creds = await window.electronAPI.getDeviceCredentials(s);
+        if (creds && String(creds.email || '').toLowerCase() === email) return s;
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  async function loadSupabaseProfile(userId, verifiedSlot) {
     try {
       let { data: profile, error } = await supabaseClient
         .from('profiles')
@@ -3704,15 +3996,15 @@ window.addEventListener('DOMContentLoaded', async () => {
             .eq('id', userId)
             .single();
           if (finalResult.data) {
-            loginWithProfileData(finalResult.data);
+            loginWithProfileData(finalResult.data, verifiedSlot);
             return;
           }
           throw insertError;
         }
         
-        loginWithProfileData(newProfile);
+        loginWithProfileData(newProfile, verifiedSlot);
       } else {
-        loginWithProfileData(profile);
+        loginWithProfileData(profile, verifiedSlot);
       }
     } catch (e) {
       console.error("Load profile error:", e);
@@ -3722,14 +4014,25 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function loginWithProfileData(profile) {
+  function loginWithProfileData(profile, verifiedSlot) {
+    // Profil yalnızca oturumu gerçekten açan slota yazılır; doğrulanmış slot
+    // gelmediyse (eski çağrı) etkin işaretçiye düşülür.
+    const loginSlot = Number.isInteger(verifiedSlot) && verifiedSlot >= 0 ? verifiedSlot : getActiveSlot();
+    localStorage.setItem(ACTIVE_SLOT_KEY, String(loginSlot));
+    state.deviceSlot = loginSlot;
     state.accountKind = 'cloud';
     state.myName = profile.name;
     state.friendId = profile.friend_id;
+    switchDMAccount();
     if (window.TSProfile && profile.profile_ext) window.TSProfile.importExt(profile.profile_ext);
-    state.myAvatar = safeAvatarUrl(profile.avatar);
+    // Sunucudaki avatar yalnızca eski kova adresi olabilir; güncel P2P
+    // tanımlayıcısı profil eklentisinden (avatarRef) gelir (TSProfileMedia.onAccount).
+    state.myAvatar = safeAvatarRef(profile.avatar);
+    const extAvatar = window.TSProfile && window.TSProfile.mine().avatarRef;
+    if (extAvatar && window.TSProfileMedia && window.TSProfileMedia.isRef(extAvatar)) state.myAvatar = extAvatar;
     state.myAvatarHash = null;
     state.friends = profile.friends || {};
+    window.setFriendSyncBase(state.friends);
     state.friendRequests = profile.requests || [];
 
     localStorage.setItem('teamsync_profile', JSON.stringify({
@@ -3744,8 +4047,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('display-name').textContent = state.myName;
     document.getElementById('my-friend-id').textContent = state.friendId;
 
-    if (state.myAvatar) {
-      document.getElementById('my-avatar-img').src = state.myAvatar;
+    if (safeAvatarUrl(state.myAvatar)) {
+      document.getElementById('my-avatar-img').src = safeAvatarUrl(state.myAvatar);
       document.getElementById('my-avatar-img').style.display = 'block';
       document.getElementById('my-avatar-default').style.display = 'none';
     } else {
@@ -3759,7 +4062,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('step-action').classList.remove('hidden');
     document.querySelector('.login-card').classList.add('expanded');
 
-    upsertDeviceAccount(getActiveSlot(), { name: state.myName, avatar: state.myAvatar, id: state.friendId });
+    // Kendi kendini onarma: bu slotun satırı, girişin döndürdüğü profille
+    // düzeltilir (eskiden yanlış slota yazılmış kimlik burada düzelir).
+    upsertDeviceAccount(loginSlot, { name: state.myName, avatar: state.myAvatar, id: state.friendId, lastUsed: Date.now() });
     registerDeviceAccount(profile.id);
 
     renderFriends();
@@ -3774,6 +4079,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.accountKind = 'legacy';
     state.myName = n;
     state.friendId = `KNK-${crypto.randomUUID().toUpperCase()}`;
+    switchDMAccount();
     displayName.textContent = n;
     document.getElementById('my-friend-id').textContent = state.friendId;
 
@@ -3800,8 +4106,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       // Aynı cihaz kimliği altında yeni slot aç (kodla eklenenler sayılmaz)
-      const local = list.filter(a => !isImportedSlot(a.slot));
-      const nextSlot = local.length ? Math.max(...local.map(a => a.slot)) + 1 : 0;
+      const nextSlot = nextFreshSlot(list);
+      rememberSlotUsed(nextSlot);
       deviceLogin(nextSlot);
       return;
     }
@@ -3910,10 +4216,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     localStorage.removeItem('teamsync_profile');
-    
+
     state.accountKind = '';
+    state.deviceSlot = null;
     state.myName = '';
     state.friendId = '';
+    switchDMAccount();
     state.myAvatar = null;
     state.myAvatarHash = null;
     state.friends = {};
@@ -3973,33 +4281,51 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-add-friend').addEventListener('click', async () => {
     const btn = document.getElementById('btn-add-friend');
-    const targetId = document.getElementById('friend-id-input').value.trim().toUpperCase();
-    const addFriendError = (key, legacyKey) => {
+    const input = document.getElementById('friend-id-input');
+    // Yapıştırılan boşluklu / küçük harfli ID de kabul edilir (js/shell-friends.js normalizeId).
+    const targetId = window.TSFriends && window.TSFriends.normalizeId ? window.TSFriends.normalizeId(input.value) : input.value.trim().toUpperCase();
+    if (window.TSFriends && targetId && input.value !== targetId) input.value = targetId;
+    const addFriendError = (key, legacyKey, vars, action) => {
       if (!window.TSFriends) return alert(t(legacyKey || key));
-      window.TSFriends.addFriendError(t(key));
+      if (window.TSFriends.showAddMessage) window.TSFriends.showAddMessage(t(key, vars), 'error', action);
+      else window.TSFriends.addFriendError(t(key, vars));
       // Sunucu üye kartındaki "Arkadaş ekle" bu düğmeyi gizli formdan tetikler;
       // satır içi mesaj görünmüyorsa hata sessizce kaybolmasın.
       const msg = document.getElementById('add-friend-msg');
-      if (!msg || !msg.offsetParent) showToast(t(key), 'warn');
+      if (!msg || !msg.offsetParent) showToast(t(key, vars), 'warn');
     };
     // Kimlik deseniyle uyuşmayan girdi hiçbir konuya ulaşamaz.
-    if (!targetId || targetId === state.friendId || !isValidFriendEventId(targetId)) return addFriendError('friends.errorValidId', 'alert.validId');
-
+    if (!targetId) return addFriendError('friends.errorEmpty', 'alert.validId');
+    if (targetId === state.friendId) return addFriendError('friends.errorSelf', 'alert.validId');
+    if (!isValidFriendEventId(targetId)) return addFriendError(/^[A-Za-z0-9_-]*$/.test(targetId) ? 'friends.errorValidId' : 'friends.errorChars', 'alert.validId');
+    if (window.TSBlock && window.TSBlock.isBlocked(targetId)) {
+      return addFriendError('friends.blockedNoAdd', null, null, { act: 'unblock', fid: targetId, label: t('friends.unblock') });
+    }
     if (state.friends[targetId] && !state.friends[targetId].temporary) return addFriendError('friends.errorAlreadyFriend', 'alert.alreadyFriend');
+    const incoming = state.friendRequests.find(r => r.id === targetId);
+    if (incoming) return addFriendError('friends.errorIncoming', null, { name: incoming.name || targetId }, { act: 'pending', label: t('friends.viewPending') });
     if (btn.disabled) return;
 
     btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    if (window.TSFriends && window.TSFriends.showAddMessage) window.TSFriends.showAddMessage(t('friends.sending'), 'loading');
     let errorKey;
     try {
       errorKey = await deliverFriendRequest(targetId);
     } finally {
       btn.disabled = false;
+      btn.removeAttribute('aria-busy');
     }
     if (errorKey === 'toast.waitingForConnection') {
+      if (window.TSFriends && window.TSFriends.showAddMessage) window.TSFriends.showAddMessage(t('friends.errorOffline'), 'warn');
       showToast(t(errorKey), "warn");
       return;
     }
     if (errorKey) return addFriendError(errorKey);
+    // Gönderildi: satır içi mesaj (onFriendRequestSent) + Bekleyen'e kısa yol.
+    if (window.TSFriends && window.TSFriends.showAddMessage) {
+      window.TSFriends.showAddMessage(t('friends.requestSentTo', { id: targetId }), 'ok', { act: 'pending', label: t('friends.viewPending') });
+    }
     showToast(t('toast.friendRequestSent'), "ok");
     document.getElementById('friend-id-input').value = '';
     document.getElementById('step-add-friend').classList.add('hidden');
@@ -4182,6 +4508,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     state.founderId = state.isRoomFounder ? state.myId : null;
     // Giriş sırası damgası: kurucu düştüğünde halef seçiminde kullanılır.
     state.joinedAt = Date.now();
+    // Kurucu dönemi (term), çakışma çözümü ve "bağlantısı en iyi olan kurucu"
+    // (bkz. onFounderClaim / evaluateAutoHost). Katılan taraf ayarları kurucudan öğrenir.
+    state.founderTerm = 0;
+    state.founderConfirmed = state.isRoomFounder;
+    state.pendingFounderClaim = null;
+    state.autoHost = defaultAutoHost(roomId);
+    state.autoHostStreak = null;
+    state.lastAutoHandover = Date.now();
+    state.lastFounderEval = Date.now();
+    state.myConnScore = null;
 
     updateFounderMenuVisibility();
 
@@ -4223,7 +4559,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
       
       state.roomName = state.sfwMode ? censorProfaneText(serverName) : serverName;
-      document.getElementById('room-title').textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
+      setRoomTitle(document.getElementById('room-title'));
       document.getElementById('display-server-id').textContent = roomId;
 
       addUser({ id: 'self', name: `${state.myName} (${t('common.you')})`, mic: true, deaf: false, sharing: false, self: true, avatar: state.myAvatar, isFounder: state.isRoomFounder });
@@ -4256,7 +4592,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Yeni kabuk (js/shell-core.js) ve ileride sunucu ses kanalları odaya bu
   // kapıdan girer; startApp DOMContentLoaded kapanışının içinde yaşıyor.
-  window.TSRoom = { start: startApp };
+  window.TSRoom = { start: startApp, claimFounder: claimSoleFounder };
 
   btnJoin.addEventListener('click', async () => {
     document.getElementById('error-modal').classList.add('hidden');
@@ -4877,7 +5213,8 @@ function isRealFriendPeer(peerId, friendId) {
 async function handlePeerDiscovered(peer) {
   if (!peer || !isValidPeerId(peer.id) || peer.id === state.myId) return;
   peer.name = typeof peer.name === 'string' ? peer.name.slice(0, 120) : 'Bilinmeyen';
-  peer.avatar = safeAvatarUrl(peer.avatar);
+  // Saklanan değer tanımlayıcı/eski adrestir; çizim safeAvatarUrl ile çözülür.
+  peer.avatar = safeAvatarRef(peer.avatar);
   if (peer.friendId && !isValidPeerId(peer.friendId)) peer.friendId = null;
 
   // Kalıcı yasak kontrolü (item 3): yasaklı biri odaya giremez. Kurucu ayrıca
@@ -5056,6 +5393,10 @@ function removePeer(peerId) {
   // Bekleyen denetim teklifleri (her iki yön) peer gidince düşer.
   if (state.pendingControlOffer && state.pendingControlOffer.peerId === peerId) clearControlOffer();
   if (state.incomingControlOffer && state.incomingControlOffer.peerId === peerId) closeCtrlOfferNote();
+  // Ayrılan peer'ın bekleyen denetim isteği de düşer: kart açık kalıp
+  // "Kabul" denirse olmayan bir peer'a denetim veriliyordu.
+  if (state.pendingControlReq && state.pendingControlReq.peerId === peerId) closeCtrlModal();
+  if (state.leavingRoom) return;
   showToast(displayName(peerId, peer.name) + ' ' + t('toast.peerLeft'), 'warn');
   updateEmptyGrid();
 
@@ -5873,8 +6214,17 @@ function setupDataChannel(peerId, dc) {
         // İnternet sinyallemesi olmasa bile geç katılan kişi kurucunun oda
         // genelindeki RNNoise tercihini açık veri kanalından hemen alır.
         if (state.isRoomFounder) {
+          // Önce kurucu iddiası (alıcı founderId'yi buna göre kurar), sonra
+          // ayarların tamamı: geç katılan biri ileride kurucu olursa arkadaş-
+          // only / oyun modu / otomatik kurucu ayarları kaybolmasın.
+          dc.send(JSON.stringify(founderClaimMsg()));
           dc.send(JSON.stringify({
             type: 'founder_settings_update',
+            friendsOnlyMode: !!state.friendsOnlyMode,
+            gameMode: !!state.gameMode,
+            sfwChatBanEnabled: !!state.sfwChatBanEnabled,
+            sfwChatBanThreshold: getSfwChatBanThreshold(),
+            autoHost: !!state.autoHost,
           }));
         }
         if (state.isSharing) dc.send(JSON.stringify({
@@ -5970,9 +6320,25 @@ function setupDataChannel(peerId, dc) {
 }
 
 const processedMessages = new Set();
-async function handleDataMessage(peerId, msg) {
+// Yetki taşıyan komutlar yalnızca o eşin kendi WebRTC veri kanalından kabul
+// edilir. MQTT yükündeki gönderen kimliği (data.id) gönderenin kendi beyanıdır:
+// oda kimliğini bilen biri kurucu ya da denetimi elinde tutan eş kılığında
+// atma/yasaklama/susturma veya uzaktan klavye-fare olayı gönderebiliyordu.
+// Her mesaj iki yoldan da gittiği için (bkz. broadcast/broadcastTo) veri kanalı
+// açıkken işlev kaybı olmaz. Kontrol, _mid ayıklamasından ÖNCE yapılır: yoksa
+// önce gelen MQTT kopyası düşürülüp gerçek kanal kopyası "tekrar" sayılırdı.
+const DC_ONLY_TYPES = new Set([
+  'kick_peer', 'ban_peer', 'force_mute', 'force_unmute', 'set_moderator',
+  'transfer_ownership', 'founder_settings_update', 'set_bitrate', 'chat_ban',
+  'founder_claim', 'conn_score'
+]);
+function requiresDataChannel(type) {
+  return DC_ONLY_TYPES.has(type) || type.startsWith('ctrl-');
+}
+async function handleDataMessage(peerId, msg, via = 'dc') {
   if (!isValidPeerId(peerId) || !msg || typeof msg !== 'object' || Array.isArray(msg)
       || typeof msg.type !== 'string' || msg.type.length > 64) return;
+  if (via !== 'dc' && requiresDataChannel(msg.type)) return;
   if (msg._mid) {
     if (typeof msg._mid !== 'string' || msg._mid.length > 128) return;
     if (processedMessages.has(msg._mid)) return;
@@ -5989,11 +6355,21 @@ async function handleDataMessage(peerId, msg) {
   if (typeof window.whiteboardHandleMessage === 'function'
       && window.whiteboardHandleMessage(peerId, msg)) return;
 
+  // Birebir aramada karşı taraf kapattı (js/teams/direct-call.js announceEnd).
+  if (msg.type === 'call_end') {
+    if (window.TSDirectCall && typeof window.TSDirectCall.onRemoteEnd === 'function') {
+      const sender = state.peers.get(peerId);
+      window.TSDirectCall.onRemoteEnd({ roomId: msg.roomId, peerId, fromId: sender && sender.friendId });
+    }
+    return;
+  }
+
   if (msg.type === 'founder_settings_update') {
     // Sunucu çapındaki ayarlar yalnızca gerçek kurucudan kabul edilir.
     if (peerId !== state.founderId) return;
     if (msg.friendsOnlyMode !== undefined) state.friendsOnlyMode = msg.friendsOnlyMode;
     if (msg.gameMode !== undefined) state.gameMode = msg.gameMode;
+    if (typeof msg.autoHost === 'boolean') { state.autoHost = msg.autoHost; state.autoHostStreak = null; }
     if (msg.sfwChatBanEnabled !== undefined) state.sfwChatBanEnabled = !!msg.sfwChatBanEnabled;
     if (msg.sfwChatBanThreshold !== undefined) state.sfwChatBanThreshold = getSfwChatBanThreshold(msg.sfwChatBanThreshold);
     if (msg.sfwMode !== undefined) {
@@ -6001,7 +6377,7 @@ async function handleDataMessage(peerId, msg) {
       if (state.sfwMode && state.roomName) {
         state.roomName = censorProfaneText(state.roomName);
         const titleEl = document.getElementById('room-title');
-        if (titleEl) titleEl.textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
+        setRoomTitle(titleEl);
       }
       if (state.sfwMode) loadAIFilter();
     }
@@ -6117,19 +6493,27 @@ async function handleDataMessage(peerId, msg) {
   } else if (msg.type === 'transfer_ownership') {
     // Yalnızca mevcut kurucu sahipliği devredebilir.
     if (peerId !== state.founderId) return;
-    state.founderId = msg.targetId;
-    state.moderators.delete(msg.targetId);
+    if (!isValidPeerId(msg.targetId)) return;
+    // Devir, kurucunun sahip olduğu oda ayarlarını da taşır (yeni kurucu
+    // bunları hello'larıyla yaymaya devam eder). Eski istemciler term/settings göndermez.
+    if (msg.settings && typeof msg.settings === 'object') applyFounderSettingsSnapshot(msg.settings);
+    const term = Number.isInteger(msg.term) && msg.term >= 0 && msg.term < 1e6 ? msg.term : (state.founderTerm || 0) + 1;
+    applyFounder(msg.targetId, term, { confirmed: true });
     if (msg.targetId === state.myId) {
-      state.isRoomFounder = true;
-      // Kurucu olan biri sunucu tarafından susturulmuş kalmasın: kendi
-      // susturmanı temizle (susturulup sonra kurucu yapılma durumu).
-      if (state.serverMutedIds) state.serverMutedIds.delete(state.myId);
-      if (state.serverMuted) { state.serverMuted = false; applyMicState(); }
-      updateFounderMenuVisibility();
-      showToast(t('toast.becameOwner'), 'ok');
+      state.lastAutoHandover = Date.now();
+      showToast(msg.auto ? t('founder.movedToYou') : t('toast.becameOwner'), 'ok');
+      broadcastFounderClaim();
     }
-    refreshUserRoleBadge(msg.targetId);
-    if (msg.fromId) refreshUserRoleBadge(msg.fromId);
+    return;
+  } else if (msg.type === 'founder_claim') {
+    onFounderClaim(peerId, msg);
+    return;
+  } else if (msg.type === 'conn_score') {
+    const p = state.peers.get(peerId);
+    const rtt = Number(msg.rtt);
+    if (p && Number.isFinite(rtt) && rtt >= 0 && rtt < 60000) {
+      p.connScore = { rtt: Math.round(rtt), relay: !!msg.relay, n: Number(msg.n) || 0, at: Date.now() };
+    }
     return;
   }
 
@@ -6378,10 +6762,10 @@ async function handleDataMessage(peerId, msg) {
          if (violation && registerSfwChatViolation(peerId)) return;
          appendChat(peerId, peer.name, safeText, isCensored);
       } else {
-         appendChat(peerId, peer.name, '🔒 [Şifre Çözülemedi]');
+         appendChat(peerId, peer.name, '[Şifre Çözülemedi]');
       }
     } else {
-      appendChat(peerId, peer.name, '🔒 [Kilitli Mesaj]');
+      appendChat(peerId, peer.name, '[Kilitli Mesaj]');
     }
   } else if (msg.type === 'file-meta') {
     const validId = typeof msg.id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(msg.id);
@@ -6754,6 +7138,18 @@ function founderSuccessorId() {
     if (aj !== bj) return aj - bj;
     return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
   };
+  // "Kurucu: bağlantısı en iyi olan" açıksa: kalanlar arasında en iyi
+  // bağlantı skoru (ortalama RTT, TURN relay cezası; 10 ms kovalara yuvarlanır,
+  // eşitlikte giriş sırası). Skor herkese aynı veri kanalı mesajıyla
+  // (conn_score) yayıldığı için istemciler aynı sonuca varır; nadiren
+  // ayrışırlarsa halef kendini duyurur (founder_claim) ve çakışma kuralı çözer.
+  if (state.autoHost) {
+    const scored = alive.map(c => ({ ...c, s: connScoreOf(c.id) }));
+    if (scored.every(c => c.s != null)) {
+      scored.sort((a, b) => (a.s - b.s) || order(a, b));
+      if (scored.length) return scored[0].id;
+    }
+  }
   const mods = alive.filter(c => isPeerModerator(c.id)).sort(order);
   if (mods.length > 0) return mods[0].id;
   const plain = alive.slice().sort(order);
@@ -6761,27 +7157,286 @@ function founderSuccessorId() {
 }
 
 function handleFounderLeft(prevFounderId) {
+  // Başka biri kendini halef olarak zaten duyurduysa (daha yüksek dönem) onu kabul et.
+  const pend = state.pendingFounderClaim;
+  if (pend && pend.id !== prevFounderId && state.peers.has(pend.id) && pend.term > (state.founderTerm || 0)) {
+    applyFounder(pend.id, pend.term, { confirmed: true });
+    return;
+  }
   const newFounderId = founderSuccessorId();
   if (!newFounderId) {
     state.founderId = null;
+    state.founderConfirmed = false;
     return;
   }
-  state.founderId = newFounderId;
-  state.moderators.delete(newFounderId);
   if (newFounderId === state.myId) {
+    // Yeni kurucu bir üst dönemle kendini duyurur: herkes aynı kişide buluşur.
+    applyFounder(state.myId, (state.founderTerm || 0) + 1, { confirmed: true });
+    showToast(t('toast.founderLeftBecameOwner'), 'ok');
+    broadcastFounderClaim();
+  } else {
+    // Yerel tahmin: halefin duyurusu (founder_claim) gelince kesinleşir.
+    applyFounder(newFounderId, state.founderTerm || 0, { confirmed: false });
+  }
+  if (prevFounderId) refreshUserRoleBadge(prevFounderId);
+}
+
+// ---------------------------------------------------------------------------
+// Kurucu: tek kurucu, el değiştirme, "bağlantısı en iyi olan" (autoHost)
+// Medya tam örgüdür (full mesh); kurucunun yalnızca yönetim yetkileri vardır.
+// Kurucu ayrılınca kimse düşmez, rol el değiştirir.
+//  • founder_claim {term, joinedAt, autoHost}: kurucu her 5 sn'de ve veri kanalı
+//    açılınca yollar (yalnızca veri kanalından kabul edilir). Daha yüksek dönem
+//    (term) devir/halefliği, eşit dönem çakışmayı belirtir: aynı anda iki kişi
+//    odayı kurucu olarak açtıysa (gc- eşzamanlı başlatma, sv- ses kanalları)
+//    odaya EN ÖNCE giren (eşitlikte küçük id) kazanır, diğeri kurucu bayrağını indirir.
+//  • conn_score {rtt, relay, n}: herkesin diğerlerine ortalama RTT'si (mevcut ping EMA).
+//  • Kurucu her ~20 sn değerlendirir: biri 3 değerlendirme üst üste ≥%30 ve
+//    ≥40 ms daha iyiyse transfer_ownership ile devreder (iki devir arası ≥60 sn).
+const FOUNDER_TICK_MS = 5000;
+const FOUNDER_EVAL_MS = 20000;
+const AUTOHOST_MIN_GAP_MS = 60000;
+const CONN_SCORE_FRESH_MS = 15000;
+const AUTOHOST_CLASSIC_KEY = 'teamsync_autohost_classic';
+
+function isClassicRoomId(roomId) {
+  const id = String(roomId || '');
+  return !/^(gc|dc|sv)-/.test(id) && !/^ts-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}$/.test(id);
+}
+
+// Varsayılan: grup (gc-), birebir (dc-) ve "Hemen toplantı" (ts-xxxxxxxx-xxxx-xxxx)
+// odalarında AÇIK; sunucu ses kanallarında (sv-) KAPALI; klasik ID+şifre
+// odalarında kurucunun bu cihazdaki son tercihi (varsayılan kapalı).
+function defaultAutoHost(roomId) {
+  const id = String(roomId || '');
+  if (id.startsWith('sv-')) return false;
+  if (!isClassicRoomId(id)) return true;
+  try { return localStorage.getItem(AUTOHOST_CLASSIC_KEY) === '1'; } catch (e) { return false; }
+}
+
+function founderOrderBefore(a, b) {
+  const aj = a.joinedAt || Number.MAX_SAFE_INTEGER;
+  const bj = b.joinedAt || Number.MAX_SAFE_INTEGER;
+  if (aj !== bj) return aj < bj;
+  return a.id < b.id;
+}
+
+function founderInfo(id) {
+  if (id === state.myId) return { id, joinedAt: state.joinedAt || 0 };
+  const p = state.peers.get(id);
+  return { id, joinedAt: (p && p.joinedAt) || 0 };
+}
+
+function founderAlive(id) {
+  return !!id && (id === state.myId || state.peers.has(id));
+}
+
+function myConnScoreNow() {
+  let total = 0;
+  let n = 0;
+  let relay = !!state.useRelay;
+  state.peers.forEach(p => {
+    if (Number.isFinite(p.smoothedPing)) { total += p.smoothedPing; n++; }
+    try { if (p.pc && p.pc.getConfiguration().iceTransportPolicy === 'relay') relay = true; } catch (e) {}
+  });
+  if (!n) return null;
+  // state.debugRttBias: yalnızca E2E testinde bağlantı farkı taklit etmek için.
+  const rtt = Math.max(0, Math.round(total / n) + (Number(state.debugRttBias) || 0));
+  return { rtt, relay, n };
+}
+
+const effConnScore = s => s.rtt + (s.relay ? 50 : 0);
+
+function connScoreOf(id) {
+  if (id === state.myId) return state.myConnScore ? Math.round(effConnScore(state.myConnScore) / 10) : null;
+  const p = state.peers.get(id);
+  if (!p || !p.connScore || Date.now() - p.connScore.at > CONN_SCORE_FRESH_MS) return null;
+  return Math.round(effConnScore(p.connScore) / 10);
+}
+
+function founderClaimMsg() {
+  return { type: 'founder_claim', term: state.founderTerm || 0, joinedAt: state.joinedAt || 0, autoHost: !!state.autoHost };
+}
+
+function sendDcOnly(msg, onlyId) {
+  const str = JSON.stringify(msg);
+  state.peers.forEach((p, id) => {
+    if (onlyId && id !== onlyId) return;
+    if (p.dc && p.dc.readyState === 'open') { try { p.dc.send(str); } catch (e) {} }
+  });
+}
+
+function broadcastFounderClaim(onlyId) {
+  if (state.isRoomFounder) sendDcOnly(founderClaimMsg(), onlyId);
+}
+
+// Kurucunun sahip olduğu oda ayarları (devirde yeni kurucuya geçer).
+function founderSettingsSnapshot() {
+  return {
+    friendsOnlyMode: !!state.friendsOnlyMode,
+    gameMode: !!state.gameMode,
+    sfwMode: !!state.sfwMode,
+    sfwChatBanEnabled: !!state.sfwChatBanEnabled,
+    sfwChatBanThreshold: getSfwChatBanThreshold(),
+    audioBitrate: getAudioBitrate(),
+    autoHost: !!state.autoHost,
+    moderators: Array.from(state.moderators || []),
+    bannedIds: Array.from(state.bannedIds || []),
+    serverMutedIds: Array.from(state.serverMutedIds || []),
+    chatBannedIds: Array.from(state.chatBannedIds || [])
+  };
+}
+
+function applyFounderSettingsSnapshot(s) {
+  const ids = v => new Set((Array.isArray(v) ? v : []).filter(isValidPeerId).slice(0, 200));
+  if (typeof s.friendsOnlyMode === 'boolean') state.friendsOnlyMode = s.friendsOnlyMode;
+  if (typeof s.gameMode === 'boolean') state.gameMode = s.gameMode;
+  if (typeof s.sfwChatBanEnabled === 'boolean') state.sfwChatBanEnabled = s.sfwChatBanEnabled;
+  if (s.sfwChatBanThreshold !== undefined) state.sfwChatBanThreshold = getSfwChatBanThreshold(s.sfwChatBanThreshold);
+  if (typeof s.autoHost === 'boolean') state.autoHost = s.autoHost;
+  if (s.sfwMode === true && !state.sfwMode) { state.sfwMode = true; loadAIFilter(); }
+  if (Array.isArray(s.moderators)) {
+    const before = new Set(state.moderators || []);
+    state.moderators = ids(s.moderators);
+    new Set([...before, ...state.moderators]).forEach(id => refreshUserRoleBadge(id));
+  }
+  if (Array.isArray(s.bannedIds)) state.bannedIds = ids(s.bannedIds);
+  if (Array.isArray(s.serverMutedIds)) state.serverMutedIds = ids(s.serverMutedIds);
+  if (Array.isArray(s.chatBannedIds)) state.chatBannedIds = ids(s.chatBannedIds);
+  const kbps = parseInt(s.audioBitrate, 10);
+  if (Number.isFinite(kbps) && kbps >= 8 && kbps <= 512 && kbps !== state.audioBitrate) {
+    state.audioBitrate = kbps;
+    applyAudioBitrateToPeers();
+  }
+}
+
+// Kurucuyu yerelde değiştirir (UI rozetleri, menü, kendi bayrağım).
+function applyFounder(newId, term, opts = {}) {
+  const prev = state.founderId;
+  const wasMe = !!state.isRoomFounder;
+  state.founderId = newId || null;
+  state.founderTerm = Math.max(state.founderTerm || 0, term || 0);
+  state.founderConfirmed = !!opts.confirmed;
+  state.pendingFounderClaim = null;
+  if (newId && state.moderators) state.moderators.delete(newId);
+  const isMe = !!newId && newId === state.myId;
+  if (isMe && !wasMe) {
     state.isRoomFounder = true;
-    // Yeni kurucu artık yetkili hello'sunu göndermeye başlar (moderatör/ban/oda
-    // adı senkronizasyonu). Yasak listesini kendi diskine de yazar.
+    state.lastAutoHandover = Date.now();
+    state.autoHostStreak = null;
+    // Yeni kurucu yetkili hello'sunu yaymaya başlar; yasak listesi diskine yazılır.
     if (state.room) saveRoomBans(state.room);
     // Kurucu olan biri susturulmuş kalmasın.
     if (state.serverMutedIds) state.serverMutedIds.delete(state.myId);
     if (state.serverMuted) { state.serverMuted = false; applyMicState(); }
-    updateFounderMenuVisibility();
-    showToast(t('toast.founderLeftBecameOwner'), 'ok');
+  } else if (!isMe && wasMe) {
+    state.isRoomFounder = false;
+    state.autoHostStreak = null;
+    const modal = document.getElementById('founder-settings-modal');
+    if (modal && !modal.classList.contains('hidden') && !canManageRoom()) modal.classList.add('hidden');
   }
-  refreshUserRoleBadge(newFounderId);
-  if (prevFounderId) refreshUserRoleBadge(prevFounderId);
+  updateFounderMenuVisibility();
+  if (newId) refreshUserRoleBadge(newId);
+  if (prev && prev !== newId) refreshUserRoleBadge(prev);
+  if (prev !== newId) document.dispatchEvent(new CustomEvent('ts:founder', { detail: { founderId: state.founderId } }));
 }
+
+// Veri kanalından gelen kurucu iddiası. Kural (her istemcide aynı):
+//  • bilinen kurucu yine iddia ediyor → dönemini al;
+//  • ben kurucuysam: eşit dönemde çakışma kuralı; daha yüksek dönem ancak
+//    ben 0. dönemdeysem (odaya kendim kurucu olarak girdim ama oda zaten
+//    vardı, ör. sv- ses kanalı) kabul edilir;
+//  • kurucu bilinmiyor/odada değil → kabul; daha yüksek dönem → kurucum
+//    yalnızca yerel tahminse kabul, kesinse bekletilir (kurucu düşünce uygulanır);
+//    eşit dönem → çakışma kuralı.
+function onFounderClaim(peerId, msg) {
+  if (!state.room || !isValidPeerId(peerId) || peerId === state.myId) return;
+  const p = state.peers.get(peerId);
+  if (!p) return;
+  const term = Number.isInteger(msg.term) && msg.term >= 0 && msg.term < 1e6 ? msg.term : 0;
+  if (Number.isFinite(msg.joinedAt) && msg.joinedAt > 0 && msg.joinedAt <= Date.now() + 60000) p.joinedAt = msg.joinedAt;
+  const myTerm = state.founderTerm || 0;
+  const cur = state.founderId;
+  let accept = false;
+  if (cur === peerId) accept = term >= myTerm;
+  else if (state.isRoomFounder) {
+    if (term > myTerm) accept = myTerm === 0;
+    else if (term === myTerm) accept = founderOrderBefore(founderInfo(peerId), founderInfo(state.myId));
+  } else if (!cur || !founderAlive(cur)) accept = true;
+  else if (term > myTerm) accept = !state.founderConfirmed;
+  else if (term === myTerm) accept = founderOrderBefore(founderInfo(peerId), founderInfo(cur));
+  if (!accept) {
+    if (term > myTerm && !state.isRoomFounder) state.pendingFounderClaim = { id: peerId, term, at: Date.now() };
+    // Kaybeden tarafın hemen öğrenmesi için kendi iddiamı ona yolla.
+    if (state.isRoomFounder) broadcastFounderClaim(peerId);
+    return;
+  }
+  if (typeof msg.autoHost === 'boolean') state.autoHost = msg.autoHost;
+  applyFounder(peerId, term, { confirmed: true });
+}
+
+// Grup aramasında "Katıl" denip odada kimse bulunamadıysa: kullanıcı atılmaz,
+// aynı odada yeni aramanın ilk (ve kurucu) katılımcısı olur (js/space/groups.js).
+function claimSoleFounder() {
+  if (!state.room) return false;
+  state.isJoining = false;
+  if (state.joinTimeout) { clearTimeout(state.joinTimeout); state.joinTimeout = null; }
+  if (state.peers.size) return false;
+  state.bannedIds = loadRoomBans(state.room);
+  applyFounder(state.myId, state.founderTerm || 0, { confirmed: true });
+  return true;
+}
+
+function evaluateAutoHost() {
+  if (!state.isRoomFounder || !state.autoHost || !state.room) { state.autoHostStreak = null; return; }
+  const mine = state.myConnScore;
+  if (!mine) { state.autoHostStreak = null; return; }
+  const myEff = effConnScore(mine);
+  let best = null;
+  state.peers.forEach((p, id) => {
+    if (!p.connScore || Date.now() - p.connScore.at > CONN_SCORE_FRESH_MS) return;
+    if (!p.dc || p.dc.readyState !== 'open') return;
+    if (state.bannedIds && state.bannedIds.has(id)) return;
+    const e = effConnScore(p.connScore);
+    if (!best || e < best.e) best = { id, e };
+  });
+  const clearlyBetter = !!best && best.e <= myEff * 0.7 && myEff - best.e >= 40;
+  if (!clearlyBetter) { state.autoHostStreak = null; return; }
+  const s = state.autoHostStreak;
+  state.autoHostStreak = s && s.id === best.id ? { id: best.id, n: s.n + 1 } : { id: best.id, n: 1 };
+  if (state.autoHostStreak.n < 3) return;
+  if (Date.now() - (state.lastAutoHandover || 0) < AUTOHOST_MIN_GAP_MS) return;
+  state.autoHostStreak = null;
+  transferFounderTo(best.id, { auto: true });
+}
+
+// Kurucu devri ("Devret" düğmesi ve otomatik devir). Ayarlar mesajla taşınır.
+function transferFounderTo(peerId, opts = {}) {
+  if (!state.isRoomFounder || !state.peers.has(peerId)) return false;
+  const term = (state.founderTerm || 0) + 1;
+  const settings = founderSettingsSnapshot();
+  const fromId = state.myId;
+  state.lastAutoHandover = Date.now();
+  applyFounder(peerId, term, { confirmed: true });
+  broadcast({ type: 'transfer_ownership', targetId: peerId, fromId, term, auto: !!opts.auto, settings });
+  if (opts.auto) {
+    const peer = state.peers.get(peerId);
+    showToast(t('founder.movedTo', { name: displayName(peerId, (peer && peer.name) || '') }), 'info');
+  }
+  return true;
+}
+
+setInterval(() => {
+  if (!state.room) return;
+  const sc = myConnScoreNow();
+  state.myConnScore = sc;
+  if (sc) sendDcOnly({ type: 'conn_score', rtt: sc.rtt, relay: sc.relay, n: sc.n });
+  broadcastFounderClaim();
+  if (state.isRoomFounder && state.autoHost && Date.now() - (state.lastFounderEval || 0) >= FOUNDER_EVAL_MS) {
+    state.lastFounderEval = Date.now();
+    evaluateAutoHost();
+  }
+}, FOUNDER_TICK_MS);
 
 // Oda listesindeki bir kullanıcının kurucu (taç) / yetkili (kalkan) rozetini
 // addUser() ile aynı DOM yapısını yeniden kullanarak canlı günceller — sahiplik
@@ -6871,8 +7526,9 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
   li.dataset.uid = id;
   li.dataset.realName = name; // lakap sisteminde gerçek isim burada saklanır
   const shownName = self ? name : displayName(id, name);
-  const avatarHtml = avatar
-    ? `<img src="${escapeHtml(avatar)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
+  const avatarSrc = safeAvatarUrl(avatar);
+  const avatarHtml = avatarSrc
+    ? `<img src="${escapeHtml(avatarSrc)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
     : name.charAt(0).toUpperCase();
   const founderBadgeHtml = isFounder ? `<span class="founder-badge" title="Founder" aria-label="Founder">${FOUNDER_BADGE_SVG}</span>` : '';
   const nameClass = isFounder ? 'founder-name' : '';
@@ -6887,7 +7543,7 @@ function addUser({ id, name, mic, deaf, sharing, self, ip, avatar, isFounder }) 
     </div>
     <div class="uact" style="display:flex; align-items:center; gap:8px;">
       <div id="ping-${id}" class="uping" title="Gecikme" style="font-size:11px; font-weight:bold;">--ms</div>
-      ${!self ? `<button data-ctrl="${id}" title="Uzaktan kontrol iste">🖱️</button>` : ''}
+      ${!self ? `<button data-ctrl="${id}" title="Uzaktan kontrol iste" aria-label="Uzaktan kontrol iste">${uiIcon('mousePointer', 14)}</button>` : ''}
     </div>
   `;
   document.getElementById('users').appendChild(li);
@@ -6957,27 +7613,34 @@ function showRoomUserProfile(targetId, targetName) {
   // "temporary" girişler DM için açılmış geçici kayıtlardır, gerçek arkadaşlık değildir.
   const isFriend = !!(friendId && state.friends[friendId] && !state.friends[friendId].temporary);
 
-  const badges = [{ text: '🟢 Sunucuda', color: '#10b981' }];
-  if (targetId === state.founderId) badges.unshift({ text: '👑 Kurucu', color: '#fbbf24' });
-  else if (isPeerModerator(targetId)) badges.unshift({ text: '🛡️ Yetkili', color: '#3b82f6' });
+  const badges = [{ text: 'Sunucuda', color: 'var(--status-online)', icon: 'volume' }];
+  if (targetId === state.founderId) badges.unshift({ text: 'Kurucu', color: 'var(--warn)', icon: 'crown' });
+  else if (isPeerModerator(targetId)) badges.unshift({ text: 'Yetkili', color: 'var(--acc)', icon: 'shield' });
 
   const actions = [
     {
-      label: '💬 Mesaj Gönder',
+      label: t('profile.sendMessage'),
       onClick: () => openServerDM(targetId, targetName)
     }
   ];
 
   if (isFriend) {
     actions.push({
-      label: '❌ Arkadaşlıktan Çıkar',
+      label: t('friends.removeTitle'),
       danger: true,
       onClick: () => removeFriend(friendId)
     });
   } else {
     actions.push({
-      label: '➕ Arkadaş Ekle',
+      label: t('profile.addFriend'),
       onClick: () => sendRoomFriendRequest(targetId)
+    });
+  }
+  if (friendId && friendId !== state.friendId && window.TSFriends) {
+    actions.push({
+      label: t('friends.block'),
+      danger: true,
+      onClick: () => window.TSFriends.confirmBlock(friendId, targetName)
     });
   }
 
@@ -7093,7 +7756,7 @@ function showUserContextMenu(e, targetId, targetName) {
   // Ekran (sistem) sesi satırı yalnızca kişi ses paylaşıyorken görünür.
   const menuPeer = state.peers.get(targetId);
   if (menuPeer && menuPeer.screenAudio) {
-    menu.appendChild(buildMenuVolumeBlock(targetId, 'screen', '🖥 Ekran Sesi', 'Müzik/oyun sesi — mikrofondan bağımsız'));
+    menu.appendChild(buildMenuVolumeBlock(targetId, 'screen', 'Ekran Sesi','Müzik/oyun sesi — mikrofondan bağımsız'));
   }
   // (Boyama, menü body'ye eklendikten sonra yapılır — bkz. aşağıdaki
   // syncPeerVolumeControls çağrısı; sync belge genelinde arama yapar.)
@@ -7115,7 +7778,7 @@ function showUserContextMenu(e, targetId, targetName) {
   nickBtn.addEventListener('click', async () => {
     menu.remove();
     const result = await window.showPrompt(
-      '✏️ Lakap Koy',
+      'Lakap Koy',
       `"${targetName}" için bir lakap belirle. Lakabı sadece sen görürsün; boş bırakıp kaydedersen lakap silinir.`,
       nick || '',
       'Lakap yaz...',
@@ -7134,12 +7797,10 @@ function showUserContextMenu(e, targetId, targetName) {
   if (isFriend) {
     friendBtn.classList.add('danger');
     friendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="23" y1="11" x2="17" y2="11"></line></svg> Arkadaşı Sil';
-    friendBtn.addEventListener('click', async () => {
-      if (await window.showConfirm('⚠️ Arkadaşı Sil', `"${targetName}" arkadaşını silmek istediğinize emin misiniz?`)) {
-        removeFriend(resolvedFriendId);
-        showToast(t('toast.friendRemoved'), 'info');
-      }
+    friendBtn.addEventListener('click', () => {
+      // removeFriend kendi onayını (Çıkarılanlar / gruplar etkilenmez açıklamasıyla) sorar.
       menu.remove();
+      removeFriend(resolvedFriendId);
     });
   } else {
     friendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg> Arkadaş Ekle';
@@ -7149,6 +7810,18 @@ function showUserContextMenu(e, targetId, targetName) {
     });
   }
   menu.appendChild(friendBtn);
+
+  // Engelle (yalnızca yerel; js/shell-friends.js)
+  if (resolvedFriendId && resolvedFriendId !== state.friendId && window.TSFriends) {
+    const blockBtn = document.createElement('button');
+    blockBtn.className = 'user-context-menu-item danger';
+    blockBtn.innerHTML = `${window.TSUI && window.TSUI.icon ? window.TSUI.icon('ban', 14) : ''} <span>${escapeHtml(t('friends.block'))}</span>`;
+    blockBtn.addEventListener('click', () => {
+      menu.remove();
+      window.TSFriends.confirmBlock(resolvedFriendId, targetName);
+    });
+    menu.appendChild(blockBtn);
+  }
 
   // Message Button
   const msgBtn = document.createElement('button');
@@ -7174,7 +7847,7 @@ function showUserContextMenu(e, targetId, targetName) {
     const offerPending = !!(state.pendingControlOffer && state.pendingControlOffer.peerId === targetId);
     if (controllingThis) {
       grantBtn.classList.add('danger');
-      grantBtn.innerHTML = '⛔ Denetimi Geri Al';
+      grantBtn.innerHTML = `${uiIcon('ban', 14)} <span>Denetimi Geri Al</span>`;
       grantBtn.addEventListener('click', () => {
         stopBeingControlled(true);
         showToast(t('toast.controlRevoked'), 'info');
@@ -7185,7 +7858,7 @@ function showUserContextMenu(e, targetId, targetName) {
       grantBtn.title = busyWithOther
         ? 'Denetim şu anda başka bir kullanıcıda.'
         : (offerPending ? 'Denetim teklifi gönderildi, yanıt bekleniyor.' : 'Bu kişiye denetim ver (istemesini beklemeden)');
-      grantBtn.innerHTML = '🎮 ' + (offerPending ? 'Teklif gönderildi…' : 'Denetim Ver');
+      grantBtn.innerHTML = `${uiIcon('mousePointer', 14)} <span>${offerPending ? 'Teklif gönderildi…' : 'Denetim Ver'}</span>`;
       grantBtn.addEventListener('click', () => {
         offerControl(targetId);
         menu.remove();
@@ -7198,7 +7871,7 @@ function showUserContextMenu(e, targetId, targetName) {
   const closeBtn = document.createElement('button');
   closeBtn.className = 'user-context-menu-item danger';
   closeBtn.style.cssText = 'border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4px;';
-  closeBtn.innerHTML = '✕ Kapat';
+  closeBtn.innerHTML = `${uiIcon('x', 14)} <span>Kapat</span>`;
   closeBtn.addEventListener('click', () => {
     menu.remove();
   });
@@ -7588,7 +8261,7 @@ function filterActivityCards(query = '') {
 
   picker.classList.toggle('activity-picker-searching', Boolean(normalizedQuery));
   const count = picker.querySelector('.activity-section-hint');
-  if (count) count.textContent = `${visibleCount} etkinlik`;
+  if (count) count.textContent = t('activity.count', { n: visibleCount });
   const empty = document.getElementById('activity-empty');
   if (empty) empty.classList.toggle('hidden', visibleCount !== 0);
 }
@@ -7642,7 +8315,7 @@ function buildCardVolumeBox(peerId, channel) {
   if (chan === 'screen') {
     const tag = document.createElement('span');
     tag.className = 'vcard-vol-tag';
-    tag.textContent = '🖥';
+    tag.innerHTML = uiIcon('monitor', 14);
     volBox.appendChild(tag);
   }
 
@@ -7727,7 +8400,7 @@ function addVideoCard(peerId, peerName, videoEl, isScreen) {
       ctrlBtn.className = 'vcard-ctrl-btn';
       ctrlBtn.type = 'button';
       ctrlBtn.dataset.ctrl = peerId;
-      ctrlBtn.innerHTML = '🖱️ <span>Denetle</span>';
+      ctrlBtn.innerHTML = `${uiIcon('mousePointer', 14)} <span>Denetle</span>`;
       ctrlBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         // Zaten denetim oturumu açıksa düğme pencereyi geri getirir.
@@ -7950,7 +8623,7 @@ function appendChat(uid, name, text, isCensored = false) {
   const t = formatUserTime(new Date());
 
   let notifyText = typeof text === 'string' ? text : String(text || '');
-  if (isCensored) notifyText = "🚫 [Yapay Zeka Tarafından Sansürlendi]";
+  if (isCensored) notifyText = "[Yapay Zeka Tarafından Sansürlendi]";
 
   if (lastChatEntry && lastChatEntry.uid === uid && lastChatEntry.text === text && lastChatEntry.isCensored === isCensored && wrap.contains(lastChatEntry.el)) {
     lastChatEntry.count++;
@@ -8082,11 +8755,19 @@ function safeDomId(prefix, value) {
   return `${prefix}${String(value).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 128)}`;
 }
 
+// Avatar ÇİZİM çözücüsü (tek giriş noktası, js/profile-media.js): P2P
+// tanımlayıcısı (tsm:…) → bu cihazdaki blob: adresi (yoksa getirilir, o sırada
+// ''), eski Supabase "avatars" kovası adresi, yerelde duran eski base64 avatar.
+// Rastgele uzak adresler kabul edilmez. Saklamak için safeAvatarRef kullanılır.
 function safeAvatarUrl(value) {
   if (typeof value !== 'string' || value.length > 2 * 1024 * 1024) return '';
-  if (/^https:\/\//i.test(value)) return value;
-  if (/^data:image\/(?!svg\+xml\b)[a-z0-9.+-]+;base64,/i.test(value)) return value;
-  return '';
+  return window.TSProfileMedia ? window.TSProfileMedia.src(value) : '';
+}
+
+// Saklanabilir avatar değeri (state / arkadaş kaydı / oda peer'i): çözülmez.
+function safeAvatarRef(value) {
+  if (typeof value !== 'string' || value.length > 2 * 1024 * 1024) return '';
+  return window.TSProfileMedia ? window.TSProfileMedia.safeRef(value) : '';
 }
 
 function safeFileName(value) {
@@ -8199,7 +8880,7 @@ const I18N = {
     'auth.serverConfigMissing': 'Sunucu yapılandırması eksik (.env dosyasını kontrol edin).',
     'auth.deviceApiMissing': 'Cihaz kimliği API bulunamadı (preload güncel değil).',
     'auth.creatingAccount': 'Bu cihaz için yeni hesap oluşturuluyor...',
-    'auth.emailConfirmationPending': 'Sunucu e-posta onayı bekliyor; Supabase panelinden "Confirm email" kapatılmalı.',
+    'auth.emailConfirmationPending': "Sunucu şu anda yeni hesap onayı bekliyor. Lütfen daha sonra tekrar dene.",
     'auth.loginFailed': 'Giriş yapılamadı: ',
     'auth.serverUnreachable': 'Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edip birazdan tekrar deneyin.',
     'auth.codeLogin': "Kodla Giriş Yap",
@@ -8231,8 +8912,8 @@ const I18N = {
     'settings.ram': "Bellek",
     'settings.appVersion': "Uygulama sürümü",
     'settings.firstSeen': "İlk kurulum",
-    'settings.cloudStatus': "Bulut kaydı",
-    'settings.cloudRegistered': "Supabase'de kayıtlı · son görülme {time}",
+    'settings.cloudStatus': "Sunucu kaydı",
+    'settings.cloudRegistered': "Sunucuda kayıtlı · son giriş {time}",
     'settings.cloudNotRegistered': "Kayıtlı değil",
     'settings.cloudLegacy': "Kayıtlı değil — eski tip hesap",
     'settings.copyAll': "Tüm cihaz bilgilerini kopyala",
@@ -8241,13 +8922,20 @@ const I18N = {
     'settings.accountKindCode': "Kodla eklendi",
     'settings.accountKindLegacy': "Eski tip · yalnızca bu cihazda",
     'settings.accountActive': "Etkin",
-    'settings.legacyCodeDesc': "Bu hesap eski tip: yalnızca bu bilgisayarda saklanıyor, bu yüzden giriş kodu yok. Buluta taşırsan adın, arkadaş ID'n ve arkadaş listen korunur; sonra başka cihazlarda kodla girebilirsin.",
-    'settings.migrateLegacy': "Hesabı Buluta Taşı",
-    'settings.migrateConfirm': "Adın, arkadaş ID'n ve arkadaş listen buluta (Supabase) kopyalanacak ve bu cihazda bir hesap yeri kullanılacak. Devam edilsin mi?",
-    'settings.migrateDone': "Hesap buluta taşındı. Giriş kodun hazır.",
+    'settings.legacyCodeDesc': "Bu hesap eski tip: yalnızca bu bilgisayarda saklanıyor, bu yüzden giriş kodu yok. Sunucuya taşırsan adın, KNK kimliğin ve arkadaş listen korunur; sonra başka cihazlarda kodla girebilirsin.",
+    'settings.migrateLegacy': "Hesabı Sunucuya Taşı",
+    'settings.migrateConfirm': "{name} ({id}) sunucuya taşınacak:\n• Adın, KNK kimliğin, profil ayrıntıların, arkadaş listen ve bekleyen arkadaşlık isteklerin sunucudaki yeni hesabına kopyalanır; böylece hesabı başka cihazlarda giriş koduyla açabilirsin.\n• Profil resimlerin sunucuya yüklenmez: bu cihazda kalır ve arkadaşlarına doğrudan gönderilir.\n• KNK kimliğin aynı kalır, arkadaşlıkların kopmaz.\n• Mesaj geçmişin, grupların ve ayarların sunucuya yüklenmez; bu bilgisayarda kalır.\n• Bu cihazdaki 3 hesap yerinden biri kullanılır ve hemen yeni hesaba geçersin.\n• Eski yerel kayıt silinmez; yedek olarak saklanır ama listede gizlenir.\nDevam edilsin mi?",
+    'settings.migrateDone': "Hesap sunucuya taşındı. Giriş kodun hazır.",
     'settings.migrateFailed': "Hesap taşınamadı: ",
-    'settings.migrateIdTaken': "Bu arkadaş ID'si bulutta başka bir hesapta kayıtlı.",
+    'settings.migrateIdTaken': "Bu KNK kimliği sunucuda zaten bir hesaba ait. Hesap daha önce taşınmış olabilir: o hesabı giriş koduyla açabilirsin.",
     'settings.migrateNotLegacy': "Açık hesap eski tip değil.",
+    'settings.migrateAlready': "Bu hesap zaten sunucuya taşınmış. Hesap değiştir ekranından sunucu hesabını açabilirsin.",
+    'settings.accountsServer': "Sunucu hesapları",
+    'settings.accountsServerCount': "Sunucu hesapları {n}/{max}",
+    'settings.accountsLegacyHead': "Yalnızca bu cihazdaki eski hesaplar",
+    'settings.copyAccountId': "Kimliği kopyala",
+    'settings.pttKey': "Bas-Konuş tuşu",
+    'settings.pttKeyHint': "Değiştirmek için tuşa tıkla, sonra yeni tuşa bas. Esc iptal eder.",
     'auth.profileLoadFailed': 'Profil yüklenemedi: ',
     'room.creatingTitle': '{room} Odası Oluşturuluyor',
     'room.joiningTitle': '{room} Odasına Katılıyor',
@@ -8445,7 +9133,7 @@ const I18N = {
     'settings.hwaccel': 'Donanım Hızlandırma',
     'settings.hwaccelDesc': 'Daha akıcı arayüz ve efektler için GPU kullanır. Değişiklik yeniden başlatınca uygulanır.',
     'settings.ptt': 'Bas-Konuş',
-    'settings.pttDesc': 'Yalnızca SPACE tuşuna basılıyken ses iletir.',
+    'settings.pttDesc': 'Yalnızca {key} tuşuna basılıyken ses iletir.',
     'settings.quality': 'Ekran Kalitesi',
     'settings.qualityHigh': 'Yüksek (1080p)',
     'settings.qualityMedium': 'Orta (720p)',
@@ -8485,7 +9173,7 @@ const I18N = {
     'auth.serverConfigMissing': 'Server configuration is missing (check the .env file).',
     'auth.deviceApiMissing': 'Device identity API not found (preload is outdated).',
     'auth.creatingAccount': 'Creating a new account for this device...',
-    'auth.emailConfirmationPending': 'The server is waiting for email confirmation; disable "Confirm email" in the Supabase dashboard.',
+    'auth.emailConfirmationPending': "The server is waiting to confirm new accounts right now. Please try again later.",
     'auth.loginFailed': 'Login failed: ',
     'auth.serverUnreachable': "Can't reach the server. Check your internet connection and try again in a moment.",
     'auth.codeLogin': "Sign in with code",
@@ -8517,8 +9205,8 @@ const I18N = {
     'settings.ram': "Memory",
     'settings.appVersion': "App version",
     'settings.firstSeen': "First installed",
-    'settings.cloudStatus': "Cloud record",
-    'settings.cloudRegistered': "Registered in Supabase · last seen {time}",
+    'settings.cloudStatus': "Server record",
+    'settings.cloudRegistered': "Registered on the server · last sign-in {time}",
     'settings.cloudNotRegistered': "Not registered",
     'settings.cloudLegacy': "Not registered — legacy account",
     'settings.copyAll': "Copy all device info",
@@ -8527,13 +9215,20 @@ const I18N = {
     'settings.accountKindCode': "Added with code",
     'settings.accountKindLegacy': "Legacy · this device only",
     'settings.accountActive': "Active",
-    'settings.legacyCodeDesc': "This is a legacy account: it is stored only on this computer, so it has no sign-in code. Move it to the cloud to keep your name, friend ID and friends list, then sign in on other devices with a code.",
-    'settings.migrateLegacy': "Move account to cloud",
-    'settings.migrateConfirm': "Your name, friend ID and friends list will be copied to the cloud (Supabase), and one account slot on this device will be used. Continue?",
-    'settings.migrateDone': "Account moved to the cloud. Your sign-in code is ready.",
+    'settings.legacyCodeDesc': "This is a legacy account: it is stored only on this computer, so it has no sign-in code. Move it to the server to keep your name, KNK ID and friends list, then sign in on other devices with a code.",
+    'settings.migrateLegacy': "Move account to server",
+    'settings.migrateConfirm': "{name} ({id}) will be moved to the server:\n• Your name, KNK ID, profile details, friends list and pending friend requests are copied to your new server account, so you can open it on other devices with the sign-in code.\n• Your profile pictures are not uploaded to the server: they stay on this device and are sent directly to your friends.\n• Your KNK ID stays the same, so you keep your friends.\n• Your message history, groups and settings are not uploaded; they stay on this computer.\n• One of the 3 account slots on this device is used and you switch to the new account right away.\n• The old local entry is not deleted; it is kept as a backup but hidden from the list.\nContinue?",
+    'settings.migrateDone': "Account moved to the server. Your sign-in code is ready.",
     'settings.migrateFailed': "Couldn't move the account: ",
-    'settings.migrateIdTaken': "This friend ID is already registered to another cloud account.",
+    'settings.migrateIdTaken': "This KNK ID already belongs to an account on the server. It may have been moved before: open that account with its sign-in code.",
     'settings.migrateNotLegacy': "The open account is not a legacy account.",
+    'settings.migrateAlready': "This account has already been moved to the server. Open the server account from the account switcher.",
+    'settings.accountsServer': "Server accounts",
+    'settings.accountsServerCount': "Server accounts {n}/{max}",
+    'settings.accountsLegacyHead': "Legacy accounts on this device only",
+    'settings.copyAccountId': "Copy ID",
+    'settings.pttKey': "Push to Talk key",
+    'settings.pttKeyHint': "Click the key, then press a new one. Esc cancels.",
     'auth.profileLoadFailed': 'Failed to load profile: ',
     'room.creatingTitle': '{room} — Creating Room',
     'room.joiningTitle': '{room} — Joining Room',
@@ -8731,7 +9426,7 @@ const I18N = {
     'settings.hwaccel': 'Hardware Acceleration',
     'settings.hwaccelDesc': 'Uses the GPU for smoother visuals and effects. Applied after restarting the app.',
     'settings.ptt': 'Push to Talk',
-    'settings.pttDesc': 'Transmits your voice only while the SPACE key is held.',
+    'settings.pttDesc': 'Transmits your voice only while {key} is held.',
     'settings.quality': 'Screen Quality',
     'settings.qualityHigh': 'High (1080p)',
     'settings.qualityMedium': 'Medium (720p)',
@@ -9531,11 +10226,14 @@ const CUSTOM_THEME_PRESETS = [
 ];
 
 const BUILT_IN_THEME_PRESETS = [
-  { id: 'aurora', theme: 'aurora', nameKey: 'settings.themeAurora', bg: '#3d164e', accent: '#cf4fa7', button: '#4f68e8' },
-  { id: 'black', theme: 'black', nameKey: 'settings.themeBlack', bg: '#17171b', accent: '#555764', button: '#26313d' },
-  { id: 'navy', theme: 'navy', nameKey: 'settings.themeNavy', bg: '#14294d', accent: '#2b7bc4', button: '#29428a' },
-  { id: 'white', theme: 'white', nameKey: 'settings.themeWhite', bg: '#e4e9f2', accent: '#2563eb', button: '#2563eb' },
-  { id: 'violet', theme: 'violet', nameKey: 'settings.themeViolet', bg: '#e6dcfa', accent: '#7c3aed', button: '#7c3aed' },
+  // bg/accent/button = style.css :root[data-theme="…"] içindeki --bg-dark /
+  // --acc / --acc-btn; kart neyi gösteriyorsa arayüz onu uygular
+  // (test/e2e/theme-presets.test.js).
+  { id: 'aurora', theme: 'aurora', nameKey: 'settings.themeAurora', bg: '#20162b', accent: '#d05ca8', button: '#4f5fe0' },
+  { id: 'black', theme: 'black', nameKey: 'settings.themeBlack', bg: '#0a0a0c', accent: '#8b8d98', button: '#a5a7b3' },
+  { id: 'navy', theme: 'navy', nameKey: 'settings.themeNavy', bg: '#081426', accent: '#3b82f6', button: '#2563eb' },
+  { id: 'white', theme: 'white', nameKey: 'settings.themeWhite', bg: '#f3f6fb', accent: '#2563eb', button: '#2563eb' },
+  { id: 'violet', theme: 'violet', nameKey: 'settings.themeViolet', bg: '#f6f4fc', accent: '#8b5cf6', button: '#7c3aed' },
   { id: 'custom', theme: 'custom', nameKey: 'settings.themeCustom', bg: '#1a1130', accent: '#a855f7', button: '#8b5cf6', editor: true }
 ];
 
@@ -9708,6 +10406,7 @@ function applyCustomThemeColors({ bg, accent, button }, persist = false) {
   const isLight = hexLuminance(bg) > 0.5;
   root.setProperty('--custom-text-main', isLight ? '#172033' : '#f5f5f5');
   root.setProperty('--custom-text-mut', isLight ? '#5b6472' : '#b7b2c4');
+  root.setProperty('--custom-status-online', isLight ? '#2f7d62' : '#91bca5');
   syncCustomColorSwatchState({ bg, accent, button });
   if (persist) {
     localStorage.setItem(CUSTOM_BG_KEY, bg);
@@ -9890,10 +10589,10 @@ function refreshCustomThemePresetLabels() {
 
 // Kart içindeki rozetler (yıldız, çöp kutusu) <button> içinde yer aldığı için
 // span + role="button" olarak kuruluyor; iç içe <button> geçersiz olurdu.
-function createPaletteBadge({ className, glyph, label, pressed, onActivate }) {
+function createPaletteBadge({ className, icon, label, pressed, onActivate }) {
   const badge = document.createElement('span');
   badge.className = className;
-  badge.textContent = glyph;
+  badge.innerHTML = uiIcon(icon, className.includes('-del') ? 11 : 13);
   badge.setAttribute('role', 'button');
   badge.tabIndex = 0;
   badge.title = label;
@@ -9938,7 +10637,7 @@ function createPaletteCard(preset, kind) {
   const favorite = isFavoritePalette(preset.id);
   const star = createPaletteBadge({
     className: `settings-theme-preset-star${favorite ? ' active' : ''}`,
-    glyph: favorite ? '★' : '☆',
+    icon: favorite ? 'starFilled' : 'star',
     label: t(favorite ? 'settings.themeUnfavorite' : 'settings.themeFavorite'),
     pressed: favorite,
     onActivate: () => toggleFavoritePalette(preset.id)
@@ -9949,7 +10648,7 @@ function createPaletteCard(preset, kind) {
   if (kind === 'saved') {
     btn.append(createPaletteBadge({
       className: 'settings-theme-preset-del',
-      glyph: '✕',
+      icon: 'x',
       label: t('settings.themeDeletePalette'),
       onActivate: () => deleteSavedPalette(preset.id)
     }));
@@ -9957,7 +10656,10 @@ function createPaletteCard(preset, kind) {
 
   btn.addEventListener('click', () => {
     markSettingsDirty();
-    if (preset.theme) {
+    // "Kendi Temam" kartı kayıtlı özel renkleri gösterir; yalnızca temayı
+    // "custom"a çevirmek, az önce önizlenen paletin renklerini bırakıyordu
+    // (kart başka, ekran başka renk). Kartın renkleri düzenleyiciye yazılır.
+    if (preset.theme && preset.theme !== 'custom') {
       applyUserTheme(preset.theme);
       return;
     }
@@ -10057,7 +10759,8 @@ function applyUserTheme(theme, persist = false) {
     }
   }
   syncThemeSelection(selected);
-  const customBg = selected === 'custom' ? getCustomThemeColors().bg : null;
+  // Önizlemede pencere zemini de düzenleyicideki (henüz kaydedilmemiş) renge uysun.
+  const customBg = selected === 'custom' ? (persist ? getCustomThemeColors().bg : getEditorColors().bg) : null;
   window.electronAPI?.setWindowTheme?.(selected, persist, customBg);
   return selected;
 }
@@ -10120,7 +10823,7 @@ function renderLanguageOptions() {
     });
     const flag = document.createElement('span');
     flag.className = 'language-flag';
-    flag.textContent = meta.flag;
+    flag.textContent = String(language).split('-')[0].toUpperCase(); // bayrak emojisi yerine dil kodu
     const copy = document.createElement('span');
     const name = document.createElement('strong');
     name.textContent = meta.name;
@@ -10128,7 +10831,7 @@ function renderLanguageOptions() {
     native.textContent = meta.native;
     copy.append(name, native);
     const mark = document.createElement('i');
-    mark.textContent = '✓';
+    mark.innerHTML = (window.TSUI && window.TSUI.icon) ? window.TSUI.icon('check', 14, 2.5) : '';
     label.append(input, flag, copy, mark);
     return label;
   };
@@ -10181,6 +10884,8 @@ function applyUserLanguage(language, persist = true) {
   // Tepsi menüsü / arka plan bildirimi renderer'ın localStorage'ını göremez.
   try { window.electronAPI?.setAppLanguage?.(lang); } catch (e) {}
   if (typeof refreshCustomThemePresetLabels === 'function') refreshCustomThemePresetLabels();
+  // Bas-Konuş açıklaması gerçek tuşu adıyla içerir ({key}); data-i18n ile değil buradan yazılır.
+  if (typeof syncPttKeyUi === 'function') syncPttKeyUi();
   refreshActivityCoverLocale();
   if (typeof window.refreshNameCityLocale === 'function') window.refreshNameCityLocale();
   // Focus controls are moved in and out of the DOM, so refresh their titles
@@ -10201,6 +10906,9 @@ function applyUserLanguage(language, persist = true) {
   populateSettingsAudioDevices();
   refreshAudioDeviceDefaultLabels();
   window.TeamSyncMediaLibrary?.refresh();
+  // Kabuk listeleri (sohbet listesi, Kişiler) metinlerini çizerken t() ile
+  // yazar; dil değişince yeniden çizilmezse eski dilde kalıyorlardı.
+  try { window.TSDM?.renderList?.(); window.TSFriends?.render?.(); } catch (e) { console.warn('[i18n] kabuk yeniden çizilemedi', e); }
 }
 
 // Oda içindeki cihaz listeleri (#mic-select / #speaker-select) odaya girilirken
@@ -10473,31 +11181,59 @@ async function renderAccountSettings() {
   // Bu cihazdaki hesaplar
   const listEl = document.getElementById('settings-device-accounts-list');
   const countEl = document.getElementById('settings-device-accounts');
-  if (countEl && accounts) countEl.textContent = `${accounts.count()}/${accounts.max}`;
+  // Sayaç yalnızca sunucu hesabı yerlerini (en çok 3) sayar; eski tip
+  // hesaplar bu sınıra dahil değildir ve ayrı başlık altında listelenir.
+  if (countEl && accounts) countEl.textContent = t('settings.accountsServerCount', { n: accounts.count(), max: accounts.max });
   if (listEl && accounts) {
     const rows = await accounts.list().catch(() => []);
     listEl.innerHTML = '';
-    rows.forEach(acc => {
+    const copyIcon = () => (window.TSUI && typeof window.TSUI.icon === 'function' && window.TSUI.icon('copy', 14))
+      || '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    const renderRow = acc => {
       const row = document.createElement('div');
       row.className = 'settings-device-account' + (acc.active ? ' is-active' : '');
+      if (acc.active) row.setAttribute('aria-current', 'true');
       const main = document.createElement('div');
+      main.className = 'settings-device-account-main';
       const name = document.createElement('strong');
       name.textContent = acc.name;
-      const id = document.createElement('span');
-      id.textContent = acc.id;
+      const id = document.createElement('code');
+      id.className = 'settings-device-account-id';
+      id.textContent = acc.id || '—';
+      id.title = acc.id || '';
       main.append(name, id);
-      const badge = document.createElement('span');
-      badge.className = 'settings-account-kind kind-' + acc.kind;
-      badge.textContent = t(acc.kind === 'code' ? 'settings.accountKindCode' : acc.kind === 'legacy' ? 'settings.accountKindLegacy' : 'settings.accountKindLocal');
-      row.append(main, badge);
+      const badges = document.createElement('div');
+      badges.className = 'settings-device-account-badges';
       if (acc.active) {
         const active = document.createElement('span');
         active.className = 'settings-account-active';
         active.textContent = t('settings.accountActive');
-        row.append(active);
+        badges.append(active);
       }
-      listEl.append(row);
-    });
+      const badge = document.createElement('span');
+      badge.className = 'settings-account-kind kind-' + acc.kind;
+      badge.textContent = t(acc.kind === 'code' ? 'settings.accountKindCode' : acc.kind === 'legacy' ? 'settings.accountKindLegacy' : 'settings.accountKindLocal');
+      badges.append(badge);
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'settings-icon-button settings-device-account-copy';
+      copy.title = t('settings.copyAccountId');
+      copy.setAttribute('aria-label', `${t('settings.copyAccountId')}: ${acc.id}`);
+      copy.innerHTML = copyIcon();
+      copy.disabled = !acc.id;
+      copy.addEventListener('click', () => copySettingsText(acc.id));
+      row.append(main, badges, copy);
+      return row;
+    };
+    const group = (titleKey, items) => {
+      if (!items.length) return;
+      const head = document.createElement('div');
+      head.className = 'settings-device-accounts-group';
+      head.textContent = t(titleKey);
+      listEl.append(head, ...items.map(renderRow));
+    };
+    group('settings.accountsServer', rows.filter(acc => acc.kind !== 'legacy'));
+    group('settings.accountsLegacyHead', rows.filter(acc => acc.kind === 'legacy'));
   }
 
   // Giriş kodu: eski tip hesapta kod yoktur, yerine buluta taşıma sunulur.
@@ -10528,7 +11264,13 @@ function initAccountSettings() {
   document.getElementById('settings-device-copy-all')?.addEventListener('click', () => copySettingsText(deviceInfoText));
   document.getElementById('settings-migrate-legacy')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
-    const ok = await window.showConfirm(t('settings.migrateLegacy'), t('settings.migrateConfirm'));
+    const pending = window.showConfirm(t('settings.migrateLegacy'),
+      t('settings.migrateConfirm', { name: state.myName || 'Anonim', id: state.friendId || '—' }), { danger: false });
+    // Madde madde açıklama ortalanınca okunmuyor; yalnızca bu onay için sola hizala.
+    const confirmMsg = document.getElementById('generic-confirm-message');
+    if (confirmMsg) confirmMsg.style.textAlign = 'left';
+    const ok = await pending;
+    if (confirmMsg) confirmMsg.style.textAlign = '';
     if (!ok || !window.TSAccounts) return;
     btn.disabled = true;
     try {
@@ -10574,6 +11316,7 @@ function openUserSettings(panel = 'general') {
   document.getElementById('user-turn-pass').value = localStorage.getItem('teamsync_turn_pass') || '';
   syncDnsProviderSelect();
   document.getElementById('user-settings-ptt').checked = localStorage.getItem('teamsync_ptt_enabled') === '1';
+  if (typeof syncPttKeyUi === 'function') syncPttKeyUi();
   const noiseSuppressionEl = document.getElementById('user-settings-noise-suppression');
   if (noiseSuppressionEl) noiseSuppressionEl.checked = localStorage.getItem(USER_NOISE_SUPPRESSION_KEY) !== '0';
   document.getElementById('user-quality-select').value = localStorage.getItem(USER_QUALITY_KEY) || document.getElementById('quality-select').value || 'medium';
@@ -11038,6 +11781,8 @@ function bindUI() {
     document.getElementById('founder-sfw-mode').checked = state.sfwMode || false;
     refreshSfwChatBanSettings();
     document.getElementById('founder-game-mode').checked = state.gameMode || false;
+    const autoHostEl = document.getElementById('founder-auto-host');
+    if (autoHostEl) autoHostEl.checked = !!state.autoHost;
     document.getElementById('founder-noise-suppression').checked = !!state.useAI;
     const bitrateEl = document.getElementById('founder-bitrate');
     if (bitrateEl) bitrateEl.value = String(getAudioBitrate());
@@ -11048,7 +11793,8 @@ function bindUI() {
     ownerOnly.classList.toggle('hidden', !state.isRoomFounder);
     document.getElementById('founder-modal-title-text').textContent = state.isRoomFounder ? 'Kurucu Ayarları' : 'Oyuncu Yönetimi (Yetkili)';
     document.getElementById('founder-modal-subtitle').textContent = state.isRoomFounder
-      ? 'Sadece sunucuyu kuran kişi bu ayarları görebilir.'
+      // Kurucu rolü devredilebilir / otomatik geçebilir: "kuran kişi" değil, şu anki kurucu.
+      ? t('founder.panelHint')
       : 'Kurucu tarafından sana yetki verildi: oyuncuları susturabilir veya atabilirsin.';
 
     // Populate Player List
@@ -11117,7 +11863,7 @@ function bindUI() {
         kickBtn.style.color = 'var(--danger)';
         kickBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
         kickBtn.onclick = async () => {
-          if (!(await window.showConfirm('⚠️ Oyuncuyu At', `"${peer.name}" sunucudan atılsın mı?`))) return;
+          if (!(await window.showConfirm('Oyuncuyu At', `"${peer.name}" sunucudan atılsın mı?`))) return;
           broadcast({ type: 'kick_peer', targetId: peerId });
           showToast(`${peer.name} ${t('toast.peerKicked')}`, 'info');
         };
@@ -11141,14 +11887,14 @@ function bindUI() {
           const modBtn = document.createElement('button');
           modBtn.className = 'btn-sec btn-sm';
           const nowMod = isPeerModerator(peerId);
-          modBtn.textContent = nowMod ? '🛡️ Yetkiyi Al' : '🛡️ Yetki Ver';
+          modBtn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;">${uiIcon('shield', 13)}<span>${nowMod ? 'Yetkiyi Al' : 'Yetki Ver'}</span></span>`;
           modBtn.style.padding = '4px 8px';
           modBtn.style.fontSize = '12px';
           modBtn.onclick = async () => {
             const confirmMsg = nowMod
               ? `"${peer.name}" adlı kişinin yetkilisi (moderatör) yetkisi alınsın mı?`
               : `"${peer.name}" adlı kişiye yetkili (moderatör) yetkisi verilsin mi? Bu kişi oyuncuları susturabilir ve atabilir.`;
-            if (!(await window.showConfirm(nowMod ? '⚠️ Yetkiyi Al' : '👑 Yetki Ver', confirmMsg))) return;
+            if (!(await window.showConfirm(nowMod ? 'Yetkiyi Al' : 'Yetki Ver', confirmMsg, { danger: !!nowMod }))) return;
             if (nowMod) state.moderators.delete(peerId); else state.moderators.add(peerId);
             broadcast({ type: 'set_moderator', targetId: peerId, value: !nowMod });
             refreshUserRoleBadge(peerId);
@@ -11161,19 +11907,13 @@ function bindUI() {
           transferBtn.className = 'btn-sec btn-sm';
           transferBtn.style.padding = '4px 8px';
           transferBtn.style.fontSize = '12px';
-          transferBtn.style.color = '#fbbf24';
+          transferBtn.style.color = 'var(--warn)';
           transferBtn.style.borderColor = 'rgba(251, 191, 36, 0.3)';
-          transferBtn.innerHTML = '👑 Devret';
+          transferBtn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;">${uiIcon('crown', 13)}<span>Devret</span></span>`;
           transferBtn.onclick = async () => {
-            if (!(await window.showConfirm('👑 Sahipliği Devret', `Sunucu sahipliğini "${peer.name}" adlı kişiye devretmek istediğine emin misin? Bu işlemden sonra kurucu yetkisini kaybedeceksin.`))) return;
-            const oldFounderId = state.myId;
-            state.isRoomFounder = false;
-            state.founderId = peerId;
-            state.moderators.delete(peerId);
-            broadcast({ type: 'transfer_ownership', targetId: peerId, fromId: oldFounderId });
-            refreshUserRoleBadge(oldFounderId);
-            refreshUserRoleBadge(peerId);
-            updateFounderMenuVisibility();
+            if (!(await window.showConfirm('Sahipliği Devret',`Sunucu sahipliğini "${peer.name}" adlı kişiye devretmek istediğine emin misin? Bu işlemden sonra kurucu yetkisini kaybedeceksin.`))) return;
+            // Dönem + oda ayarlarıyla devir (bkz. transferFounderTo).
+            if (!transferFounderTo(peerId)) return;
             document.getElementById('founder-settings-modal').classList.add('hidden');
             showToast(`${t('toast.ownershipTransferredPrefix')} ${peer.name} ${t('toast.ownershipTransferredSuffix')}`, 'info');
           };
@@ -11186,9 +11926,9 @@ function bindUI() {
           banBtn.style.fontSize = '12px';
           banBtn.style.color = 'var(--danger)';
           banBtn.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-          banBtn.innerHTML = '🚫 Yasakla';
+          banBtn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;">${uiIcon('ban', 13)}<span>Yasakla</span></span>`;
           banBtn.onclick = async () => {
-            if (!(await window.showConfirm('🚫 Kalıcı Yasakla', `"${peer.name}" bu sunucudan kalıcı olarak yasaklansın mı? Bu kişi bir daha bu odaya giremez.`))) return;
+            if (!(await window.showConfirm('Kalıcı Yasakla',`"${peer.name}" bu sunucudan kalıcı olarak yasaklansın mı? Bu kişi bir daha bu odaya giremez.`))) return;
             if (!state.bannedIds) state.bannedIds = new Set();
             state.bannedIds.add(peerId);
             if (state.room) saveRoomBans(state.room);
@@ -11203,12 +11943,12 @@ function bindUI() {
           chatBanBtn.className = 'btn-sec btn-sm';
           chatBanBtn.style.padding = '4px 8px';
           chatBanBtn.style.fontSize = '12px';
-          chatBanBtn.style.color = chatBanned ? 'var(--ok)' : '#fbbf24';
+          chatBanBtn.style.color = chatBanned ? 'var(--ok)' : 'var(--warn)';
           chatBanBtn.style.borderColor = chatBanned ? 'rgba(74,222,128,0.3)' : 'rgba(251,191,36,0.3)';
-          chatBanBtn.innerHTML = chatBanned ? '💬 Sohbet yasağını kaldır' : '💬 Sohbetten yasakla';
+          chatBanBtn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;">${uiIcon('messageCircle', 13)}<span>${chatBanned ? 'Sohbet yasağını kaldır' : 'Sohbetten yasakla'}</span></span>`;
           chatBanBtn.onclick = async () => {
             const action = chatBanned ? 'sohbet yasağı kaldırılsın mı?' : 'sohbetten yasaklansın mı?';
-            if (!(await window.showConfirm('💬 Sohbet Moderasyonu', `"${peer.name}" ${action}`))) return;
+            if (!(await window.showConfirm('Sohbet Moderasyonu',`"${peer.name}" ${action}`))) return;
             setChatBan(peerId, !chatBanned);
             showToast(chatBanned ? `${peer.name} ${t('toast.chatBanRemovedSuffix')}` : `${peer.name} ${t('toast.chatBannedSuffix')}`, 'info');
             document.getElementById('founder-settings').dispatchEvent(new Event('click'));
@@ -11246,7 +11986,7 @@ function bindUI() {
     if (state.sfwMode && state.roomName) {
       state.roomName = censorProfaneText(state.roomName);
       const titleEl = document.getElementById('room-title');
-      if (titleEl) titleEl.textContent = '# ' + state.roomName + (state.cryptoKey ? ' 🔒' : '');
+      setRoomTitle(titleEl);
     }
     if (state.sfwMode) loadAIFilter();
     refreshSfwChatBanSettings();
@@ -11283,6 +12023,35 @@ function bindUI() {
       input.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
+
+  // "Kurucu: bağlantısı en iyi olan" anahtarı (index.html'e dokunmadan
+  // kurucu panelinin başına eklenir; metinler teams-strings.js'te).
+  (function mountAutoHostSwitch() {
+    const host = document.getElementById('founder-owner-only-settings');
+    if (!host || document.getElementById('founder-auto-host')) return;
+    const row = document.createElement('div');
+    row.className = 'founder-autohost-row';
+    row.style.cssText = 'margin-top:20px; display:flex; align-items:center; justify-content:space-between; gap:12px;';
+    row.innerHTML = `<label for="founder-auto-host" style="font-weight:bold; display:flex; align-items:center; gap:8px;">${window.TSUI && window.TSUI.icon ? window.TSUI.icon('crown', 16) : ''}<span data-i18n="founder.autoHost">${escapeHtml(t('founder.autoHost'))}</span></label>
+      <label class="switch"><input type="checkbox" id="founder-auto-host"><span class="slider round"></span></label>`;
+    const desc = document.createElement('p');
+    desc.className = 'muted';
+    desc.style.cssText = 'margin-top:10px; font-size:12px;';
+    desc.setAttribute('data-i18n', 'founder.autoHostDesc');
+    desc.textContent = t('founder.autoHostDesc');
+    host.prepend(desc);
+    host.prepend(row);
+    document.getElementById('founder-auto-host').addEventListener('change', (e) => {
+      if (!state.isRoomFounder) { e.target.checked = !!state.autoHost; return; }
+      state.autoHost = !!e.target.checked;
+      state.autoHostStreak = null;
+      if (isClassicRoomId(state.room)) {
+        try { localStorage.setItem(AUTOHOST_CLASSIC_KEY, state.autoHost ? '1' : '0'); } catch (err) {}
+      }
+      broadcast({ type: 'founder_settings_update', autoHost: state.autoHost });
+      showToast(state.autoHost ? t('founder.autoHostOn') : t('founder.autoHostOff'), 'info');
+    });
+  })();
 
   document.getElementById('founder-game-mode').addEventListener('change', (e) => {
     state.gameMode = e.target.checked;
@@ -11459,14 +12228,29 @@ function applyPttMode(enabled) {
   const pttBtn = document.getElementById('ptt');
   if (enabled) {
     // Tuş artık Ayarlar → Kısayollar panelinden değiştirilebilir; varsayılan Space.
-    window.electronAPI.registerPTT(window.getPttAccelerator ? window.getPttAccelerator() : 'Space');
+    window.electronAPI.registerPTT(window.getPttAccelerator ? window.getPttAccelerator() : 'Space',
+      window.getPttHookBinding ? window.getPttHookBinding() : null);
     if (pttBtn) pttBtn.classList.remove('hidden');
     if (!state.pttAttached) {
-      window.electronAPI.onPTT(() => {
+      window.electronAPI.onPTT((_event, info) => {
         if (!state.pttMode) return;
+        // uiohook yolu tuşu yutmaz: TeamSync odaktayken bir yazı alanına
+        // Bas-Konuş tuşu yazılıyorsa (ör. Space ile mesaj yazmak) mikrofon
+        // açılmaz, tuş normal yazılır. globalShortcut yedeği tuşu zaten
+        // yuttuğu için orada eski davranış (her durumda konuş) korunur.
+        if (info && info.source === 'hook' && document.hasFocus()
+            && window.isShortcutTypingTarget && window.isShortcutTypingTarget(document.activeElement)) return;
+        if (state.pttActive) return; // basılı tutarken gelen tekrarlar
         state.pttActive = true;
         document.getElementById('ptt').classList.add('active');
         setMicEnabled(true);
+      });
+      // Tuş bırakıldı (main süreç uiohook): pencere odakta olmasa da çalışır.
+      window.electronAPI.onPTTRelease?.(() => {
+        if (!state.pttMode || !state.pttActive) return;
+        state.pttActive = false;
+        document.getElementById('ptt').classList.remove('active');
+        setMicEnabled(false);
       });
       document.addEventListener('keyup', (e) => {
         const isPttKey = window.matchesPttReleaseKey ? window.matchesPttReleaseKey(e) : e.code === 'Space';
@@ -11754,6 +12538,11 @@ document.getElementById('ctrl-accept').addEventListener('click', () => {
       closeCtrlModal();
       return;
     }
+    // İsteyen bu arada ayrıldıysa hayalet bir kimliğe denetim verilmez.
+    if (!state.peers.has(request.peerId)) {
+      closeCtrlModal();
+      return;
+    }
     // Kabul: gelen ctrl-event'lerin işleneceği kaynak burada kaydedilir.
     grantControlTo(request.peerId, request.reqId);
   }
@@ -11989,6 +12778,8 @@ const remotePressedKeys = new Set();
 
 function safeCursorAvatar(value) {
   if (typeof value !== 'string' || value.length > 2_000_000) return '';
+  // Kendi avatarım P2P tanımlayıcısıysa yerel blob: adresine çözülür.
+  if (window.TSProfileMedia && window.TSProfileMedia.isRef(value)) return safeAvatarUrl(value);
   return /^(https?:\/\/|data:image\/)/i.test(value) ? value : '';
 }
 
@@ -12327,6 +13118,7 @@ function resetSharedBrowserState() {
   state.sb.lastNavTs = 0;
   state.sb.lastVideoSyncTs = 0;
   state.sb.remoteVideoSyncTs = 0;
+  state.sb.remoteEcho = null;
   state.sb.lastVideoState = null;
   state.sb.lastActionTs = 0;
   state.sb.lastRoutineSyncTs = 0;
@@ -12437,10 +13229,33 @@ function limitVideoBitrate(sender) {
 }
 
 function disconnectApp() {
+  // Birebir aramada karşı tarafa "kapattım" de (eşler aşağıda silinmeden önce).
+  if (window.TSDirectCall && typeof window.TSDirectCall.announceEnd === 'function') {
+    try { window.TSDirectCall.announceEnd(); } catch (e) { console.warn('[leave] call_end gönderilemedi', e); }
+  }
+  // Katılım zaman aşımı odadan çıkınca da durmalı; yoksa sonraki odada/ana
+  // ekranda eski "katılamadı" akışı tetikleniyordu.
+  if (state.joinTimeout) { clearTimeout(state.joinTimeout); state.joinTimeout = null; }
   // Odadan çıkarken Ortak Tarayıcı'yı sıfırla — kart aşağıda sadece
   // GİZLENİYOR; webview boşaltılmazsa izlenen videonun sesi odadan
   // çıktıktan sonra da arka planda çalmaya devam ediyordu.
   resetSharedBrowserState();
+  // Ekran paylaşımı sürerken çıkılırsa yalnızca izleri durdurmak yetmiyordu:
+  // isSharing/screenStream/düğme/kart kalıyor, sonraki odada yeni gelenlere
+  // siyah bir paylaşım kartı gidiyordu. Paylaşımı gerçek yoldan kapat.
+  if (state.isSharing || state.screenStream) {
+    try { stopScreenShare(); } catch (e) { console.warn('[leave] paylaşım kapatılamadı', e); }
+  }
+  // Etkinlik lobisinden çıkılmazsa eski activeLobbyId sonraki odada gelen
+  // tüm etkinlik mesajlarını düşürüyor, gidenleri ölü lobi kimliğiyle
+  // damgalıyordu.
+  if (state.activeLobbyId && typeof window.leaveActiveLobby === 'function') {
+    try { window.leaveActiveLobby(); } catch (e) { console.warn('[leave] lobi kapatılamadı', e); }
+  }
+  state.lobbies = [];
+  state.activeLobbyId = null;
+  state.isLobbyHost = false;
+  state.spectating = false;
   // Kayıt sürüyorsa önce düzgünce bitir: aksi halde izler durduruluyor ama
   // MediaRecorder hiç stop edilmediği için kayıt dosyası asla inmiyordu.
   if (state.isRecording) stopRecording();
@@ -12461,13 +13276,23 @@ function disconnectApp() {
   if (state.remoteAudioCtx && state.remoteAudioCtx.state !== 'closed') {
     try { state.remoteAudioCtx.close(); } catch(e) {}
   }
+  // Kapanan bağlam referansı kalırsa bir sonraki aramada ses yükseltme
+  // zinciri ölü bağlama kuruluyor ve karşı taraf hiç duyulmuyordu.
+  state.remoteAudioCtx = null;
   
   if (window.electronAPI.stopDiscovery) {
     window.electronAPI.stopDiscovery();
   }
   
-  for (const id of state.peers.keys()) {
-    removePeer(id);
+  // Kendi çıkışımızda peer'ları sessizce temizle: "X ayrıldı" bildirimleri ve
+  // kurucu halefi seçimi (bizi yanlışlıkla yeni sahip yapıyordu) çalışmasın.
+  state.leavingRoom = true;
+  try {
+    for (const id of Array.from(state.peers.keys())) {
+      removePeer(id);
+    }
+  } finally {
+    state.leavingRoom = false;
   }
   state.peers.clear();
   state.speakingPeers.clear();
@@ -12521,6 +13346,11 @@ function disconnectApp() {
   // Sunucudan çıkınca susturma da kalkar (odaya özel).
   state.serverMuted = false;
   state.founderId = null;
+  state.isRoomFounder = false;
+  state.founderTerm = 0;
+  state.pendingFounderClaim = null;
+  // Katılırken (kimseye ulaşmadan) çıkılırsa bayrak kalıp sonraki odayı bozuyordu.
+  state.isJoining = false;
   document.getElementById('founder-settings').classList.add('hidden');
 
   document.getElementById('app').classList.add('hidden');
@@ -12796,26 +13626,30 @@ function confirmLargeFileSend(file) {
       modal = document.createElement('div');
       modal.id = 'large-file-warn-modal';
       modal.className = 'hidden';
-      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: color-mix(in srgb, var(--bg-dark) 82%, transparent); z-index: 10000; display: flex; align-items: center; justify-content: center;';
       modal.innerHTML = `
-        <div class="mcard" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 400px; padding: 24px; text-align: center;">
-          <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 20px; color: #f8fafc;">⚠️ Büyük Dosya</h3>
-          <p id="large-file-warn-message" style="margin-bottom: 18px; color: #94a3b8; font-size: 15px; line-height: 1.5;"></p>
-          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px; color: #94a3b8; font-size: 13px; cursor: pointer; justify-content: center;">
+        <div class="mcard" style="background: var(--bg-card); color: var(--txt-main); border: 1px solid color-mix(in srgb, var(--txt-main) 14%, transparent); border-radius: 8px; box-shadow: none; width: min(400px, calc(100vw - 32px)); padding: 24px; text-align: center;">
+          <h3 style="margin: 0 0 12px; font-size: 18px; color: var(--txt-main); display: flex; align-items: center; justify-content: center; gap: 8px;"><span aria-hidden="true" style="display: inline-flex; color: var(--warn);">${uiIcon('alert', 20)}</span><span id="large-file-warn-title"></span></h3>
+          <p id="large-file-warn-message" style="margin-bottom: 18px; color: var(--txt-mut); font-size: 14px; line-height: 1.5;"></p>
+          <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 20px; color: var(--txt-mut); font-size: 13px; cursor: pointer; justify-content: center;">
             <input type="checkbox" id="large-file-warn-skip" style="width: 16px; height: 16px; cursor: pointer;" />
-            Bir daha gösterme
+            <span id="large-file-warn-skip-label"></span>
           </label>
           <div style="display: flex; gap: 12px; justify-content: center;">
-            <button id="large-file-warn-yes" class="btn-pri" style="flex: 1; padding: 10px; border-radius: 8px; background: #ef4444; border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">Yine de Gönder</button>
-            <button id="large-file-warn-no" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; font-weight: bold; cursor: pointer; transition: 0.2s;">İptal</button>
+            <button id="large-file-warn-yes" class="btn-pri btn-danger" style="flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s;"></button>
+            <button id="large-file-warn-no" class="btn-sec" style="flex: 1; padding: 10px; border-radius: 8px; background: var(--bg-hover); border: 1px solid color-mix(in srgb, var(--txt-main) 16%, transparent); color: var(--txt-main); font-weight: bold; cursor: pointer; transition: 0.2s;"></button>
           </div>
         </div>
       `;
       document.body.appendChild(modal);
     }
 
+    document.getElementById('large-file-warn-title').textContent = t('largeFile.title');
+    document.getElementById('large-file-warn-skip-label').textContent = t('largeFile.skip');
+    document.getElementById('large-file-warn-yes').textContent = t('largeFile.send');
+    document.getElementById('large-file-warn-no').textContent = t('common.cancel');
     document.getElementById('large-file-warn-message').innerText =
-      `"${file.name}" dosyası ${(file.size / 1024 / 1024).toFixed(1)} MB. Büyük dosyalar gönderim ve alım tarafında yavaş olabilir. Yine de göndermek istiyor musunuz?`;
+      t('largeFile.body', { name: file.name, size: (file.size / 1024 / 1024).toFixed(1) });
     const skipBox = document.getElementById('large-file-warn-skip');
     skipBox.checked = false;
     modal.classList.remove('hidden');
@@ -13136,8 +13970,11 @@ function pushDmMessage(friendId, entry) {
 }
 
 window.sendDMText = async (text) => {
-  if (!state.activeDM || !text.trim() || !state.globalMqtt || !state.globalMqtt.connected) return;
+  // Bağlantı yokken de mesaj kaybolmaz: kaydedilir, kuyruğa alınır ve
+  // bağlantı/arkadaş geri gelince gönderilir (js/dm-extras.js).
+  if (!state.activeDM || !text.trim()) return;
   const friendId = state.activeDM;
+  if (window.TSBlock && window.TSBlock.isBlocked(friendId)) { showToast(t('friends.blockedNoDm'), 'warn'); return; }
   // :thumbsup: → 👍 (js/ui/emoji.js); yazıyor göstergesi sıfırlanır.
   if (window.TSEmoji) text = window.TSEmoji.replaceShortcodes(text);
   if (window.TSTyping) window.TSTyping.localSent(`dm:${friendId}`);
@@ -13173,9 +14010,12 @@ window.sendDMText = async (text) => {
     isCensored: isCensored,
     mid
   };
-  state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify(dmPayload));
+  let published = false;
+  if (state.globalMqtt && state.globalMqtt.connected) {
+    try { state.globalMqtt.publish(`teamsync/user/${friendId}/events`, JSON.stringify(dmPayload)); published = true; } catch (e) {}
+  }
   // Güvenilir teslim (js/dm-extras.js): onay gelene kadar "bekliyor".
-  if (window.TSDMX && window.TSDMX.track(friendId, dmPayload)) {
+  if (window.TSDMX && window.TSDMX.track(friendId, dmPayload, { unsent: !published })) {
     const sent = state.dms[friendId].find(m => m.id === mid);
     if (sent) { sent.pending = true; saveDMs(); renderDMs(); }
   }
@@ -13196,7 +14036,8 @@ window.sendDMFile = async (file) => {
     return false;
   }
   const friendId = state.activeDM;
-  
+  if (window.TSBlock && window.TSBlock.isBlocked(friendId)) { showToast(t('friends.blockedNoDm'), 'warn'); return false; }
+
   if (file.size > MAX_DM_FILE_SIZE) {
     showToast(t('dm.fileTooLarge'), 'warn');
     return false;
@@ -13409,71 +14250,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('my-avatar-input').click();
   });
   
-  addEvt('my-avatar-input', 'change', (e) => {
+  // Profil fotoğrafı bu cihazda işlenir (256 px WebP) ve yerel depoda saklanır;
+  // sunucuya hiçbir bayt gitmez, arkadaşlar P2P alır (js/profile-media.js).
+  addEvt('my-avatar-input', 'change', async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        const MAX_SIZE = 128;
-        let width = img.width;
-        let height = img.height;
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height *= MAX_SIZE / width;
-            width = MAX_SIZE;
-          }
-        } else {
-          if (height > MAX_SIZE) {
-            width *= MAX_SIZE / height;
-            height = MAX_SIZE;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        
-        if (state.sfwMode && state.aiModel) {
-          const checked = await checkAvatar(dataUrl);
-          if (!checked) {
-             showToast(t('toast.aiContentBlocked'), "danger");
-             return;
-          }
-        }
-        
-        // Profil fotoğrafını Supabase Storage'a yükle; başarılı olursa base64
-        // yerine kalıcı public URL kullan. Yükleme başarısızsa base64'e düş.
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
-        const publicUrl = await uploadAvatarToStorage(blob);
-        const avatarSrc = publicUrl || dataUrl;
-
-        state.myAvatar = avatarSrc;
-        state.myAvatarHash = getAvatarHash(avatarSrc);
-        document.getElementById('my-avatar-img').src = avatarSrc;
-        document.getElementById('my-avatar-img').style.display = 'block';
-        document.getElementById('my-avatar-default').style.display = 'none';
-        saveProfile();
-        // Send a ping immediately to update friends
-        if (state.globalMqtt && state.globalMqtt.connected) {
-          state.globalMqtt.publish(`teamsync/user/${state.friendId}/presence`, JSON.stringify({
-            online: true,
-            id: state.friendId,
-            name: state.myName,
-            room: state.room || null,
-            avatarHash: state.myAvatarHash,
-            // Supabase URL'i kısa olduğundan doğrudan presence ile paylaşılır;
-            // arkadaşlar fotoğrafı base64 alışverişi olmadan yükleyebilir.
-            avatar: (typeof avatarSrc === 'string' && avatarSrc.startsWith('http')) ? avatarSrc : undefined
-          }));
-        }
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    e.target.value = '';
+    if (!file || !window.TSProfileMedia) return;
+    try {
+      await window.TSProfileMedia.setOwnAvatarFromFile(file);
+      showToast(t('profile.avatarSaved'), 'ok');
+    } catch (err) {
+      showToast(window.TSProfileMedia.errorText(err), err && err.code === 'sfw' ? 'danger' : 'warn');
+    }
   });
 
   addEvt('btn-show-server-dms', 'click', () => {
@@ -13690,8 +14478,8 @@ window.renderLobbiesList = function(activity) {
     const lobbyName = state.sfwMode ? censorProfaneText(lob.name || '') : (lob.name || '');
     const lobbyHostName = state.sfwMode ? censorProfaneText(lob.hostName || '') : (lob.hostName || '');
     const infoText = `Kurucu: ${escapeHtml(lobbyHostName)} • Oyuncular: ${playerCount}/${maxPlayers} ${specCount > 0 ? `(${specCount} İzleyici)` : ''}`;
-    const statusText = lob.status === 'playing' ? '🎮 Devam Ediyor' : '⌛ Bekliyor';
-    const statusColor = lob.status === 'playing' ? '#f59e0b' : 'var(--ok)';
+    const statusText = lob.status === 'playing' ? 'Devam Ediyor' : 'Bekliyor';
+    const statusColor = lob.status === 'playing' ? 'var(--warn)' : 'var(--ok)';
 
     row.innerHTML = `
       <div>
@@ -14571,10 +15359,66 @@ function applyPttShortcut() {
   try {
     if (typeof state === 'undefined' || !state || !state.pttMode) return;
     if (!window.electronAPI?.registerPTT) return;
-    window.electronAPI.registerPTT(getPttAccelerator());
+    window.electronAPI.registerPTT(getPttAccelerator(), getPttHookBinding());
   } catch (e) {
     console.warn('PTT kısayolu güncellenemedi:', e);
   }
+}
+
+// main süreç uiohook ile tuşun basılmasını VE bırakılmasını uygulama odakta
+// değilken de görür; bunun için DOM tuş kodunu ve değiştiricileri ister.
+function getPttHookBinding() {
+  const binding = getShortcutBinding('ptt');
+  if (!binding) return null;
+  return { code: binding.code, ctrl: !!binding.ctrl, alt: !!binding.alt, shift: !!binding.shift };
+}
+
+// Ses sekmesindeki Bas-Konuş tuşu satırı ve açıklaması. Kısayollar sayfasıyla
+// aynı kaydı (teamsync_shortcut_bindings.ptt) ve aynı kaydediciyi kullanır;
+// iki yerden biri değişince ikisi de buradan tazelenir.
+function syncPttKeyUi() {
+  // Dil, betik başında (kısayol tabloları tanımlanmadan) uygulanabiliyor;
+  // o anda sessizce çık, DOMContentLoaded'daki init yeniden çağırır.
+  try { if (!SHORTCUT_DEFS) return; } catch (e) { return; }
+  const binding = getShortcutBinding('ptt');
+  const label = shortcutComboLabel(binding);
+  const desc = t('settings.pttDesc', { key: label });
+  ['user-settings-ptt-desc', 'settings-ptt-desc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = desc;
+  });
+  const button = document.getElementById('user-ptt-key');
+  const enabled = !!document.getElementById('user-settings-ptt')?.checked;
+  document.getElementById('user-ptt-key-row')?.classList.toggle('is-disabled', !enabled);
+  if (button) {
+    let listening = false;
+    try { listening = !!shortcutRebindState && shortcutRebindState.button === button; } catch (e) {}
+    if (!listening) button.textContent = label;
+    button.disabled = !enabled;
+    button.title = t('settings.shortcutRebind');
+    button.setAttribute('aria-label', `${t('settings.pttKey')}: ${label} — ${t('settings.shortcutRebind')}`);
+  }
+  const reset = document.getElementById('user-ptt-key-reset');
+  if (reset) {
+    const def = shortcutDef('ptt');
+    const isDefault = !!def && shortcutBindingMatches(binding, { ...def.def, ctrl: !!def.def.ctrl, alt: !!def.def.alt, shift: !!def.def.shift });
+    reset.disabled = !enabled || isDefault;
+  }
+  if (!enabled) setPttKeyMessage('');
+}
+
+function setPttKeyMessage(text, tone = 'warn') {
+  const msg = document.getElementById('user-ptt-key-msg');
+  if (!msg) return;
+  msg.textContent = text || '';
+  msg.classList.toggle('hidden', !text);
+  msg.dataset.tone = tone;
+}
+
+// Kısayol kaydı değişti: iki ekran da aynı anda güncellenir.
+function refreshShortcutUis() {
+  renderShortcutSettings();
+  syncPttKeyUi();
 }
 
 /* --------------------------------------------------------------------------
@@ -14594,8 +15438,8 @@ function resetShortcut(id) {
   const map = readShortcutBindings();
   delete map[id];
   writeShortcutBindings(map);
-  renderShortcutSettings();
-  if (id === 'ptt') applyPttShortcut();
+  refreshShortcutUis();
+  if (id === 'ptt') { setPttKeyMessage(''); applyPttShortcut(); }
 }
 
 function resetAllShortcuts() {
@@ -14603,7 +15447,7 @@ function resetAllShortcuts() {
     localStorage.removeItem(SHORTCUTS_BINDINGS_KEY);
     localStorage.removeItem(SHORTCUTS_ENABLED_KEY);
   } catch (e) {}
-  renderShortcutSettings();
+  refreshShortcutUis();
   applyPttShortcut();
   showToast(t('settings.shortcutUpdated'), 'ok');
 }
@@ -14639,7 +15483,9 @@ function onShortcutRebindKey(event) {
   const clash = SHORTCUT_DEFS.find(def => def.id !== id && shortcutBindingMatches(getShortcutBinding(def.id), combo));
   if (clash) {
     cancelShortcutRebind();
-    showToast(`${t('settings.shortcutConflict')}: ${t(clash.nameKey)}`, 'warn');
+    const message = `${t('settings.shortcutConflict')}: ${t(clash.nameKey)}`;
+    if (id === 'ptt') setPttKeyMessage(message, 'warn');
+    showToast(message, 'warn');
     return;
   }
   const map = readShortcutBindings();
@@ -14648,8 +15494,8 @@ function onShortcutRebindKey(event) {
   });
   writeShortcutBindings(map);
   cancelShortcutRebind();
-  renderShortcutSettings();
-  if (id === 'ptt') applyPttShortcut();
+  refreshShortcutUis();
+  if (id === 'ptt') { setPttKeyMessage(''); applyPttShortcut(); }
   showToast(t('settings.shortcutUpdated'), 'ok');
 }
 
@@ -14756,7 +15602,21 @@ function initShortcutSettings() {
   // Panel her açılışta yeniden çizilir: dil değişimi ve dışarıdan yapılan
   // değişiklikler böylece görünür olur.
   document.querySelector('[data-settings-panel="shortcuts"]')?.addEventListener('click', renderShortcutSettings);
+  // Ses > Bas-Konuş tuşu: Kısayollar sayfasındaki ptt satırıyla aynı kaydedici.
+  const pttKeyBtn = document.getElementById('user-ptt-key');
+  pttKeyBtn?.addEventListener('click', () => {
+    if (pttKeyBtn.disabled) return;
+    setPttKeyMessage('');
+    beginShortcutRebind('ptt', pttKeyBtn);
+  });
+  document.getElementById('user-ptt-key-reset')?.addEventListener('click', () => resetShortcut('ptt'));
+  document.getElementById('user-settings-ptt')?.addEventListener('change', () => {
+    if (shortcutRebindState && shortcutRebindState.button === pttKeyBtn) cancelShortcutRebind();
+    syncPttKeyUi();
+  });
+  document.querySelector('[data-settings-panel="voice"]')?.addEventListener('click', syncPttKeyUi);
   renderShortcutSettings();
+  syncPttKeyUi();
   updateShortcutsPausedBadge();
   setInterval(updateShortcutsPausedBadge, 700);
 }
@@ -14766,8 +15626,11 @@ document.addEventListener('DOMContentLoaded', initShortcutSettings);
 window.shortcutsAllowed = shortcutsAllowed;
 window.isShortcutSuppressed = isShortcutSuppressed;
 window.getPttAccelerator = getPttAccelerator;
+window.getPttHookBinding = getPttHookBinding;
+window.syncPttKeyUi = syncPttKeyUi;
 window.matchesPttReleaseKey = matchesPttReleaseKey;
 window.renderShortcutSettings = renderShortcutSettings;
+window.isShortcutTypingTarget = isShortcutTypingTarget;
 
 /* --------------------------------------------------------------------------
  * İSİM-ŞEHİR — gerçek etkinlik modalı için ortak oyun akışı
@@ -14782,12 +15645,12 @@ window.renderShortcutSettings = renderShortcutSettings;
     it: { locale: 'it-IT', name: 'Italiano', letters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), categories: [['name','Nome'],['city','Città'],['animal','Animale'],['food','Cibo'],['object','Oggetto'],['country','Paese']] }
   };
   const NC_UI = {
-    en: { voteBadge: 'VOTE', title: 'Name City', cardDesc: 'Pick a letter, answer, vote together', lobbies: 'Name City Lobbies', exit: '← Leave room', setupKicker: 'VOTE · WORD GAME', intro: 'Every answer is accepted or rejected by the room vote.', host: 'You are the host', waiting: 'Waiting for the host', language: 'Language', rounds: 'Rounds', duration: 'Answer time', players: 'Players', minimum: 'Minimum 2', recommended: 'Recommended 3+', start: 'Start game', needPlayers: 'At least 2 players required', rule: 'Use the same letter. Empty, duplicate or wrong-letter answers score zero.', round: 'ROUND {round} / {total}', timeLeft: 'Time left:', lockHelp: 'Lock your answers while the timer is running.', lock: 'Lock answers', locked: 'Answers locked', reviewKicker: 'REVIEW ANSWERS', reviewTitle: 'Vote on every answer', reviewDeadline: 'Voting ends in: {seconds}s · Ties reject the answer.', duplicate: '{count} duplicate answers were automatically excluded.', noAnswers: 'There are no answers to vote on.', accept: 'Accept', reject: 'Reject', accepted: 'Accepted by vote', rejected: 'Rejected by vote', gameOver: 'GAME OVER', result: 'ROUND {round} RESULT', winner: 'The winner is decided', roundLabel: 'Round', totalLabel: 'Total', next: 'Next round', showResults: 'Show results', waitingNext: 'Waiting for the host to open the next round.', lobbyName: "{name}'s Name City lobby", hostLabel: 'Host:', playersLabel: 'Players:', spectators: 'Spectators', preparing: 'Preparing lobby…' },
-    tr: { voteBadge: 'OYLA', title: 'İsim-Şehir', cardDesc: 'Harf seç, cevapla, birlikte oyla', lobbies: 'İsim-Şehir Lobileri', exit: '← Odadan çık', setupKicker: 'OYLA · KELİME OYUNU', intro: 'Her cevap odadaki oylamayla kabul edilir veya reddedilir.', host: 'Kurucu sensin', waiting: 'Kurucu bekleniyor', language: 'Dil', rounds: 'Tur sayısı', duration: 'Cevap süresi', players: 'Oyuncular', minimum: 'Minimum 2', recommended: 'Önerilen 3+', start: 'Oyunu başlat', needPlayers: 'En az 2 oyuncu gerekli', rule: 'Aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.', round: 'TUR {round} / {total}', timeLeft: 'Kalan süre:', lockHelp: 'Cevaplarını süre bitmeden kilitle.', lock: 'Cevapları kilitle', locked: 'Cevaplar kilitlendi', reviewKicker: 'CEVAPLARI DEĞERLENDİR', reviewTitle: 'Her cevap için oy ver', reviewDeadline: 'Oylama bitişi: {seconds}s · Eşitlikte cevap reddedilir.', duplicate: '{count} tekrar cevap otomatik olarak puan dışı bırakıldı.', noAnswers: 'Oylanacak dolu cevap yok.', accept: 'Kabul', reject: 'Ret', accepted: 'Oylamayla kabul', rejected: 'Oylamayla reddedildi', gameOver: 'OYUN BİTTİ', result: 'TUR {round} SONUCU', winner: 'Kazanan belli oldu', roundLabel: 'Tur', totalLabel: 'Toplam', next: 'Sonraki tur', showResults: 'Sonuçları göster', waitingNext: 'Kurucunun sonraki turu açması bekleniyor.', lobbyName: "{name}'in İsim-Şehir Lobisi", hostLabel: 'Kurucu:', playersLabel: 'Oyuncular:', spectators: 'İzleyici', preparing: 'Lobi hazırlanıyor…' },
-    de: { voteBadge: 'ABSTIMMEN', title: 'Stadt-Land-Fluss', cardDesc: 'Buchstabe wählen, antworten und abstimmen', lobbies: 'Stadt-Land-Fluss-Lobbys', exit: '← Raum verlassen', setupKicker: 'ABSTIMMEN · WORTSPIEL', intro: 'Jede Antwort wird durch die Abstimmung des Raums angenommen oder abgelehnt.', host: 'Du bist der Host', waiting: 'Warten auf den Host', language: 'Sprache', rounds: 'Runden', duration: 'Antwortzeit', players: 'Spieler', minimum: 'Mindestens 2', recommended: 'Empfohlen: 3+', start: 'Spiel starten', needPlayers: 'Mindestens 2 Spieler erforderlich', rule: 'Mit demselben Buchstaben antworten. Leere, doppelte oder falsche Antworten geben keine Punkte.', round: 'RUNDE {round} / {total}', timeLeft: 'Verbleibende Zeit:', lockHelp: 'Antworten vor Ablauf der Zeit sperren.', lock: 'Antworten sperren', locked: 'Antworten gesperrt', reviewKicker: 'ANTWORTEN PRÜFEN', reviewTitle: 'Über jede Antwort abstimmen', reviewDeadline: 'Abstimmung endet in: {seconds}s · Bei Gleichstand wird abgelehnt.', duplicate: '{count} doppelte Antworten wurden ausgeschlossen.', noAnswers: 'Keine Antworten zum Abstimmen.', accept: 'Annehmen', reject: 'Ablehnen', accepted: 'Angenommen', rejected: 'Abgelehnt', gameOver: 'SPIEL VORBEI', result: 'ERGEBNIS RUNDE {round}', winner: 'Der Gewinner steht fest', roundLabel: 'Runde', totalLabel: 'Gesamt', next: 'Nächste Runde', showResults: 'Ergebnisse anzeigen', waitingNext: 'Warten auf den Host für die nächste Runde.', lobbyName: 'Stadt-Land-Fluss-Lobby von {name}', hostLabel: 'Host:', playersLabel: 'Spieler:', spectators: 'Zuschauer', preparing: 'Lobby wird vorbereitet…' },
-    es: { voteBadge: 'VOTAR', title: 'Nombre-Ciudad', cardDesc: 'Elige una letra, responde y votad juntos', lobbies: 'Salas de Nombre-Ciudad', exit: '← Salir de la sala', setupKicker: 'VOTA · JUEGO DE PALABRAS', intro: 'Cada respuesta se acepta o rechaza mediante la votación de la sala.', host: 'Eres el anfitrión', waiting: 'Esperando al anfitrión', language: 'Idioma', rounds: 'Rondas', duration: 'Tiempo de respuesta', players: 'Jugadores', minimum: 'Mínimo 2', recommended: 'Recomendado: 3+', start: 'Iniciar partida', needPlayers: 'Se necesitan al menos 2 jugadores', rule: 'Responde con la misma letra. Las respuestas vacías, repetidas o con otra letra no puntúan.', round: 'RONDA {round} / {total}', timeLeft: 'Tiempo restante:', lockHelp: 'Bloquea tus respuestas antes de que termine el tiempo.', lock: 'Bloquear respuestas', locked: 'Respuestas bloqueadas', reviewKicker: 'REVISAR RESPUESTAS', reviewTitle: 'Vota cada respuesta', reviewDeadline: 'La votación termina en: {seconds}s · Los empates se rechazan.', duplicate: 'Se excluyeron {count} respuestas repetidas.', noAnswers: 'No hay respuestas para votar.', accept: 'Aceptar', reject: 'Rechazar', accepted: 'Aceptada por votación', rejected: 'Rechazada por votación', gameOver: 'PARTIDA TERMINADA', result: 'RESULTADO DE LA RONDA {round}', winner: 'Ya hay ganador', roundLabel: 'Ronda', totalLabel: 'Total', next: 'Siguiente ronda', showResults: 'Ver resultados', waitingNext: 'Esperando al anfitrión para abrir la siguiente ronda.', lobbyName: 'Sala de Nombre-Ciudad de {name}', hostLabel: 'Anfitrión:', playersLabel: 'Jugadores:', spectators: 'Espectadores', preparing: 'Preparando la sala…' },
-    fr: { voteBadge: 'VOTE', title: 'Petit Bac', cardDesc: 'Choisissez une lettre, répondez et votez ensemble', lobbies: 'Salons de Petit Bac', exit: '← Quitter la salle', setupKicker: 'VOTE · JEU DE MOTS', intro: 'Chaque réponse est acceptée ou refusée par le vote du salon.', host: 'Vous êtes l’hôte', waiting: 'En attente de l’hôte', language: 'Langue', rounds: 'Manches', duration: 'Temps de réponse', players: 'Joueurs', minimum: 'Minimum 2', recommended: 'Recommandé : 3+', start: 'Démarrer la partie', needPlayers: 'Au moins 2 joueurs sont nécessaires', rule: 'Répondez avec la même lettre. Les réponses vides, répétées ou avec une autre lettre ne rapportent aucun point.', round: 'MANCHE {round} / {total}', timeLeft: 'Temps restant :', lockHelp: 'Verrouillez vos réponses avant la fin du temps.', lock: 'Verrouiller les réponses', locked: 'Réponses verrouillées', reviewKicker: 'VÉRIFIER LES RÉPONSES', reviewTitle: 'Votez pour chaque réponse', reviewDeadline: 'Fin du vote dans : {seconds}s · En cas d’égalité, la réponse est refusée.', duplicate: '{count} réponses en double ont été exclues.', noAnswers: 'Aucune réponse à voter.', accept: 'Accepter', reject: 'Refuser', accepted: 'Acceptée par vote', rejected: 'Refusée par vote', gameOver: 'PARTIE TERMINÉE', result: 'RÉSULTAT DE LA MANCHE {round}', winner: 'Le gagnant est connu', roundLabel: 'Manche', totalLabel: 'Total', next: 'Manche suivante', showResults: 'Voir les résultats', waitingNext: 'En attente de l’hôte pour ouvrir la prochaine manche.', lobbyName: 'Salon de Petit Bac de {name}', hostLabel: 'Hôte :', playersLabel: 'Joueurs :', spectators: 'Spectateurs', preparing: 'Préparation du salon…' },
-    it: { voteBadge: 'VOTA', title: 'Nomi e Città', cardDesc: 'Scegli una lettera, rispondi e votate insieme', lobbies: 'Lobby di Nomi e Città', exit: '← Esci dalla stanza', setupKicker: 'VOTA · GIOCO DI PAROLE', intro: 'Ogni risposta viene accettata o rifiutata dal voto della stanza.', host: 'Sei il coordinatore', waiting: 'In attesa del coordinatore', language: 'Lingua', rounds: 'Round', duration: 'Tempo per rispondere', players: 'Giocatori', minimum: 'Minimo 2', recommended: 'Consigliati: 3+', start: 'Avvia partita', needPlayers: 'Servono almeno 2 giocatori', rule: 'Rispondi con la stessa lettera. Risposte vuote, duplicate o con una lettera diversa non fanno punti.', round: 'ROUND {round} / {total}', timeLeft: 'Tempo rimasto:', lockHelp: 'Blocca le risposte prima della fine del tempo.', lock: 'Blocca risposte', locked: 'Risposte bloccate', reviewKicker: 'REVISIONE RISPOSTE', reviewTitle: 'Vota ogni risposta', reviewDeadline: 'Voto termina tra: {seconds}s · In caso di parità la risposta è rifiutata.', duplicate: '{count} risposte duplicate escluse.', noAnswers: 'Nessuna risposta da votare.', accept: 'Accetta', reject: 'Rifiuta', accepted: 'Accettata dal voto', rejected: 'Rifiutata dal voto', gameOver: 'PARTITA FINITA', result: 'RISULTATO ROUND {round}', winner: 'Il vincitore è deciso', roundLabel: 'Round', totalLabel: 'Totale', next: 'Round successivo', showResults: 'Mostra risultati', waitingNext: 'In attesa del coordinatore per il prossimo round.', lobbyName: 'Lobby Nomi e Città di {name}', hostLabel: 'Coordinatore:', playersLabel: 'Giocatori:', spectators: 'Spettatori', preparing: 'Preparazione lobby…' }
+    en: { voteBadge: 'VOTE', title: 'Name City', cardDesc: 'Pick a letter, answer, vote together', lobbies: 'Name City Lobbies', exit: 'Leave room', setupKicker: 'VOTE · WORD GAME', intro: 'Every answer is accepted or rejected by the room vote.', host: 'You are the host', waiting: 'Waiting for the host', language: 'Language', rounds: 'Rounds', duration: 'Answer time', players: 'Players', minimum: 'Minimum 2', recommended: 'Recommended 3+', start: 'Start game', needPlayers: 'At least 2 players required', rule: 'Use the same letter. Empty, duplicate or wrong-letter answers score zero.', round: 'ROUND {round} / {total}', timeLeft: 'Time left:', lockHelp: 'Lock your answers while the timer is running.', lock: 'Lock answers', locked: 'Answers locked', reviewKicker: 'REVIEW ANSWERS', reviewTitle: 'Vote on every answer', reviewDeadline: 'Voting ends in: {seconds}s · Ties reject the answer.', duplicate: '{count} duplicate answers were automatically excluded.', noAnswers: 'There are no answers to vote on.', accept: 'Accept', reject: 'Reject', accepted: 'Accepted by vote', rejected: 'Rejected by vote', gameOver: 'GAME OVER', result: 'ROUND {round} RESULT', winner: 'The winner is decided', roundLabel: 'Round', totalLabel: 'Total', next: 'Next round', showResults: 'Show results', waitingNext: 'Waiting for the host to open the next round.', lobbyName: "{name}'s Name City lobby", hostLabel: 'Host:', playersLabel: 'Players:', spectators: 'Spectators', preparing: 'Preparing lobby…' },
+    tr: { voteBadge: 'OYLA', title: 'İsim-Şehir', cardDesc: 'Harf seç, cevapla, birlikte oyla', lobbies: 'İsim-Şehir Lobileri', exit: 'Odadan çık', setupKicker: 'OYLA · KELİME OYUNU', intro: 'Her cevap odadaki oylamayla kabul edilir veya reddedilir.', host: 'Kurucu sensin', waiting: 'Kurucu bekleniyor', language: 'Dil', rounds: 'Tur sayısı', duration: 'Cevap süresi', players: 'Oyuncular', minimum: 'Minimum 2', recommended: 'Önerilen 3+', start: 'Oyunu başlat', needPlayers: 'En az 2 oyuncu gerekli', rule: 'Aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.', round: 'TUR {round} / {total}', timeLeft: 'Kalan süre:', lockHelp: 'Cevaplarını süre bitmeden kilitle.', lock: 'Cevapları kilitle', locked: 'Cevaplar kilitlendi', reviewKicker: 'CEVAPLARI DEĞERLENDİR', reviewTitle: 'Her cevap için oy ver', reviewDeadline: 'Oylama bitişi: {seconds}s · Eşitlikte cevap reddedilir.', duplicate: '{count} tekrar cevap otomatik olarak puan dışı bırakıldı.', noAnswers: 'Oylanacak dolu cevap yok.', accept: 'Kabul', reject: 'Ret', accepted: 'Oylamayla kabul', rejected: 'Oylamayla reddedildi', gameOver: 'OYUN BİTTİ', result: 'TUR {round} SONUCU', winner: 'Kazanan belli oldu', roundLabel: 'Tur', totalLabel: 'Toplam', next: 'Sonraki tur', showResults: 'Sonuçları göster', waitingNext: 'Kurucunun sonraki turu açması bekleniyor.', lobbyName: "{name}'in İsim-Şehir Lobisi", hostLabel: 'Kurucu:', playersLabel: 'Oyuncular:', spectators: 'İzleyici', preparing: 'Lobi hazırlanıyor…' },
+    de: { voteBadge: 'ABSTIMMEN', title: 'Stadt-Land-Fluss', cardDesc: 'Buchstabe wählen, antworten und abstimmen', lobbies: 'Stadt-Land-Fluss-Lobbys', exit: 'Raum verlassen', setupKicker: 'ABSTIMMEN · WORTSPIEL', intro: 'Jede Antwort wird durch die Abstimmung des Raums angenommen oder abgelehnt.', host: 'Du bist der Host', waiting: 'Warten auf den Host', language: 'Sprache', rounds: 'Runden', duration: 'Antwortzeit', players: 'Spieler', minimum: 'Mindestens 2', recommended: 'Empfohlen: 3+', start: 'Spiel starten', needPlayers: 'Mindestens 2 Spieler erforderlich', rule: 'Mit demselben Buchstaben antworten. Leere, doppelte oder falsche Antworten geben keine Punkte.', round: 'RUNDE {round} / {total}', timeLeft: 'Verbleibende Zeit:', lockHelp: 'Antworten vor Ablauf der Zeit sperren.', lock: 'Antworten sperren', locked: 'Antworten gesperrt', reviewKicker: 'ANTWORTEN PRÜFEN', reviewTitle: 'Über jede Antwort abstimmen', reviewDeadline: 'Abstimmung endet in: {seconds}s · Bei Gleichstand wird abgelehnt.', duplicate: '{count} doppelte Antworten wurden ausgeschlossen.', noAnswers: 'Keine Antworten zum Abstimmen.', accept: 'Annehmen', reject: 'Ablehnen', accepted: 'Angenommen', rejected: 'Abgelehnt', gameOver: 'SPIEL VORBEI', result: 'ERGEBNIS RUNDE {round}', winner: 'Der Gewinner steht fest', roundLabel: 'Runde', totalLabel: 'Gesamt', next: 'Nächste Runde', showResults: 'Ergebnisse anzeigen', waitingNext: 'Warten auf den Host für die nächste Runde.', lobbyName: 'Stadt-Land-Fluss-Lobby von {name}', hostLabel: 'Host:', playersLabel: 'Spieler:', spectators: 'Zuschauer', preparing: 'Lobby wird vorbereitet…' },
+    es: { voteBadge: 'VOTAR', title: 'Nombre-Ciudad', cardDesc: 'Elige una letra, responde y votad juntos', lobbies: 'Salas de Nombre-Ciudad', exit: 'Salir de la sala', setupKicker: 'VOTA · JUEGO DE PALABRAS', intro: 'Cada respuesta se acepta o rechaza mediante la votación de la sala.', host: 'Eres el anfitrión', waiting: 'Esperando al anfitrión', language: 'Idioma', rounds: 'Rondas', duration: 'Tiempo de respuesta', players: 'Jugadores', minimum: 'Mínimo 2', recommended: 'Recomendado: 3+', start: 'Iniciar partida', needPlayers: 'Se necesitan al menos 2 jugadores', rule: 'Responde con la misma letra. Las respuestas vacías, repetidas o con otra letra no puntúan.', round: 'RONDA {round} / {total}', timeLeft: 'Tiempo restante:', lockHelp: 'Bloquea tus respuestas antes de que termine el tiempo.', lock: 'Bloquear respuestas', locked: 'Respuestas bloqueadas', reviewKicker: 'REVISAR RESPUESTAS', reviewTitle: 'Vota cada respuesta', reviewDeadline: 'La votación termina en: {seconds}s · Los empates se rechazan.', duplicate: 'Se excluyeron {count} respuestas repetidas.', noAnswers: 'No hay respuestas para votar.', accept: 'Aceptar', reject: 'Rechazar', accepted: 'Aceptada por votación', rejected: 'Rechazada por votación', gameOver: 'PARTIDA TERMINADA', result: 'RESULTADO DE LA RONDA {round}', winner: 'Ya hay ganador', roundLabel: 'Ronda', totalLabel: 'Total', next: 'Siguiente ronda', showResults: 'Ver resultados', waitingNext: 'Esperando al anfitrión para abrir la siguiente ronda.', lobbyName: 'Sala de Nombre-Ciudad de {name}', hostLabel: 'Anfitrión:', playersLabel: 'Jugadores:', spectators: 'Espectadores', preparing: 'Preparando la sala…' },
+    fr: { voteBadge: 'VOTE', title: 'Petit Bac', cardDesc: 'Choisissez une lettre, répondez et votez ensemble', lobbies: 'Salons de Petit Bac', exit: 'Quitter la salle', setupKicker: 'VOTE · JEU DE MOTS', intro: 'Chaque réponse est acceptée ou refusée par le vote du salon.', host: 'Vous êtes l’hôte', waiting: 'En attente de l’hôte', language: 'Langue', rounds: 'Manches', duration: 'Temps de réponse', players: 'Joueurs', minimum: 'Minimum 2', recommended: 'Recommandé : 3+', start: 'Démarrer la partie', needPlayers: 'Au moins 2 joueurs sont nécessaires', rule: 'Répondez avec la même lettre. Les réponses vides, répétées ou avec une autre lettre ne rapportent aucun point.', round: 'MANCHE {round} / {total}', timeLeft: 'Temps restant :', lockHelp: 'Verrouillez vos réponses avant la fin du temps.', lock: 'Verrouiller les réponses', locked: 'Réponses verrouillées', reviewKicker: 'VÉRIFIER LES RÉPONSES', reviewTitle: 'Votez pour chaque réponse', reviewDeadline: 'Fin du vote dans : {seconds}s · En cas d’égalité, la réponse est refusée.', duplicate: '{count} réponses en double ont été exclues.', noAnswers: 'Aucune réponse à voter.', accept: 'Accepter', reject: 'Refuser', accepted: 'Acceptée par vote', rejected: 'Refusée par vote', gameOver: 'PARTIE TERMINÉE', result: 'RÉSULTAT DE LA MANCHE {round}', winner: 'Le gagnant est connu', roundLabel: 'Manche', totalLabel: 'Total', next: 'Manche suivante', showResults: 'Voir les résultats', waitingNext: 'En attente de l’hôte pour ouvrir la prochaine manche.', lobbyName: 'Salon de Petit Bac de {name}', hostLabel: 'Hôte :', playersLabel: 'Joueurs :', spectators: 'Spectateurs', preparing: 'Préparation du salon…' },
+    it: { voteBadge: 'VOTA', title: 'Nomi e Città', cardDesc: 'Scegli una lettera, rispondi e votate insieme', lobbies: 'Lobby di Nomi e Città', exit: 'Esci dalla stanza', setupKicker: 'VOTA · GIOCO DI PAROLE', intro: 'Ogni risposta viene accettata o rifiutata dal voto della stanza.', host: 'Sei il coordinatore', waiting: 'In attesa del coordinatore', language: 'Lingua', rounds: 'Round', duration: 'Tempo per rispondere', players: 'Giocatori', minimum: 'Minimo 2', recommended: 'Consigliati: 3+', start: 'Avvia partita', needPlayers: 'Servono almeno 2 giocatori', rule: 'Rispondi con la stessa lettera. Risposte vuote, duplicate o con una lettera diversa non fanno punti.', round: 'ROUND {round} / {total}', timeLeft: 'Tempo rimasto:', lockHelp: 'Blocca le risposte prima della fine del tempo.', lock: 'Blocca risposte', locked: 'Risposte bloccate', reviewKicker: 'REVISIONE RISPOSTE', reviewTitle: 'Vota ogni risposta', reviewDeadline: 'Voto termina tra: {seconds}s · In caso di parità la risposta è rifiutata.', duplicate: '{count} risposte duplicate escluse.', noAnswers: 'Nessuna risposta da votare.', accept: 'Accetta', reject: 'Rifiuta', accepted: 'Accettata dal voto', rejected: 'Rifiutata dal voto', gameOver: 'PARTITA FINITA', result: 'RISULTATO ROUND {round}', winner: 'Il vincitore è deciso', roundLabel: 'Round', totalLabel: 'Totale', next: 'Round successivo', showResults: 'Mostra risultati', waitingNext: 'In attesa del coordinatore per il prossimo round.', lobbyName: 'Lobby Nomi e Città di {name}', hostLabel: 'Coordinatore:', playersLabel: 'Giocatori:', spectators: 'Spettatori', preparing: 'Preparazione lobby…' }
   };
   const nc = { game: null, draft: {}, timer: null };
   const languageKey = () => typeof getUserLanguage === 'function' ? getUserLanguage() : 'en';
@@ -15025,14 +15888,14 @@ window.renderShortcutSettings = renderShortcutSettings;
   }
 
   function renderHeader(game) {
-    return `<header class="namecity-header"><button id="nc-close-top" class="namecity-exit" type="button">← Odadan çık</button><div><span class="namecity-kicker">TEAMSYNC · ${esc(catalog(game).name.toUpperCase())}</span><h2>İsim-Şehir</h2><p>Harf aynı, cevaplar farklı. Geçerli olup olmadığına oda karar verir.</p></div><div class="namecity-players">${players(game).map(p => `<span class="namecity-player-pill">${esc(p.name)}</span>`).join('')}</div></header>`;
+    return `<header class="namecity-header"><button id="nc-close-top" class="namecity-exit" type="button">Odadan çık</button><div><span class="namecity-kicker">TEAMSYNC · ${esc(catalog(game).name.toUpperCase())}</span><h2>İsim-Şehir</h2><p>Harf aynı, cevaplar farklı. Geçerli olup olmadığına oda karar verir.</p></div><div class="namecity-players">${players(game).map(p => `<span class="namecity-player-pill">${esc(p.name)}</span>`).join('')}</div></header>`;
   }
 
   function renderSetup() {
     const language = languageKey();
     const current = catalogs[language] ? language : 'en';
     const categories = catalogs[current].categories;
-    root().innerHTML = `<div class="namecity-shell"><header class="namecity-header"><button id="nc-close-top" class="namecity-exit" type="button">← Odadan çık</button><div><span class="namecity-kicker">OYLA · KELİME OYUNU</span><h2>İsim-Şehir</h2><p>Bir kelimeyi kabul etmek veya reddetmek odadaki oyuncuların oyuyla belirlenir.</p></div><span class="namecity-chip">${state.isLobbyHost ? 'Kurucu sensin' : 'Kurucu bekleniyor'}</span></header><section class="namecity-panel"><div class="namecity-form-grid"><label class="namecity-field">Dil<select id="nc-language">${Object.entries(catalogs).map(([key, value]) => `<option value="${key}" ${key === current ? 'selected' : ''}>${esc(value.name)}</option>`).join('')}</select></label><label class="namecity-field">Tur sayısı<select id="nc-rounds"><option value="1">1 tur</option><option value="3" selected>3 tur</option><option value="5">5 tur</option><option value="10">10 tur</option></select></label><label class="namecity-field">Cevap süresi<select id="nc-seconds"><option value="45">45 saniye</option><option value="90" selected>90 saniye</option><option value="120">120 saniye</option></select></label></div><div class="namecity-category-grid">${categories.map(([key, label], index) => `<label class="namecity-category"><input type="checkbox" name="nc-category" value="${key}" ${index < 4 ? 'checked' : ''}> ${esc(label)}</label>`).join('')}</div><p class="namecity-player-rule">Oyuncular: <strong id="nc-player-count">1</strong> · Minimum 2 · Önerilen 3+</p><button id="nc-start" class="namecity-primary">Oyunu başlat</button><p class="namecity-muted">Her turda aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.</p></section></div>`;
+    root().innerHTML = `<div class="namecity-shell"><header class="namecity-header"><button id="nc-close-top" class="namecity-exit" type="button">Odadan çık</button><div><span class="namecity-kicker">OYLA · KELİME OYUNU</span><h2>İsim-Şehir</h2><p>Bir kelimeyi kabul etmek veya reddetmek odadaki oyuncuların oyuyla belirlenir.</p></div><span class="namecity-chip">${state.isLobbyHost ? 'Kurucu sensin' : 'Kurucu bekleniyor'}</span></header><section class="namecity-panel"><div class="namecity-form-grid"><label class="namecity-field">Dil<select id="nc-language">${Object.entries(catalogs).map(([key, value]) => `<option value="${key}" ${key === current ? 'selected' : ''}>${esc(value.name)}</option>`).join('')}</select></label><label class="namecity-field">Tur sayısı<select id="nc-rounds"><option value="1">1 tur</option><option value="3" selected>3 tur</option><option value="5">5 tur</option><option value="10">10 tur</option></select></label><label class="namecity-field">Cevap süresi<select id="nc-seconds"><option value="45">45 saniye</option><option value="90" selected>90 saniye</option><option value="120">120 saniye</option></select></label></div><div class="namecity-category-grid">${categories.map(([key, label], index) => `<label class="namecity-category"><input type="checkbox" name="nc-category" value="${key}" ${index < 4 ? 'checked' : ''}> ${esc(label)}</label>`).join('')}</div><p class="namecity-player-rule">Oyuncular: <strong id="nc-player-count">1</strong> · Minimum 2 · Önerilen 3+</p><button id="nc-start" class="namecity-primary">Oyunu başlat</button><p class="namecity-muted">Her turda aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.</p></section></div>`;
     document.getElementById('nc-start')?.addEventListener('click', startGame);
     bindCloseButton();
     updateSetupPlayerGate();
@@ -15075,7 +15938,7 @@ window.renderShortcutSettings = renderShortcutSettings;
     const container = root();
     if (!container) return;
     const exact = new Map([
-      ['İsim-Şehir', text('title')], ['← Odadan çık', text('exit')], ['OYLA · KELİME OYUNU', text('setupKicker')],
+      ['İsim-Şehir', text('title')], ['Odadan çık', text('exit')], ['OYLA · KELİME OYUNU', text('setupKicker')],
       ['Bir kelimeyi kabul etmek veya reddetmek odadaki oyuncuların oyuyla belirlenir.', text('intro')],
       ['Kurucu sensin', text('host')], ['Kurucu bekleniyor', text('waiting')], ['Dil', text('language')], ['Tur sayısı', text('rounds')], ['Cevap süresi', text('duration')],
       ['Oyunu başlat', text('start')], ['En az 2 oyuncu gerekli', text('needPlayers')], ['Her turda aynı harfle cevap verilir. Boş, tekrar veya yanlış harfli cevap puanlanmaz.', text('rule')],

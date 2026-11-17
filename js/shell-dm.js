@@ -1,5 +1,6 @@
-// Direkt mesajlar: yan sütundaki sohbet listesi (Sabitlenenler / Sohbetler,
-// filtre çipleri, son mesaj önizlemesi + saat, okunmamış sayaçları) ve DM
+// Direkt mesajlar: yan sütundaki sohbet listesi (Sabitlenenler / Sohbetler /
+// Diğer arkadaşlar, satırda hızlı arama + "…" menüsü, son mesaj önizlemesi +
+// saat, okunmamış sayaçları) ve DM
 // görünümü (çevrimiçi / son görülme başlığı, baloncuklu mesajlar, profil paneli).
 // Mesaj gönderme/alma hâlâ renderer.js'teki sendDMText/receiveDM'de; bu dosya
 // yalnızca görünümü ve okunmamış/gizlenmiş/sabitlenmiş sohbet durumunu yönetir.
@@ -23,10 +24,16 @@
   let hiddenAt = {};
   let pins = [];
   let loadedFor = null;
+  // Filtre yalnızca bellekte tutulur ve yalnızca çipler görünürken uygulanır:
+  // çipler (#chat-filters) gizliyken kayıtlı eski bir filtre listeyi sessizce
+  // boşaltıyordu ve kullanıcının onu temizleyecek yolu yoktu.
   let filter = null;
   let collapsed = {};
-  try { filter = localStorage.getItem(FILTER_KEY) || null; } catch (e) {}
+  try { localStorage.removeItem(FILTER_KEY); } catch (e) {}
   try { collapsed = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}') || {}; } catch (e) { collapsed = {}; }
+  const chipsShown = () => { const el = $('chat-filters'); return !!el && el.getClientRects().length > 0; };
+  const inCallNow = () => !!(window.TSShell && window.TSShell.inCall && window.TSShell.inCall());
+  const PHONE_SVG = () => window.TSUI.icon('phone', 15);
 
   const { esc, tr } = { esc: v => window.TSUI.esc(v), tr: (k, v) => window.TSUI.tr(k, v) };
 
@@ -162,8 +169,44 @@
 
   function setFilter(next) {
     filter = filter === next ? null : next;
-    try { if (filter) localStorage.setItem(FILTER_KEY, filter); else localStorage.removeItem(FILTER_KEY); } catch (e) {}
     renderList();
+  }
+
+  // "Sohbet"e basıldığında liste asla görünmez kalmasın: daraltılmış bölümleri aç.
+  function expandSections() {
+    if (!Object.keys(collapsed).some(k => collapsed[k])) return;
+    collapsed = {};
+    try { localStorage.removeItem(COLLAPSE_KEY); } catch (e) {}
+    renderList();
+  }
+
+  // Satırdaki / arkadaş listesindeki hızlı arama düğmesi.
+  function callTarget(key) {
+    if (inCallNow()) { window.showToast && window.showToast(tr('chat.callBusy'), 'warn'); return; }
+    const id = key.slice(2);
+    if (key.startsWith('g:')) {
+      if (window.TSGroups && window.TSGroups.startOrJoinCall) window.TSGroups.startOrJoinCall(id);
+    } else if (id && id !== window.state.friendId && window.TSDirectCall) {
+      window.TSDirectCall.call(id);
+    }
+  }
+  function callFriend(fid) { callTarget(`f:${fid}`); }
+
+  function callBtnAttrs() {
+    const busy = inCallNow();
+    const label = tr(busy ? 'chat.callBusy' : 'chat.call');
+    return `title="${esc(label)}" aria-label="${esc(tr('chat.call'))}"${busy ? ' aria-disabled="true"' : ''}`;
+  }
+
+  // Arama başlayıp bitince düğmelerin "devre dışı" durumu yerinde güncellenir.
+  function syncCallButtons() {
+    const busy = inCallNow();
+    const label = tr(busy ? 'chat.callBusy' : 'chat.call');
+    document.querySelectorAll('.dm-row-call, .friend-action-call').forEach(b => {
+      if (b.title !== label) b.title = label;
+      if (busy && b.getAttribute('aria-disabled') !== 'true') b.setAttribute('aria-disabled', 'true');
+      if (!busy && b.hasAttribute('aria-disabled')) b.removeAttribute('aria-disabled');
+    });
   }
 
   function renderList() {
@@ -185,16 +228,30 @@
     });
     (window.TSGroups ? window.TSGroups.list() : [])
       .forEach(g => items.push({ gid: g.gid, ts: g.lastTs || 0, unread: g.unread || 0, online: !!g.call, g }));
-    if (!items.length) {
+    // Diğer arkadaşlar: listede görünür sohbeti olmayan (hiç yazışılmamış ya da
+    // "listeden kaldır" ile kapatılmış) her arkadaş — herkes her zaman seçilebilir.
+    const listed = new Set(items.filter(it => it.fid).map(it => it.fid));
+    const others = Object.keys(friends)
+      .filter(fid => !listed.has(fid) && fid !== window.state.friendId)
+      .map(fid => {
+        const list = dms[fid] || [];
+        const st = window.TSStatus ? window.TSStatus.statusOf(fid) : (friends[fid] && friends[fid].online ? 'online' : 'offline');
+        return { fid, ts: 0, unread: 0, online: st !== 'offline' && st !== 'invisible', st, last: list[list.length - 1], other: true };
+      })
+      .sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0)
+        || String((friends[a.fid] || {}).name || a.fid).localeCompare(String((friends[b.fid] || {}).name || b.fid), uiLocale(), { sensitivity: 'base' }));
+    if (!items.length && !others.length) {
       host.innerHTML = `<li class="dm-list-empty">${esc(tr('chat.startHint'))}</li>`;
       return;
     }
-    const pass = it => !filter
-      || (filter === 'unread' && it.unread > 0)
-      || (filter === 'groups' && !!it.gid)
-      || (filter === 'online' && it.online);
+    const f0 = chipsShown() ? filter : null;
+    const pass = it => !f0
+      || (f0 === 'unread' && it.unread > 0)
+      || (f0 === 'groups' && !!it.gid)
+      || (f0 === 'online' && it.online);
     const shown = items.filter(it => pass(it) || it.fid === active || it.gid === activeGroup).sort((a, b) => b.ts - a.ts);
-    if (!shown.length) {
+    const othersShown = others.filter(it => pass(it) || it.fid === active);
+    if (!shown.length && !othersShown.length) {
       host.innerHTML = `<li class="dm-list-empty">${esc(tr('chat.noFilterMatch'))}</li>`;
       return;
     }
@@ -203,33 +260,42 @@
     const section = (key, label, list) => {
       if (!list.length) return '';
       const closed = !!collapsed[key];
+      const hint = tr(closed ? 'chat.sectionShow' : 'chat.sectionHide');
       return `
         <li class="dm-sec ${closed ? 'is-collapsed' : ''}" data-sec="${key}">
-          <button type="button" class="dm-sec-btn" data-sec-toggle="${key}" aria-expanded="${closed ? 'false' : 'true'}">${CHEVRON_SVG}<span>${esc(label)}</span></button>
+          <button type="button" class="dm-sec-btn" data-sec-toggle="${key}" aria-expanded="${closed ? 'false' : 'true'}" title="${esc(`${label} (${list.length}) · ${hint}`)}">${CHEVRON_SVG}<span class="dm-sec-label">${esc(label)}</span><span class="dm-sec-count">${list.length}</span></button>
         </li>
         ${closed ? '' : list.map(it => (it.gid ? groupRowHtml(it) : dmRowHtml(it))).join('')}`;
     };
-    host.innerHTML = section('pinned', tr('chat.pinned'), pinned) + section('recent', tr('chat.recent'), rest);
+    host.innerHTML = section('pinned', tr('chat.pinned'), pinned)
+      + section('recent', tr('chat.recent'), rest)
+      + section('others', tr('chat.otherFriends'), othersShown);
 
-    function moreBtn(it) {
-      return `<button type="button" class="dm-row-more" data-row-menu="${esc(pinKey(it))}" title="${esc(tr('dmh.more'))}">${MORE_SVG}</button>`;
+    function actsHtml(it) {
+      const key = esc(pinKey(it));
+      return `<span class="dm-row-acts">`
+        + `<button type="button" class="dm-row-call" data-row-call="${key}" ${callBtnAttrs()}>${PHONE_SVG()}</button>`
+        + `<button type="button" class="dm-row-more" data-row-menu="${key}" title="${esc(tr('dmh.more'))}" aria-label="${esc(tr('dmh.more'))}" aria-haspopup="menu">${MORE_SVG}</button>`
+        + `</span>`;
     }
 
     function dmRowHtml(it) {
       const fid = it.fid;
       const f = friends[fid] || {};
       const nick = typeof window.getNickname === 'function' ? window.getNickname(fid) : '';
-      const sub = it.last ? { cls: '', html: esc(previewOf(it.last)) } : subLine(fid);
+      const sub = it.last
+        ? { cls: '', html: esc(previewOf(it.last)) }
+        : (it.other ? { cls: 'is-empty', html: esc(tr('chat.noMessagesYet')) } : subLine(fid));
       const n = it.unread;
       return `
-        <li class="dm-row chat-row ${fid === active ? 'active' : ''} ${n ? 'has-unread' : ''} ${it.st === 'offline' ? 'is-offline' : ''}" data-fid="${esc(fid)}">
+        <li class="dm-row chat-row ${it.other ? 'is-other' : ''} ${fid === active ? 'active' : ''} ${n ? 'has-unread' : ''} ${it.st === 'offline' ? 'is-offline' : ''}" data-fid="${esc(fid)}">
           ${window.TSUI.avatarHtml({ src: f.avatar, name: f.name, seed: fid, size: 36, status: it.st })}
           <span class="dm-row-copy">
             <span class="dm-row-top"><span class="dm-row-name">${esc(nick || f.name || fid)}</span><time class="dm-row-time">${esc(shortTime(it.ts))}</time></span>
             <span class="dm-row-sub ${sub ? sub.cls : ''}">${sub ? sub.html : ''}</span>
           </span>
           ${n ? `<span class="ts-count-badge">${n > 99 ? '99+' : n}</span>` : ''}
-          ${moreBtn(it)}
+          ${actsHtml(it)}
         </li>`;
     }
 
@@ -237,7 +303,7 @@
       const g = it.g;
       const stack = window.TSGroupUI && window.TSGroupUI.stackHtml ? window.TSGroupUI.stackHtml(g.gid, g.members, 36) : '';
       const sub = g.call
-        ? `<span class="dm-row-sub grp-row-call">🔊 ${esc(tr('groups.inCall'))} · ${window.TSUI.sinceHtml(g.call.startedAt)}</span>`
+        ? `<span class="dm-row-sub grp-row-call">${window.TSUI.icon('volume', 13)} ${esc(tr('groups.inCall'))} · ${window.TSUI.sinceHtml(g.call.startedAt)}</span>`
         : `<span class="dm-row-sub">${esc(tr('groups.memberCount', { n: g.members.length }))}</span>`;
       return `
         <li class="dm-row chat-row grp-row ${g.gid === activeGroup ? 'active' : ''} ${g.unread ? 'has-unread' : ''}" data-gid="${esc(g.gid)}">
@@ -247,7 +313,7 @@
             ${sub}
           </span>
           ${g.unread ? `<span class="ts-count-badge">${g.unread > 99 ? '99+' : g.unread}</span>` : ''}
-          ${moreBtn(it)}
+          ${actsHtml(it)}
         </li>`;
     }
   }
@@ -261,17 +327,21 @@
     const isGroup = key.startsWith('g:');
     const id = key.slice(2);
     const item = isGroup ? { gid: id } : { fid: id };
-    const row = (icon, action, label, cls = '') => `<button type="button" class="ts-menu-row ${cls}" data-rm="${action}">${icon}<span class="ts-menu-text"><span>${esc(label)}</span></span></button>`;
+    const row = (icon, action, label, cls = '', extra = '') => `<button type="button" class="ts-menu-row ${cls}" data-rm="${action}" ${extra}>${icon}<span class="ts-menu-text"><span>${esc(label)}</span></span></button>`;
+    const isOther = !!(anchor && anchor.closest && anchor.closest('.is-other'));
+    const busy = inCallNow();
     const pop = window.TSUI.popover(`
       <div class="ts-menu ts-row-menu">
+        ${row(window.TSUI.icon('phone', 18), 'call', tr('chat.callMenu'), '', busy ? `aria-disabled="true" title="${esc(tr('chat.callBusy'))}"` : '')}
         ${row(PIN_SVG, 'pin', tr(isPinned(item) ? 'chat.unpin' : 'chat.pin'))}
-        ${isGroup ? '' : `${row(USER_SVG, 'profile', tr('dm.toggleProfile'))}<div class="ts-menu-sep"></div>${row(X_SVG, 'close', tr('dmh.closeChat'), 'is-danger')}`}
+        ${isGroup ? '' : `${row(USER_SVG, 'profile', tr('dm.toggleProfile'))}${isOther ? '' : `<div class="ts-menu-sep"></div>${row(X_SVG, 'close', tr('dmh.closeChat'), 'is-danger')}`}`}
       </div>`, anchor, { placement: 'right' });
     pop.el.addEventListener('click', e => {
       const b = e.target.closest('[data-rm]');
       if (!b) return;
       pop.close();
-      if (b.dataset.rm === 'pin') togglePin(item);
+      if (b.dataset.rm === 'call') callTarget(key);
+      else if (b.dataset.rm === 'pin') togglePin(item);
       else if (b.dataset.rm === 'profile' && window.TSProfile) window.TSProfile.showCard({ friendId: id }, anchor);
       else if (b.dataset.rm === 'close') hideChat(id);
     });
@@ -423,6 +493,12 @@
         renderList();
         return;
       }
+      const call = e.target.closest('[data-row-call]');
+      if (call) {
+        e.stopPropagation();
+        callTarget(call.dataset.rowCall);
+        return;
+      }
       const more = e.target.closest('[data-row-menu]');
       if (more) {
         e.stopPropagation();
@@ -473,6 +549,7 @@
     };
     document.addEventListener('ts:presence', refresh);
     document.addEventListener('ts:profile', refresh);
+    document.addEventListener('ts:call', syncCallButtons);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -502,6 +579,7 @@
 
   window.TSDM = {
     renderList, show, markActive, onReceived, clearUnread, totalUnread, groupedHtml, isViewing,
-    presenceText, previewOf, shortTime, dayLabel, hideChat, togglePin, isPinned, renderHeader
+    presenceText, previewOf, shortTime, dayLabel, hideChat, togglePin, isPinned, renderHeader,
+    expandSections, callFriend, callTarget, syncCallButtons, setFilter
   };
 })();

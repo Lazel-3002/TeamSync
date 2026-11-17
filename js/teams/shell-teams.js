@@ -1,6 +1,6 @@
 // Teams'ten esinlenen kabuk parçaları (js/shell-core.js'in üstüne):
 //   • TSLastSeen: arkadaşların "son görülme" zamanı (bu cihazda tutulur)
-//   • Ray: Takvim, Aramalar, Toplantı (oda kur + ID ile katıl + planla),
+//   • Ray: Aramalar, Toplantı (oda kur + ID ile katıl + şifreli katıl),
 //     Ayarlar, hesap menüsü (durum, ID, hesap değiştir)
 //   • Sohbet başlığı: sesli/görüntülü arama, kişi ekle, sohbette ara, diğer
 //     menüsü ve Sohbet / Dosyalar / Fotoğraflar sekmeleri
@@ -14,8 +14,6 @@
   const svg = (d, w = 20, sw = 2) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const ICON = {
     video: '<rect x="2" y="6" width="14" height="12" rx="3"/><path d="M16 10.5 22 7v10l-6-3.5"/>',
-    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
-    cal: '<rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
     copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
@@ -131,8 +129,7 @@
             <button type="submit" class="ts-pill-btn is-primary">${esc(tr('meet.joinBtn'))}</button>
           </div>
         </form>
-        <button type="button" class="ts-menu-row" data-meet="schedule">${svg(ICON.cal, 18)}<span class="ts-menu-text"><span>${esc(tr('meet.schedule'))}</span><small>${esc(tr('meet.scheduleDesc'))}</small></span></button>
-        <button type="button" class="ts-menu-row" data-meet="advanced">${svg(ICON.link, 18)}<span class="ts-menu-text"><span>${esc(tr('meet.advanced'))}</span></span></button>
+        <button type="button" class="ts-menu-row" data-meet="advanced">${window.TSUI.icon('lock', 18)}<span class="ts-menu-text"><span>${esc(tr('meet.advanced'))}</span><small>${esc(tr('meet.advancedDesc'))}</small></span></button>
       </div>`;
     const pop = window.TSUI.popover(html, anchor, { placement: 'right', cls: 'ts-menu-pop' });
     pop.el.addEventListener('click', e => {
@@ -141,7 +138,6 @@
       pop.close();
       const k = b.dataset.meet;
       if (k === 'create') meetNow();
-      else if (k === 'schedule') { window.TSShell.setView('calendar'); setTimeout(() => window.TSCalendar && window.TSCalendar.openEditor(null), 60); }
       else if (k === 'advanced') {
         if (inCall()) { window.showToast(tr('shell.youInCall'), 'warn'); return; }
         window.TSShell.openQuickCall('join');
@@ -324,7 +320,8 @@
     if (!fid) return;
     const f = (window.state.friends || {})[fid] || {};
     const pinned = window.TSDM && window.TSDM.isPinned({ fid });
-    const row = (icon, k, label, cls = '') => `<button type="button" class="ts-menu-row ${cls}" data-dm-more="${k}">${svg(icon, 18)}<span class="ts-menu-text"><span>${esc(label)}</span></span></button>`;
+    const row = (icon, k, label, cls = '') => `<button type="button" class="ts-menu-row ${cls}" data-dm-more="${k}">${icon.startsWith('<svg') ? icon : svg(icon, 18)}<span class="ts-menu-text"><span>${esc(label)}</span></span></button>`;
+    const isFriend = !!(f.name && !f.temporary);
     const pop = window.TSUI.popover(`
       <div class="ts-menu ts-row-menu" data-i18n-ignore>
         ${row(ICON.user, 'profile', tr('dm.toggleProfile'))}
@@ -332,7 +329,9 @@
         ${row(f.isMuted ? ICON.bell : ICON.bellOff, 'mute', tr(f.isMuted ? 'dmh.unmute' : 'dmh.mute'))}
         ${row(ICON.copy, 'copy', tr('dmh.copyId'))}
         <div class="ts-menu-sep"></div>
-        ${row(ICON.x, 'close', tr('dmh.closeChat'), 'is-danger')}
+        ${row(ICON.x, 'close', tr('dmh.closeChat'))}
+        ${isFriend ? row(window.TSUI.icon('userMinus', 18), 'remove', tr('friends.removeTitle'), 'is-danger') : ''}
+        ${row(window.TSUI.icon('ban', 18), 'block', tr('friends.block'), 'is-danger')}
       </div>`, anchor, { placement: 'bottom' });
     pop.el.addEventListener('click', e => {
       const b = e.target.closest('[data-dm-more]');
@@ -344,6 +343,8 @@
       else if (k === 'mute' && typeof window.toggleMuteFriend === 'function') window.toggleMuteFriend(fid);
       else if (k === 'copy') window.TSUI.copyText(fid);
       else if (k === 'close' && window.TSDM) window.TSDM.hideChat(fid);
+      else if (k === 'remove' && typeof window.removeFriend === 'function') window.removeFriend(fid);
+      else if (k === 'block' && window.TSFriends) window.TSFriends.confirmBlock(fid, f.name || fid);
     });
   }
 
@@ -455,7 +456,10 @@
       gView.appendChild(invite);
     }
     const volWrap = bar.querySelector('.vol-wrap');
-    ['wb-btn', 'act-btn', 'rec'].forEach(id => { const b = $(id); if (b) panel.appendChild(b); });
+    // Etkinlikler görüşmenin ana parçası: "Diğer" menüsüne gömülmez, çubukta görünür.
+    const actBtn = $('act-btn');
+    if (actBtn) gTools.insertBefore(actBtn, more);
+    ['wb-btn', 'rec'].forEach(id => { const b = $(id); if (b) panel.appendChild(b); });
     if (volWrap) panel.appendChild(volWrap);
     ['founder-settings', 'settings'].forEach(id => { const b = $(id); if (b) panel.appendChild(b); });
     ['mic', 'deaf', 'ptt', 'share'].forEach(id => { const b = $(id); if (b) gMedia.appendChild(b); });
@@ -530,19 +534,30 @@
   }
 
   // --- süre sayacı ---
+  // Bu ODADA geçen süre: odaya girdiğim an başlar (yalnızken, bekleme odasında,
+  // ses kanalında da), çıkınca sıfırlanır. Başlangıç = renderer startApp'in
+  // gerçek giriş damgası (state.joinedAt). Arama geçmişindeki "bağlı kalınan
+  // süre" ayrı tutulur (js/teams/call-log.js). connectedAt: ts:call'da sıfırlanır.
   let connectedAt = 0;
+  let timerRoom = null;
   function tickTimer() {
     const el = $('call-timer');
     if (!el) return;
-    if (!inCall()) { connectedAt = 0; el.textContent = '--:--'; return; }
-    const peers = window.state.peers ? window.state.peers.size : 0;
-    if (peers > 0 && !connectedAt) connectedAt = Date.now();
-    if (!connectedAt) { el.textContent = '--:--'; return; }
-    const s = Math.floor((Date.now() - connectedAt) / 1000);
+    const st = window.state || {};
+    if (!st.room) { connectedAt = 0; timerRoom = null; if (el.textContent !== '0:00') el.textContent = '0:00'; return; }
+    if (timerRoom !== st.room || !connectedAt) {
+      timerRoom = st.room;
+      const j = Number(st.joinedAt);
+      connectedAt = Number.isFinite(j) && j > 0 && j <= Date.now() ? j : Date.now();
+    }
+    const s = Math.max(0, Math.floor((Date.now() - connectedAt) / 1000));
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    el.textContent = h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    const sec = String(s % 60).padStart(2, '0');
+    const text = h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+    if (el.textContent !== text) el.textContent = text;
+    const title = tr('call.timerTitle');
+    if (el.title !== title) el.title = title;
   }
 
   // --- sahne: yalnız / birebir ---
@@ -567,7 +582,9 @@
     const ringing = out && !out.answered;
     const target = ringing && out.fids.length ? out.fids[0] : null;
     const f = target ? (window.state.friends || {})[target] : null;
-    const key = [ringing ? 'r' : 'w', target, f && f.avatar, window.state.myAvatar, window.state.room].join('|');
+    // Katılan taraf ilk eşe bağlanana kadar "Bağlanıyor…" görür (grup aramasında "Katıl").
+    const connecting = !ringing && !!window.state.isJoining;
+    const key = [ringing ? 'r' : (connecting ? 'c' : 'w'), target, f && f.avatar, window.state.myAvatar, window.state.room].join('|');
     if (key === stageKey) return;
     stageKey = key;
     const prof = window.TSProfile ? window.TSProfile.mine() : {};
@@ -576,7 +593,7 @@
       : window.TSUI.avatarHtml({ src: window.state.myAvatar, name: window.state.myName, seed: window.state.friendId, size: 132, frame: prof.frame, color: prof.avatarColor });
     stage.innerHTML = `
       <div class="call-stage-av ${ringing ? 'is-ringing' : ''}">${av}</div>
-      <strong class="call-stage-title">${esc(ringing ? tr('call.calling') : tr('call.waiting'))}</strong>
+      <strong class="call-stage-title">${esc(ringing ? tr('call.calling') : (connecting ? tr('call.connecting') : tr('call.waiting')))}</strong>
       ${ringing && f ? `<span class="call-stage-sub">${esc(f.name || '')}${out.fids.length > 1 ? ` +${out.fids.length - 1}` : ''}</span>` : ''}
       ${ringing ? '' : `
       <div class="call-stage-actions">
@@ -591,7 +608,6 @@
   function bind() {
     // Logo = ana sayfa (Kişiler)
     $('rail-brand')?.addEventListener('click', () => window.TSShell.setView('friends'));
-    $('rail-calendar')?.addEventListener('click', () => window.TSShell.setView('calendar'));
     $('rail-calls')?.addEventListener('click', () => window.TSShell.setView('calls'));
     $('rail-meet')?.addEventListener('click', e => openMeetMenu(e.currentTarget));
     $('rail-settings')?.addEventListener('click', () => window.openUserSettings && window.openUserSettings('general'));

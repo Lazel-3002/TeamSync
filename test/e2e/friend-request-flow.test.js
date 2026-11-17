@@ -56,6 +56,71 @@ module.exports = async function run() {
       };
     })()`);
     assert.deepStrictEqual(after, { name: 'Alici B', outgoing: 0 });
+
+    // Grup "Arkadaş ekle" seçicisi: eklenecek kimse yoksa ölü birincil düğme yok;
+    // aday varken seçim yapılana kadar düğme devre dışı.
+    await evalJS(a.client, `TSProfile.request(${JSON.stringify(fb)}, 0, true); 1`);
+    await waitFor(a.client, `!!TSCrypto.peerKeys(${JSON.stringify(fb)})`, 25000, 'A learns B keys');
+    const gid = await evalJS(a.client, `TSGroups.createGroup([${JSON.stringify(fb)}], 'Picker').then(r => r.gid)`, true);
+    const picker = await evalJS(a.client, `(async () => {
+      TSShell.setView('group', ${JSON.stringify(gid)});
+      await new Promise(r => setTimeout(r, 300));
+      const clickAdd = () => document.querySelector('#grp-members-panel [data-grp-add]').click();
+      clickAdd();
+      await new Promise(r => setTimeout(r, 200));
+      const empty = { go: !!document.querySelector('.grp-pick-pop .grp-pick-go'), goadd: !!document.querySelector('.grp-pick-pop [data-pick="goadd"]') };
+      TSUI.closePopover();
+      state.friends['KNK-PICKERTEST1'] = { name: 'Seçici Deneme', online: false };
+      clickAdd();
+      await new Promise(r => setTimeout(r, 200));
+      const go = document.querySelector('.grp-pick-pop .grp-pick-go');
+      const before = go.disabled;
+      document.querySelector('.grp-pick-pop .grp-pick-row').click();
+      await new Promise(r => setTimeout(r, 100));
+      const after = go.disabled;
+      TSUI.closePopover();
+      delete state.friends['KNK-PICKERTEST1'];
+      return { empty, before, after };
+    })()`, true);
+    assert.deepStrictEqual(picker, { empty: { go: false, goadd: true }, before: true, after: false });
+
+    // Arkadaşlıktan çıkarma → "Çıkarılanlar"; ortak grup etkilenmez; çıkarılandan DM gelmez.
+    const removed = await evalJS(b.client, `removeFriend(${JSON.stringify(fa)}, { skipConfirm: true }).then(() => ({
+      friend: !!state.friends[${JSON.stringify(fa)}],
+      list: TSFriends.removedList().map(r => r.fid + ':' + r.name),
+      stillInGroup: !!TSGroups.get(${JSON.stringify(gid)})
+    }))`, true);
+    assert.deepStrictEqual(removed, { friend: false, list: [fa + ':Gonderen A'], stillInGroup: true });
+
+    // Engelle: Çıkarılanlar'dan Engellenenler'e geçer; DM ve istek düşer.
+    const blocked = await evalJS(b.client, `(() => {
+      TSBlock.block(${JSON.stringify(fa)}, 'Gonderen A');
+      TSFriends.setTab('blocked');
+      return {
+        blocked: TSBlock.isBlocked(${JSON.stringify(fa)}),
+        removed: TSFriends.removedList().length,
+        rows: document.querySelectorAll('#people-list .people-item').length,
+        stored: !!localStorage.getItem('teamsync_blocked_' + state.friendId),
+        notInProfile: !JSON.stringify(JSON.parse(localStorage.getItem('teamsync_profile') || '{}')).includes('blocked')
+      };
+    })()`);
+    assert.deepStrictEqual(blocked, { blocked: true, removed: 0, rows: 1, stored: true, notInProfile: true });
+    await evalJS(a.client, `(() => {
+      state.globalMqtt.publish('teamsync/user/' + ${JSON.stringify(fb)} + '/events', JSON.stringify({ type: 'dm_msg', fromId: state.friendId, fromName: state.myName, msgType: 'text', content: 'engelli mesaj', mid: crypto.randomUUID() }), { qos: 1 });
+      state.globalMqtt.publish('teamsync/user/' + ${JSON.stringify(fb)} + '/events', JSON.stringify({ type: 'friend_request', id: state.friendId, name: state.myName }), { qos: 1 });
+      return 1;
+    })()`);
+    await new Promise(r => setTimeout(r, 3000));
+    const dropped = await evalJS(b.client, `({
+      dm: (state.dms[${JSON.stringify(fa)}] || []).some(m => m.content === 'engelli mesaj'),
+      request: state.friendRequests.some(r => r.id === ${JSON.stringify(fa)}),
+      temp: !!state.friends[${JSON.stringify(fa)}]
+    })`);
+    assert.deepStrictEqual(dropped, { dm: false, request: false, temp: false });
+
+    // Engeli kaldır: arkadaşlık geri gelmez, liste boşalır.
+    const unblocked = await evalJS(b.client, `(() => { TSFriends.unblockUser(${JSON.stringify(fa)}, true); return { blocked: TSBlock.isBlocked(${JSON.stringify(fa)}), friend: !!state.friends[${JSON.stringify(fa)}], rows: document.querySelectorAll('#people-list .people-item').length }; })()`);
+    assert.deepStrictEqual(unblocked, { blocked: false, friend: false, rows: 0 });
   } finally {
     cleanupPeer(a);
     cleanupPeer(b);

@@ -94,6 +94,9 @@ class ActivityDetector {
     this.index = null;
     this.lookup = {};
     this.current = null;
+    // Çalışan ama gizlenmiş oyun: yayınlanmaz, yalnızca Ayarlar'da "Gizli"
+    // olarak gösterilir (kullanıcı oradan geri açabilsin).
+    this.hiddenCurrent = null;
     this.missCount = 0;
     this.pollTimer = null;
     this.scanning = null;
@@ -101,12 +104,7 @@ class ActivityDetector {
   }
 
   async init() {
-    const saved = await readJson(this.settingsFile, null);
-    if (saved && typeof saved === 'object') {
-      this.settings.enabled = saved.enabled !== false;
-      this.settings.custom = Array.isArray(saved.custom) ? saved.custom.filter(g => g && EXE_NAME_RE.test(g.exe || '')).slice(0, 200) : [];
-      this.settings.hidden = Array.isArray(saved.hidden) ? saved.hidden.filter(x => typeof x === 'string').slice(0, 500) : [];
-    }
+    await this.loadSettings();
     this.registerIpc();
     const cached = await readJson(this.indexFile, null);
     if (cached && cached.version === INDEX_VERSION) {
@@ -117,6 +115,69 @@ class ActivityDetector {
     // Açılışı yavaşlatmasın: kütüphane taraması 20 sn sonra arka planda.
     setTimeout(() => { if (stale) this.buildIndex().catch(() => {}); }, stale && this.index ? 20000 : 3000);
     this.schedule(this.index ? 4000 : 25000);
+  }
+
+  // activity.json: { enabled, custom:[…], hidden:[{id,name,steamAppId}] }.
+  // Eski "hidden" yalnızca kimlik dizisiydi; okunur ve yeni biçime çevrilir.
+  async loadSettings() {
+    const saved = await readJson(this.settingsFile, null);
+    if (saved && typeof saved === 'object') {
+      this.settings.enabled = saved.enabled !== false;
+      this.settings.custom = Array.isArray(saved.custom) ? saved.custom.filter(g => g && EXE_NAME_RE.test(g.exe || '')).slice(0, 200) : [];
+      this.settings.hidden = P.normalizeHiddenList(saved.hidden);
+    }
+    const before = JSON.stringify(this.settings.hidden);
+    this.cleanHidden();
+    this.resolveHiddenNames();
+    if (saved && (JSON.stringify(this.settings.hidden) !== before || (Array.isArray(saved.hidden) && saved.hidden.some(x => typeof x === 'string')))) {
+      this.saveSettings();
+    }
+  }
+
+  hiddenIds() {
+    return this.settings.hidden.map(h => h.id);
+  }
+
+  // Silinmiş elle eklenen oyunun gizleme kaydı hiçbir yerde görünmüyordu.
+  cleanHidden() {
+    const customIds = new Set(this.settings.custom.map(g => `custom:${g.id}`));
+    this.settings.hidden = this.settings.hidden.filter(h => !h.id.startsWith('custom:') || customIds.has(h.id));
+  }
+
+  // Adı bilinmeyen eski kayıtlar exe dizininden / elle eklenenlerden adlandırılır.
+  resolveHiddenNames() {
+    let changed = false;
+    this.settings.hidden.forEach(h => {
+      if (h.name && (h.steamAppId || !h.id.startsWith('steam:'))) return;
+      const found = P.resolveGameName(h.id, this.lookup, this.settings.custom);
+      if (found && found.name && (found.name !== h.name || (found.steamAppId || 0) !== h.steamAppId)) {
+        h.name = h.name || found.name;
+        h.steamAppId = h.steamAppId || found.steamAppId || 0;
+        changed = true;
+      }
+      if (!h.steamAppId && /^steam:\d+$/.test(h.id)) { h.steamAppId = Number(h.id.slice(6)); changed = true; }
+    });
+    return changed;
+  }
+
+  setHidden(id, hidden, name) {
+    if (typeof id !== 'string' || !id || id.length > 200) return false;
+    this.settings.hidden = this.settings.hidden.filter(h => h.id !== id);
+    if (hidden) {
+      const fromCurrent = this.current && this.current.id === id ? this.current : null;
+      const found = fromCurrent ? { name: fromCurrent.name, steamAppId: fromCurrent.steamAppId } : P.resolveGameName(id, this.lookup, this.settings.custom);
+      const fallback = typeof name === 'string' ? name : '';
+      this.settings.hidden.push(...P.normalizeHiddenList([{ id, name: (found && found.name) || fallback, steamAppId: (found && found.steamAppId) || 0 }]));
+      if (fromCurrent) {
+        const { source, steamAppId, startedAt, icon } = fromCurrent;
+        this.hiddenCurrent = { id, name: fromCurrent.name, source, steamAppId, startedAt, icon };
+      }
+    } else if (this.hiddenCurrent && this.hiddenCurrent.id === id) {
+      this.hiddenCurrent = null;
+    }
+    this.resolveHiddenNames();
+    this.saveSettings();
+    return true;
   }
 
   saveSettings() {
@@ -142,6 +203,7 @@ class ActivityDetector {
       ignore: known.ignore,
       custom: this.settings.custom
     });
+    if (this.resolveHiddenNames()) this.saveSettings();
   }
 
   async scanSteam() {
@@ -238,10 +300,17 @@ class ActivityDetector {
       const processes = P.parseTasklistCsv(csv);
       if (!processes.length) return; // tasklist başarısız: durumu değiştirme
       const match = P.matchProcesses(processes, this.lookup, {
-        hidden: this.settings.hidden,
+        hidden: this.hiddenIds(),
         runningAppId,
         previousId: this.current ? this.current.id : null
       });
+      // Gizlenen bir oyun çalışıyor mu? (Ayarlar'da "Gizli · Göster" için.)
+      const any = match ? null : P.matchProcesses(processes, this.lookup, { runningAppId });
+      const hiddenRun = any && this.hiddenIds().includes(any.id) ? any : null;
+      if ((hiddenRun && hiddenRun.id) !== (this.hiddenCurrent && this.hiddenCurrent.id)) {
+        this.hiddenCurrent = hiddenRun ? { id: hiddenRun.id, name: hiddenRun.name, source: hiddenRun.source, steamAppId: hiddenRun.steamAppId || 0, startedAt: Date.now(), icon: '' } : null;
+        this.emitState();
+      }
       if (match) {
         this.missCount = 0;
         if (!this.current || this.current.id !== match.id || this.current.pid !== match.pid) {
@@ -305,13 +374,22 @@ class ActivityDetector {
     if (win && !win.isDestroyed()) win.webContents.send('activity-changed', this.publicCurrent());
   }
 
+  // Ayarlar sayfası açıkken gizli oyun durumu değişince yeniden çizilsin.
+  emitState() {
+    const win = this.getWindow();
+    if (win && !win.isDestroyed()) win.webContents.send('activity-state-changed', this.state());
+  }
+
   state() {
     return {
       available: true,
       enabled: this.settings.enabled,
       current: this.publicCurrent(),
       custom: this.settings.custom,
-      hidden: this.settings.hidden,
+      // Geriye uyum: kimlik dizisi. Adlar hiddenGames içinde.
+      hidden: this.hiddenIds(),
+      hiddenGames: this.settings.hidden.map(h => ({ ...h })),
+      hiddenCurrent: this.hiddenCurrent ? { ...this.hiddenCurrent } : null,
       gameCount: this.gameCount(),
       lastScan: this.index ? this.index.builtAt : 0
     };
@@ -367,17 +445,18 @@ class ActivityDetector {
     }));
     this.ipcMain.handle('activity-remove-custom', guard(id => {
       this.settings.custom = this.settings.custom.filter(g => g.id !== id);
+      // custom:<id> gizleme kaydı yetim kalmasın.
+      this.cleanHidden();
+      if (this.hiddenCurrent && this.hiddenCurrent.id === `custom:${id}`) this.hiddenCurrent = null;
       this.saveSettings();
       this.rebuildLookup();
       if (this.current && this.current.id === `custom:${id}`) this.setCurrentNone();
       return this.state();
     }));
-    this.ipcMain.handle('activity-set-hidden', guard((id, hidden) => {
-      if (typeof id !== 'string' || id.length > 200) return this.state();
-      this.settings.hidden = this.settings.hidden.filter(h => h !== id);
-      if (hidden) this.settings.hidden.push(id);
-      this.saveSettings();
+    this.ipcMain.handle('activity-set-hidden', guard((id, hidden, name) => {
+      if (!this.setHidden(id, !!hidden, name)) return this.state();
       if (hidden && this.current && this.current.id === id) this.setCurrentNone();
+      // Gösterilen oyun hemen yeniden algılanır ve presence'a girer.
       else this.schedule(300);
       return this.state();
     }));

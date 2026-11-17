@@ -36,14 +36,27 @@
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
-  background: var(--acc);
-  color: #fff;
+  background: var(--acc-btn);
+  color: var(--acc-btn-fg);
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
 }
-.grp-call-btn:hover { background: var(--acc-hover); }
-.grp-call-btn.is-leave { background: var(--status-dnd); }
+.grp-call-btn:hover { background: var(--acc-btn-hover); }
+.grp-call-btn.is-leave { background: var(--status-dnd); color: lch(from var(--status-dnd) calc((49.44 - l) * infinity) 0 0); }
+/* Arama yokken: "Toplantı başlat" (sessiz) + "Herkesi ara"; aramadayken "Herkesi çağır". */
+.grp-call-start { display: flex; align-items: center; gap: 6px; }
+.grp-call-btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.grp-call-btn svg { flex: 0 0 auto; }
+.grp-call-btn.is-ghost {
+  background: transparent;
+  color: var(--txt-main);
+  border: 1px solid var(--sh-border);
+}
+.grp-call-btn.is-ghost:hover { background: var(--sh-hover); }
+.grp-call-btn:disabled { opacity: 0.55; cursor: default; }
+.grp-call-note { font-size: 12px; font-weight: 600; color: var(--txt-mut); padding: 0 6px; }
+.grp-row-call .ts-ico, .grp-row-call svg { vertical-align: -2px; margin-right: 2px; }
 .grp-members-toggle { width: auto; gap: 4px; padding: 0 8px; }
 .grp-members-toggle span { font-size: 13px; font-weight: 600; }
 
@@ -65,50 +78,149 @@
 .grp-member {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px;
+  gap: 4px;
+  padding: 2px 4px 2px 0;
   border-radius: 6px;
   --dot-ring: var(--sh-side);
 }
-.grp-member:hover { background: var(--sh-hover); --dot-ring: color-mix(in srgb, var(--sh-side) 93%, var(--txt-main)); }
-.grp-member.is-offline .ts-av-img, .grp-member.is-offline .ts-av-initial { opacity: 0.45; }
-.grp-member.is-pending { opacity: 0.6; }
-.grp-member-name { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.grp-member-name small { color: var(--txt-mut); font-size: 11px; font-weight: 400; white-space: normal; }
-.grp-member-line { display: flex; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.grp-owner { display: inline-flex; margin-left: 6px; vertical-align: -2px; }
-.grp-kick {
-  width: 24px; height: 24px;
-  display: none; align-items: center; justify-content: center;
-  border: 0; border-radius: 50%; background: none;
-  color: var(--txt-mut); font-size: 18px; cursor: pointer;
+.grp-member:hover, .grp-member:focus-within { background: var(--sh-hover); --dot-ring: color-mix(in srgb, var(--sh-side) 93%, var(--txt-main)); }
+.grp-member.is-pending { opacity: 0.6; gap: 10px; padding: 6px; }
+.grp-member-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.grp-member:hover .grp-kick { display: flex; }
-.grp-kick:hover { color: var(--status-dnd); background: var(--sh-hover); }
+.grp-member-main:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+.grp-member.is-offline .ts-av-img, .grp-member.is-offline .ts-av-initial { opacity: 0.45; }
+.grp-member.is-offline .grp-member-text { color: var(--txt-mut); }
+.grp-member-name { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp-member-name small { color: var(--txt-mut); font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp-member-line { display: flex; align-items: center; min-width: 0; overflow: hidden; }
+.grp-member-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.grp-owner { display: inline-flex; margin-left: 6px; vertical-align: -2px; }
+/* Satır eylemleri: üzerine gelince / klavyeyle odaklanınca görünür */
+.grp-m-acts { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; opacity: 0; }
+.grp-member:hover .grp-m-acts, .grp-member:focus-within .grp-m-acts { opacity: 1; }
+.grp-m-act, .grp-m-state {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 6px; background: none;
+  color: var(--txt-mut); cursor: pointer;
+}
+.grp-m-state { cursor: default; }
+.grp-m-act:hover { color: var(--txt-main); background: color-mix(in srgb, var(--txt-main) 10%, transparent); }
+.grp-m-act.is-danger:hover { color: var(--status-dnd); }
+.grp-m-act:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+.grp-m-act:disabled { opacity: 0.4; cursor: default; }
+@media (hover: none) { .grp-m-acts { opacity: 1; } }
+
+.grp-panel-actions { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.grp-panel-danger { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--sh-border); }
+.grp-panel-note { margin: 0; padding: 0 2px; color: var(--txt-mut); font-size: 12px; line-height: 1.4; }
 .grp-panel-btn {
   width: 100%;
-  margin-top: 6px;
-  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid var(--sh-border);
   border-radius: 6px;
   background: var(--sh-panel);
   color: var(--txt-main);
   font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
   text-align: left;
 }
+.grp-panel-btn > svg { flex: 0 0 auto; color: var(--txt-mut); }
 .grp-panel-btn:hover { border-color: var(--acc); }
-.grp-panel-btn.is-danger { color: var(--status-dnd); }
-.grp-panel-btn.is-danger:hover { border-color: var(--status-dnd); }
+.grp-panel-btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+/* Dolgulu birincil düğmeler temanın buton rengini (--acc-btn) kullanır; .btn-pri ile aynı. */
+.grp-panel-btn.is-pri { background: var(--acc-btn); border-color: var(--acc-btn); color: var(--acc-btn-fg); }
+.grp-panel-btn.is-pri > svg { color: currentColor; }
+.grp-panel-btn.is-pri:hover { background: var(--acc-btn-hover); border-color: var(--acc-btn-hover); }
+.grp-panel-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.grp-panel-btn.is-danger { background: none; border-color: transparent; color: var(--status-dnd); }
+.grp-panel-btn.is-danger > svg { color: currentColor; }
+.grp-panel-btn.is-danger:hover { border-color: color-mix(in srgb, var(--status-dnd) 50%, transparent); background: color-mix(in srgb, var(--status-dnd) 10%, transparent); }
 
-/* ---------- Grup oluşturma ---------- */
-.grp-create-pop { width: 420px; }
-.grp-create { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
-.grp-create-title { font-size: 12px; font-weight: 800; letter-spacing: 0.03em; color: var(--txt-main); }
-.grp-create-count { font-size: 12px; color: var(--txt-mut); margin-top: -4px; }
-.grp-create-search, .grp-create-name-input {
+/* ---------- Kişi seçici: grup oluştur + gruba ekle ---------- */
+.grp-pick-pop { width: min(400px, calc(100vw - 16px)); max-height: calc(100vh - 56px); display: flex; flex-direction: column; }
+.grp-pick { min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.grp-pick-head { display: flex; flex-direction: column; gap: 4px; }
+.grp-pick-title { font-size: 16px; font-weight: 700; color: var(--txt-main); }
+.grp-pick-help { margin: 0; color: var(--txt-mut); font-size: 13px; line-height: 1.4; }
+.grp-pick-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--sh-border);
+  border-radius: 6px;
+  background: var(--sh-input);
+  color: var(--txt-mut);
+}
+.grp-pick-search:focus-within { border-color: var(--acc); }
+.grp-pick-q { flex: 1 1 auto; min-width: 0; height: 100%; border: 0 !important; background: none !important; color: var(--txt-main); font-size: 14px; outline: none; padding: 0 !important; margin: 0 !important; }
+.grp-pick-list {
+  min-height: 0;
+  max-height: min(320px, 46vh);
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  --dot-ring: var(--sh-float);
+}
+.grp-pick-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.grp-pick-row.hidden { display: none; }
+.grp-pick-row:hover { background: var(--sh-hover); }
+.grp-pick-row:focus-within { border-color: var(--acc); }
+.grp-pick-row.is-on { background: color-mix(in srgb, var(--acc) 14%, transparent); }
+.grp-pick-row.is-locked { opacity: 0.5; cursor: not-allowed; }
+/* Gerçek onay kutusu (klavye + ekran okuyucu) görünmez, yerine .grp-pick-box çizilir */
+.grp-pick-cb { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; pointer-events: none; }
+.grp-pick-copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.grp-pick-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--txt-main); }
+.grp-pick-st { font-size: 12px; color: var(--txt-mut); }
+.grp-pick-st.s-online { color: var(--status-online); }
+.grp-pick-box {
+  flex: 0 0 20px;
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid color-mix(in srgb, var(--txt-mut) 70%, transparent);
+  border-radius: 5px;
+  color: transparent;
+}
+.grp-pick-box .ts-ico { stroke-width: 3; }
+.grp-pick-row.is-on .grp-pick-box { background: var(--acc); border-color: var(--acc); color: var(--acc-fg); }
+.grp-pick-nomatch { padding: 16px 8px; color: var(--txt-mut); font-size: 13px; text-align: center; }
+.grp-pick-nomatch.hidden { display: none; }
+.grp-pick-name-input {
   width: 100%;
-  height: 34px;
+  height: 36px;
   padding: 0 10px;
   border: 1px solid var(--sh-border);
   border-radius: 6px;
@@ -116,21 +228,107 @@
   color: var(--txt-main);
   font-size: 14px;
 }
-.grp-create-list { max-height: 260px; overflow-y: auto; margin: 2px -4px; --dot-ring: var(--sh-float); }
-.grp-create-row {
+.grp-pick-cap { font-size: 12px; color: var(--txt-mut); line-height: 1.4; }
+.grp-pick-cap:empty { display: none; }
+.grp-pick-cap.is-full { color: var(--status-dnd); }
+.grp-pick-foot {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sh-border);
+}
+.grp-pick-count { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--txt-mut); }
+.grp-pick-go { width: auto !important; margin: 0 !important; padding: 8px 18px !important; white-space: nowrap; }
+.grp-pick-go:disabled { opacity: 0.45; cursor: not-allowed; }
+.grp-pick-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 8px 6px; text-align: center; }
+.grp-pick-empty p { margin: 0; color: var(--txt-mut); font-size: 14px; line-height: 1.45; }
+.grp-pick-empty-ico {
+  width: 52px; height: 52px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--sh-hover);
+  color: var(--txt-mut);
+}
+.grp-pick-goadd { display: inline-flex !important; align-items: center; gap: 8px; width: auto !important; padding: 8px 14px !important; }
+
+/* ---------- Arkadaşlar sayfası: Çıkarılanlar / Engellenenler (js/shell-friends.js) ---------- */
+.people-list { list-style: none; margin: 0; padding: 0; }
+.people-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  border-top: 1px solid var(--sh-border);
+  border-radius: 0;
+}
+.people-item:hover { background: var(--sh-hover); }
+.people-copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.people-copy b { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.people-copy small { color: var(--txt-mut); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.people-actions { display: flex; align-items: center; flex-wrap: nowrap; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
+.people-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--sh-border);
   border-radius: 6px;
+  background: none;
+  color: var(--txt-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.people-btn:hover { background: var(--bg-hover, var(--sh-hover)); border-color: var(--acc); }
+.people-btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.people-btn:disabled { opacity: 0.5; cursor: default; }
+.people-btn.is-pri { background: var(--acc-btn); border-color: var(--acc-btn); color: var(--acc-btn-fg); }
+.people-btn.is-pri:hover { background: var(--acc-btn-hover); border-color: var(--acc-btn-hover); }
+.people-btn.is-danger { color: var(--status-dnd); }
+.people-btn.is-danger:hover { border-color: var(--status-dnd); }
+.people-btn.is-icon { width: 32px; padding: 0; justify-content: center; color: var(--txt-mut); }
+.people-state { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px; color: var(--txt-mut); font-size: 13px; }
+.people-empty { border: 0; }
+@container (max-width: 520px) { .people-btn:not(.is-icon) span { display: none; } .people-btn:not(.is-icon) { width: 32px; padding: 0; justify-content: center; } }
+@media (max-width: 640px) { .people-btn:not(.is-icon) span { display: none; } .people-btn:not(.is-icon) { width: 32px; padding: 0; justify-content: center; } }
+
+/* Arkadaş satırı: "sessize alındı" etiketi + ekleme formunun satır içi durumları */
+.friend-muted-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px 0 1px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--sh-hover);
+  color: var(--txt-mut);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.add-friend-msg { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.add-friend-msg .afm-ico { display: inline-flex; }
+.add-friend-msg.loading, .add-friend-msg.warn { color: var(--txt-mut); }
+.add-friend-msg.warn .afm-ico { color: var(--status-idle); }
+.afm-act {
+  margin-left: 4px;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 }
-.grp-create-row:hover { background: var(--sh-hover); }
-.grp-create-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-.grp-create-row input { width: 18px; height: 18px; accent-color: var(--acc); cursor: pointer; }
-.grp-create-empty { padding: 16px; color: var(--txt-mut); text-align: center; }
-.grp-create-go { width: 100%; margin-top: 4px; }
-.grp-create-go:disabled { opacity: 0.5; cursor: not-allowed; }
+.afm-act:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
 
 /* ---------- Gelen grup araması ---------- */
 .grp-ring {
@@ -158,10 +356,11 @@
 .grp-ring-btn {
   width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
-  border: 0; border-radius: 50%; cursor: pointer; color: #fff; font-size: 20px;
+  border: 0; border-radius: 50%; cursor: pointer; color: var(--acc-fg, var(--txt-main)); font-size: 20px;
 }
-.grp-ring-btn.is-join { background: var(--status-online); }
-.grp-ring-btn.is-decline { background: var(--status-dnd); }
+/* Yazı rengi zemindeki tema renginden türetilir (koyu/açık zemine göre siyah/beyaz). */
+.grp-ring-btn.is-join { background: var(--status-online); color: lch(from var(--status-online) calc((49.44 - l) * infinity) 0 0); }
+.grp-ring-btn.is-decline { background: var(--status-dnd); color: lch(from var(--status-dnd) calc((49.44 - l) * infinity) 0 0); }
 @media (prefers-reduced-motion: reduce) { .grp-ring { animation: none; } }
 
 /* ---------- Mesaj araç çubuğu + tepkiler ---------- */
@@ -208,7 +407,14 @@
 .emoji-jumbo { font-size: 44px; line-height: 1.2; }
 .view-dm .dmx-msg.is-pending .dmx-content { opacity: 0.55; }
 .view-dm .dmx-msg.is-pending .dmx-content::after {
-  content: '⏱';
+  /* Saat simgesi (emoji yerine SVG maskesi, yazı rengini alır). */
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E") center / contain no-repeat;
   margin-left: 6px;
   font-size: 12px;
   opacity: 0.9;

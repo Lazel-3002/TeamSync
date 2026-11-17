@@ -315,7 +315,7 @@ function initLuckyWheel() {
       label.dataset.i18nIgnore = 'true';
       label.textContent = option;
       const detail = document.createElement('small');
-      detail.textContent = pollState.myVote === index ? '✓ Senin oyun' : `${count} oy`;
+      detail.textContent = pollState.myVote === index ? 'Senin oyun' : `${count} oy`;
       copy.append(label, detail);
       const metric = document.createElement('span');
       metric.className = 'poll-opt-metric';
@@ -325,7 +325,7 @@ function initLuckyWheel() {
       metricUnit.textContent = '%';
       const check = document.createElement('span');
       check.className = 'poll-check';
-      check.textContent = '✓';
+      check.innerHTML = window.TSUI ? window.TSUI.icon('check', 12, 3) : '';
       metric.append(metricValue, metricUnit, check);
       button.append(bar, letter, copy, metric);
       button.addEventListener('click', () => castPollVote(index));

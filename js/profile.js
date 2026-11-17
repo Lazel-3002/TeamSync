@@ -6,13 +6,17 @@
 //   → teamsync/user/<hedef>/events  { type:'req_profile', fromId, have }
 //   ← teamsync/user/<isteyen>/events { type:'res_profile', fromId, rev, profile }
 // Presence'taki `pr` (profil sürümü) arttığında önbellek tazelenir.
-// Görseller YALNIZCA Supabase public "avatars" kovasından kabul edilir: bir
-// arkadaş kendi sunucusundaki bir resmi göstererek IP'ni öğrenemesin.
+// Görseller sunucuya HİÇ yüklenmez (js/profile-media.js): profilde yalnızca
+// `tsm:<fid>:<sha256>:<bayt>` tanımlayıcısı dolaşır, baytlar sahibinden P2P
+// istenir. Eski sürümler için Supabase "avatars" kovası adresleri yalnızca
+// OKUNUR; başka hiçbir uzak adres kabul edilmez (IP sızdırma).
+// Kendi profilimde `legacy: {av, an, bn}` eski kova adreslerini, ilgili resim
+// değişene dek eski sürüm arkadaşlara göndermek için tutar.
 (function () {
   const EXT_KEY = fid => `teamsync_profile_ext::${fid}`;
   const CACHE_KEY = 'teamsync_profile_cache';
   const CACHE_MAX = 200;
-  const DEFAULT = { rev: 0, bio: '', bannerColor: '', bannerUrl: '', avatarColor: '', avatarAnimUrl: '', frame: 'none', accent: '', typingVerb: '' };
+  const DEFAULT = { rev: 0, bio: '', bannerColor: '', bannerUrl: '', avatarColor: '', avatarAnimUrl: '', avatarRef: '', frame: 'none', accent: '', typingVerb: '' };
   const HEX = /^#[0-9a-f]{6}$/i;
   const SUPABASE_MEDIA_RE = /^https:\/\/[a-z0-9-]{8,40}\.supabase\.co\/storage\/v1\/object\/public\/avatars\/[A-Za-z0-9/_.-]{1,160}(\?[A-Za-z0-9=&._-]{0,60})?$/;
 
@@ -33,28 +37,43 @@
 
   const { esc, tr } = { esc: v => window.TSUI.esc(v), tr: (k, v) => window.TSUI.tr(k, v) };
 
-  function safeMedia(url) {
+  // Saklanabilir görsel değeri: P2P tanımlayıcısı ya da eski kova adresi.
+  // (Çizim için her zaman mediaSrc → TSProfileMedia.src kullanılır.)
+  function legacyMedia(url) {
     if (typeof url !== 'string' || !url) return '';
     if (!SUPABASE_MEDIA_RE.test(url)) return '';
     if (mediaPrefix && !url.startsWith(mediaPrefix)) return '';
     return url;
   }
+  function safeMedia(url) {
+    if (typeof url !== 'string' || !url) return '';
+    if (window.TSProfileMedia && window.TSProfileMedia.isRef(url)) return url;
+    return legacyMedia(url);
+  }
+  const isMediaRef = v => !!(window.TSProfileMedia && window.TSProfileMedia.isRef(v));
+  const mediaSrc = v => (window.TSProfileMedia ? window.TSProfileMedia.src(v) : legacyMedia(v));
 
   function sanitizeProfile(raw) {
     const p = raw && typeof raw === 'object' ? raw : {};
     const banner = p.banner && typeof p.banner === 'object' ? p.banner : {};
+    const pm = p.pm && typeof p.pm === 'object' ? p.pm : {};
     const frame = window.TSUI.FRAMES.includes(p.frame) ? p.frame : 'none';
     const verb = typeof p.tv === 'string' ? p.tv : (typeof p.typingVerb === 'string' ? p.typingVerb : '');
-    return {
+    const lg = p.legacy && typeof p.legacy === 'object' ? p.legacy : null;
+    const out = {
       bio: typeof p.bio === 'string' ? p.bio.slice(0, 190) : '',
       bannerColor: HEX.test(banner.c || p.bannerColor || '') ? (banner.c || p.bannerColor) : '',
-      bannerUrl: safeMedia(banner.u || p.bannerUrl || ''),
+      // Yeni istemcilerde `pm` (P2P tanımlayıcıları) önce gelir; eski alanlar eski sürümler içindir.
+      bannerUrl: (isMediaRef(pm.bn) && pm.bn) || safeMedia(p.bannerUrl || '') || legacyMedia(banner.u || ''),
       avatarColor: HEX.test(p.avatarColor || '') ? p.avatarColor : '',
-      avatarAnimUrl: safeMedia(p.anim || p.avatarAnimUrl || ''),
+      avatarAnimUrl: (isMediaRef(pm.an) && pm.an) || safeMedia(p.avatarAnimUrl || '') || legacyMedia(p.anim || ''),
+      avatarRef: (isMediaRef(pm.av) && pm.av) || (isMediaRef(p.avatarRef) ? p.avatarRef : ''),
       frame,
       accent: HEX.test(p.accent || '') ? p.accent : '',
       typingVerb: Array.from(verb.replace(/[\r\n<>]+/g, ' ').trim()).slice(0, 24).join('')
     };
+    if (lg) out.legacy = { av: legacyMedia(lg.av), an: legacyMedia(lg.an), bn: legacyMedia(lg.bn) };
+    return out;
   }
 
   // ---------- Kendi profilim ----------
@@ -96,13 +115,24 @@
     return { ...mine() };
   }
 
+  // Eski sürüm arkadaşlar yalnızca banner.u / anim / av alanlarını (Supabase
+  // kovası adresleri) tanır: resim değişene dek eski adres gönderilmeye devam
+  // eder. Yeni istemciler `pm` içindeki P2P tanımlayıcılarını kullanır.
   function wirePayload(p) {
     const out = { bio: p.bio, frame: p.frame };
-    if (p.bannerColor || p.bannerUrl) out.banner = { c: p.bannerColor || undefined, u: p.bannerUrl || undefined };
+    const lg = p.legacy || {};
+    const oldBanner = legacyMedia(p.bannerUrl) || legacyMedia(lg.bn);
+    const oldAnim = legacyMedia(p.avatarAnimUrl) || legacyMedia(lg.an);
+    if (p.bannerColor || oldBanner) out.banner = { c: p.bannerColor || undefined, u: oldBanner || undefined };
     if (p.avatarColor) out.avatarColor = p.avatarColor;
-    if (p.avatarAnimUrl) out.anim = p.avatarAnimUrl;
+    if (oldAnim) out.anim = oldAnim;
     if (p.accent) out.accent = p.accent;
     if (p.typingVerb) out.tv = p.typingVerb;
+    const pm = {};
+    if (isMediaRef(p.bannerUrl)) pm.bn = p.bannerUrl;
+    if (isMediaRef(p.avatarAnimUrl)) pm.an = p.avatarAnimUrl;
+    if (isMediaRef(window.state.myAvatar)) pm.av = window.state.myAvatar;
+    if (Object.keys(pm).length) out.pm = pm;
     return out;
   }
 
@@ -114,18 +144,42 @@
       if (!session) return;
       // Ayrı güncelleme: profile_ext sütunu yoksa (SQL kurulmadı) yalnızca bu
       // çağrı başarısız olur, isim/arkadaş eşitlemesi etkilenmez.
-      await supabaseClient.from('profiles').update({ profile_ext: exportExt() }).eq('id', session.user.id);
+      // Yalnızca metin: P2P tanımlayıcıları + eski kova adresleri; resim verisi
+      // (data:/blob:) TSProfileMedia.serverSafe ile atılır.
+      const ext = window.TSProfileMedia ? window.TSProfileMedia.serverSafe(exportExt(), 'profile_ext') : exportExt();
+      await supabaseClient.from('profiles').update({ profile_ext: ext }).eq('id', session.user.id);
     } catch (e) {}
   }
 
-  function saveMine(next) {
+  // opts.exactLegacy: `next.legacy` olduğu gibi yazılır (taşıma / avatar).
+  // Aksi hâlde (düzenleyici) değişen resmin eski kova adresi silinir: eski
+  // sürüm arkadaşlar o resim için baş harfe / renge düşer.
+  function saveMine(next, opts = {}) {
     ensureLoaded();
-    window.state.myProfile = { ...DEFAULT, ...sanitizeProfile(next), rev: (window.state.myProfile.rev || 0) + 1 };
+    const prev = window.state.myProfile || {};
+    const clean = sanitizeProfile(next);
+    const lg = opts.exactLegacy ? { ...(clean.legacy || {}) } : { ...(prev.legacy || {}) };
+    if (!opts.exactLegacy) {
+      if ((clean.bannerUrl || '') !== (prev.bannerUrl || '')) lg.bn = '';
+      if ((clean.avatarAnimUrl || '') !== (prev.avatarAnimUrl || '')) lg.an = '';
+    }
+    clean.legacy = lg;
+    if (!clean.avatarRef && !(next && 'avatarRef' in next)) clean.avatarRef = prev.avatarRef || '';
+    if (!opts.exactLegacy && (clean.avatarRef || '') !== (prev.avatarRef || '')) lg.av = '';
+    window.state.myProfile = { ...DEFAULT, ...clean, rev: (prev.rev || 0) + 1 };
     persistLocal();
     if (typeof window.saveProfile === 'function') window.saveProfile();
     syncToSupabase();
     if (typeof window.publishPresence === 'function') window.publishPresence();
     document.dispatchEvent(new CustomEvent('ts:profile', { detail: { fid: window.state.friendId } }));
+  }
+
+  // Mevcut profile küçük bir yama (avatar tanımlayıcısı, eski adreslerin
+  // taşınması): fn(mevcut) → yeni profil; legacy olduğu gibi yazılır.
+  function updateMine(fn) {
+    ensureLoaded();
+    const cur = { ...window.state.myProfile, legacy: { ...(window.state.myProfile.legacy || {}) } };
+    saveMine(fn(cur), { exactLegacy: true });
   }
 
   // ---------- Arkadaş profilleri (P2P) ----------
@@ -185,6 +239,7 @@
   async function answer(toFid) {
     if (!toFid || !/^[A-Za-z0-9_-]{3,128}$/.test(toFid)) return;
     if (window.TSStatus && window.TSStatus.isInvisible()) return;
+    if (window.TSBlock && window.TSBlock.isBlocked(toFid)) return; // engellenen profilimi göremez
     const now = Date.now();
     const p = mine();
     // Aynı sürümü 10 sn içinde tekrar gönderme; ama yeni bir sürüm (profil
@@ -197,6 +252,10 @@
     try { if (window.TSCrypto) { await window.TSCrypto.ensureIdentity(); keys = window.TSCrypto.publicKeysSync(); } } catch (e) {}
     const payload = { type: 'res_profile', fromId: window.state.friendId, rev: p.rev || 0, profile: wirePayload(p) };
     if (keys) payload.keys = keys;
+    // Arkadaş olmayan grup üyeleri presence görmez: avatar burada. `av` yalnızca
+    // eski sürümler için eski kova adresi; yeni istemciler profile.pm.av'yi kullanır.
+    const av = window.TSProfileMedia ? window.TSProfileMedia.legacyAvatar() : legacyMedia(window.state.myAvatar);
+    if (av) payload.av = av;
     publishTo(toFid, payload, 1);
   }
 
@@ -209,10 +268,21 @@
       if (typeof fid !== 'string' || !/^[A-Za-z0-9_-]{3,128}$/.test(fid)) return;
       if (JSON.stringify(data).length > 8192) return;
       // İstemediğimiz ya da tanımadığımız birinin profilini önbelleğe alma.
-      if (!pending[fid] && !(window.state.friends && window.state.friends[fid]) && !cache[fid]) return;
+      // Ortak bir grubun üyesi (arkadaş olmasa da) kabul edilir: üye panelinde ad/avatar.
+      const sharesGroup = !!(window.TSGroups && window.TSGroups.list && window.TSGroups.list().some(g => g.members.some(m => m.fid === fid)));
+      if (!pending[fid] && !(window.state.friends && window.state.friends[fid]) && !cache[fid] && !sharesGroup) return;
       const r = Number.isInteger(data.rev) ? data.rev : 0;
       if (data.keys && window.TSCrypto && window.state.friends && window.state.friends[fid]) window.TSCrypto.rememberPeer(fid, data.keys);
-      cache[fid] = { rev: r, profile: sanitizeProfile(data.profile), at: Date.now() };
+      const prof = sanitizeProfile(data.profile);
+      delete prof.legacy;
+      const foreign = v => isMediaRef(v) && window.TSProfileMedia.parse(v).fid !== fid;
+      if (foreign(prof.bannerUrl)) prof.bannerUrl = '';
+      if (foreign(prof.avatarAnimUrl)) prof.avatarAnimUrl = '';
+      // Avatar: P2P tanımlayıcısı (yalnız sahibinin kendi kimliğiyle) ya da eski kova adresi.
+      const ref = prof.avatarRef && window.TSProfileMedia && (window.TSProfileMedia.parse(prof.avatarRef) || {}).fid === fid ? prof.avatarRef : '';
+      cache[fid] = { rev: r, profile: { ...prof, avatarRef: ref, avatarUrl: ref || legacyMedia(data.av) }, at: Date.now() };
+      // Arkadaşın listedeki avatarı da yenilensin (baytlar gelene dek eskisi kalır).
+      if (ref && window.state.friends && window.state.friends[fid] && window.TSProfileMedia) window.TSProfileMedia.adoptFriendAvatar(fid, ref);
       saveCache();
       if (pending[fid]) { clearTimeout(pending[fid].timer); delete pending[fid]; }
       document.dispatchEvent(new CustomEvent('ts:profile', { detail: { fid } }));
@@ -220,18 +290,21 @@
   }
 
   // ---------- Kart modeli ----------
-  function friendModel(fid) {
+  // hint: arkadaş olmayan grup üyesi için { name, status } (js/ui/group-view.js).
+  function friendModel(fid, hint) {
     const f = (window.state.friends || {})[fid] || {};
-    const st = window.TSStatus ? window.TSStatus.statusOf(fid) : (f.online ? 'online' : 'offline');
+    let st = window.TSStatus ? window.TSStatus.statusOf(fid) : (f.online ? 'online' : 'offline');
+    if (hint && hint.status && st === 'offline') st = hint.status;
     const pres = window.TSStatus ? window.TSStatus.presenceOf(fid) : null;
     const prof = profileOf(fid) || { ...DEFAULT };
     const nick = typeof window.getNickname === 'function' ? window.getNickname(fid) : '';
     return {
       kind: 'friend',
       fid,
-      name: nick || f.name || fid,
+      name: nick || f.name || (hint && hint.name) || fid,
       realName: f.name || '',
-      avatar: f.avatar,
+      avatar: f.avatar || prof.avatarUrl || undefined,
+      blocked: !!(window.TSBlock && window.TSBlock.isBlocked(fid)),
       status: st,
       custom: pres && pres.cs ? pres.cs : null,
       activity: pres && pres.act ? pres.act : null,
@@ -288,7 +361,8 @@
 
   // ---------- Kart HTML ----------
   function bannerStyle(p, fallbackSeed) {
-    if (p.bannerUrl) return `background-image:url('${esc(p.bannerUrl)}');background-color:${esc(p.bannerColor || '#1e1f22')}`;
+    const img = mediaSrc(p.bannerUrl);
+    if (img) return `background-image:url('${esc(img)}');background-color:${p.bannerColor ? esc(p.bannerColor) : 'var(--bg-dark)'}`;
     if (p.bannerColor) return `background-color:${esc(p.bannerColor)}`;
     if (p.accent) return `background-color:${esc(p.accent)}`;
     return `background-color:${window.TSUI.colorFromString(fallbackSeed || '?')}`;
@@ -329,7 +403,7 @@
     const loading = m.loading ? `<div class="pc-loading">${esc(tr('profile.loading'))}</div>` : '';
     return `
       <div class="pc ${opts.cls || ''}" style="${accent}" data-i18n-ignore>
-        <div class="pc-banner ${p.bannerUrl ? 'has-img' : ''}" style="${bannerStyle(p, m.fid || m.name)}"></div>
+        <div class="pc-banner ${mediaSrc(p.bannerUrl) ? 'has-img' : ''}" style="${bannerStyle(p, m.fid || m.name)}"></div>
         <div class="pc-head">
           <div class="pc-avatar">${avatar}</div>
           ${custom}
@@ -348,17 +422,34 @@
   }
 
   // ---------- Kartı göster ----------
+  // Düzen: birincil eylem tam genişlik en üstte, ikincil eylemler eşit bir
+  // satırda, yıkıcı eylemler (çıkar / engelle) en altta daha sakin bir satırda.
   function actionButtons(m) {
-    if (m.kind === 'self') return '';
-    const btns = [];
-    if (m.fid) btns.push(`<button type="button" class="pc-btn pc-btn-pri" data-pc-action="message">${esc(tr('profile.sendMessage'))}</button>`);
-    if (m.kind === 'friend' && m.isFriend) {
-      btns.push(`<button type="button" class="pc-btn" data-pc-action="mute">${esc(tr(m.muted ? 'profile.unmute' : 'profile.mute'))}</button>`);
-      btns.push(`<button type="button" class="pc-btn pc-btn-danger" data-pc-action="remove">${esc(tr('profile.removeFriend'))}</button>`);
-    } else if (m.kind === 'room' && m.roomPeerId) {
-      btns.push(`<button type="button" class="pc-btn" data-pc-action="add-friend">${esc(tr('profile.addFriend'))}</button>`);
+    const b = (action, label, cls = '') => `<button type="button" class="pc-btn ${cls}" data-pc-action="${action}">${esc(label)}</button>`;
+    let pri = '';
+    const sec = [];
+    const danger = [];
+    if (m.kind === 'self') {
+      sec.push(b('edit-profile', tr('profile.editProfile')));
+    } else if (m.kind === 'friend' && m.blocked) {
+      sec.push(b('unblock', tr('friends.unblock')));
+    } else {
+      const groupOnly = m.kind === 'friend' && !m.isFriend; // ortak gruptaki arkadaş olmayan üye
+      if (m.fid && !groupOnly) pri = b('message', tr('profile.sendMessage'), 'pc-btn-pri');
+      if (m.kind === 'friend' && m.isFriend) {
+        sec.push(b('mute', tr(m.muted ? 'profile.unmute' : 'profile.mute')));
+        danger.push(b('remove', tr('profile.removeFriend'), 'pc-btn-danger'));
+        danger.push(b('block', tr('friends.block'), 'pc-btn-danger'));
+      } else if (groupOnly && m.fid) {
+        pri = b('request', tr('profile.addFriend'), 'pc-btn-pri');
+        danger.push(b('block', tr('friends.block'), 'pc-btn-danger'));
+      } else if (m.kind === 'room' && m.roomPeerId) {
+        sec.push(b('add-friend', tr('profile.addFriend')));
+      }
     }
-    return btns.length ? `<div class="pc-actions">${btns.join('')}</div>` : '';
+    const row = (items, cls) => items.length ? `<div class="pc-actions-row ${cls}">${items.join('')}</div>` : '';
+    const html = (pri ? row([pri], 'is-pri') : '') + row(sec, 'is-sec') + row(danger, 'is-danger');
+    return html ? `<div class="pc-actions">${html}</div>` : '';
   }
 
   function bindCardActions(root, m, close) {
@@ -375,6 +466,10 @@
       } else if (action === 'mute') { close(); window.toggleMuteFriend && window.toggleMuteFriend(m.fid); }
       else if (action === 'remove') { close(); window.removeFriend && window.removeFriend(m.fid); }
       else if (action === 'add-friend') { close(); typeof window.sendRoomFriendRequest === 'function' && window.sendRoomFriendRequest(m.roomPeerId); }
+      else if (action === 'request') { close(); typeof window.sendFriendRequestTo === 'function' && window.sendFriendRequestTo(m.fid); }
+      else if (action === 'block') { close(); window.TSFriends && window.TSFriends.confirmBlock(m.fid, m.name); }
+      else if (action === 'unblock') { close(); window.TSFriends && window.TSFriends.unblockUser(m.fid); }
+      else if (action === 'edit-profile') { close(); window.openUserSettings && window.openUserSettings('profile'); }
     });
   }
 
@@ -382,9 +477,15 @@
 
   function showCard(target, anchor) {
     let modelFn;
-    if (target.self) modelFn = () => selfModel();
+    // Odadan kendi kartını açmak (showRoomUserProfile(state.myId)) da "ben"
+    // kartıdır: arkadaş ekle / engelle değil, "Profili düzenle" gösterilir.
+    const st = window.state || {};
+    const isMe = target.self
+      || (target.roomPeerId && (target.roomPeerId === 'self' || target.roomPeerId === st.myId))
+      || (target.friendId && target.friendId === st.friendId);
+    if (isMe) modelFn = () => selfModel();
     else if (target.roomPeerId) modelFn = () => roomPeerModel(target.roomPeerId, target.name);
-    else if (target.friendId) modelFn = () => friendModel(target.friendId);
+    else if (target.friendId) modelFn = () => friendModel(target.friendId, target);
     else return;
     let m = modelFn();
     if (m.fid && m.kind !== 'self') { request(m.fid); m = modelFn(); }
@@ -553,9 +654,12 @@
           </div>
           <div class="pe-field">
             <label>${esc(tr('profile.avatar'))}</label>
+            <p class="pe-help pe-local-note" data-pe-local-note>${window.TSUI.icon ? window.TSUI.icon('lock', 14) : ''}<span>${esc(tr('profile.mediaLocalNote'))}</span></p>
             <div class="pe-inline">
               <button type="button" class="btn-pri btn-sm" data-pe="change-avatar">${esc(tr('profile.changeAvatar'))}</button>
+              <input type="file" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" data-pe-file="avatar" />
             </div>
+            <div class="pe-media-msg hidden" data-pe-msg="avatar" role="alert"></div>
           </div>
           <div class="pe-field">
             <label>${esc(tr('profile.animatedAvatar'))}</label>
@@ -565,6 +669,7 @@
               <button type="button" class="btn-sec btn-sm ${draft.avatarAnimUrl ? '' : 'hidden'}" data-pe="remove-gif">${esc(tr('profile.remove'))}</button>
               <input type="file" class="hidden" accept="image/gif" data-pe-file="gif" />
             </div>
+            <div class="pe-media-msg hidden" data-pe-msg="gif" role="alert"></div>
           </div>
           <div class="pe-field">
             <label>${esc(tr('profile.avatarColor'))}</label>
@@ -579,6 +684,7 @@
               <button type="button" class="btn-sec btn-sm ${draft.bannerUrl ? '' : 'hidden'}" data-pe="remove-banner">${esc(tr('profile.remove'))}</button>
               <input type="file" class="hidden" accept="image/png,image/jpeg,image/gif,image/webp" data-pe-file="banner" />
             </div>
+            <div class="pe-media-msg hidden" data-pe-msg="banner" role="alert"></div>
           </div>
           <div class="pe-field">
             <label>${esc(tr('profile.frame'))}</label>
@@ -628,30 +734,46 @@
     root.querySelectorAll('.pe-frame').forEach(b => b.addEventListener('click', () => { draft.frame = b.dataset.frame; preview(); }));
 
     const pick = kind => root.querySelector(`[data-pe-file="${kind}"]`).click();
-    root.querySelector('[data-pe-file="gif"]').addEventListener('change', async e => {
+    // Görseller bu cihazda işlenir ve saklanır (js/profile-media.js); hiçbir
+    // bayt sunucuya gitmez. Hata, ilgili alanın altında satır içi gösterilir.
+    const PM = () => window.TSProfileMedia;
+    const showMsg = (kind, text, tone) => {
+      root.querySelectorAll('[data-pe-msg]').forEach(el => {
+        const on = el.dataset.peMsg === kind && !!text;
+        el.classList.toggle('hidden', !on);
+        el.classList.toggle('is-error', on && tone === 'error');
+        el.innerHTML = on ? `${window.TSUI.icon ? window.TSUI.icon(tone === 'error' ? 'alert' : 'info', 14) : ''}<span>${esc(text)}</span>` : '';
+      });
+    };
+    const handleFile = (kind, run) => root.querySelector(`[data-pe-file="${kind}"]`).addEventListener('change', async e => {
       const file = e.target.files && e.target.files[0];
       e.target.value = '';
-      if (!file) return;
-      if (file.type !== 'image/gif') return window.showToast(tr('profile.gifOnly'), 'warn');
-      if (file.size > 2 * 1024 * 1024) return window.showToast(tr('profile.fileTooLarge'), 'warn');
-      const url = await uploadMedia(file, 'avatar_anim.gif', 'image/gif');
-      if (!url) return;
-      draft.avatarAnimUrl = url;
-      // Eski istemciler için ilk kare normal avatar olur.
-      firstFrameAvatar(file);
+      if (!file || !PM()) return;
+      showMsg(kind, tr('profile.mediaProcessing'), 'info');
+      try {
+        await run(file);
+        showMsg(kind, '');
+      } catch (err) {
+        if (!(err instanceof PM().MediaError)) console.warn('[profil] görsel işlenemedi', err);
+        showMsg(kind, PM().errorText(err), 'error');
+      }
       preview();
     });
-    root.querySelector('[data-pe-file="banner"]').addEventListener('change', async e => {
-      const file = e.target.files && e.target.files[0];
-      e.target.value = '';
-      if (!file) return;
-      const ext = { 'image/gif': 'gif', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[file.type];
-      if (!ext) return window.showToast(tr('profile.imageOnly'), 'warn');
-      if (file.size > 4 * 1024 * 1024) return window.showToast(tr('profile.fileTooLarge'), 'warn');
-      const url = await uploadMedia(file, `banner.${ext}`, file.type);
-      if (!url) return;
-      draft.bannerUrl = url;
-      preview();
+    handleFile('avatar', async file => {
+      await PM().setOwnAvatarFromFile(file);
+      draft.avatarRef = window.state.myAvatar;
+      window.showToast(tr('profile.avatarSaved'), 'ok');
+    });
+    handleFile('gif', async file => {
+      const res = await PM().processAnimAvatar(file);
+      draft.avatarAnimUrl = res.ref;
+      // İlk kare sabit avatar olur (listeler, hareket oynatmayan yerler); Kaydet'te uygulanır.
+      draft._still = res.firstFrameRef;
+      draft._stillFor = res.ref;
+    });
+    handleFile('banner', async file => {
+      const res = await PM().processBanner(file);
+      draft.bannerUrl = res.ref;
     });
 
     editorPreview = preview;
@@ -667,62 +789,24 @@
       if (!btn || !draft) return;
       const a = btn.dataset.pe;
       if (a === 'edit-name') document.getElementById('btn-edit-name')?.click();
-      else if (a === 'change-avatar') document.getElementById('my-avatar-input')?.click();
+      else if (a === 'change-avatar') editorPick('avatar');
       else if (a === 'upload-gif') editorPick('gif');
       else if (a === 'remove-gif') { draft.avatarAnimUrl = ''; editorPreview(); }
       else if (a === 'upload-banner') editorPick('banner');
       else if (a === 'remove-banner') { draft.bannerUrl = ''; editorPreview(); }
       else if (a === 'reset') renderEditor();
       else if (a === 'save') {
+        if (draft._still && draft._stillFor === draft.avatarAnimUrl) {
+          draft.avatarRef = draft._still;
+          window.state.myAvatar = draft._still;
+          window.state.myAvatarHash = typeof window.getAvatarHash === 'function' ? window.getAvatarHash(draft._still) : null;
+        }
         saveMine(draft);
+        if (window.TSProfileMedia) window.TSProfileMedia.renderOwnAvatarImg();
         window.showToast(tr('profile.saved'), 'ok');
         renderEditor();
       }
     });
-  }
-
-  async function uploadMedia(blob, name, contentType) {
-    try {
-      if (typeof supabaseClient === 'undefined' || !supabaseClient) throw new Error('no-client');
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) throw new Error('no-session');
-      const path = `${session.user.id}/${name}`;
-      const { error } = await supabaseClient.storage.from('avatars')
-        .upload(path, blob, { upsert: true, contentType, cacheControl: '604800' });
-      if (error) throw error;
-      const { data } = supabaseClient.storage.from('avatars').getPublicUrl(path);
-      return safeMedia(`${data.publicUrl}?v=${Date.now().toString(36)}`) || null;
-    } catch (e) {
-      console.warn('Profil medyası yüklenemedi:', e && e.message);
-      window.showToast(tr('profile.uploadFailed'), 'danger');
-      return null;
-    }
-  }
-
-  // GIF'in ilk karesini 128px JPEG avatar yapar (eski istemciler + listeler).
-  function firstFrameAvatar(file) {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = async () => {
-      try {
-        const size = 128;
-        const canvas = document.createElement('canvas');
-        canvas.width = size; canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        const s = Math.min(img.naturalWidth, img.naturalHeight);
-        ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size);
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.85));
-        const publicUrl = typeof window.uploadAvatarToStorage === 'function' ? await window.uploadAvatarToStorage(blob) : null;
-        if (publicUrl) {
-          window.state.myAvatar = publicUrl;
-          if (typeof window.saveProfile === 'function') window.saveProfile();
-          if (typeof window.publishPresence === 'function') window.publishPresence();
-          document.dispatchEvent(new CustomEvent('ts:profile', { detail: { fid: window.state.friendId } }));
-        }
-      } catch (e) {} finally { URL.revokeObjectURL(url); }
-    };
-    img.onerror = () => URL.revokeObjectURL(url);
-    img.src = url;
   }
 
   // Eski showFriendProfile / showRoomUserProfile yerine yeni kart.
@@ -731,7 +815,8 @@
 
   window.TSProfile = {
     rev, mine, exportExt, importExt, profileOf, request, onRevSeen, onEvent,
-    save: saveMine,
+    save: next => saveMine(next),
+    updateMine,
     showCard, showSelfPanel, cardHtml, friendModel, selfModel, renderEditor,
     typingVerbOf: fid => (profileOf(fid) || {}).typingVerb || '',
     _safeMedia: safeMedia,

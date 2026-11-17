@@ -94,11 +94,16 @@
 .pc-act-time { display: flex; align-items: center; gap: 5px; color: var(--status-online); font-size: 13px; font-weight: 600; }
 .pc-act-time svg { width: 15px; height: 15px; }
 .pc-loading { margin-top: 10px; color: var(--txt-mut); font-size: 12px; }
-.pc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+/* Birincil tam genişlik; ikinciller eşit satır; yıkıcılar en altta, zeminsiz. */
+.pc-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.pc-actions-row { display: flex; gap: 8px; }
+.pc-actions-row.is-danger { gap: 4px; }
 .pc-btn {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding: 8px 12px;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--txt-main) 14%, transparent);
   border-radius: 6px;
   background: var(--sh-float-2);
   color: var(--txt-main);
@@ -107,9 +112,10 @@
   cursor: pointer;
 }
 .pc-btn:hover { background: color-mix(in srgb, var(--sh-float-2) 85%, var(--txt-main)); }
-.pc-btn-pri { background: var(--acc); color: #fff; }
-.pc-btn-pri:hover { background: var(--acc-hover); }
-.pc-btn-danger { color: var(--status-dnd); }
+.pc-btn-pri { background: var(--acc-btn); border-color: var(--acc-btn); color: var(--acc-btn-fg); }
+.pc-btn-pri:hover { background: var(--acc-btn-hover); border-color: var(--acc-btn-hover); }
+.pc-btn-danger { padding: 6px 8px; border-color: transparent; background: none; color: var(--txt-mut); font-weight: 500; font-size: 12px; }
+.pc-btn-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 .pc-menu {
   margin-top: 12px;
   padding: 6px;
@@ -127,6 +133,13 @@
 .pe-field > label { display: block; margin-bottom: 6px; color: var(--txt-mut); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .pe-help { margin: -2px 0 8px; color: var(--txt-mut); font-size: 13px; line-height: 1.35; }
 .pe-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Görseller yalnızca bu cihazda: bilgi satırı + alan altı satır içi mesaj */
+.pe-local-note { display: flex; align-items: flex-start; gap: 6px; }
+.pe-local-note svg { flex: 0 0 auto; margin-top: 2px; color: var(--acc); }
+.pe-media-msg { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; color: var(--txt-mut); font-size: 13px; line-height: 1.35; }
+.pe-media-msg.hidden { display: none; }
+.pe-media-msg svg { flex: 0 0 auto; margin-top: 2px; }
+.pe-media-msg.is-error { color: var(--danger); }
 .pe-name { font-size: 15px; font-weight: 600; margin-right: 4px; }
 .pe-field textarea, .pe-field input[type="text"] {
   width: 100%;
@@ -203,6 +216,14 @@
 .act-game-row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-radius: 6px; }
 .act-game-row:hover { background: var(--sh-hover); }
 .act-game-row.muted-row { opacity: 0.7; }
+/* Gizlenen oyunlar: tam opaklık (soluk satır tanınmıyordu), gerçek ad + kapak. */
+.act-hidden-row .ts-game-art { flex: 0 0 auto; }
+.act-hidden-pill {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: color-mix(in srgb, var(--txt-main) 9%, transparent); color: var(--txt-mut);
+}
+.act-hidden-pill svg { width: 13px; height: 13px; }
 .act-game-icon { width: 32px; height: 32px; flex: 0 0 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--sh-panel); color: var(--txt-mut); }
 .act-game-copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .act-game-copy strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

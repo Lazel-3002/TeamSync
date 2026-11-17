@@ -158,14 +158,15 @@ function unoRenderLobby() {
       el.className = 'u-lobby-player' + (p.id === state.uno.host ? ' host' : '') + (isBot ? ' bot' : '');
       el.style.animationDelay = (idx * 0.05) + 's';
       el.innerHTML = `<span class="u-av">${escapeHtml(unoInitial(p.name))}</span>${escapeHtml(p.name)}` +
-        `${p.id === state.uno.host ? ' 👑' : ''}${isBot ? ' 🤖' : ''}` +
+        `${p.id === state.uno.host ? ` <span class="u-role-ico" title="Kurucu">${window.TSUI ? window.TSUI.icon('crown', 14) : ''}</span>` : ''}${isBot ? ` <span class="u-role-ico" title="Bot">${window.TSUI ? window.TSUI.icon('bot', 14) : ''}</span>` : ''}` +
         `${p.id === state.myId ? ' <span class="u-you">(sen)</span>' : ''}`;
       // Kurucu, kendisi dışındaki oyuncu ve botları atabilir.
       if (unoIsHost() && p.id !== state.myId) {
         const kick = document.createElement('button');
         kick.className = 'u-kick';
         kick.title = (isBot ? 'Botu' : 'Oyuncuyu') + ' at';
-        kick.textContent = '✕';
+        kick.setAttribute('aria-label', kick.title);
+        kick.innerHTML = window.TSUI ? window.TSUI.icon('x', 12, 2.5) : '';
         kick.addEventListener('click', (e) => { e.stopPropagation(); unoHostKick(p.id); });
         el.appendChild(kick);
       }

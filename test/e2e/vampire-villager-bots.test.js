@@ -92,11 +92,12 @@ module.exports = async function run() {
     await evalJS(peer.client, `document.getElementById('vv-bot-add-pill').click(); document.getElementById('vv-bot-add-pill').click(); 1`);
     let layout = await evalJS(peer.client, `(() => ({
       pills: document.querySelectorAll('[data-bot-pill]').length,
-      names: Array.from(document.querySelectorAll('[data-bot-pill]')).map(p => p.textContent.trim()),
+      names: Array.from(document.querySelectorAll('[data-bot-pill]')).map(p => (p.querySelector('.u-role-ico svg') ? '[bot] ' : '') + p.textContent.trim()),
       startDisabled: document.getElementById('vampire-start').disabled
     }))()`);
     assert.strictEqual(layout.pills, 2, JSON.stringify(layout));
-    assert.deepStrictEqual(layout.names, ['🤖 Bot 1', '🤖 Bot 2'], JSON.stringify(layout));
+    // Bot işareti artık emoji değil SVG simge (TSUI.icon('bot')).
+    assert.deepStrictEqual(layout.names, ['[bot] Bot 1', '[bot] Bot 2'], JSON.stringify(layout));
     assert.strictEqual(layout.startDisabled, true, 'Botlarla birlikte 3 oyuncu varken başlat düğmesi hâlâ kapalı olmalı: ' + JSON.stringify(layout));
 
     await evalJS(peer.client, `document.getElementById('vv-bot-add-pill').click(); 1`);

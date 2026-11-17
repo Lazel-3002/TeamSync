@@ -132,6 +132,26 @@ function sbApplyRemoteNav(url) {
 // katılımcılara etkileşim yetkisi verebilir. Yetkisi olmayanlar sayfayı
 // sadece izler: tıklayamaz, yazamaz, gezinemez — ama kartı büyütüp
 // küçültebilir ve kendi tarafında kapatabilir.
+// Uzak bir video senkronu yerel videoyu gerçekten değiştirdiğinde bırakılan
+// tek seferlik yankı jetonu: { paused, t, rate, wallTs } = komutun yarattığı
+// beklenen durum. Yoklama döngüsü bir değişim gördüğünde bu fonksiyonu
+// çağırır; değişim beklenen duruma uyuyorsa yankıdır (true) ve jeton
+// tüketilir. Uymuyorsa (ör. senkrondan 300 ms sonra basılan duraklat) false
+// döner ve değişim gerçek kullanıcı eylemi olarak yayınlanır. Jeton 4 sn
+// sonra kendiliğinden düşer. Döngü riski yok: yankı yanlışlıkla bir kez
+// yayınlansa bile karşı taraf zaten o durumda olduğundan uygulama no-op
+// olur ya da kendi jetonuyla susturulur — zincir ilk adımda biter.
+function sbConsumeRemoteEcho(vState, now) {
+  const e = state.sb.remoteEcho;
+  if (!e) return false;
+  if (now - e.wallTs > 4000) { state.sb.remoteEcho = null; return false; }
+  if (!!vState.paused !== e.paused) return false;
+  const expectedT = e.paused ? e.t : e.t + ((now - e.wallTs) / 1000) * (e.rate || 1);
+  if (Math.abs(vState.currentTime - expectedT) > 3.5) return false;
+  state.sb.remoteEcho = null;
+  return true;
+}
+
 function sbIsHost() {
   return !!state.sb.host && state.sb.host === state.myId;
 }
@@ -209,7 +229,7 @@ function sbRenderAuthPanel() {
     name.style.cssText = 'font-size:13px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
 
     const btn = document.createElement('button');
-    btn.textContent = isAuth ? '✓ Yetkili' : 'Yetki Ver';
+    btn.textContent = isAuth ? 'Yetkili' : 'Yetki Ver';
     btn.style.cssText = 'flex-shrink:0; font-size:12px; padding:4px 10px; border-radius:12px; border:none; cursor:pointer; color:#fff; background:' + (isAuth ? '#22c55e' : 'rgba(255,255,255,0.12)') + ';';
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -217,10 +237,10 @@ function sbRenderAuthPanel() {
       if (!Array.isArray(state.sb.authorized)) state.sb.authorized = [];
       if (isAuth) {
         state.sb.authorized = state.sb.authorized.filter(x => x !== id);
-        showToast('🔒 ' + (peer.name || '') + ' yetkisi alındı', 'warn');
+        showToast((peer.name || '') + ' yetkisi alındı', 'warn');
       } else {
         state.sb.authorized.push(id);
-        showToast('🔓 ' + (peer.name || '') + ' yetkilendirildi', 'info');
+        showToast((peer.name || '') + ' yetkilendirildi', 'info');
       }
       sbBroadcastAuth();
       sbRenderAuthPanel();
@@ -264,12 +284,12 @@ function sbHandleHostLeft(departedId) {
   if (successor === state.myId) {
     const card = document.getElementById('sb-card');
     if (card && !card.classList.contains('hidden') && state.sb.joinedActivity) {
-      showToast('👑 Kurucu ayrıldı — Ortak Tarayıcı\'nın yeni kurucusu sensin', 'info');
+      showToast('Kurucu ayrıldı — Ortak Tarayıcı\'nın yeni kurucusu sensin', 'info');
       broadcast({ type: 'sb-state', host: state.myId, startedAt: state.sb.startedAt, url: sbCurrentUrl(), auth: (state.sb.authorized || []).slice() });
     }
   } else if (state.sb.joinedActivity) {
     const p = state.peers.get(successor);
-    showToast('👑 Kurucu ayrıldı — yeni kurucu: ' + (p && p.name ? p.name : 'seçildi'), 'info');
+    showToast('Kurucu ayrıldı — yeni kurucu: ' + (p && p.name ? p.name : 'seçildi'), 'info');
   }
   sbUpdateControlsUI();
 }
@@ -361,7 +381,7 @@ function initSharedBrowser() {
   if (sbGuard) {
     sbGuard.addEventListener('click', (e) => {
       e.stopPropagation();
-      showToast('🔒 Etkileşim için kurucudan yetki almalısın', 'warn');
+      showToast('Etkileşim için kurucudan yetki almalısın', 'warn');
     });
   }
 
@@ -412,7 +432,7 @@ function initSharedBrowser() {
 
   document.getElementById('sb-go').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!sbCanInteract()) { showToast('🔒 Gezinmek için kurucudan yetki almalısın', 'warn'); return; }
+    if (!sbCanInteract()) { showToast('Gezinmek için kurucudan yetki almalısın', 'warn'); return; }
     let url = sbUrl.value.trim();
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) {
@@ -556,7 +576,7 @@ function initSharedBrowser() {
               if (node.tagName && node.tagName.includes('RENDERER')) {
                 const del = document.createElement('div');
                 del.style.cssText = 'padding:10px;text-align:center;color:#ef4444;font-size:12px;font-weight:bold;';
-                del.textContent = '🛡️ AI Tarafından Silindi';
+                del.textContent = 'AI Tarafından Silindi';
                 node.replaceChildren(del);
                 node.classList.add('ai-sfw-hidden');
               } else {
@@ -571,7 +591,7 @@ function initSharedBrowser() {
             const overlay = document.createElement('div');
             overlay.id = 'ai-scan-overlay';
             const mkLine = (txt, css) => { const d = document.createElement('div'); d.style.cssText = css; d.textContent = txt; return d; };
-            overlay.appendChild(mkLine('🛡️ Aile Dostu Yapay Zeka — Analiz Ediyor...', 'margin-bottom:20px; text-align:center;'));
+            overlay.appendChild(mkLine('Aile Dostu Yapay Zeka — Analiz Ediyor...', 'margin-bottom:20px; text-align:center;'));
             overlay.appendChild(mkLine('(İçerik Taranıyor)', 'font-size:16px;color:#aaa;'));
             document.body.appendChild(overlay);
             
@@ -582,7 +602,7 @@ function initSharedBrowser() {
                    let text = titleNode.innerText.toLocaleLowerCase('tr-TR');
                    if (badWords.some(w => text.includes(w))) {
                      overlay.replaceChildren(
-                       mkLine('🚫 Bu Video Yapay Zeka Tarafından Engellendi.', 'color:#ef4444; text-align:center;'),
+                       mkLine('Bu Video Yapay Zeka Tarafından Engellendi.', 'color:var(--danger); text-align:center;'),
                        mkLine('(Sakıncalı İçerik)', 'font-size:16px;')
                      );
                      const v = document.querySelector('video');
@@ -712,6 +732,7 @@ function initSharedBrowser() {
     const isUserGesture = sbUserGestureNav;
     sbUserGestureNav = false;
     state.sb.lastVideoState = null;
+    state.sb.remoteEcho = null;
     // Yeni sayfa = yeni video: eylem kalkanı sıfırlanır ki kurucunun rutin
     // drift düzeltmesi (geç katılan senkronu) beklemeden uygulanabilsin
     state.sb.lastActionTs = 0;
@@ -895,17 +916,23 @@ function initSharedBrowser() {
             // "büyük fark var" diye gereksiz geri-yayın kaskadı yaratıyordu)
             state.sb.lastVideoState = { paused: vState.paused, currentTime: vState.currentTime, rate: vState.rate, wallTs: now };
 
-            // Az önce UZAKTAN uygulanan bir senkronun kendi tetiklediği
-            // paused/currentTime değişimini "yeni yerel eylem" sanma
-            const echoingRemote = (now - (state.sb.remoteVideoSyncTs || 0)) < 1500;
-
-            if (probe && !echoingRemote && sbCanInteract()) {
+            if (probe && sbCanInteract()) {
               const pausedChanged = probe.paused !== vState.paused;
               const expected = probe.paused
                 ? probe.currentTime
                 : probe.currentTime + ((now - probe.wallTs) / 1000) * (probe.rate || 1);
               const seeked = Math.abs(vState.currentTime - expected) > 3.5;
-              if (pausedChanged || seeked) {
+              // Az önce UZAKTAN uygulanan senkronun kendi yarattığı değişim
+              // yeniden yayınlanmaz — ama bu artık kör bir zaman penceresi
+              // değil (eski 1.5 sn'lik pencere, uzak senkrondan hemen sonra
+              // basılan GERÇEK bir duraklat/oynat/sarmayı da yutuyordu:
+              // misafir durdurur, kimseye gitmez). Yankı jetonu yalnızca
+              // uzak komutun beklenen durumuna (paused + yaklaşık konum)
+              // uyan İLK değişimi susturur ve tüketilir; uymayan her
+              // değişim gerçek bir yerel eylemdir ve yayınlanır.
+              const isEcho = (pausedChanged || seeked) && sbConsumeRemoteEcho(vState, now);
+              if ((pausedChanged || seeked) && !isEcho) {
+                state.sb.remoteEcho = null;
                 state.sb.lastVideoSyncTs = now;
                 state.sb.lastActionTs = now;
                 broadcast({
@@ -1026,7 +1053,7 @@ function handleSBMessage(peerId, msg) {
     // Yetki durumum değiştiyse haber ver (sb-auth kaybolsa bile beacon getirir)
     const canNow = sbCanInteract();
     if (state.sb.joinedActivity && canNow !== couldInteractBefore) {
-      showToast(canNow ? '🔓 Ortak Tarayıcı\'da yetkilendirildin' : '🔒 Ortak Tarayıcı yetkin alındı', canNow ? 'info' : 'warn');
+      showToast(canNow ? 'Ortak Tarayıcı\'da yetkilendirildin' : 'Ortak Tarayıcı yetkin alındı', canNow ? 'info' : 'warn');
     }
     sbUpdateControlsUI();
 
@@ -1060,7 +1087,7 @@ function handleSBMessage(peerId, msg) {
     if (Array.isArray(msg.list)) state.sb.authorized = msg.list.filter(x => typeof x === 'string');
     const canNow = sbCanInteract();
     if (state.sb.joinedActivity && canNow !== couldInteractBefore) {
-      showToast(canNow ? '🔓 Ortak Tarayıcı\'da yetkilendirildin — artık tıklayıp yazabilirsin' : '🔒 Ortak Tarayıcı yetkin alındı', canNow ? 'info' : 'warn');
+      showToast(canNow ? 'Ortak Tarayıcı\'da yetkilendirildin — artık tıklayıp yazabilirsin' : 'Ortak Tarayıcı yetkin alındı', canNow ? 'info' : 'warn');
     }
     sbUpdateControlsUI();
   } else if (msg.type === 'sb-nav') {
@@ -1132,6 +1159,14 @@ function handleSBMessage(peerId, msg) {
         if (!sbWebview || !sbCard || sbCard.classList.contains('hidden')) return;
         const elapsed = paused ? 0 : (Date.now() - recvWall) / 1000;
         const targetTime = currentTime + elapsed;
+        // Rutin için: yoklama döngüsünün son gördüğü durum. Video bundan
+        // sapmışsa (duraklatıldı/oynatıldı/sarıldı) yerelde HENÜZ yayınlanmamış
+        // bir eylem var demektir; rutin onu ezip yok etmesin. Sayfanın
+        // play/pause olayı yoksa ya da geç geliyorsa da çalışır.
+        const pr = isRoutine ? state.sb.lastVideoState : null;
+        const probe = (pr && Number.isFinite(pr.currentTime) && Number.isFinite(pr.wallTs))
+          ? { paused: !!pr.paused, currentTime: pr.currentTime, rate: Number(pr.rate) || 1, wallTs: pr.wallTs }
+          : null;
         // currentTime/paused/tolerance are sanitized above (finite numbers /
         // boolean) and re-serialized with JSON.stringify so they can only
         // ever appear as safe literals here, never as injected script.
@@ -1149,6 +1184,13 @@ function handleSBMessage(peerId, msg) {
           // eylemler zaten rutin DEĞİL olarak yayınlanır; onlar bu kalkandan
           // etkilenmez ve karşı tarafa normal şekilde uygulanır.
           if (${JSON.stringify(isRoutine)} && Date.now() - (window.__sbLastUserAction || 0) < 6000) return false;
+          const probe = ${JSON.stringify(probe)};
+          if (probe) {
+            if (v.paused !== probe.paused) return false;
+            const exp = probe.paused ? probe.currentTime
+              : probe.currentTime + ((Date.now() - probe.wallTs) / 1000) * probe.rate;
+            if (Math.abs(v.currentTime - exp) > 3.5) return false;
+          }
           // Bundan sonraki play/pause/seek olayları BİZİM ürettiğimizdir;
           // izleyici bunları kullanıcı eylemi saymasın.
           window.__sbApplying = Date.now();
@@ -1160,16 +1202,16 @@ function handleSBMessage(peerId, msg) {
           }
           if (${JSON.stringify(paused)} && !v.paused) { v.pause(); changed = true; }
           if (!${JSON.stringify(paused)} && v.paused) { v.play().catch(e => {}); changed = true; }
-          return changed;
+          if (!changed) return false;
+          return { paused: !!v.paused, t: Number(v.currentTime), rate: v.playbackRate || 1 };
         })()`;
-        // Yankı kalkanı SADECE uzak senkron gerçekten bir şey değiştirdiyse
-        // kurulur. Kurucunun 3 sn'lik rutini çoğunlukla no-op'tur; eski gibi
-        // her uygulamada kalkan kurulsaydı 1.5 sn'lik pencere neredeyse hep
-        // açık kalır ve misafirin KENDİ duraklat/sarma eylemi "uzak yankı"
-        // sanılıp hiç yayınlanmayabilirdi.
+        // Yankı jetonu SADECE uzak senkron gerçekten bir şey değiştirdiyse
+        // bırakılır ve komutun yarattığı durumu taşır (sbConsumeRemoteEcho).
         sbWebview.executeJavaScript(syncScript).then((res) => {
-          if (res === true) state.sb.remoteVideoSyncTs = Date.now();
-          else if (res === 'retry' && attempt < 15) setTimeout(() => applySync(attempt + 1), 1000);
+          if (res && typeof res === 'object' && Number.isFinite(res.t)) {
+            state.sb.remoteVideoSyncTs = Date.now();
+            state.sb.remoteEcho = { paused: !!res.paused, t: res.t, rate: Number(res.rate) || 1, wallTs: Date.now() };
+          } else if (res === 'retry' && attempt < 15) setTimeout(() => applySync(attempt + 1), 1000);
         }).catch(e => {});
       };
       applySync(0);

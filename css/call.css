@@ -161,14 +161,14 @@
   justify-content: center;
   overflow: hidden;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--tile-bg, #5865f2) 38%, #16171a);
-  color: #fff;
+  background: color-mix(in srgb, var(--tile-bg, var(--acc)) 38%, var(--bg-dark));
+  color: var(--txt-main);
   cursor: pointer;
   outline: 3px solid transparent;
   outline-offset: -3px;
   transition: outline-color 0.12s ease;
   user-select: none;
-  --dot-ring: #16171a;
+  --dot-ring: var(--bg-dark);
 }
 .ptile:focus-visible { outline-color: var(--acc); }
 .ptile.speaking { outline-color: var(--status-online); }

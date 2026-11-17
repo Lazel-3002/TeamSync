@@ -1,6 +1,6 @@
-// Uygulama kabuğu: etiketli uygulama rayı (Sohbet / Kişiler / Takvim /
-// Aramalar / Toplantı + sunucular) + sohbet listesi + görünüm yönlendiricisi
-// (Kişiler / DM / Grup / Sunucu / Takvim / Aramalar / Arama). Teams'ten
+// Uygulama kabuğu: etiketli uygulama rayı (Sohbet / Kişiler / Aramalar /
+// Toplantı + sunucular) + sohbet listesi + görünüm yönlendiricisi
+// (Kişiler / DM / Grup / Sunucu / Aramalar / Arama). Teams'ten
 // esinlenen yerleşimin geri kalanı js/teams/*.js'te.
 //
 // Eski akışlar (giriş adımları, oda kurma/katılma formları, disconnectApp)
@@ -34,7 +34,8 @@
     } catch (e) {}
     try {
       const saved = JSON.parse(localStorage.getItem(LAST_VIEW) || 'null');
-      if (saved && ['friends', 'dm', 'group', 'server', 'calendar', 'calls'].includes(saved.view)) lastHome = saved;
+      // Kaldırılan görünümler (ör. eski 'calendar') burada elenir → Kişiler.
+      if (saved && ['friends', 'dm', 'group', 'server', 'calls'].includes(saved.view)) lastHome = saved;
     } catch (e) {}
   }
 
@@ -134,10 +135,13 @@
 
   // Sohbet uygulaması: en son açılan sohbet; o artık yoksa listedeki ilk satır.
   function openChatHome() {
+    // Daraltılmış "Sohbetler" bölümü listeyi boş gösteriyordu: Sohbet'e
+    // basınca bölümler her zaman açılır ki kimin sohbetine gidileceği seçilebilsin.
+    if (window.TSDM && window.TSDM.expandSections) window.TSDM.expandSections();
     const ok = c => c && ((c.view === 'dm' && window.state.friends && window.state.friends[c.param])
       || (c.view === 'group' && window.TSGroups && window.TSGroups.get(c.param)));
     if (ok(lastChat)) { setView(lastChat.view, lastChat.param); return; }
-    const first = document.querySelector('#dm-list .dm-row[data-fid], #dm-list .dm-row[data-gid]');
+    const first = document.querySelector('#dm-list .dm-row[data-fid]:not(.is-other), #dm-list .dm-row[data-gid]');
     if (first && first.dataset.gid) setView('group', first.dataset.gid);
     else if (first && first.dataset.fid) setView('dm', first.dataset.fid);
     else setView('friends');
@@ -145,6 +149,8 @@
 
   // ---------- Görünüm yönlendiricisi ----------
   function setView(next, param) {
+    // Bilinmeyen/kaldırılmış görünüm (ör. eski 'calendar') → Kişiler.
+    if (!['friends', 'dm', 'group', 'server', 'calls', 'call'].includes(next)) { next = 'friends'; param = null; }
     if (next === 'call' && !inCall) {
       next = lastHome.view;
       param = lastHome.param;
@@ -171,7 +177,6 @@
     $('view-dm')?.classList.toggle('hidden', next !== 'dm');
     $('view-group')?.classList.toggle('hidden', next !== 'group');
     $('view-server')?.classList.toggle('hidden', next !== 'server');
-    $('view-calendar')?.classList.toggle('hidden', next !== 'calendar');
     $('view-calls')?.classList.toggle('hidden', next !== 'calls');
     $('view-call')?.classList.toggle('is-bg', next !== 'call');
     document.body.dataset.view = next;
@@ -184,7 +189,6 @@
     $('rail-home')?.classList.toggle('active', next === 'dm' || next === 'group');
     $('rail-call')?.classList.toggle('active', next === 'call');
     $('side-friends')?.classList.toggle('active', next === 'friends');
-    $('rail-calendar')?.classList.toggle('active', next === 'calendar');
     $('rail-calls')?.classList.toggle('active', next === 'calls');
     if (next === 'dm' || next === 'group') {
       lastChat = { view: next, param: viewParam };
@@ -477,29 +481,66 @@
     let items = [];
     let sel = 0;
     const close = () => overlay.remove();
+    // Sonuçlar: arkadaşlar + arkadaş grupları + sunucular; her satırda küçük tür ipucu.
     const render = () => {
       const q = input.value.trim().toLocaleLowerCase();
-      items = Object.keys(window.state.friends || {})
-        .map(fid => ({ fid, f: window.state.friends[fid] }))
-        .filter(({ f, fid }) => !q || String(f.name || '').toLocaleLowerCase().includes(q) || fid.toLowerCase().includes(q))
-        .sort((a, b) => (b.f.online ? 1 : 0) - (a.f.online ? 1 : 0))
-        .slice(0, 12);
+      const hit = (...vals) => !q || vals.some(v => String(v || '').toLocaleLowerCase().includes(q));
+      const friends = Object.keys(window.state.friends || {})
+        .map(fid => ({ kind: 'dm', id: fid, f: window.state.friends[fid] }))
+        .filter(({ f, id }) => hit(f.name, id))
+        .sort((a, b) => (b.f.online ? 1 : 0) - (a.f.online ? 1 : 0));
+      let groups = [];
+      try {
+        groups = (window.TSGroups ? window.TSGroups.list() : [])
+          .filter(g => hit(g.title))
+          .map(g => ({ kind: 'group', id: g.gid, g }));
+      } catch (e) { groups = []; }
+      let servers = [];
+      try {
+        servers = (window.TSServers ? window.TSServers.list() : [])
+          .filter(s => hit(s.name))
+          .map(s => ({ kind: 'server', id: s.sid, s }));
+      } catch (e) { servers = []; }
+      items = friends.slice(0, 8).concat(groups.slice(0, 5), servers.slice(0, 5)).slice(0, 14);
       sel = Math.min(sel, Math.max(0, items.length - 1));
-      list.innerHTML = items.length ? items.map(({ fid, f }, i) => `
-        <button type="button" class="ts-switcher-item ${i === sel ? 'sel' : ''}" data-fid="${esc(fid)}">
-          ${avatarHtml({ src: f.avatar, name: f.name, seed: fid, size: 24, status: window.TSStatus ? window.TSStatus.statusOf(fid) : null })}
-          <span>${esc(f.name || fid)}</span><small>${esc(fid)}</small>
-        </button>`).join('') : `<div class="ts-switcher-empty">${esc(tr('shell.switcherEmpty'))}</div>`;
+      const typeHint = kind => `<em class="ts-switcher-kind">${esc(tr(kind === 'group' ? 'switcher.group' : kind === 'server' ? 'switcher.server' : 'switcher.friend'))}</em>`;
+      const rowHtml = (it, i) => {
+        let av; let name; let sub;
+        if (it.kind === 'group') {
+          av = window.TSGroupUI && window.TSGroupUI.stackHtml ? window.TSGroupUI.stackHtml(it.id, it.g.members, 24) : window.TSUI.icon('users', 18);
+          name = it.g.title; sub = tr('groups.memberCount', { n: (it.g.members || []).length });
+        } else if (it.kind === 'server') {
+          av = `<span class="ts-switcher-ico">${window.TSUI.icon('server', 16)}</span>`;
+          name = it.s.name; sub = '';
+        } else {
+          av = avatarHtml({ src: it.f.avatar, name: it.f.name, seed: it.id, size: 24, status: window.TSStatus ? window.TSStatus.statusOf(it.id) : null });
+          name = it.f.name || it.id; sub = it.id;
+        }
+        return `
+        <button type="button" class="ts-switcher-item ${i === sel ? 'sel' : ''}" data-kind="${it.kind}" data-id="${esc(it.id)}">
+          ${av}<span>${esc(name)}</span><small>${esc(sub)}</small>${typeHint(it.kind)}
+        </button>`;
+      };
+      list.innerHTML = items.length ? items.map(rowHtml).join('') : `<div class="ts-switcher-empty">${esc(tr('shell.switcherEmpty'))}</div>`;
     };
-    const go = fid => { close(); if (fid && typeof window.openDM === 'function') window.openDM(fid); };
+    const go = it => {
+      close();
+      if (!it) return;
+      if (it.kind === 'group') setView('group', it.id);
+      else if (it.kind === 'server') setView('server', it.id);
+      else if (typeof window.openDM === 'function') window.openDM(it.id);
+    };
     input.addEventListener('input', () => { sel = 0; render(); });
     input.addEventListener('keydown', e => {
       if (e.key === 'Escape') { e.stopPropagation(); close(); }
       else if (e.key === 'ArrowDown') { sel = Math.min(items.length - 1, sel + 1); render(); e.preventDefault(); }
       else if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); render(); e.preventDefault(); }
-      else if (e.key === 'Enter' && items[sel]) go(items[sel].fid);
+      else if (e.key === 'Enter' && items[sel]) go(items[sel]);
     });
-    list.addEventListener('click', e => { const b = e.target.closest('[data-fid]'); if (b) go(b.dataset.fid); });
+    list.addEventListener('click', e => {
+      const b = e.target.closest('[data-kind]');
+      if (b) go(items.find(it => it.kind === b.dataset.kind && it.id === b.dataset.id));
+    });
     overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
     render();
     setTimeout(() => input.focus(), 20);

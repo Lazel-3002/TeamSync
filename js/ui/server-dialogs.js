@@ -298,10 +298,10 @@
       <div class="srv-modal-body">
         <div class="srv-field-label">${esc(tr('servers.channelType'))}</div>
         <label class="srv-kind"><input type="radio" name="srv-kind" value="text" ${kind !== 'voice' ? 'checked' : ''} /><span class="srv-kind-icon">#</span><span><strong>${esc(tr('servers.kindText'))}</strong><small>${esc(tr('servers.kindTextDesc'))}</small></span></label>
-        <label class="srv-kind"><input type="radio" name="srv-kind" value="voice" ${kind === 'voice' ? 'checked' : ''} /><span class="srv-kind-icon">🔊</span><span><strong>${esc(tr('servers.kindVoice'))}</strong><small>${esc(tr('servers.kindVoiceDesc'))}</small></span></label>
+        <label class="srv-kind"><input type="radio" name="srv-kind" value="voice" ${kind === 'voice' ? 'checked' : ''} /><span class="srv-kind-icon">${window.TSUI.icon('volume', 18)}</span><span><strong>${esc(tr('servers.kindVoice'))}</strong><small>${esc(tr('servers.kindVoiceDesc'))}</small></span></label>
         <label class="srv-field"><span>${esc(tr('servers.channelName'))}</span><input type="text" class="srv-ch-name" maxlength="40" placeholder="${esc(tr('servers.newChannelPh'))}" /></label>
         ${canPrivate ? `
-          <label class="srv-switch-row"><span><strong>🔒 ${esc(tr('servers.privateChannel'))}</strong><small>${esc(tr('servers.privateChannelDesc'))}</small></span><input type="checkbox" class="srv-ch-private" /></label>
+          <label class="srv-switch-row"><span><strong class="srv-inline-ico">${window.TSUI.icon('lock', 14)}<span>${esc(tr('servers.privateChannel'))}</span></strong><small>${esc(tr('servers.privateChannelDesc'))}</small></span><input type="checkbox" class="srv-ch-private" /></label>
           <div class="srv-private-roles hidden">${roles.length ? roles.map(r => `<label class="srv-check"><input type="checkbox" value="${esc(r.id)}" /><i style="background:${esc(r.color || '#99aab5')}"></i>${esc(r.name)}</label>`).join('') : `<small class="srv-note">${esc(tr('servers.privateNoRoles'))}</small>`}</div>` : ''}
       </div>
       <div class="srv-modal-foot">
@@ -341,7 +341,7 @@
     const cols = ch0.kind === 'voice' ? ['VIEW_CHANNEL', 'CONNECT'] : ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ADD_REACTIONS', 'MANAGE_MESSAGES'];
     const m = modal(`
       <button type="button" class="srv-modal-x" data-close aria-label="${esc(tr('common.close'))}">×</button>
-      <div class="srv-modal-head srv-modal-head-left"><h2>${ch0.kind === 'voice' ? '🔊' : '#'} ${esc(ch0.name)}</h2><p>${esc(tr('servers.channelSettings'))}</p></div>
+      <div class="srv-modal-head srv-modal-head-left"><h2 class="srv-inline-ico">${window.TSUI.icon(ch0.kind === 'voice' ? 'volume' : 'hash', 20)}<span>${esc(ch0.name)}</span></h2><p>${esc(tr('servers.channelSettings'))}</p></div>
       <div class="srv-modal-body">
         <label class="srv-field"><span>${esc(tr('servers.channelName'))}</span><input type="text" class="srv-cs-name" maxlength="40" value="${esc(ch0.name)}" /></label>
         ${ch0.kind === 'text' ? `
@@ -350,8 +350,8 @@
         ${canPerms ? `<div class="srv-field-label">${esc(tr('servers.channelPerms'))}</div><p class="srv-note">${esc(tr('servers.channelPermsDesc'))}</p><div class="srv-perm-grid"></div>
           <div class="srv-perm-add"><select class="srv-perm-add-sel"></select></div>` : ''}
         <div class="srv-cs-move">
-          <button type="button" class="btn-sec btn-sm" data-move="up">↑ ${esc(tr('servers.moveUp'))}</button>
-          <button type="button" class="btn-sec btn-sm" data-move="down">↓ ${esc(tr('servers.moveDown'))}</button>
+          <button type="button" class="btn-sec btn-sm" data-move="up">${window.TSUI.icon('arrowUp', 14)} ${esc(tr('servers.moveUp'))}</button>
+          <button type="button" class="btn-sec btn-sm" data-move="down">${window.TSUI.icon('arrowDown', 14)} ${esc(tr('servers.moveDown'))}</button>
           <button type="button" class="btn-sec btn-sm is-danger" data-delete-ch>${esc(tr('servers.deleteChannel'))}</button>
         </div>
       </div>
@@ -371,7 +371,7 @@
     const labelOf = key => {
       const st = stOf(sid);
       if (key === SS().EVERYONE) return { name: '@everyone', color: '' };
-      if (key.startsWith('u:')) return { name: `👤 ${X().memberName(sid, key.slice(2))}`, color: '' };
+      if (key.startsWith('u:')) return { name: X().memberName(sid, key.slice(2)), color: '' };
       const r = st && st.roles[key];
       return { name: r ? r.name : key, color: r ? r.color : '' };
     };
@@ -387,7 +387,7 @@
           const l = labelOf(k);
           return `<div class="srv-perm-row" data-key="${esc(k)}">
             <span class="srv-perm-who"${l.color ? ` style="color:${esc(l.color)}"` : ''}>${esc(l.name)}</span>
-            ${cols.map(c => { const v = state3(k, c); return `<button type="button" class="srv-tri ${v === 1 ? 'is-allow' : v === -1 ? 'is-deny' : ''}" data-perm="${c}" title="${esc(tr(v === 1 ? 'servers.allow' : v === -1 ? 'servers.deny' : 'servers.inherit'))}">${v === 1 ? '✓' : v === -1 ? '✕' : '/'}</button>`; }).join('')}
+            ${cols.map(c => { const v = state3(k, c); return `<button type="button" class="srv-tri ${v === 1 ? 'is-allow' : v === -1 ? 'is-deny' : ''}" data-perm="${c}" title="${esc(tr(v === 1 ? 'servers.allow' : v === -1 ? 'servers.deny' : 'servers.inherit'))}">${v === 1 ? window.TSUI.icon('check', 14, 2.5) : v === -1 ? window.TSUI.icon('x', 14, 2.5) : '/'}</button>`; }).join('')}
             ${k !== SS().EVERYONE ? `<button type="button" class="srv-perm-rm" data-rm-key title="${esc(tr('servers.remove'))}">×</button>` : '<span></span>'}
           </div>`;
         }).join('')}`;
@@ -395,7 +395,7 @@
       if (sel) {
         const addable = SS().sortedRoles(st).filter(r => r.id !== SS().EVERYONE && !draft[r.id]);
         const people = Object.values(st.members).filter(mm => !draft[`u:${mm.fid}`]).slice(0, 100);
-        sel.innerHTML = `<option value="">＋ ${esc(tr('servers.addRoleOrMember'))}</option>${addable.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}${people.map(p => `<option value="u:${esc(p.fid)}">👤 ${esc(X().memberName(sid, p.fid))}</option>`).join('')}`;
+        sel.innerHTML = `<option value="">${esc(tr('servers.addRoleOrMember'))}</option>${addable.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}${people.map(p => `<option value="u:${esc(p.fid)}">${esc(X().memberName(sid, p.fid))}</option>`).join('')}`;
       }
     };
     m.el.addEventListener('click', async e => {
@@ -577,8 +577,8 @@
               ${permRows}
               ${role.id !== SS().EVERYONE && editable ? `
                 <div class="srv-role-actions">
-                  <button type="button" class="btn-sec btn-sm" data-role-move="up">↑ ${esc(tr('servers.moveUp'))}</button>
-                  <button type="button" class="btn-sec btn-sm" data-role-move="down">↓ ${esc(tr('servers.moveDown'))}</button>
+                  <button type="button" class="btn-sec btn-sm" data-role-move="up">${window.TSUI.icon('arrowUp', 14)} ${esc(tr('servers.moveUp'))}</button>
+                  <button type="button" class="btn-sec btn-sm" data-role-move="down">${window.TSUI.icon('arrowDown', 14)} ${esc(tr('servers.moveDown'))}</button>
                   <button type="button" class="btn-sec btn-sm is-danger" data-role-delete>${esc(tr('servers.deleteRole'))}</button>
                 </div>` : ''}` : ''}
           </div>
@@ -603,7 +603,7 @@
           }
           return `<li class="srv-set-member" data-fid="${esc(mm.fid)}">
             ${window.TSUI.avatarHtml({ src: (X().memberPresence(sid, mm.fid) || {}).av, name: X().memberName(sid, mm.fid), seed: mm.fid, size: 36 })}
-            <span class="srv-set-member-copy"><strong${SS().memberColor(st, mm.fid) ? ` style="color:${esc(SS().memberColor(st, mm.fid))}"` : ''}>${esc(X().memberName(sid, mm.fid))}${mm.fid === st.owner ? ' 👑' : ''}</strong><small>${esc(mm.fid)} · ${esc(tr('servers.memberSince', { date: new Date(mm.joinedAt).toLocaleDateString() }))}</small>
+            <span class="srv-set-member-copy"><strong${SS().memberColor(st, mm.fid) ? ` style="color:${esc(SS().memberColor(st, mm.fid))}"` : ''}>${esc(X().memberName(sid, mm.fid))}${mm.fid === st.owner ? ` <span class="srv-owner-ico" title="${esc(tr('servers.owner'))}">${window.TSUI.icon('crown', 13)}</span>` : ''}</strong><small>${esc(mm.fid)} · ${esc(tr('servers.memberSince', { date: new Date(mm.joinedAt).toLocaleDateString() }))}</small>
               <span class="srv-card-roles">${roles.map(r => `<span class="srv-role-chip"><i style="background:${esc(r.color || '#99aab5')}"></i>${esc(r.name)}</span>`).join('')}</span></span>
             <span class="srv-set-member-acts"><button type="button" class="btn-sec btn-sm" data-m-card="${esc(mm.fid)}">${esc(tr('servers.manage'))}</button>${acts.join('')}</span>
           </li>`;

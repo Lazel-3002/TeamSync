@@ -1,7 +1,7 @@
-// Teams esintili kabuk: etiketli ray + Takvim/Aramalar görünümleri, sohbet
-// listesi (önizleme, saat, sabitleme, filtre), DM başlığındaki "son görülme",
-// iki gerçek eş arasında birebir arama (zil kartı → kabul → birebir sahne,
-// arama geçmişi; ikinci aramada ret) ve takvimden toplantı daveti (DM).
+// Teams esintili kabuk: etiketli ray + Aramalar görünümü (Takvim kaldırıldı),
+// sohbet listesi (önizleme, saat, sabitleme, filtre), DM başlığındaki "son
+// görülme" ve iki gerçek eş arasında birebir arama (zil kartı → kabul →
+// birebir sahne, arama geçmişi; ikinci aramada ret).
 const assert = require('assert');
 const {
   spawnPeer,
@@ -27,14 +27,15 @@ module.exports = async function run() {
     const B = b.client;
 
     // --- Ray ve görünümler ---
-    const rail = JSON.parse(await evalJS(A, `JSON.stringify(['rail-home', 'side-friends', 'rail-calendar', 'rail-calls', 'rail-meet', 'rail-settings', 'rail-account'].map(id => !!document.getElementById(id)))`));
-    assert.deepStrictEqual(rail, [true, true, true, true, true, true, true]);
-    await evalJS(A, `document.getElementById('rail-calendar').click(); 1`);
-    assert.strictEqual(await evalJS(A, `document.body.dataset.view`), 'calendar');
-    assert.strictEqual(await evalJS(A, `getComputedStyle(document.getElementById('shell-side')).display`), 'none');
-    assert.strictEqual(await evalJS(A, `document.querySelectorAll('#view-calendar .cal-cell').length`), 42);
+    const rail = JSON.parse(await evalJS(A, `JSON.stringify(['rail-home', 'side-friends', 'rail-calls', 'rail-meet', 'rail-settings', 'rail-account'].map(id => !!document.getElementById(id)))`));
+    assert.deepStrictEqual(rail, [true, true, true, true, true, true]);
+    // Takvim tamamen kaldırıldı; kayıtlı eski 'calendar' görünümü Kişiler'e düşer.
+    assert.strictEqual(await evalJS(A, `!document.getElementById('rail-calendar') && !document.getElementById('view-calendar') && typeof window.TSCalendar === 'undefined'`), true);
+    await evalJS(A, `TSShell.setView('calendar'); 1`);
+    assert.strictEqual(await evalJS(A, `document.body.dataset.view`), 'friends');
     await evalJS(A, `document.getElementById('rail-calls').click(); 1`);
     assert.strictEqual(await evalJS(A, `document.body.dataset.view`), 'calls');
+    assert.strictEqual(await evalJS(A, `getComputedStyle(document.getElementById('shell-side')).display`), 'none');
     assert.strictEqual(await evalJS(A, `!!document.querySelector('#view-calls .calls-empty')`), true);
     // Logo ana sayfaya (Kişiler) götürür; görüntülü arama düğmesi yok.
     await evalJS(A, `document.getElementById('rail-brand').click(); 1`);
@@ -55,9 +56,23 @@ module.exports = async function run() {
     assert.ok(row.time.length > 0, JSON.stringify(row));
     await evalJS(A, `TSDM.togglePin({ fid: ${JSON.stringify(fb)} }); 1`);
     assert.strictEqual(await evalJS(A, `!!document.querySelector('#dm-list .dm-sec[data-sec="pinned"] + .chat-row[data-fid=${JSON.stringify(fb)}]')`), true);
+    // Filtre çipleri gizliyken filtre uygulanmaz (eski kayıtlı filtre listeyi boşaltıyordu).
     await evalJS(A, `document.querySelector('#chat-filters [data-cf="groups"]').click(); 1`);
-    assert.strictEqual(await evalJS(A, `!!document.querySelector('#dm-list .chat-row[data-fid=${JSON.stringify(fb)}]')`), false);
+    assert.strictEqual(await evalJS(A, `getComputedStyle(document.getElementById('chat-filters')).display === 'none' && !!document.querySelector('#dm-list .chat-row[data-fid=${JSON.stringify(fb)}]') && localStorage.getItem('teamsync_chat_filter') === null`), true);
     await evalJS(A, `document.querySelector('#chat-filters [data-cf="groups"]').click(); 1`);
+    // Hiç yazışılmamış arkadaş "Diğer arkadaşlar"da; satırda hızlı arama düğmesi var.
+    assert.strictEqual(await evalJS(A, `(() => { state.friends['KNK-NEW'] = { name: 'Yeni', online: false }; TSDM.renderList(); const r = document.querySelector('#dm-list .dm-sec[data-sec="others"] ~ .chat-row.is-other[data-fid="KNK-NEW"]'); const ok = !!r && !!r.querySelector('.dm-row-call[aria-label]'); delete state.friends['KNK-NEW']; TSDM.renderList(); return ok; })()`), true);
+    // Daraltılmış "Sohbetler" Sohbet'e basınca açılır.
+    await evalJS(A, `document.querySelector('#dm-list [data-sec-toggle="pinned"]').click(); 1`);
+    assert.strictEqual(await evalJS(A, `document.querySelector('#dm-list .dm-sec[data-sec="pinned"]').classList.contains('is-collapsed')`), true);
+    await evalJS(A, `document.getElementById('rail-home').click(); 1`);
+    assert.strictEqual(await evalJS(A, `!document.querySelector('#dm-list .dm-sec.is-collapsed') && !!document.querySelector('#dm-list .chat-row[data-fid=${JSON.stringify(fb)}]')`), true);
+    // Popover aynı düğmeyle aç/kapa.
+    await evalJS(A, `document.getElementById('rail-meet').click(); 1`);
+    assert.strictEqual(await evalJS(A, `document.querySelectorAll('.ts-popover').length`), 1);
+    assert.strictEqual(await evalJS(A, `!/schedule/.test(document.querySelector('.ts-popover').innerHTML)`), true);
+    await evalJS(A, `document.getElementById('rail-meet').click(); 1`);
+    assert.strictEqual(await evalJS(A, `document.querySelectorAll('.ts-popover').length`), 0);
 
     // --- DM başlığı: durum satırı, sekmeler ---
     await waitFor(A, `TSStatus.statusOf(${JSON.stringify(fb)}) === 'online'`, 30000, 'B çevrimiçi görünüyor');
@@ -83,13 +98,17 @@ module.exports = async function run() {
     await waitForPeerConnected(a, 40000);
     await waitForPeerConnected(b, 40000);
     await waitFor(A, `document.querySelector('#view-call .main').classList.contains('stage-duo')`, 10000, 'birebir sahne');
-    await waitFor(A, `/^\\d{2}:\\d{2}$/.test(document.getElementById('call-timer').textContent)`, 5000, 'süre sayacı');
+    // Sayaç kendi girişimden sayar, m:ss (saat varsa h:mm:ss) biçiminde.
+    await waitFor(A, `/^\\d+:\\d{2}(:\\d{2})?$/.test(document.getElementById('call-timer').textContent)`, 5000, 'süre sayacı');
     assert.strictEqual(await evalJS(A, `TSDirectCall.outgoing() && TSDirectCall.outgoing().answered`), true);
     await new Promise(r => setTimeout(r, 3500));
+    const hangupAt = Date.now();
     await evalJS(A, `disconnectApp(); 1`);
     await waitFor(A, `!state.room && TSCallLog.list().length > 0`, 10000, 'A arama kaydı');
-    // Birebir aramada karşı taraf ayrılınca arama kendiliğinden biter.
-    await waitFor(B, `!state.room && TSCallLog.list().length > 0`, 30000, 'B arama kendiliğinden bitti');
+    // Birebir aramada karşı taraf kapatınca açık call_end sinyaliyle arama
+    // hemen (zaman aşımını beklemeden) biter.
+    await waitFor(B, `!state.room && TSCallLog.list().length > 0`, 8000, 'B arama call_end ile hemen bitti');
+    console.log(`B ended ${Date.now() - hangupAt} ms after hang-up`);
     const logA = JSON.parse(await evalJS(A, `JSON.stringify(TSCallLog.list()[0])`));
     assert.strictEqual(logA.kind, 'direct', JSON.stringify(logA));
     assert.strictEqual(logA.dir, 'out', JSON.stringify(logA));
@@ -106,19 +125,6 @@ module.exports = async function run() {
     await evalJS(B, `document.querySelector('.dc-ring [data-dc="decline"]').click(); 1`);
     await waitFor(A, `!state.room && !TSDirectCall.outgoing()`, 15000, 'ret sonrası A aramayı kapattı');
     assert.strictEqual(await evalJS(B, `TSCallLog.list()[0].dir`), 'declined');
-
-    // --- Takvim: toplantı daveti DM ile gider ---
-    await evalJS(A, `TSShell.setView('calendar'); TSCalendar.openEditor(null); 1`);
-    await evalJS(A, `(() => {
-      const f = document.querySelector('.cal-dialog');
-      f.querySelector('input[name="title"]').value = 'Oyun gecesi';
-      f.querySelector('input[name="att"][value=${JSON.stringify(fb)}]').checked = true;
-      f.requestSubmit();
-      return 1;
-    })()`);
-    assert.strictEqual(await evalJS(A, `TSCalendar.list().length`), 1);
-    assert.strictEqual(await evalJS(A, `!!document.querySelector('#view-calendar .cal-ev')`), true);
-    await waitFor(B, `(state.dms[${JSON.stringify(fa)}] || []).some(m => String(m.content).includes('Oyun gecesi'))`, 20000, 'B toplantı mesajını aldı');
   } finally {
     cleanupPeer(a);
     cleanupPeer(b);

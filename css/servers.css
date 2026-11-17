@@ -400,7 +400,7 @@ body[data-home="server"] #side-server { display: flex; }
 .srv-link-btn { padding: 0; border: 0; background: none; color: var(--acc-light); font-size: 13px; cursor: pointer; }
 .srv-link-btn:hover { text-decoration: underline; }
 .srv-link-btn.is-danger { color: var(--status-dnd); }
-.btn-pri.btn-danger { background: var(--status-dnd) !important; }
+/* .btn-pri.btn-danger rengi css/refresh.css'te (--danger-btn). */
 .btn-pri:disabled, .btn-sec:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .srv-icon-pick { display: flex; flex-direction: column; align-items: center; gap: 6px; }

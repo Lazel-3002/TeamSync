@@ -51,12 +51,27 @@
     if (window.state.activeDM === fid && typeof window.renderDMs === 'function') window.renderDMs();
   }
 
+  function isOnline(fid) {
+    const f = window.state.friends && window.state.friends[fid];
+    return !!(f && f.online);
+  }
+
   // ---------- Güvenilir teslim ----------
   // sendDMText gönderdikten sonra çağırır. true → mesaj "bekliyor" işaretlenmeli.
-  function track(fid, payload) {
+  // Eskiden yalnızca bu oturumda v≥2 olarak görülen arkadaşlar için
+  // bekletiliyordu; çevrimdışı arkadaşa (sürümü henüz bilinmiyor) yazılan
+  // mesaj tek bir QoS-0 yayınla kayboluyordu. Artık:
+  //  - onay destekleyen arkadaş: her zamanki gibi onay gelene kadar bekler;
+  //  - çevrimdışı ya da hiç gönderilemeyen (bağlantı yok) mesaj: arkadaş
+  //    çevrimiçi olunca gönderilir; o an hâlâ eski sürümse BİR kez gönderilip
+  //    kuyruktan düşer (eski istemci onay göndermez, tekrar tekrar gitmesin).
+  function track(fid, payload, opts) {
     ensureLoaded();
-    if (!payload || !payload.mid || !supportsAck(fid)) return false;
-    (outbox[fid] = outbox[fid] || []).push({ mid: payload.mid, payload, at: Date.now(), tries: 1 });
+    if (!payload || !payload.mid) return false;
+    const unsent = !!(opts && opts.unsent);
+    const ack = supportsAck(fid);
+    if (!ack && !unsent && isOnline(fid)) return false;
+    (outbox[fid] = outbox[fid] || []).push({ mid: payload.mid, payload, at: Date.now(), tries: unsent ? 0 : 1, once: !ack });
     if (outbox[fid].length > 200) outbox[fid] = outbox[fid].slice(-200);
     persist();
     return true;
@@ -84,14 +99,25 @@
     ensureLoaded();
     const list = outbox[fid];
     if (!list || !list.length || !client()) return;
+    const ack = supportsAck(fid);
     let i = 0;
+    let cleared = false;
     list.forEach(item => {
       if (item.tries >= MAX_TRIES) return;
       item.tries++;
+      if (item.once && ack) item.once = false;
+      if (item.once) {
+        // Eski sürüm alıcı: bir kez gönder, onay bekleme.
+        item.tries = MAX_TRIES;
+        const m = findMessage(fid, item.mid);
+        if (m && m.pending) { delete m.pending; cleared = true; }
+      }
       setTimeout(() => publish(fid, item.payload), 120 * i++);
     });
     outbox[fid] = list.filter(item => item.tries < MAX_TRIES);
+    if (!outbox[fid].length) delete outbox[fid];
     persist();
+    if (cleared) rerender(fid);
   }
 
   // Arkadaş çevrimiçi olunca bekleyenleri gönder; açıkken de 30 sn'de bir

@@ -192,7 +192,48 @@ function matchProcesses(processes, index, { hidden = [], runningAppId = 0, previ
   return candidates[0];
 }
 
+// Gizlenen oyunlar listesi. Eski biçim yalnızca kimlik dizisiydi
+// (["steam:730", "custom:x.exe"]); yeni biçim adı da saklar:
+// [{ id, name, steamAppId }]. İkisi de okunur, sonuç her zaman yeni biçimdir.
+function normalizeHiddenList(raw, limit = 500) {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(raw) ? raw : []).forEach(item => {
+    const entry = typeof item === 'string' ? { id: item } : (item && typeof item === 'object' ? item : null);
+    if (!entry || typeof entry.id !== 'string') return;
+    const id = entry.id.trim();
+    if (!id || id.length > 200 || seen.has(id)) return;
+    seen.add(id);
+    const name = typeof entry.name === 'string' ? entry.name.replace(/[\r\n]+/g, ' ').trim().slice(0, 80) : '';
+    const sid = Number(entry.steamAppId);
+    out.push({ id, name, steamAppId: Number.isInteger(sid) && sid > 0 ? sid : 0 });
+  });
+  return out.slice(0, limit);
+}
+
+// Kimliğe göre oyun adı: önce elle eklenenler, sonra exe dizini
+// (Steam/Epic/bilinen oyunlar). Bulunamazsa null.
+function resolveGameName(id, index, custom = []) {
+  if (typeof id !== 'string') return null;
+  if (id.startsWith('custom:')) {
+    const g = (custom || []).find(c => `custom:${c.id}` === id);
+    return g ? { name: g.name, steamAppId: g.steam || 0 } : null;
+  }
+  const games = Object.values(index || {});
+  const hit = games.find(g => g && g.id === id);
+  if (hit) return { name: hit.name, steamAppId: hit.steamAppId || 0 };
+  // Kaldırılmış bir Steam oyunu: bilinen oyunlar listesinde aynı appid varsa adını al.
+  const m = /^steam:(\d+)$/.exec(id);
+  if (m) {
+    const sid = Number(m[1]);
+    const known = games.find(g => g && g.steamAppId === sid);
+    if (known) return { name: known.name, steamAppId: sid };
+  }
+  return null;
+}
+
 module.exports = {
   parseVdf, libraryPathsFromVdf, parseAcf, parseEpicItem, parseTasklistCsv,
-  buildExeIndex, matchProcesses, shouldSkipDir, DEFAULT_IGNORE
+  buildExeIndex, matchProcesses, shouldSkipDir, DEFAULT_IGNORE,
+  normalizeHiddenList, resolveGameName
 };

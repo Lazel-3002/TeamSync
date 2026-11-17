@@ -1156,7 +1156,7 @@
     const status = botOllamaStatus.get(bot.id);
     if (!status || status.state === 'idle') return '<span class="vv-bot-status idle">Kontrol edilmedi</span>';
     if (status.state === 'checking') return '<span class="vv-bot-status checking">Kontrol ediliyor…</span>';
-    if (status.state === 'ok') return `<span class="vv-bot-status ok">Bağlı ✓ ${esc(status.detail || '')}</span>`;
+    if (status.state === 'ok') return `<span class="vv-bot-status ok">${window.TSUI ? window.TSUI.icon('check', 12, 2.5) : ''} Bağlı ${esc(status.detail || '')}</span>`;
     return `<span class="vv-bot-status err">Bağlantı yok ✗ ${esc(status.detail || '')}</span>`;
   }
   // Bot ayarları, herkesin isminin göründüğü üst satırdaki bot pilinin
@@ -1287,7 +1287,7 @@
     const canManageBots = host() && g.phase === 'lobby' && !g.started;
     const pillsHtml = g.players.map((player, index) => {
       const clickable = player.isBot && (host() || player.operatorId === state.myId);
-      if (player.isBot) return `<span class="vv-player-pill vv-player-pill-bot${player.alive ? '' : ' is-dead'}" ${clickable ? `data-bot-pill="${esc(player.id)}"` : ''}>🤖 ${esc(player.name)}</span>`;
+      if (player.isBot) return `<span class="vv-player-pill vv-player-pill-bot${player.alive ? '' : ' is-dead'}" ${clickable ? `data-bot-pill="${esc(player.id)}"` : ''}><span class="u-role-ico" title="Bot">${window.TSUI ? window.TSUI.icon('bot', 13) : ''}</span> ${esc(player.name)}</span>`;
       const initials = player.isBot ? 'AI' : playerInitials(player.name);
       return `<span class="vv-player-pill${clickable ? ' vv-player-pill-bot' : ''}${player.alive ? '' : ' is-dead'}" ${clickable ? `data-bot-pill="${esc(player.id)}"` : ''}><span class="vv-player-avatar">${esc(initials)}</span><span class="vv-player-copy"><strong>${esc(player.name)}${player.id === state.myId ? ' · Sen' : ''}</strong><small>${player.alive ? `Masa ${String(index + 1).padStart(2, '0')}` : 'Elendi'}</small></span></span>`;
     }).join('');

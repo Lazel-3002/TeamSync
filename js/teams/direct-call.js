@@ -21,6 +21,7 @@
 
   const me = () => window.state.friendId;
   const friend = fid => (window.state.friends || {})[fid] || null;
+  const isBlocked = fid => !!(window.TSBlock && typeof window.TSBlock.isBlocked === 'function' && window.TSBlock.isBlocked(fid));
   const mqttOk = () => !!(window.state.globalMqtt && window.state.globalMqtt.connected);
 
   function randomHex(bytes) {
@@ -63,7 +64,14 @@
 
   // fids: aranacak arkadaşlar. kind: 'direct' (birebir) | 'meeting' (takvimden).
   async function call(fids, opts = {}) {
-    fids = (Array.isArray(fids) ? fids : [fids]).filter(fid => friend(fid));
+    fids = Array.isArray(fids) ? fids : [fids];
+    // Engellenen kişi aranamaz (DM başlığı ve sohbet listesi düğmesi de buradan
+    // geçer). Engelleme arkadaşlığı da kaldırdığı için arkadaş süzgecinden ÖNCE bakılır.
+    if (fids.some(isBlocked)) {
+      window.showToast(tr('friends.blockedNoCall'), 'warn');
+      fids = fids.filter(fid => !isBlocked(fid));
+    }
+    fids = fids.filter(fid => friend(fid));
     if (!fids.length) return false;
     if (window.state.room) {
       // Zaten aramadaysak yeni oda kurmak yerine kişiyi mevcut aramaya çağır.
@@ -113,7 +121,7 @@
     if (window.TSCallLog) window.TSCallLog.expect({ roomId, kind: 'room', dir: 'out', title: name });
     const ok = await startRoom(roomId, '', name);
     if (!ok || window.state.room !== roomId) return false;
-    const invitees = fids.filter(fid => friend(fid));
+    const invitees = fids.filter(fid => friend(fid) && !isBlocked(fid));
     if (invitees.length) {
       const cid = crypto.randomUUID();
       outgoing = { cid, fids: invitees, roomId, startedAt: Date.now(), kind: 'meeting', title: name, answered: false };
@@ -129,6 +137,8 @@
 
   function inviteToCurrent(fids, opts = {}) {
     if (!window.state.room) return;
+    fids = (fids || []).filter(fid => !isBlocked(fid));
+    if (!fids.length) { window.showToast(tr('friends.blockedNoCall'), 'warn'); return; }
     const cid = (outgoing && outgoing.roomId === window.state.room && outgoing.cid) || crypto.randomUUID();
     inviteFids(fids, { kind: opts.kind || 'direct', cid, title: opts.title || window.state.roomName || '' });
     window.showToast(tr('toast.inviteSent'), 'ok');
@@ -252,6 +262,7 @@
   // call_decline / call_cancel (renderer.js kişisel olay kanalından)
   function onEvent(data) {
     if (!data || !data.fromId) return;
+    if (data.type === 'call_end') { onRemoteEnd({ roomId: data.roomId, fromId: data.fromId }); return; }
     if (data.type === 'call_cancel' && incoming && incoming.cid === data.cid && incoming.fromId === data.fromId) {
       missed(data.cid);
       return;
@@ -274,11 +285,17 @@
   // odada karşı taraf ayrılıp 4 sn dönmezse arama Teams'teki gibi kendiliğinden biter.
   let directSeenPeer = false;
   let directEmptySince = 0;
+  let directRoom = null;
   setInterval(() => {
     const st = window.state;
     if (outgoing && !outgoing.answered && st.room === outgoing.roomId && st.peers && st.peers.size > 0) answered();
     const direct = !!st.room && String(st.room).startsWith('dc-');
-    if (!direct) { directSeenPeer = false; directEmptySince = 0; return; }
+    if (!direct) { directSeenPeer = false; directEmptySince = 0; directRoom = null; return; }
+    // Bir aramadan diğerine aynı tikte geçilince (ikinci aramayı kabul etmek)
+    // oda hiç "doğrudan değil" görünmüyordu; eski odanın "eş görüldü" bilgisi
+    // yeni, henüz boş odaya taşınıp arama ~4 sn'de kapanıyordu.
+    if (st.room !== directRoom) { directRoom = st.room; directSeenPeer = false; directEmptySince = 0; }
+    if (st.isJoining) return;
     // Oda kodu kopan eşi ancak ~12 sn sessizlikten sonra düşürür; birebirde
     // bağlantısı kopmuş (ICE failed/closed ya da 6 sn'dir sessiz + disconnected)
     // eşi şimdiden gitmiş say.
@@ -300,6 +317,37 @@
     }
   }, 700);
 
+  // Kapatan taraf: birebir (dc-) odadan çıkarken karşı tarafa açık "arama
+  // bitti" sinyali (veri kanalı + kişisel olay kanalı). Eski istemciler
+  // tanımadıkları için yok sayar; onlarda yukarıdaki zaman aşımı devrede kalır.
+  // renderer.js disconnectApp() eşleri silmeden ÖNCE çağırır.
+  function announceEnd() {
+    const st = window.state;
+    if (!st || !st.room || !String(st.room).startsWith('dc-') || !st.peers || !st.peers.size) return;
+    const roomId = st.room;
+    try { if (typeof window.broadcast === 'function') window.broadcast({ type: 'call_end', roomId }); } catch (e) { /* kanal kapanıyor olabilir */ }
+    const fids = new Set();
+    st.peers.forEach(p => { if (p && p.friendId && p.friendId !== me()) fids.add(p.friendId); });
+    fids.forEach(fid => publishTo(fid, { type: 'call_end', fromId: me(), roomId }));
+  }
+
+  // Karşı taraf kapattı: odada ondan başka canlı eş yoksa hemen bitir.
+  function onRemoteEnd({ roomId, fromId, peerId }) {
+    const st = window.state;
+    if (!st || !st.room || st.room !== roomId || !String(st.room).startsWith('dc-')) return;
+    let others = 0;
+    if (st.peers) st.peers.forEach((p, id) => {
+      if (id === peerId || (fromId && p && p.friendId === fromId)) return;
+      const ice = p && p.pc ? p.pc.iceConnectionState : null;
+      if (ice !== 'failed' && ice !== 'closed') others++;
+    });
+    if (others > 0 || typeof window.disconnectApp !== 'function') return;
+    directSeenPeer = false;
+    directEmptySince = 0;
+    window.disconnectApp();
+    window.showToast(tr('call.ended'), 'info');
+  }
+
   document.addEventListener('ts:call', e => { if (!(e.detail && e.detail.active)) onCallEnded(); });
   document.addEventListener('keydown', e => {
     if (!incoming) return;
@@ -307,7 +355,7 @@
   });
 
   window.TSDirectCall = {
-    call, meet, inviteToCurrent, onIncoming, onEvent,
+    call, meet, inviteToCurrent, onIncoming, onEvent, announceEnd, onRemoteEnd,
     outgoing: () => (outgoing && window.state.room === outgoing.roomId ? outgoing : null),
     incoming: () => incoming
   };

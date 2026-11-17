@@ -309,7 +309,7 @@
       <div class="mcard ts-cs-card" role="dialog" aria-modal="true">
         <h3>${esc(tr('status.customTitle'))}</h3>
         <div class="ts-cs-row">
-          <input class="ts-cs-emoji" maxlength="8" value="${esc(current.e)}" placeholder="🙂" aria-label="${esc(tr('status.customEmoji'))}" />
+          <input class="ts-cs-emoji" maxlength="8" value="${esc(current.e)}" placeholder="${esc(tr('status.customEmoji'))}" aria-label="${esc(tr('status.customEmoji'))}" />
           <input class="ts-cs-text" maxlength="128" value="${esc(current.t)}" placeholder="${esc(tr('status.customPlaceholder'))}" />
         </div>
         <label class="ts-cs-label">${esc(tr('status.clearAfter'))}</label>

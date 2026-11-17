@@ -1,0 +1,542 @@
+/* Frekans: sıcak gri yüzeyler, yatay gezinme ve sakin bir çalışma alanı.
+   Temalı köklerin özgüllüğü daha yüksek; kayıtlı renk tercihleri korunur. */
+:root {
+  /* Renk kimliği (zemin, vurgu, buton, yazı) YALNIZCA style.css'teki
+     :root[data-theme="…"] bloklarından gelir; burada sabit renk tanımlanırsa
+     o temanın kartında görünmeyen bir renk (ör. kehribar) her yere sızar.
+     Aşağıdakiler temanın kendi renklerinden türetilir. */
+  --acc-btn: var(--acc);
+  --acc-btn-hover: var(--acc-hover);
+  /* Vurgu renkli yazı/ikon: vurgu, temanın yazı rengine doğru biraz
+     yaklaştırılır; açık zeminde koyulaşır, koyu zeminde açılır. */
+  --acc-ink: color-mix(in srgb, var(--acc) 72%, var(--txt-main));
+  --txt-subtle: var(--txt-mut);
+  /* Kenar çizgisi temanın kendi renklerinden türer. */
+  --border: 1px solid color-mix(in srgb, var(--txt-main) 14%, var(--bg-dark));
+  /* Vurgu / buton zeminindeki yazı: zeminin CIE L* açıklığı 49.44'ün altındaysa
+     beyaz, üstündeyse siyah (WCAG kontrastının eşit olduğu nokta). Böylece
+     kehribar ya da nane gibi açık vurgularda yazı koyu, mavi/mor gibi koyu
+     vurgularda beyaz olur. */
+  --acc-fg: lch(from var(--acc) calc((49.44 - l) * infinity) 0 0);
+  --acc-btn-fg: lch(from var(--acc-btn) calc((49.44 - l) * infinity) 0 0);
+  /* Tehlikeli dolgulu düğme: temanın --danger tonu, açıklığı 45'e sınırlanır;
+     böylece yazı her temada beyaz kalır ve kontrast ≥4.5:1 olur. */
+  --danger-btn: lch(from var(--danger) min(l, 45) c h);
+  --danger-btn-hover: lch(from var(--danger) min(l, 39) c h);
+  --danger-btn-fg: lch(from var(--danger-btn) calc((49.44 - l) * infinity) 0 0);
+  --radius-lg: 8px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --shadow: none;
+  --shadow-sm: none;
+  --status-online: #91bca5;
+  /* Durum renkleri anlamsaldır; vurgu rengine bağlanırsa mor temada "Boşta"
+     mor görünür. */
+  --status-idle: var(--warn);
+  --status-dnd: #d65c62;
+  --sh-main: var(--bg-dark);
+  --sh-side: var(--bg-panel);
+  --sh-rail: var(--bg-dark);
+  --sh-panel: var(--bg-card);
+  --sh-input: var(--bg-panel);
+  --sh-hover: var(--bg-hover);
+  --sh-active: var(--bg-hover);
+  --sh-float: var(--bg-card);
+  --sh-float-2: var(--bg-card);
+  --sh-border: color-mix(in srgb, var(--txt-main) 16%, var(--bg-dark));
+  --tm-side-w: 248px;
+  --tm-rail-w: 0px;
+  --tm-head-h: 64px;
+  --f-nav-h: 64px;
+}
+
+/* Yazı ve yüzeyler: ağ yazı tipi, ışık halesi veya cam efekti yok. */
+body, button, input, select, textarea {
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+body { background: var(--bg-dark); background-image: none !important; }
+.login-wrap, .login-card { background-image: none !important; }
+.login-wrap::before { display: none; }
+body.shell-active { background: var(--bg-dark); }
+#custom-titlebar.custom-titlebar { background: var(--bg-panel); color: var(--txt-mut); }
+.titlebar-title { font-size: 12px; font-weight: 600; }
+/* Başlık çubuğu düğmeleri index.html'de satır içi SVG taşır (eskiden "x", "□", "✕" yazıydı). */
+#custom-titlebar .tb-btn .tb-ico { display: block; pointer-events: none; }
+#custom-titlebar .tb-forcequit:hover { text-shadow: none; }
+#custom-titlebar .tb-btn:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+
+/* Mevcut ray, DOM taşınmadan üst gezinme satırına dönüşür. */
+body.shell-active #shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: var(--f-nav-h) minmax(0, 1fr);
+}
+body.shell-active #srv-rail {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: var(--f-nav-h);
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px;
+  border-right: 0;
+  border-bottom: var(--border);
+  background: var(--bg-dark);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+#srv-rail .rail-brand {
+  display: flex;
+  width: auto;
+  height: 40px;
+  flex: 0 0 auto;
+  gap: 10px;
+  margin: 0 24px 0 0;
+  background: none;
+  border-radius: 6px;
+  color: var(--txt-main);
+}
+#srv-rail .rail-brand img { width: 24px; height: 24px; }
+#srv-rail .rail-brand::after { content: "TeamSync"; font-size: 19px; font-weight: 650; }
+#srv-rail .rail-btn.rail-app {
+  width: auto;
+  height: 100%;
+  flex: 0 0 auto;
+  flex-direction: row;
+  gap: 8px;
+  padding: 0 12px;
+  margin: 0;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--txt-mut);
+}
+#srv-rail .rail-btn.rail-app .rail-icon { display: none; }
+#srv-rail .rail-label { display: block; max-width: none; font-size: 13px; font-weight: 500; letter-spacing: 0; line-height: 1.4; }
+#srv-rail .rail-btn.active { color: var(--acc); border-bottom-color: var(--acc); }
+#srv-rail .rail-btn:hover { background: var(--sh-hover); color: var(--txt-main); }
+#srv-rail .rail-pill { display: none; }
+#srv-rail .rail-sep { width: 1px; height: 24px; flex: 0 0 1px; margin: 0 4px; }
+#srv-rail .rail-bottom { margin: 0 0 0 auto; padding: 0; height: 100%; flex-direction: row; gap: 8px; flex-shrink: 0; }
+#srv-rail .rail-btn:not(.rail-app), #srv-rail .rail-btn:not(.rail-app) .rail-icon {
+  width: 32px; height: 32px; flex: 0 0 32px; margin: 0; border-radius: 6px;
+}
+#srv-rail .rail-action .rail-icon { background: none; color: var(--txt-mut); }
+#srv-rail .rail-badge { position: static; margin-left: 0; background: var(--acc); color: var(--bg-dark); outline: none; }
+#srv-rail .rail-account { width: 36px; height: 36px; margin: 0; }
+#srv-rail .rail-account .ts-av { --av: 30px !important; }
+/* Güncelleme düğmesi menü sekmesi değil, durum göstergesidir: simgesi (indirme
+   halkası, "hazır" noktası) gizlenirse ilerleme ve yeni sürüm görünmüyordu. */
+#srv-rail #update-btn.rail-update {
+  display: flex; flex-direction: row; align-items: center; gap: 6px;
+  height: 40px; flex: 0 0 auto; padding: 0 10px; margin: 0;
+  border: 0; border-radius: 6px; color: var(--txt-mut);
+}
+#srv-rail #update-btn.rail-update .rail-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex: 0 0 28px; background: none;
+}
+#srv-rail #update-btn.rail-update:hover { background: var(--bg-hover); color: var(--txt-main); }
+#srv-rail #update-btn.rail-update[data-state="downloading"] { color: var(--acc); }
+#srv-rail #update-btn.rail-update.update-ready { color: var(--acc-fg); background: var(--acc); }
+#srv-rail #update-btn.rail-update.update-ready:hover { background: var(--acc-hover); }
+#srv-rail #update-btn.rail-update.update-ready .rail-label { font-weight: 600; }
+#shell-side { grid-column: 1; grid-row: 2; min-width: 0; width: var(--tm-side-w); background: var(--bg-panel); border-right: var(--border); }
+#shell-main { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; background: var(--bg-dark); }
+body[data-view="calls"] #shell-main { grid-column: 1 / -1; }
+
+/* Oda listesi: yinelenen başlık ve filtreler yerine sade liste. */
+#chat-filters, .chat-head-title { display: none; }
+#shell-side .chat-head { justify-content: flex-end; padding: 0 16px; border-bottom: var(--border); }
+#shell-side .side-scroll { padding: 16px 12px; }
+.dm-sec-btn { padding: 4px 8px 12px; font-size: 12px; font-weight: 500; }
+.dm-row.chat-row { padding: 12px 8px; margin: 4px 0; border-radius: 6px; }
+.dm-row.chat-row.active { background: var(--bg-hover); }
+.dm-row.chat-row.active::before { display: none; }
+.dm-row.chat-row.active .dm-row-name { color: var(--acc); }
+#shell-side .voice-mini { background: var(--bg-panel); border-top: var(--border); padding: 12px; }
+#shell-side .ss-ch.active { background: var(--bg-hover); border-left: 0; }
+
+/* Arkadaşlar: boş etkinlik sütunu saklanır, eylemler ikincil kalır. */
+#active-now:has(.active-now-empty), #active-now:has(#active-now-list:empty) { display: none; }
+.shell-main .view-header { background: var(--bg-dark); border-bottom: var(--border); padding-left: 32px; padding-right: 24px; }
+.shell-main .vh-title { font-size: 18px; font-weight: 600; }
+#view-friends .friends-tabs { gap: 8px; }
+#view-friends .friends-tabs button { border-radius: 6px; padding: 7px 12px; font-size: 13px; }
+#view-friends .friends-tabs button.active { background: var(--bg-hover); color: var(--txt-main); }
+.friends-tabs .ftab-add, .friends-tabs .ftab-add.active {
+  background: none; color: var(--txt-main); border: var(--border); font-weight: 500;
+}
+.friends-tabs .ftab-add:hover { background: var(--bg-hover); color: var(--txt-main); }
+.friends-pane { padding: 24px 32px; }
+.friends-search { background: var(--bg-panel); border: var(--border); height: 38px; border-radius: 6px; font-size: 13px; }
+.friends-count { padding: 24px 0 12px; letter-spacing: 0; font-weight: 500; }
+#view-friends #friends-list > .friend-item { padding: 16px 0; min-height: 76px; border-top: var(--border); border-radius: 0; background: none; }
+#view-friends #friends-list { margin-inline: 0; }
+#view-friends #friends-list .friend-actions .icon-btn { background: none; border: var(--border); border-radius: 6px; width: 34px; height: 34px; }
+#view-friends .friend-actions .icon-btn:hover { background: var(--bg-hover); color: var(--acc); }
+#view-friends .friend-avatar-wrap, #view-friends .friend-avatar { width: 40px; height: 40px; }
+/* Baş harf avatarları sakin gri. !important gerekli: kaldırılınca kimlikten
+   türetilen eski mor/pembe renkler geri geliyor, açık temada harf okunmuyordu. */
+.ts-av-initial { background: color-mix(in srgb, var(--txt-mut) 22%, var(--bg-panel)) !important; color: var(--txt-main) !important; }
+#view-friends .friend-avatar { background: color-mix(in srgb, var(--txt-mut) 22%, var(--bg-panel)) !important; color: var(--txt-main) !important; }
+
+/* Mesajlar taslaktaki gibi aynı akışta, düz metin hiyerarşisiyle okunur. */
+#dm-view-header { padding: 0 24px; }
+.dmh-call-group { background: none; }
+#view-dm .dmx-intro { text-align: left; padding: 32px 32px 8px; }
+#view-dm .dmx-intro .ts-av { margin: 0; }
+#view-dm .dmx-intro h2 { font-size: 24px; font-weight: 600; }
+/* Yalnızca birebir sohbet: grup/sunucu sohbetinde kendi mesajında zaten
+   avatar var, ek girinti metni iki kat içeri itiyordu. */
+#view-dm .dmx-group, #view-dm .dmx-group[data-sender="me"] { justify-content: flex-start; padding: 4px 32px; margin-top: 16px; }
+#view-dm .dmx-group .dmx-main, #view-dm .dmx-group[data-sender="me"] .dmx-main { align-items: flex-start; max-width: min(100%, 760px); }
+/* Kendi mesajın: avatar sütunu hizasında ince vurgu çizgisiyle ayrılır. */
+#view-dm .dmx-group[data-sender="me"] .dmx-main { margin-left: 30px; padding-left: 12px; border-left: 2px solid var(--acc); }
+#view-dm .dmx-group[data-sender="me"] .dmx-head { color: var(--acc-ink); }
+.view-dm .dmx-msg .dmx-content, .view-dm .dmx-msg.sent .dmx-content {
+  background: none; padding: 4px 0; border-radius: 0; color: var(--txt-main); font-size: 14px; line-height: 1.7;
+}
+.view-dm .dm-input-area { margin: 16px 32px 24px; background: var(--bg-panel) !important; border: var(--border); border-bottom: var(--border) !important; border-radius: 8px; box-shadow: none; }
+/* Odakta dört kenar birlikte vurgulanır (yalnız alt kenar boyanınca hata gibi görünüyordu). */
+:is(.view-dm .dm-input-area, .view-group .grp-input-area, .view-server .srv-input-area):focus-within { border-color: var(--acc) !important; }
+.shell-main .ts-pill-btn.is-primary { background: var(--acc-btn); color: var(--acc-btn-fg); }
+
+/* Arama çubuğu: oda bilgisi esner; eylemler kesilmeden yerleşir. */
+#view-call > .app { background: color-mix(in srgb, var(--bg-panel) 80%, var(--bg-dark)); }
+#view-call .top-bar.call-topbar { min-height: var(--tm-head-h); padding: 8px 16px; gap: 12px; flex-wrap: wrap; background: var(--bg-panel); border-bottom: var(--border); }
+#view-call .call-topbar .call-topbar-lead { flex: 1 1 170px; min-width: 0; gap: 8px; overflow: hidden; }
+#view-call .call-topbar .call-topbar-lead #room-title { flex: 1 1 auto; min-width: 72px; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: var(--txt-main); }
+#view-call .call-id-chip { max-width: 160px; border-radius: 6px; background: none; }
+#view-call .top-bar .bar { flex: 0 0 auto; overflow: visible; gap: 8px; justify-content: center; }
+#view-call .top-bar .bar > .bar-group { padding-right: 8px; gap: 4px; }
+#view-call .top-bar .bar .btn, #view-call .top-bar .bar .call-chat-btn {
+  min-width: 44px; height: 48px; padding: 0 6px; border-radius: 6px; box-shadow: none; color: var(--txt-main);
+}
+#view-call .top-bar .bar .btn .lbl { display: block; font-size: 11px; font-weight: 500; }
+/* Etkinlik görünür ama "açık" gibi durmaz: kehribar yalnızca etkin durum içindir. */
+#view-call .top-bar .bar #act-btn { min-width: 58px; color: var(--txt-main); }
+#view-call .top-bar .bar #act-btn.active { color: var(--acc); }
+#view-call .top-bar .bar #act-btn .lbl { display: block; color: inherit; }
+#view-call .top-bar .bar #leave.call-leave-btn { padding: 0 12px; border-radius: 6px; }
+#view-call .top-bar .bar .btn.off { color: var(--txt-mut); }
+#view-call .top-bar .bar .btn.off .lbl { color: inherit; }
+#view-call .ptile { background: var(--bg-hover); color: var(--txt-main); border-radius: 8px; outline-width: 1px; box-shadow: none; }
+#view-call .ptile .ts-av { background: var(--bg-panel); }
+#view-call .ptile-lbl { background: var(--bg-panel); color: var(--txt-main); font-size: 12px; font-weight: 500; }
+#view-call .vcard.screen { border: var(--border); border-radius: 8px; box-shadow: none; }
+/* Paylaşım, katılmadan önceki önizlemede de ana içerik olarak kalır. */
+#view-call .main:not(.focus-mode) #grid:has(> .vcard.screen:not(.hidden)) {
+  display: grid;
+  position: relative;
+  inset: auto;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  padding: 16px;
+  border: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  align-content: start;
+  grid-auto-rows: auto;
+  overflow-x: hidden;
+}
+#view-call .main:not(.focus-mode) #grid > .vcard.screen {
+  grid-column: 1 / -1; order: -1; width: 100%; min-height: 0; max-width: 100%; aspect-ratio: 16 / 9;
+}
+#view-call .main:not(.focus-mode) #grid:has(> .vcard.screen:not(.hidden)) > .ptile {
+  position: relative; inset: auto; width: auto; height: 116px;
+  min-height: 100px; max-height: 116px; aspect-ratio: auto;
+}
+#view-call #grid:has(> .vcard.screen:not(.hidden)) > .ptile-invite { display: none; }
+#view-call #grid > .vcard:not(.focused) { max-width: 100%; }
+#view-call .inactive-overlay { background: color-mix(in srgb, var(--bg-dark) 90%, transparent) !important; border-radius: 8px !important; }
+#view-call .inactive-overlay button { color: var(--bg-dark) !important; border-radius: 6px !important; box-shadow: none !important; }
+#view-call .vlbl { background: var(--bg-panel); color: var(--txt-main); border-radius: 6px; font-size: 12px; }
+#view-call .vlbl .live { background: var(--status-online); }
+#view-call .ptile-live { background: var(--bg-panel); color: var(--acc); letter-spacing: 0; }
+#view-call :is(#cinput, #fbtn, #csubmit) { border-radius: 6px; box-shadow: none; }
+#view-call #cinput { background: var(--bg-panel); border: var(--border); color: var(--txt-main); font-size: 13px; }
+#view-call :is(#fbtn, #csubmit) { background: var(--bg-hover); color: var(--txt-main); }
+#view-call #csubmit { color: var(--acc); }
+.call-stage-title { font-size: 20px; font-weight: 600; }
+#view-call .main.stage-solo #grid { width: 200px; height: 116px; border-radius: 8px; border: 0; background: none; }
+body[data-view="call"] #shell:has(.focus-mode) #shell-main { grid-column: 1 / -1; }
+body[data-view="call"] #shell:has(.focus-mode) #shell-side { display: none; }
+
+/* Ayarlar: iç içe kutular yerine ayırıcılarla kurulan düz satırlar. */
+#settings-modal { background: color-mix(in srgb, var(--bg-dark) 82%, transparent); backdrop-filter: none; }
+#settings-modal .settings-shell { border: var(--border); border-radius: 8px; box-shadow: none; background: var(--bg-dark) !important; color: var(--txt-main); grid-template-columns: 232px minmax(0, 1fr); }
+#settings-modal .settings-sidebar { background: var(--bg-panel); border-right: var(--border); padding: 24px 12px; }
+#settings-modal .settings-content { background: var(--bg-dark); }
+#settings-modal .settings-scroll { padding: 40px 32px 24px; }
+#settings-modal .settings-card, #settings-modal .settings-theme-section {
+  background: transparent !important; border: 0; border-bottom: var(--border); border-radius: 0; padding: 20px 0; margin: 0; box-shadow: none;
+}
+#settings-modal .settings-nav-item { color: var(--txt-mut); font-weight: 500; border-radius: 6px; }
+#settings-modal .settings-nav-item.active { background: color-mix(in srgb, var(--acc) 16%, var(--bg-hover)); color: var(--acc-ink); }
+#settings-modal .settings-nav-item:hover { background: var(--bg-hover); color: var(--txt-main); }
+#settings-modal .settings-nav-icon { color: inherit; opacity: .85; width: 20px; height: 20px; flex: 0 0 20px; }
+#settings-modal .settings-nav-icon svg { display: block; }
+#settings-modal .settings-nav-item.active .settings-nav-icon { opacity: 1; }
+#settings-modal .settings-profile img { box-shadow: none; border-radius: 8px; }
+#settings-modal .settings-profile { border-bottom: var(--border); }
+#settings-modal :is(.settings-lead, .settings-row p, .settings-help, .settings-profile span, .settings-theme-heading p, .settings-theme-copy small) { color: var(--txt-mut); }
+#settings-modal :is(.settings-nav-label, .settings-theme-eyebrow, .settings-theme-device) { font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--txt-mut); }
+#settings-modal .settings-theme-eyebrow { display: none; }
+#settings-modal .settings-close { border: var(--border); border-radius: 6px; color: var(--txt-mut); }
+#settings-modal :is(.settings-select, .settings-input) { background: var(--bg-panel); border: var(--border); border-radius: 6px; color: var(--txt-main); }
+#settings-modal :is(.settings-select, .settings-input):focus { border-color: var(--acc); }
+#settings-modal .settings-actions { background: var(--bg-panel); border-top: var(--border); }
+#settings-modal .settings-actions > span { color: var(--txt-mut); }
+#settings-modal :is(.settings-theme-save-btn, #settings-save, #settings-v2-save) {
+  background: var(--acc-btn); color: var(--acc-btn-fg); border-radius: 6px; box-shadow: none; font-weight: 600;
+}
+#settings-modal :is(.settings-theme-save-btn, #settings-save, #settings-v2-save):hover { background: var(--acc-btn-hover); }
+#settings-modal :is(.settings-theme-preset-name, .settings-theme-hint) { font-size: 11px; font-weight: 500; }
+#settings-modal :is(.settings-theme-preset-swatch, .settings-theme-preset-dot, .settings-theme-device) { border-radius: 6px; box-shadow: none; }
+#settings-modal .slider { background: var(--bg-hover); }
+#settings-modal input:checked + .slider { background: var(--acc); border-color: var(--acc); }
+#settings-modal .settings-theme-hint, #settings-modal .settings-theme-hint > span:first-child { color: var(--txt-mut); }
+
+/* Etkinlik seçici: aynı yüzey ailesi ve ölçülü köşeler. */
+#activities-modal .activity-picker { background: var(--bg-dark) !important; border: var(--border); border-radius: 8px; box-shadow: none; color: var(--txt-main); }
+#activities-modal .src { border-radius: 8px; box-shadow: none; background: var(--bg-panel); border: var(--border); }
+#activities-modal :is(.media-picker-eyebrow, .activity-section-label) { font-size: 11px; letter-spacing: 0; text-transform: none; }
+/* Kapak resimli kartlar (sahibin isteğiyle geri geldi): style.css'teki 2 sütunlu
+   ızgara ve kapak sanatı korunur; yalnızca kart yüzeyi tema renklerinden gelir. */
+#activities-modal .card-act-btn { background: var(--bg-panel); border: var(--border); border-radius: 8px; }
+#activities-modal .card-act-btn:hover { background: var(--bg-hover); border-color: color-mix(in srgb, var(--acc) 45%, var(--bg-dark)); transform: translateY(-1px); box-shadow: none; }
+/* Klavye odağı "seçili" gibi görünmesin: yalnızca çerçeve. */
+#activities-modal .card-act-btn:focus-visible { box-shadow: none; outline: 2px solid var(--acc); outline-offset: 2px; }
+#activities-modal .activity-cover-badge { box-shadow: none; }
+#activities-modal .activity-quick-section h4 { font-size: 12px; font-weight: 600; color: var(--txt-mut); }
+#activities-modal .activity-shortcut { width: 44px; height: 44px; flex-basis: 44px; }
+#activities-modal :is(.activity-picker, .activity-search-row, .activity-picker-scroll) { background: var(--bg-dark); }
+#activities-modal .activity-card-footer { min-height: 72px; padding: 12px 8px; }
+#activities-modal :is(.activity-icon, .activity-shortcut) {
+  background: var(--bg-hover); color: var(--acc); border-radius: 6px; box-shadow: none;
+}
+#activities-modal .activity-name { color: var(--txt-main); font-size: 14px; font-weight: 600; }
+#activities-modal .activity-copy p { color: var(--txt-mut); font-size: 12px; }
+#activities-modal .act-count-badge { color: var(--txt-mut); background: none; padding: 0; font-size: 11px; font-weight: 400; }
+#activities-modal .act-arrow-btn { color: var(--txt-mut); }
+#activities-modal .card-act-btn:hover .act-arrow-btn { background: none; color: var(--acc); }
+#activities-modal .activity-search-box { background: var(--bg-panel); border: var(--border); box-shadow: none; }
+#activities-modal .activity-search-box:focus-within { border-color: var(--acc); box-shadow: none; }
+#activities-modal .activity-search-box input { background: transparent; }
+#activities-modal .activity-shortcut:hover { transform: none; background: var(--bg-panel); }
+
+/* Dar pencere çekmecesi üst gezinmenin altından açılır. */
+@media (max-width: 1100px) {
+  #srv-rail .rail-brand { margin-right: 12px; }
+  #srv-rail .rail-btn.rail-app { padding: 0 8px; }
+  body.shell-active #srv-rail { gap: 4px; padding: 0 16px; }
+  body[data-view="call"] #shell-main { grid-column: 1 / -1; }
+  body[data-view="call"] #shell-side { display: none; }
+  .call-id-chip { display: none; }
+}
+@media (max-width: 900px) {
+  #srv-rail .rail-brand::after { font-size: 16px; }
+  #srv-rail .rail-brand { margin-right: 4px; gap: 6px; }
+  #srv-rail .rail-label { font-size: 12px; }
+  #srv-rail .rail-btn.rail-app { padding: 0 6px; }
+  #srv-rail .rail-sep { margin: 0; }
+  #srv-rail .rail-bottom { gap: 4px; }
+  .friends-pane { padding: 20px 24px; }
+  .shell-main .view-header { padding-left: 16px; padding-right: 16px; gap: 8px; }
+  .friends-tabs { gap: 4px; }
+  .friends-tabs button { padding: 7px 8px; font-size: 12px; }
+  #view-call .top-bar .bar .btn .lbl { display: block; }
+}
+@media (max-width: 1000px) {
+  body[data-view="call"] #shell:has(.focus-mode) { grid-template-rows: 0 minmax(0, 1fr); }
+  body[data-view="call"] #shell:has(.focus-mode) #srv-rail { display: none; }
+}
+@media (max-width: 760px) {
+  :root { --tm-side-w: 216px; }
+  body.shell-active #srv-rail { padding: 0 12px; }
+  #srv-rail .rail-brand::after { display: none; }
+  body.shell-drawer-open #shell-side { top: var(--f-nav-h); bottom: 0; left: 0; width: min(280px, 100vw); }
+  body:is([data-view="dm"], [data-view="group"], [data-view="server"]) #shell-main { grid-column: 1 / -1; }
+  #view-call .top-bar.call-topbar { row-gap: 8px; }
+  #view-call .call-topbar .call-topbar-lead { flex-basis: 100%; }
+  #view-call .top-bar .bar { flex: 1 1 100%; justify-content: center; flex-wrap: wrap; }
+  #view-call .top-bar .bar .btn, #view-call .top-bar .bar .call-chat-btn { min-width: 40px; padding: 0 4px; }
+  #view-call > .app > .sidebar.call-side { width: 280px; flex-basis: 280px; }
+  #settings-modal .settings-shell { grid-template-columns: 192px minmax(0, 1fr); }
+  #settings-modal .settings-scroll { padding: 40px 24px 24px; }
+}
+@media (max-width: 560px) {
+  #shell-main { grid-column: 1 / -1; }
+  #srv-rail .rail-brand { margin: 0; }
+  .friends-pane { padding: 16px 12px; }
+  .dmx-group, .dmx-group[data-sender="me"] { padding: 4px 16px; }
+  .view-dm .dm-input-area { margin: 12px 16px; }
+  #settings-modal .settings-shell { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ===== Fable denetimi sonrası düzeltmeler ===== */
+
+/* Buton zeminli düğmeler: yazı rengi buton renginin açıklığına göre seçilir
+   (--acc-btn-fg), gölge yok. Vurgu zeminli giden mesaj --acc-fg kullanır. */
+.btn-pri, .login-card button:not(.btn-sec):not(.action-card), .poll-primary-button { color: var(--acc-btn-fg); box-shadow: none; }
+#server-dm-messages .dm-msg.sent { color: var(--acc-fg); box-shadow: none; }
+/* "Evet, ayrıl" tehlikeli eylemdir: kehribar değil kırmızı. */
+#leave-confirm.leave-btn-danger { background: var(--danger-btn); color: var(--danger-btn-fg); }
+/* Tehlikeli birincil düğmeler (.btn-pri.btn-danger): style.css'teki basit
+   arayüz kuralı (.btn-pri için buton rengi, !important) bunları hariç tutar. */
+.btn-pri.btn-danger { background: var(--danger-btn) !important; border-color: var(--danger-btn) !important; color: var(--danger-btn-fg); }
+.btn-pri.btn-danger:hover { background: var(--danger-btn-hover) !important; border-color: var(--danger-btn-hover) !important; }
+
+/* Açık temalarda çevrimiçi yeşili beyaz zeminde okunmuyordu (2.1:1). */
+:root:is([data-theme="white"], [data-theme="violet"]) { --status-online: #2f7d62; }
+:root:is([data-theme="white"], [data-theme="violet"]) #view-call > .app { background: var(--bg-dark); }
+
+/* Başlık bantları aynı yükseklikte hizalanır. */
+#shell-side .chat-head { height: var(--tm-head-h); }
+#shell-side .ss-header { height: var(--tm-head-h); }
+
+/* Eski mor/Discord renk kalıntıları. Logo tek renkli: ekrandaki tek doygun renk oydu. */
+:is(.titlebar-icon img, #srv-rail .rail-brand img, #settings-modal .settings-profile img, .login-logo img, .login-card > img) {
+  filter: grayscale(1) brightness(1.3);
+}
+.settings-test-button { background: var(--bg-hover); color: var(--txt-main); border: var(--border); box-shadow: none; }
+.settings-test-button:hover { background: var(--sh-active); }
+.settings-range, .vol-slider, .ucm-vol-slider { accent-color: var(--acc); }
+.drop-overlay { background: color-mix(in srgb, var(--bg-dark) 85%, transparent) !important; }
+:is(#ctrl-offer-modal .ctrl-note-head, #ctrl-offer-timer-bar) { background: var(--acc); color: var(--acc-fg); }
+.remote-pointer-profile { background: var(--acc); color: var(--acc-fg); }
+.settings-theme-check { background: var(--acc); color: var(--acc-fg); }
+.login-card input { background: var(--bg-panel); border: var(--border); color: var(--txt-main); }
+
+/* Üst gezinmede sunucular: etkin olan ve okunmamış olan görünür. */
+#srv-rail .rail-server { position: relative; }
+#srv-rail .rail-server.has-unread:not(.active)::after {
+  content: ""; position: absolute; right: -2px; top: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--acc);
+}
+
+/* "..." satır menüsü (çıkar / engelle) ve arama düğmesi her zaman görünür; "..." dinlenirken
+   sönük durur, satıra gelince / odaklanınca / menü açıkken tam renk alır. */
+#view-friends #friends-list .friend-item .friend-actions .friend-action-more { color: var(--txt-mut); border-color: transparent; transition: color .15s, border-color .15s; }
+#view-friends #friends-list .friend-item:is(:hover, :focus-within) .friend-actions .friend-action-more,
+#view-friends #friends-list .friend-item .friend-actions .friend-action-more[aria-expanded="true"] { color: var(--txt-main); border: var(--border); }
+
+/* Minicik büyük harfli etiketler yerine düz başlıklar. */
+:is(.srv-members-head, .pe-field > label, .pe-preview-label, .ts-menu-title, .ts-cs-label, .friends-count) {
+  text-transform: none; letter-spacing: 0; font-weight: 500;
+}
+
+/* Ayarlardaki süsler: "kişisel tercih" çipi ve yıldız/ışıltı işaretleri. */
+#settings-modal .settings-theme-device { display: none; }
+#settings-modal .settings-theme-hint > span:first-child { display: none; }
+
+/* Aramalar sayfası filtreleri arkadaş sekmeleriyle aynı biçimde. */
+.calls-filters .chat-chip { border-radius: 6px; }
+
+/* En küçük pencere 850x600: tek başına kutucuk "Oda kimliğini kopyala"nın üstüne binmesin. */
+@media (max-width: 1100px) {
+  #view-call .main.stage-solo #grid { width: 140px; height: 82px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #view-friends #friends-list .friend-item .friend-actions .friend-action-more { transition: none; }
+}
+/* Dolu vurgulu düğmede ayrıca nokta gerekmez (vurgu renginde görünmez de olurdu). */
+#srv-rail #update-btn.rail-update.update-ready .rail-update-dot { display: none; }
+
+/* Üst çubukta sunucular: küçük simge + ad içeren hap (yalnız "22"/"LS" baş
+   harfleri ne olduğunu anlatmıyordu). Çok sunucu olunca yalnızca bu şerit
+   kayar; Ayarlar ve hesap düğmesi ekrandan itilmez. */
+body.shell-active #srv-rail .rail-spaces {
+  display: flex; align-items: center; gap: 6px; flex: 0 1 auto; min-width: 0; height: 100%;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+/* Kaydırma çubuğu yerine fare tekerleği (js/ui/server-view.js) ve taşan
+   tarafta solan kenar: yarım görünen hap daha fazlası olduğunu anlatır. */
+body.shell-active #srv-rail .rail-spaces::-webkit-scrollbar { display: none; }
+body.shell-active #srv-rail .rail-spaces.is-overflow-end { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+body.shell-active #srv-rail .rail-spaces.is-overflow-start { mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); }
+body.shell-active #srv-rail .rail-spaces.is-overflow-start.is-overflow-end { mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+body.shell-active #srv-rail .rail-spaces:empty { display: none; }
+#srv-rail .rail-spaces .rail-sep-servers { display: none; }
+#srv-rail .rail-btn.rail-server {
+  width: auto; height: 36px; flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  margin: 0; padding: 0 10px 0 4px; border: 1px solid var(--sh-border); border-radius: 8px;
+  background: none; color: var(--txt-mut);
+}
+#srv-rail .rail-btn.rail-server:hover { background: var(--sh-hover); color: var(--txt-main); }
+#srv-rail .rail-btn.rail-server.active { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 14%, transparent); color: var(--txt-main); }
+#srv-rail .rail-btn.rail-server .rail-icon,
+#srv-rail .rail-btn.rail-server:hover .rail-icon { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 6px; background: var(--sh-main); }
+#srv-rail .rail-btn.rail-server .srv-icon-img { width: 26px !important; height: 26px !important; }
+#srv-rail .rail-btn.rail-server .srv-icon-initials { font-size: 10.5px !important; color: var(--txt-main); background: color-mix(in srgb, var(--txt-mut) 22%, var(--bg-panel)) !important; }
+#srv-rail .rail-server-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; line-height: 1.3; }
+#srv-rail .rail-btn.rail-server.is-offline .rail-server-name { opacity: 0.65; }
+#srv-rail .rail-btn.rail-server.has-unread .rail-server-name { color: var(--txt-main); font-weight: 650; }
+#srv-rail .rail-btn.rail-server:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+@media (max-width: 1100px) { #srv-rail .rail-server-name { max-width: 96px; } }
+
+/* Ayarlar: üst çubuğun sağındaki diğer simge düğmeleri gibi kare bir dişli;
+   "Ayarlar" yazısı yalnızca ekran okuyucular için kalır (title korunur). */
+#srv-rail #rail-settings.rail-btn.rail-app {
+  width: 32px; height: 32px; flex: 0 0 32px; padding: 0; justify-content: center; align-self: center;
+  border-bottom: 0; border-radius: 6px;
+}
+#srv-rail #rail-settings.rail-btn.rail-app .rail-icon {
+  display: flex; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 6px; background: none; color: var(--txt-mut);
+}
+#srv-rail #rail-settings.rail-btn.rail-app:hover .rail-icon { background: none; color: var(--txt-main); }
+#srv-rail #rail-settings .rail-label {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* Sunucu sütunu başlığı: simge + "SUNUCU" üst etiketi + ad + menü oku. */
+#side-server .ss-header { gap: 10px; }
+#side-server .ss-header:focus:not(:focus-visible) { outline: none; }
+#side-server .ss-icon { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; overflow: hidden; display: flex; }
+#side-server .ss-icon:empty { display: none; }
+#side-server .ss-icon .srv-icon-img { width: 32px !important; height: 32px !important; border-radius: 8px; }
+#side-server .ss-icon .srv-icon-initials { font-size: 12px !important; color: var(--txt-main); background: color-mix(in srgb, var(--txt-mut) 22%, var(--bg-panel)) !important; }
+#side-server .ss-head-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+#side-server .ss-overline { color: var(--txt-mut); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+#side-server .ss-header[aria-expanded="true"] .ss-chevron { transform: rotate(180deg); }
+#side-server .ss-header[aria-expanded="true"] { background: var(--sh-hover); }
+
+/* Onay penceresi (window.showConfirm, index.html #generic-confirm-modal): başlık
+   metni ayrı, uyarı simgesi yanında; renkler temadan. */
+#generic-confirm-modal { background: color-mix(in srgb, var(--bg-dark) 82%, transparent); }
+#generic-confirm-modal .ts-confirm-card { background: var(--bg-card); color: var(--txt-main); border: var(--border); border-radius: 8px; box-shadow: none; }
+#generic-confirm-modal .ts-confirm-head { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 18px; color: var(--txt-main); }
+#generic-confirm-modal .ts-confirm-ico { display: inline-flex; color: var(--warn); }
+#generic-confirm-modal #generic-confirm-message { color: var(--txt-mut); line-height: 1.5; }
+/* Evet düğmesi: yıkıcı onayda .btn-danger (kırmızı), diğerlerinde normal birincil. */
+#generic-confirm-modal .ts-confirm-yes:not(.btn-danger) { background: var(--acc-btn); color: var(--acc-btn-fg); }
+#generic-confirm-modal .ts-confirm-yes:not(.btn-danger):hover { background: var(--acc-btn-hover); }
+#generic-confirm-modal .ts-confirm-card:not(.is-danger) .ts-confirm-ico { color: var(--acc-ink); }
+
+/* Emoji yerine gelen satır içi SVG simgeler (TSUI.icon): metinle aynı hizada. */
+.room-title-lock { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--txt-mut); }
+:is(.srv-inline-ico) { display: inline-flex; align-items: center; gap: 6px; }
+:is(.srv-owner-ico, .u-role-ico) { display: inline-flex; vertical-align: -2px; color: var(--warn); }
+.u-role-ico[title="Bot"] { color: var(--txt-mut); }
+.srv-tri { display: inline-flex; align-items: center; justify-content: center; }
+.srv-slow-note .ts-ico, .srv-kind-icon .ts-ico { vertical-align: -2px; }
+:is([data-move], [data-role-move]) .ts-ico { vertical-align: -2px; }
+.u-kick { display: inline-flex; align-items: center; justify-content: center; }
+.account-row-avatar .ts-ico, .account-row-delete-btn .ts-ico { display: block; margin: auto; }
+
+/* Odak halkası: Chromium'un varsayılan halkası (Windows'ta sistem vurgu rengini,
+   ör. sarı, alabiliyor) yerine tema vurgusu; yalnızca klavye odağında görünür.
+   Fareyle tıklanan düğmede halka çıkmaz. Yazı alanları halka yerine kenar
+   rengiyle odak gösterir (tıklayınca da klavyeyle gelince de). */
+:where(:focus:not(:focus-visible)) { outline: none; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+:where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), textarea, select, [contenteditable="true"]):focus-visible { outline: none; }
+:where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), textarea, select):focus { border-color: var(--acc); }

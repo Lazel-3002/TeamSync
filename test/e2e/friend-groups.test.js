@@ -29,6 +29,8 @@ module.exports = async function run() {
     await waitFor(b.client, `!!TSGroups.get(${q(gid)})`, 20000, 'B receives invite');
     await waitFor(c.client, `!!TSGroups.get(${q(gid)})`, 20000, 'C receives invite');
     await waitFor(b.client, `TSGroups.get(${q(gid)}).rec.members.length === 3`, 15000, 'B knows all 3 members');
+    // Davet teslimi doğrulanır (ilk /eph mesajı): bekleyen davetli kalmaz.
+    await waitFor(a.client, `TSGroups.unconfirmed(${q(gid)}).length === 0 && TSGroups.list().find(g => g.gid === ${q(gid)}).unconfirmed.length === 0`, 20000, 'A: invites confirmed');
     assert.strictEqual(await evalJS(b.client, `TSGroups.groupTitle(${q(gid)})`), 'Test Grubu');
     // DM listesinde grup satırı
     await waitFor(b.client, `!!document.querySelector('#dm-list [data-gid=' + JSON.stringify(${q(gid)}) + ']')`, 5000, 'group row in DM list');
@@ -61,6 +63,36 @@ module.exports = async function run() {
     await evalJS(a.client, `TSGroups.react(${q(gid)}, ${q(target)}, '🔥', 'add').then(() => 1)`, true);
     await waitFor(b.client, `TSGroups.loadEvents(${q(gid)}).then(evs => evs.some(e => e.type === 'react' && e.body.target === ${q(target)} && e.body.e === '🔥'))`, 15000, 'B receives reaction');
     await waitFor(b.client, `!!document.querySelector('#grp-messages .rx[data-mid=' + JSON.stringify(${q(target)}) + ']')`, 5000, 'reaction chip rendered');
+
+    // 5b) Grup araması, kurucu ayrılır: kalan ikisi bağlı kalır ve AYNI yeni kurucuda buluşur
+    const connected = `Array.from(state.peers.values()).filter(p => p.pc && ['connected', 'completed'].includes(p.pc.iceConnectionState)).length`;
+    await evalJS(a.client, `TSGroups.startOrJoinCall(${q(gid)}, { ring: false }).then(() => 1)`, true);
+    await waitFor(b.client, `!!TSGroups.activeCall(${q(gid)})`, 15000, 'B sees call');
+    await waitFor(c.client, `!!TSGroups.activeCall(${q(gid)})`, 15000, 'C sees call');
+    assert.strictEqual(await evalJS(b.client, `!!document.querySelector('.grp-ring')`), false, 'sessiz arama çaldırdı');
+    await evalJS(b.client, `TSGroups.startOrJoinCall(${q(gid)}).then(() => 1)`, true);
+    await evalJS(c.client, `TSGroups.startOrJoinCall(${q(gid)}).then(() => 1)`, true);
+    await waitFor(c.client, `${connected} >= 2`, 60000, 'C connected to A and B');
+    await waitFor(b.client, `${connected} >= 2`, 60000, 'B connected to A and C');
+    const aRoomId = await evalJS(a.client, `state.myId`);
+    await waitFor(b.client, `state.founderId === ${q(aRoomId)}`, 15000, 'B: A is founder');
+    await waitFor(c.client, `state.founderId === ${q(aRoomId)}`, 15000, 'C: A is founder');
+    await evalJS(a.client, `TSGroups.leaveCall(${q(gid)}); 1`);
+    await waitFor(b.client, `!state.peers.has(${q(aRoomId)})`, 45000, 'B notices founder left');
+    await waitFor(c.client, `!state.peers.has(${q(aRoomId)})`, 45000, 'C notices founder left');
+    await new Promise(r => setTimeout(r, 6000));
+    const after = await Promise.all([b, c].map(p => evalJS(p.client, `JSON.stringify({ room: !!state.room, conn: ${connected}, f: state.founderId, me: state.myId, isF: !!state.isRoomFounder, tiles: document.querySelectorAll('#grid .ptile[data-tile-uid]').length })`).then(JSON.parse)));
+    after.forEach((s, i) => {
+      assert.ok(s.room && s.conn === 1 && s.tiles === 2, `kurucu ayrılınca ${i ? 'C' : 'B'} düştü: ${JSON.stringify(s)}`);
+    });
+    assert.ok(after[0].f && after[0].f === after[1].f && after[0].f !== aRoomId, 'yeni kurucuda anlaşılamadı: ' + JSON.stringify(after));
+    assert.strictEqual(after.filter(s => s.isF).length, 1, 'tam bir kurucu olmalı: ' + JSON.stringify(after));
+    // Geç katılan (eski kurucu) aynı kurucuyu görür
+    await evalJS(a.client, `TSGroups.startOrJoinCall(${q(gid)}).then(() => 1)`, true);
+    await waitFor(a.client, `${connected} >= 2`, 60000, 'A rejoins');
+    await waitFor(a.client, `state.founderId === ${q(after[0].f)} && !state.isRoomFounder`, 20000, 'late joiner agrees on founder');
+    for (const p of [a, b, c]) await evalJS(p.client, `TSGroups.leaveCall(${q(gid)}); 1`);
+    await waitFor(a.client, `!TSGroups.activeCall(${q(gid)})`, 20000, 'call over');
 
     // 6) Çıkarma + anahtar yenileme
     await evalJS(a.client, `TSGroups.kick(${q(gid)}, ${q(fc)}).then(() => 1)`, true);

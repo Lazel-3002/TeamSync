@@ -65,6 +65,14 @@
 
   if (available) {
     try { api.onActivityChanged(a => { if (!injected) setCurrent(a); }); } catch (e) {}
+    // Gizli oyun başlayınca/kapanınca Ayarlar sayfası güncel kalsın.
+    try {
+      api.onActivityState?.(s => {
+        if (!s) return;
+        lastState = s;
+        if (isSettingsOpen()) renderSettings();
+      });
+    } catch (e) {}
     document.addEventListener('DOMContentLoaded', () => { setTimeout(refreshState, 1500); });
   }
 
@@ -88,22 +96,31 @@
       root.innerHTML = `<div class="settings-card"><p>${esc(tr('activity.unavailable'))}</p></div>`;
       return;
     }
-    const s = lastState || await refreshState() || { enabled: true, custom: [], hidden: [] };
+    // Ayarlar açılışında her zaman taze durum okunur: eski önbellekle
+    // (ya da hiç durum yokken) gizle/göster yanlış yöne çevriliyordu.
+    const s = await refreshState() || lastState || { enabled: true, custom: [], hidden: [], hiddenGames: [] };
     const cur = current;
     const hidden = new Set(s.hidden || []);
+    // Eski main süreçten gelen durum yalnızca kimlik dizisi taşıyabilir.
+    const hiddenGames = Array.isArray(s.hiddenGames) ? s.hiddenGames : (s.hidden || []).map(id => ({ id, name: '', steamAppId: 0 }));
+    const hiddenCur = !cur && s.hiddenCurrent ? s.hiddenCurrent : null;
+    const toggleBtn = (id, isHidden, name) => `<button type="button" class="btn-sec btn-sm act-toggle-hidden" data-hid="${esc(id)}" data-action="${isHidden ? 'show' : 'hide'}" data-name="${esc(name || '')}">${esc(tr(isHidden ? 'activity.show' : 'activity.hide'))}</button>`;
     const customRows = (s.custom || []).map(g => `
       <div class="act-game-row" data-id="${esc(g.id)}">
         <span class="act-game-icon">${window.TSUI.GAMEPAD_SVG}</span>
-        <div class="act-game-copy"><strong>${esc(g.name)}</strong><small>${esc(g.exe)}</small></div>
-        <button type="button" class="btn-sec btn-sm act-toggle-hidden" data-hid="custom:${esc(g.id)}">${esc(tr(hidden.has(`custom:${g.id}`) ? 'activity.show' : 'activity.hide'))}</button>
+        <div class="act-game-copy"><strong>${esc(g.name)}</strong><small>${esc(g.exe)}${hidden.has(`custom:${g.id}`) ? ` · ${esc(tr('activity.hiddenBadge'))}` : ''}</small></div>
+        ${toggleBtn(`custom:${g.id}`, hidden.has(`custom:${g.id}`), g.name)}
         <button type="button" class="btn-sec btn-sm act-remove" data-id="${esc(g.id)}">${esc(tr('activity.removeGame'))}</button>
       </div>`).join('');
-    const hiddenOthers = (s.hidden || []).filter(id => !id.startsWith('custom:'));
-    const hiddenRows = hiddenOthers.map(id => `
-      <div class="act-game-row muted-row">
-        <span class="act-game-icon">${window.TSUI.GAMEPAD_SVG}</span>
-        <div class="act-game-copy"><strong>${esc(id.replace(/^(steam|epic|known):/, ''))}</strong><small>${esc(id)}</small></div>
-        <button type="button" class="btn-sec btn-sm act-toggle-hidden" data-hid="${esc(id)}">${esc(tr('activity.show'))}</button>
+    const sourceOf = id => (String(id).match(/^(steam|epic|known|custom):/) || [])[1] || 'custom';
+    const hiddenRows = hiddenGames.map(h => `
+      <div class="act-game-row act-hidden-row" data-hidden-id="${esc(h.id)}">
+        ${gameArtHtml({ sid: h.steamAppId || 0 }, 36)}
+        <div class="act-game-copy">
+          <strong>${esc(h.name || tr('activity.hiddenUnknown'))}</strong>
+          <small>${esc(sourceLabel(sourceOf(h.id)))}${h.name ? '' : ` · ${esc(tr('activity.hiddenIdLabel', { id: h.id }))}`}</small>
+        </div>
+        ${toggleBtn(h.id, true, h.name)}
       </div>`).join('');
 
     root.innerHTML = `
@@ -123,7 +140,15 @@
             <small>${esc(sourceLabel(cur.source))}</small>
             <span class="act-current-time">${window.TSUI.GAMEPAD_SVG} ${sinceHtml(cur.startedAt)}</span>
           </div>
-          <button type="button" class="btn-sec btn-sm act-toggle-hidden" data-hid="${esc(cur.id)}">${esc(tr('activity.hide'))}</button>
+          ${toggleBtn(cur.id, false, cur.name)}
+        ` : hiddenCur ? `
+          ${gameArtHtml({ sid: hiddenCur.steamAppId || 0, icon: hiddenCur.icon || '' }, 64)}
+          <div class="act-current-copy">
+            <strong>${esc(hiddenCur.name)}</strong>
+            <small>${esc(tr('activity.hiddenRunning'))}</small>
+            <span class="act-hidden-pill">${window.TSUI.icon ? window.TSUI.icon('eyeOff', 13) : ''} ${esc(tr('activity.hiddenBadge'))}</span>
+          </div>
+          ${toggleBtn(hiddenCur.id, true, hiddenCur.name)}
         ` : `
           <span class="ts-game-art" style="--gs:64px"><span class="ts-game-fallback">${window.TSUI.GAMEPAD_SVG}</span></span>
           <div class="act-current-copy"><strong>${esc(tr('activity.none'))}</strong><small>${esc(tr('activity.noneDesc'))}</small></div>
@@ -137,7 +162,11 @@
       </div>
       <h3 class="settings-section-title">${esc(tr('activity.registered'))}</h3>
       <div class="settings-card act-list">
-        ${customRows || hiddenRows ? customRows + hiddenRows : `<p class="muted">${esc(tr('activity.registeredEmpty'))}</p>`}
+        ${customRows || `<p class="muted">${esc(tr('activity.registeredEmpty'))}</p>`}
+      </div>
+      <h3 class="settings-section-title">${esc(tr('activity.hiddenTitle'))}</h3>
+      <div class="settings-card act-list act-hidden-list" id="act-hidden-list">
+        ${hiddenRows || `<p class="muted">${esc(tr('activity.hiddenEmpty'))}</p>`}
       </div>
       <div class="act-footer">
         <button type="button" class="btn-sec" id="act-rescan">${esc(tr('activity.rescan'))}</button>
@@ -151,10 +180,12 @@
       if (typeof window.publishPresence === 'function') window.publishPresence();
       emit();
     });
+    // Yön düğmenin kendisinden okunur (data-action); lastState henüz
+    // gelmemişken "göster" tıklaması oyunu yeniden gizliyordu.
     root.querySelectorAll('.act-toggle-hidden').forEach(btn => btn.addEventListener('click', async () => {
-      const id = btn.dataset.hid;
-      const isHidden = (lastState && lastState.hidden || []).includes(id);
-      lastState = await api.activitySetHidden(id, !isHidden) || lastState;
+      btn.disabled = true;
+      const hide = btn.dataset.action === 'hide';
+      lastState = await api.activitySetHidden(btn.dataset.hid, hide, btn.dataset.name || '') || lastState;
       renderSettings();
     }));
     root.querySelectorAll('.act-remove').forEach(btn => btn.addEventListener('click', async () => {

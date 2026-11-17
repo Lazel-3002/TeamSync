@@ -159,6 +159,63 @@ module.exports = async function run() {
     if (!typing.skipped) {
       assert.strictEqual(typing.after, typing.before, 'metin girişindeyken mikrofon kısayolu tetiklendi');
     }
+
+    // --- 10. Ses > Bas-Konuş tuşu ile Kısayollar satırı aynı kaydı kullanır ---
+    // Ses sayfasından atanan tuş Kısayollar satırına ve açıklamaya yansımalı;
+    // Kısayollar'dan atanan tuş da Ses sayfasına.
+    const press = code => `window.dispatchEvent(new KeyboardEvent('keydown', { code: '${code}', key: 'x', bubbles: true, cancelable: true }))`;
+    const pttView = `(() => ({
+      voiceKey: document.getElementById('user-ptt-key').textContent.trim(),
+      voiceDisabled: document.getElementById('user-ptt-key').disabled,
+      desc: document.getElementById('user-settings-ptt-desc').textContent.trim(),
+      legacyDesc: document.getElementById('settings-ptt-desc').textContent.trim(),
+      shortcutKey: document.querySelector('.shortcut-row[data-shortcut-id="ptt"] .shortcut-key').textContent.trim(),
+      msg: document.getElementById('user-ptt-key-msg').textContent.trim(),
+      stored: JSON.parse(localStorage.getItem('teamsync_shortcut_bindings') || '{}').ptt || null
+    }))()`;
+    await evalJS(peer.client, `localStorage.removeItem('teamsync_shortcut_bindings'); localStorage.setItem('teamsync_language', 'tr'); applyUserLanguage('tr'); openUserSettings('voice'); 1`);
+    let ptt = await evalJS(peer.client, pttView);
+    assert.strictEqual(ptt.voiceKey, 'Space', JSON.stringify(ptt));
+    assert.strictEqual(ptt.voiceDisabled, true, 'Bas-Konuş kapalıyken tuş seçici devre dışı olmalı: ' + JSON.stringify(ptt));
+    assert.strictEqual(ptt.desc, 'Yalnızca Space tuşuna basılıyken ses iletir.', JSON.stringify(ptt));
+
+    await evalJS(peer.client, `(() => { const cb = document.getElementById('user-settings-ptt'); cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); return 1; })()`);
+    await evalJS(peer.client, `document.getElementById('user-ptt-key').click(); 1`);
+    const pttListening = await evalJS(peer.client, `document.getElementById('user-ptt-key').classList.contains('listening')`);
+    assert.strictEqual(pttListening, true, 'tuş seçici dinleme durumuna geçmeli');
+    await evalJS(peer.client, `${press('F8')}; 1`);
+    ptt = await evalJS(peer.client, pttView);
+    assert.strictEqual(ptt.voiceKey, 'F8', JSON.stringify(ptt));
+    assert.strictEqual(ptt.shortcutKey, 'F8', 'Kısayollar satırı güncellenmeli: ' + JSON.stringify(ptt));
+    assert.strictEqual(ptt.desc, 'Yalnızca F8 tuşuna basılıyken ses iletir.', JSON.stringify(ptt));
+    assert.strictEqual(ptt.legacyDesc, ptt.desc, JSON.stringify(ptt));
+    assert.strictEqual(ptt.stored && ptt.stored.code, 'F8', JSON.stringify(ptt));
+
+    // Esc iptal eder, tuş değişmez.
+    await evalJS(peer.client, `document.getElementById('user-ptt-key').click(); ${press('Escape')}; 1`);
+    ptt = await evalJS(peer.client, pttView);
+    assert.strictEqual(ptt.voiceKey, 'F8', 'Esc tuşu değiştirmemeli: ' + JSON.stringify(ptt));
+
+    // Başka kısayolun tuşu: çakışma mesajı, tuş değişmez.
+    await evalJS(peer.client, `document.getElementById('user-ptt-key').click(); ${press('KeyM')}; 1`);
+    ptt = await evalJS(peer.client, pttView);
+    assert.strictEqual(ptt.voiceKey, 'F8', JSON.stringify(ptt));
+    assert.ok(ptt.msg.length > 0, 'çakışma mesajı görünmeli: ' + JSON.stringify(ptt));
+
+    // Kısayollar sayfasından atama → Ses sayfası ve açıklama.
+    await evalJS(peer.client, `setSettingsPanel('shortcuts'); document.querySelector('.shortcut-row[data-shortcut-id="ptt"] .shortcut-key').click(); 1`);
+    await evalJS(peer.client, `${press('KeyV')}; 1`);
+    ptt = await evalJS(peer.client, pttView);
+    assert.strictEqual(ptt.shortcutKey, 'V', JSON.stringify(ptt));
+    assert.strictEqual(ptt.voiceKey, 'V', 'Ses sayfası güncellenmeli: ' + JSON.stringify(ptt));
+    assert.strictEqual(ptt.desc, 'Yalnızca V tuşuna basılıyken ses iletir.', JSON.stringify(ptt));
+
+    // Varsayılana dön
+    await evalJS(peer.client, `document.getElementById('user-ptt-key-reset').click(); 1`);
+    ptt = await evalJS(peer.client, pttView);
+    assert.strictEqual(ptt.voiceKey, 'Space', JSON.stringify(ptt));
+    assert.strictEqual(ptt.shortcutKey, 'Space', JSON.stringify(ptt));
+    assert.strictEqual(ptt.stored, null, JSON.stringify(ptt));
   } finally {
     cleanupPeer(peer);
   }

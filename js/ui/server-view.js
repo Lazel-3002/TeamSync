@@ -88,13 +88,33 @@
     const host = $('rail-spaces');
     if (!host || !X()) return;
     const list = X().list();
-    host.innerHTML = list.map(s => `
+    // Her sunucu adıyla birlikte bir "hap" olarak görünür (yalnız baş harfler
+    // "22" / "LS" gibi anlamsız duruyordu); araç ipucu ve aria-label "Sunucu: ad".
+    host.innerHTML = list.map(s => {
+      const label = tr(s.online ? 'servers.railLabel' : 'servers.railOffline', { name: s.name });
+      return `
       <button type="button" class="rail-btn rail-server ${s.sid === activeSid ? 'active' : ''} ${s.online ? '' : 'is-offline'} ${s.unread ? 'has-unread' : ''}"
-        data-sid="${esc(s.sid)}" title="${esc(s.name)}${s.online ? '' : ` — ${esc(tr('servers.offlineShort'))}`}" data-i18n-ignore>
+        data-sid="${esc(s.sid)}" title="${esc(label)}" aria-label="${esc(label)}"${s.sid === activeSid ? ' aria-current="page"' : ''} data-i18n-ignore>
         <span class="rail-pill"></span>
         <span class="rail-icon">${serverIconHtml(s.name, s.icon, 48, s.sid)}</span>
+        <span class="rail-server-name" aria-hidden="true">${esc(s.name)}</span>
         ${s.mentions ? `<span class="rail-badge">${s.mentions > 99 ? '99+' : s.mentions}</span>` : ''}
-      </button>`).join('') + (list.length ? '<div class="rail-sep rail-sep-servers"></div>' : '');
+      </button>`;
+    }).join('') + (list.length ? '<div class="rail-sep rail-sep-servers"></div>' : '');
+    const active = host.querySelector('.rail-server.active');
+    if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    syncRailOverflow();
+  }
+
+  // Sunucu şeridi taşınca kenarlar solar (css/refresh.css .is-overflow-*).
+  function syncRailOverflow() {
+    const host = $('rail-spaces');
+    if (!host) return;
+    const max = host.scrollWidth - host.clientWidth;
+    const start = max > 1 && host.scrollLeft > 1;
+    const end = max > 1 && host.scrollLeft < max - 1;
+    if (host.classList.contains('is-overflow-start') !== start) host.classList.toggle('is-overflow-start', start);
+    if (host.classList.contains('is-overflow-end') !== end) host.classList.toggle('is-overflow-end', end);
   }
 
   // ---------- sol sütun: kanal listesi ----------
@@ -111,9 +131,16 @@
     const scroll = $('ss-scroll');
     const banner = $('ss-banner');
     if (!nameEl || !scroll) return;
-    if (!rt) { nameEl.textContent = ''; scroll.innerHTML = ''; return; }
+    const iconEl = $('ss-icon');
+    const over = $('ss-overline');
+    const hdr = $('ss-header');
+    if (over) over.textContent = tr('servers.overline');
+    if (hdr) { const m = tr('servers.headerMenu'); hdr.title = m; hdr.setAttribute('aria-label', m); }
+    if (!rt) { nameEl.textContent = ''; if (iconEl) iconEl.innerHTML = ''; scroll.innerHTML = ''; return; }
     const st = rt.st;
     nameEl.textContent = (st && st.name) || rt.rec.name || '';
+    if (hdr) hdr.setAttribute('aria-label', `${tr('servers.headerMenu')}: ${nameEl.textContent}`);
+    if (iconEl) iconEl.innerHTML = serverIconHtml(nameEl.textContent, (st && st.icon) || rt.rec.icon || '', 32, sid);
     if (!st || !st.members[me()]) {
       scroll.innerHTML = `<div class="ss-empty">${esc(tr('servers.syncing'))}</div>`;
       renderBanner(sid, banner);
@@ -471,7 +498,7 @@
       disabled = true;
       placeholder = tr('servers.slowWait', { t: window.TSUI.formatElapsed(left + 999) });
     }
-    if (st && ch && ch.slow && !disabled) noteHtml = `<span class="srv-slow-note">⏱ ${esc(tr('servers.slowOn', { t: slowLabel(ch.slow) }))}</span>`;
+    if (st && ch && ch.slow && !disabled) noteHtml = `<span class="srv-slow-note">${window.TSUI.icon('clock', 12)} ${esc(tr('servers.slowOn', { t: slowLabel(ch.slow) }))}</span>`;
     if (replyTo) {
       noteHtml = `<span class="srv-replying">${esc(tr('servers.replyingTo', { name: X().memberName(sid, replyTo.author) }))}</span><button type="button" class="srv-reply-cancel" data-reply-cancel title="${esc(tr('common.close'))}">×</button>` + noteHtml;
     }
@@ -632,7 +659,7 @@
         const reason = await window.showPrompt(tr('servers.ban'), tr('servers.banConfirm', { name }), '', tr('servers.banReason'));
         if (reason != null) run(() => X().ban(sid, fid, reason));
       } else if (k === 'host') {
-        if (await window.showConfirm(tr('servers.offerHost'), tr('servers.offerHostConfirm', { name }))) {
+        if (await window.showConfirm(tr('servers.offerHost'), tr('servers.offerHostConfirm', { name }), { danger: false })) {
           const ok = await run(() => X().offerHost(sid, fid));
           if (ok) window.showToast(tr('servers.offerHostSent', { name }), 'ok');
         }
@@ -695,12 +722,24 @@
       const b = e.target.closest('[data-sid]');
       if (b) window.TSShell.setView('server', b.dataset.sid);
     });
+    // Dikey tekerlek şeridi yatay kaydırır (kaydırma çubuğu gizli).
+    $('rail-spaces')?.addEventListener('wheel', e => {
+      const host = e.currentTarget;
+      if (host.scrollWidth <= host.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      host.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
+    $('rail-spaces')?.addEventListener('scroll', syncRailOverflow, { passive: true });
+    window.addEventListener('resize', syncRailOverflow);
     $('rail-spaces')?.addEventListener('contextmenu', e => {
       const b = e.target.closest('[data-sid]');
       if (!b) return;
       e.preventDefault();
-      window.TSShell.setView('server', b.dataset.sid);
-      openServerMenu(b);
+      const sid = b.dataset.sid;
+      window.TSShell.setView('server', sid);
+      // setView rayı yeniden çizer: menüyü eski (artık belgede olmayan) düğmeye değil yenisine bağla.
+      const fresh = Array.from($('rail-spaces').querySelectorAll('[data-sid]')).find(x => x.dataset.sid === sid);
+      openServerMenu(fresh || b);
     });
     $('ss-header')?.addEventListener('click', e => openServerMenu(e.currentTarget));
     $('ss-banner')?.addEventListener('click', e => {

@@ -232,6 +232,27 @@ body.shell-active #user-panel { display: none; }
 }
 .side-icon-btn:hover, .ts-icon-btn:hover, .side-icon-btn:focus-visible, .ts-icon-btn:focus-visible { background: var(--sh-hover); color: var(--txt-main); }
 .ts-icon-btn.is-call { color: var(--tm-acc); }
+/* Sohbet sütunu başlığındaki etiketli düğmeler (Ara / Toplantı / Yeni grup):
+   simge üstte, kısa etiket altta; 248px sütuna tr/en kaydırmadan sığar. */
+.chat-head-actions:has(.side-labeled-btn) { flex: 1 1 auto; justify-content: space-between; gap: 4px; min-width: 0; }
+.side-icon-btn.side-labeled-btn {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 48px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 4px;
+}
+.side-btn-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.15;
+}
 .ts-icon-btn.active { background: var(--sh-active); color: var(--txt-main); }
 
 .chat-filters {
@@ -307,13 +328,24 @@ body.shell-active #user-panel { display: none; }
   border-radius: 0 3px 3px 0;
   background: var(--tm-acc);
 }
-.dm-row-more {
+/* Satır eylemleri (hızlı arama + "…"): üzerine gelince ya da klavyeyle
+   odaklanınca görünür. display:none yerine opaklık: gizliyken de Tab ile
+   ulaşılabilsinler. */
+.dm-row-acts {
   position: absolute;
   right: 6px;
   top: 50%;
+  display: flex;
+  gap: 4px;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.dm-row.chat-row:is(:hover, :focus-within) .dm-row-acts { opacity: 1; pointer-events: auto; }
+.dm-row-more, .dm-row-call {
   width: 28px;
   height: 28px;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -321,13 +353,50 @@ body.shell-active #user-panel { display: none; }
   border-radius: 6px;
   background: color-mix(in srgb, var(--sh-side) 70%, var(--txt-main));
   color: var(--txt-main);
-  transform: translateY(-50%);
   cursor: pointer;
 }
-.dm-row.chat-row:hover .dm-row-more, .dm-row-more:focus-visible { display: flex; }
-.dm-row.chat-row:hover .dm-row-time { visibility: hidden; }
-.dm-row.chat-row:hover .ts-count-badge { display: none; }
-.dm-row-more:hover { background: var(--sh-active); }
+.dm-row-call { color: var(--status-online); }
+.dm-row-call[aria-disabled="true"] { color: var(--txt-mut); cursor: not-allowed; opacity: 0.6; }
+.dm-row-more:focus-visible, .dm-row-call:focus-visible { outline: 2px solid var(--tm-acc); outline-offset: 1px; }
+.dm-row.chat-row:is(:hover, :focus-within) .dm-row-time { visibility: hidden; }
+.dm-row.chat-row:is(:hover, :focus-within) .ts-count-badge { visibility: hidden; }
+.dm-row-more:hover, .dm-row-call:not([aria-disabled="true"]):hover { background: var(--sh-active); }
+.dm-sec-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-sec-count {
+  flex: 0 0 auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--sh-hover);
+  color: var(--txt-mut);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dm-sec.is-collapsed .dm-sec-btn { color: var(--txt-main); }
+.dm-sec-btn svg { flex: 0 0 auto; }
+.dm-row.chat-row .dm-row-sub.is-empty { font-style: italic; }
+.grp-row-call .ts-ico { vertical-align: -2px; }
+/* Ctrl+K: sonuç türü ipucu (Arkadaş / Grup / Sunucu) */
+.ts-switcher-kind {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  color: var(--txt-mut);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+}
+.ts-switcher-item small + .ts-switcher-kind { margin-left: 8px; }
+.ts-switcher-ico { width: 24px; height: 24px; flex: 0 0 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--sh-hover); color: var(--txt-mut); }
+/* Arkadaş listesindeki hızlı arama düğmesi (renderer.js renderFriends) */
+.friend-action-call { color: var(--status-online); }
+.friend-action-call[aria-disabled="true"] { color: var(--txt-mut); cursor: not-allowed; opacity: 0.6; }
 .dm-list-empty { padding: 18px 14px; text-align: center; }
 .ts-menu-row.is-danger, .ts-menu-row.is-danger > svg { color: var(--status-dnd); }
 
@@ -512,8 +581,8 @@ body.shell-active #user-panel { display: none; }
   white-space: nowrap;
 }
 .ts-pill-btn:hover { background: var(--sh-hover); }
-.ts-pill-btn.is-primary { border-color: transparent; background: var(--tm-acc); color: #fff; }
-.ts-pill-btn.is-primary:hover { background: color-mix(in srgb, var(--acc) 86%, #000); }
+.ts-pill-btn.is-primary { border-color: transparent; background: var(--acc-btn); color: var(--acc-btn-fg); }
+.ts-pill-btn.is-primary:hover { background: var(--acc-btn-hover); }
 .ts-pill-btn.is-danger { border-color: color-mix(in srgb, var(--status-dnd) 50%, transparent); color: var(--status-dnd); }
 .ts-pill-btn.is-danger:hover { background: color-mix(in srgb, var(--status-dnd) 12%, transparent); }
 .ts-spacer { flex: 1 1 auto; }
@@ -570,9 +639,8 @@ body.shell-active #user-panel { display: none; }
   --dot-ring: var(--sh-float-2);
 }
 .dc-ring.show { opacity: 1; transform: none; }
-.dc-ring.cal-ring { flex-wrap: wrap; }
 .dc-ring-av { position: relative; flex: 0 0 auto; border-radius: 50%; }
-.dc-ring:not(.cal-ring) .dc-ring-av::after {
+.dc-ring .dc-ring-av::after {
   content: '';
   position: absolute;
   inset: -5px;
@@ -582,12 +650,10 @@ body.shell-active #user-panel { display: none; }
 }
 @keyframes tm-ring { from { opacity: 0.9; transform: scale(0.92); } to { opacity: 0; transform: scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { .dc-ring-av::after { animation: none; } }
-.cal-ring-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--tm-acc-soft); color: var(--tm-acc); }
 .dc-ring-copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
 .dc-ring-copy strong { font-size: 14px; }
 .dc-ring-copy small { color: var(--txt-mut); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-ring-actions { display: flex; gap: 8px; }
-.cal-ring .dc-ring-actions { width: 100%; justify-content: flex-end; }
 .dc-ring-btn {
   width: 42px;
   height: 42px;
@@ -867,122 +933,12 @@ body.shell-active #user-panel { display: none; }
 #view-call .main.stage-duo #grid > .empty { display: none !important; }
 #view-call .main.stage-duo #grid > .ptile:not([data-tile-uid="self"]) .ts-av { --av: 120px !important; }
 
-/* ---------- Takvim ---------- */
-.view-calendar, .view-calls { display: flex; flex-direction: column; min-height: 0; }
-.view-calendar.hidden, .view-calls.hidden { display: none; }
-.cal-header, .calls-header { gap: 12px; padding: 0 16px; }
-.cal-nav, .calls-filters { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.cal-month-label { margin-left: 6px; font-size: 15px; font-weight: 700; white-space: nowrap; text-transform: capitalize; }
-.cal-header .vh-actions, .calls-header .vh-actions { margin-left: auto; }
-.cal-body { flex: 1 1 auto; min-height: 0; display: flex; }
-.cal-month { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: 8px 16px 16px; }
-.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); padding: 6px 0; color: var(--txt-mut); font-size: 12px; font-weight: 600; text-transform: capitalize; }
-.cal-weekdays span { padding-left: 8px; }
-.cal-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat(6, minmax(64px, 1fr)); border-top: 1px solid var(--sh-border); border-left: 1px solid var(--sh-border); }
-.cal-cell {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 3px;
-  padding: 6px;
-  overflow: hidden;
-  border: 0;
-  border-right: 1px solid var(--sh-border);
-  border-bottom: 1px solid var(--sh-border);
-  background: none;
-  color: var(--txt-main);
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-.cal-cell:hover { background: var(--sh-hover); }
-.cal-cell.is-out { color: var(--txt-mut); }
-.cal-cell.is-out .cal-cell-num { opacity: 0.55; }
-.cal-cell-num { align-self: flex-start; min-width: 24px; height: 24px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
-.cal-cell.is-today .cal-cell-num { background: var(--tm-acc); color: #fff; }
-.cal-cell.is-selected { background: var(--tm-acc-soft); }
-.cal-chip { display: block; padding: 2px 6px; border-radius: 4px; border-left: 3px solid var(--tm-acc); background: var(--sh-panel); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-chip-more { color: var(--txt-mut); font-size: 11px; padding-left: 4px; }
-.cal-side { width: 330px; flex: 0 0 330px; overflow-y: auto; padding: 14px 16px 20px; border-left: 1px solid var(--sh-border); background: var(--sh-side); --dot-ring: var(--sh-side); }
-.cal-side-head { display: flex; align-items: center; gap: 8px; }
-.cal-side-head h2 { flex: 1 1 auto; margin: 0; font-size: 16px; font-weight: 700; text-transform: capitalize; }
-.cal-side-sub { margin: 22px 0 8px; color: var(--txt-mut); font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; }
-.cal-day-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-.cal-empty { margin: 6px 0; color: var(--txt-mut); font-size: 13px; }
-.cal-ev { display: flex; gap: 10px; padding: 10px; border-radius: 10px; background: var(--sh-panel); }
-.cal-ev-bar { width: 3px; flex: 0 0 3px; border-radius: 3px; background: var(--tm-acc); }
-.cal-ev.is-live .cal-ev-bar { background: var(--status-online); }
-.cal-ev.is-past { opacity: 0.6; }
-.cal-ev-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.cal-ev-time { color: var(--txt-mut); font-size: 12px; font-variant-numeric: tabular-nums; }
-.cal-ev-title { font-size: 14px; font-weight: 650; word-break: break-word; }
-.cal-ev-note { color: var(--txt-mut); font-size: 12.5px; word-break: break-word; }
-.cal-ev-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.cal-ev-actions .ts-pill-btn { height: 28px; padding: 0 10px; font-size: 12.5px; }
-.cal-att { display: flex; align-items: center; margin-top: 4px; --dot-ring: var(--sh-panel); }
-.cal-att .ts-av + .ts-av { margin-left: -6px; }
-.cal-att .ts-av { outline: 2px solid var(--sh-panel); border-radius: 50%; }
-.cal-att-more { margin-left: 6px; color: var(--txt-mut); font-size: 12px; }
-.cal-up-list { display: flex; flex-direction: column; gap: 4px; }
-.cal-up { display: flex; align-items: center; gap: 10px; padding: 6px; border: 0; border-radius: 8px; background: none; color: var(--txt-main); text-align: left; font: inherit; cursor: pointer; }
-.cal-up:hover { background: var(--sh-hover); }
-.cal-up-date { width: 40px; flex: 0 0 40px; display: flex; flex-direction: column; align-items: center; line-height: 1.05; padding: 4px 0; border-radius: 8px; background: var(--sh-panel); }
-.cal-up-date b { font-size: 16px; }
-.cal-up-date small { color: var(--txt-mut); font-size: 10.5px; text-transform: uppercase; }
-.cal-up.is-live .cal-up-date { background: color-mix(in srgb, var(--status-online) 22%, transparent); }
-.cal-up-copy { min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
-.cal-up-copy strong { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-up-copy small { color: var(--txt-mut); font-size: 12px; }
-.cal-note { margin-top: 22px; color: var(--txt-mut); font-size: 11.5px; line-height: 1.4; }
-@media (max-width: 1000px) {
-  .cal-side { display: none; }
-}
-
-/* Takvim penceresi */
-.ts-dialog-overlay { display: flex; align-items: center; justify-content: center; z-index: 9000; background: rgba(0, 0, 0, 0.55); }
-.ts-dialog {
-  width: min(520px, calc(100vw - 32px));
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  border: 1px solid var(--sh-border);
-  border-radius: 14px;
-  background: var(--sh-float-2);
-  color: var(--txt-main);
-  --dot-ring: var(--sh-float-2);
-}
-.ts-dialog h2 { margin: 0 0 4px; font-size: 18px; }
-.ts-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.ts-field > span { color: var(--txt-mut); font-size: 12px; font-weight: 600; }
-.ts-field input, .ts-field select, .ts-field textarea {
-  width: 100%;
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--sh-border);
-  border-radius: 8px;
-  background: var(--sh-input);
-  color: var(--txt-main);
-  font: inherit;
-  font-size: 14px;
-  color-scheme: dark;
-}
-:root:is([data-theme="white"], [data-theme="violet"]) .ts-field :is(input, select, textarea) { color-scheme: light; }
-.ts-field textarea { resize: vertical; }
-.ts-field :is(input, select, textarea):focus { outline: none; border-color: var(--tm-acc); }
-.ts-field-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; }
-@media (max-width: 520px) { .ts-field-row { grid-template-columns: 1fr 1fr; } }
-.cal-pick { max-height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 4px; border: 1px solid var(--sh-border); border-radius: 8px; background: var(--sh-input); }
-.cal-pick-row { display: flex; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 14px; --dot-ring: var(--sh-input); }
-.cal-pick-row:hover { background: var(--sh-hover); }
-.cal-pick-row input { width: 16px; height: 16px; margin: 0; accent-color: var(--acc); }
-.ts-dialog-actions { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-
 /* ---------- Aramalar ---------- */
+.view-calls { display: flex; flex-direction: column; min-height: 0; }
+.view-calls.hidden { display: none; }
+.calls-header { gap: 12px; padding: 0 16px; }
+.calls-filters { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.calls-header .vh-actions { margin-left: auto; }
 .calls-body { flex: 1 1 auto; min-height: 0; display: flex; }
 .calls-speed { width: 280px; flex: 0 0 280px; overflow-y: auto; padding: 14px 10px; border-right: 1px solid var(--sh-border); background: var(--sh-side); --dot-ring: var(--sh-side); }
 .calls-speed h3, .calls-day { margin: 0 0 8px; padding: 0 8px; color: var(--txt-mut); font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; }
@@ -1011,8 +967,7 @@ body.shell-active #user-panel { display: none; }
 .calls-empty-ico svg { width: 28px; height: 28px; }
 @media (max-width: 900px) { .calls-speed { display: none; } }
 
-/* Takvim ve Aramalar tam genişlik: sohbet listesi gizlenir */
-body[data-view="calendar"] .shell-side,
+/* Aramalar tam genişlik: sohbet listesi gizlenir */
 body[data-view="calls"] .shell-side { display: none; }
 
 /* ---------- Dar pencereler ---------- */

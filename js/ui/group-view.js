@@ -18,14 +18,33 @@
   const CROWN_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="#f0b232" stroke="none"><path d="M2 7l5 5 5-8 5 8 5-5-2 12H4z"/></svg>';
 
   // ---------- yardımcılar ----------
+  const ico = (name, size = 16) => (window.TSUI && typeof window.TSUI.icon === 'function' ? window.TSUI.icon(name, size) : '');
+  const isRealFriend = fid => { const f = window.state.friends && window.state.friends[fid]; return !!(f && !f.temporary); };
+  const isBlocked = fid => !!(window.TSBlock && window.TSBlock.isBlocked(fid));
+
+  // Arkadaş olmayan üyenin çevrimiçi durumu grubun /eph kalp atışlarından gelir.
+  function groupOnline(gid, fid) {
+    if (fid === me()) return true;
+    const rt = G().get(gid);
+    const seen = rt && rt.online && rt.online.get(fid);
+    if (seen && Date.now() - seen < 45000) return true;
+    const f = window.state.friends && window.state.friends[fid];
+    return !!(f && f.online);
+  }
+
   function avatarFor(gid, fid, size, withStatus) {
     const friend = window.state.friends && window.state.friends[fid];
     const isMe = fid === me();
-    const src = isMe ? window.state.myAvatar : friend && friend.avatar;
+    const prof = isMe && window.TSProfile ? window.TSProfile.mine() : (window.TSProfile ? window.TSProfile.profileOf(fid) : null) || {};
+    // Arkadaş olmayan üye: avatar profil yanıtından (res_profile.av) gelir.
+    const src = isMe ? window.state.myAvatar : (friend && friend.avatar) || (prof && prof.avatarUrl) || undefined;
     const name = G().displayName(gid, fid);
     let status = null;
-    if (withStatus) status = isMe ? (window.TSStatus ? window.TSStatus.effective() : 'online') : (friend && window.TSStatus ? window.TSStatus.statusOf(fid) : null);
-    const prof = isMe && window.TSProfile ? window.TSProfile.mine() : (window.TSProfile ? window.TSProfile.profileOf(fid) : null) || {};
+    if (withStatus) {
+      if (isMe) status = window.TSStatus ? window.TSStatus.effective() : 'online';
+      else if (isRealFriend(fid) && window.TSStatus) status = window.TSStatus.statusOf(fid);
+      if (!isMe && (!status || status === 'offline')) status = groupOnline(gid, fid) ? 'online' : 'offline';
+    }
     return window.TSUI.avatarHtml({ src, name, seed: fid, size, status, frame: prof && prof.frame, color: prof && prof.avatarColor });
   }
 
@@ -44,7 +63,7 @@
     if (!G()) return [];
     return G().list().map(g => {
       const sub = g.call
-        ? `<span class="dm-row-sub grp-row-call">🔊 ${esc(tr('groups.inCall'))} · ${window.TSUI.sinceHtml(g.call.startedAt)}</span>`
+        ? `<span class="dm-row-sub grp-row-call">${ico('phone', 12)}${esc(tr('groups.inCall'))} · ${window.TSUI.sinceHtml(g.call.startedAt)}</span>`
         : `<span class="dm-row-sub">${esc(tr('groups.memberCount', { n: g.members.length }))}</span>`;
       return {
         ts: g.lastTs || 0,
@@ -77,27 +96,42 @@
     renderCallArea();
   }
 
+  // Çakışan çizimler (await sırasında gelen yeni olay) eski sonucu yazmasın.
+  let callRenderToken = 0;
   async function renderCallArea() {
     const gid = current;
     const host = $('grp-call');
-    if (!host || !gid) return;
-    const call = G().activeCall(gid);
+    if (!host || !gid || !G()) return;
+    const token = ++callRenderToken;
     const rt = G().get(gid);
     const inThis = rt ? await G().inMyCall(rt) : false;
-    if (gid !== current) return;
-    if (call && call.participants.size) {
-      const people = Array.from(call.participants.keys());
+    if (token !== callRenderToken || gid !== current) return;
+    // Arama durumu await'ten SONRA okunur (bayat "Katıl" yazılmasın).
+    const call = G().activeCall(gid);
+    const mine = inThis && G().myCall ? G().myCall(gid) : null;
+    if ((call && call.participants.size) || mine) {
+      const c = call && call.participants.size ? call : { ...mine, participants: new Map() };
+      const people = Array.from(c.participants.keys());
+      // Odadayım ama henüz kimseye bağlanmadım: işaret göndermiyorum.
+      const connecting = !!(mine && !people.includes(me()));
+      const members = rt ? rt.rec.members.length : 0;
+      const canRingMissing = inThis && !connecting && people.length < members;
+      const actions = inThis
+        ? `${connecting ? `<span class="grp-call-note">${esc(tr('call.connecting'))}</span>` : ''}${canRingMissing ? `<button type="button" class="grp-call-btn is-ghost" data-grp-call="callring" title="${esc(tr('groups.ringMissingTitle'))}">${ico('bell', 14)}<span>${esc(tr('groups.ringMissing'))}</span></button>` : ''}<button type="button" class="grp-call-btn is-leave" data-grp-call="leave">${esc(tr('groups.leaveCall'))}</button>`
+        : `<button type="button" class="grp-call-btn" data-grp-call="join">${esc(tr('groups.join'))}</button>`;
       host.innerHTML = `
-        <div class="grp-call-live" title="${esc(tr('groups.callBy', { name: G().displayName(gid, call.startedBy) }))}">
-          <span class="grp-call-caller">${avatarFor(gid, call.startedBy, 24)}</span>
-          ${window.TSUI.sinceHtml(call.startedAt, 'grp-call-timer')}
+        <div class="grp-call-live" title="${esc(tr('groups.callBy', { name: G().displayName(gid, c.startedBy) }))}">
+          <span class="grp-call-caller">${avatarFor(gid, c.startedBy, 24)}</span>
+          ${window.TSUI.sinceHtml(c.startedAt, 'grp-call-timer')}
           <span class="grp-call-people">${people.slice(0, 3).map(fid => avatarFor(gid, fid, 20)).join('')}${people.length > 3 ? `<span class="grp-more">+${people.length - 3}</span>` : ''}</span>
-          ${inThis
-            ? `<button type="button" class="grp-call-btn is-leave" data-grp-call="leave">${esc(tr('groups.leaveCall'))}</button>`
-            : `<button type="button" class="grp-call-btn" data-grp-call="join">${esc(tr('groups.join'))}</button>`}
+          ${actions}
         </div>`;
     } else {
-      host.innerHTML = `<button type="button" class="vh-icon-btn grp-start-call" data-grp-call="start" title="${esc(tr('groups.startCall'))}">${PHONE_SVG}</button>`;
+      host.innerHTML = `
+        <div class="grp-call-start">
+          <button type="button" class="grp-call-btn grp-start-call" data-grp-call="meet" title="${esc(tr('groups.meetNowTitle'))}">${ico('video', 16) || PHONE_SVG}<span>${esc(tr('groups.meetNow'))}</span></button>
+          <button type="button" class="grp-call-btn is-ghost grp-ring-all" data-grp-call="ringall" title="${esc(tr('groups.ringAllTitle'))}">${ico('phone', 16)}<span>${esc(tr('groups.ringAll'))}</span></button>
+        </div>`;
     }
   }
 
@@ -211,23 +245,76 @@
     $('grp-members-toggle')?.classList.toggle('active', panelOpen());
     const owner = rt.rec.owner;
     const iAmOwner = owner === me();
+    const unconfirmed = new Set(Array.isArray(rt.rec.unconfirmed) ? rt.rec.unconfirmed : []);
+    const requested = new Set(window.TSFriends && window.TSFriends.outgoingIds ? window.TSFriends.outgoingIds() : []);
+    const iconBtn = (attr, fid, icon, label, cls = '') => `<button type="button" class="grp-m-act ${cls}" ${attr}="${esc(fid)}" title="${esc(label)}" aria-label="${esc(label)}">${ico(icon, 16)}</button>`;
     const rows = rt.rec.members.slice().sort((a, b) => (a.fid === owner ? -1 : b.fid === owner ? 1 : 0)).map(m => {
-      const online = m.fid === me() || (rt.online.get(m.fid) && Date.now() - rt.online.get(m.fid) < 45000) || (window.state.friends[m.fid] && window.state.friends[m.fid].online);
+      const isMe = m.fid === me();
+      const online = groupOnline(gid, m.fid);
+      const friend = isRealFriend(m.fid);
+      const blocked = !isMe && isBlocked(m.fid);
+      if (!isMe && !friend) askProfile(m.fid);
+      let hint = '';
+      if (unconfirmed.has(m.fid)) hint = tr('groups.inviteUnconfirmed');
+      else if (blocked) hint = tr('friends.blockedTag');
+      else if (!isMe && !friend) hint = tr('friends.notFriend');
+      let acts = '';
+      if (!isMe && !friend && !blocked) {
+        acts += requested.has(m.fid)
+          ? `<span class="grp-m-state" title="${esc(tr('friends.requestPending'))}">${ico('clock', 14)}</span>`
+          : iconBtn('data-grp-addfriend', m.fid, 'userPlus', tr('profile.addFriend'));
+        acts += iconBtn('data-grp-block', m.fid, 'ban', tr('friends.block'), 'is-danger');
+      }
+      if (iAmOwner && !isMe) acts += iconBtn('data-kick', m.fid, 'userMinus', tr('groups.kick'), 'is-danger');
       return `
-        <li class="grp-member ${online ? '' : 'is-offline'}" data-fid="${esc(m.fid)}">
-          ${avatarFor(gid, m.fid, 32, true)}
-          <span class="grp-member-name"><span class="grp-member-line">${esc(G().displayName(gid, m.fid))}${m.fid === owner ? `<span class="grp-owner" title="${esc(tr('groups.owner'))}">${CROWN_SVG}</span>` : ''}</span></span>
-          ${iAmOwner && m.fid !== me() ? `<button type="button" class="grp-kick" data-kick="${esc(m.fid)}" title="${esc(tr('groups.kick'))}">×</button>` : ''}
+        <li class="grp-member ${online ? '' : 'is-offline'} ${!isMe && !friend ? 'is-nonfriend' : ''}" data-fid="${esc(m.fid)}">
+          <button type="button" class="grp-member-main" data-grp-profile="${esc(m.fid)}">
+            ${avatarFor(gid, m.fid, 32, true)}
+            <span class="grp-member-name"><span class="grp-member-line"><span class="grp-member-text">${esc(G().displayName(gid, m.fid))}</span>${m.fid === owner ? `<span class="grp-owner" title="${esc(tr('groups.owner'))}">${CROWN_SVG}</span>` : ''}</span>${hint ? `<small>${esc(hint)}</small>` : ''}</span>
+          </button>
+          ${acts ? `<span class="grp-m-acts">${acts}</span>` : ''}
         </li>`;
     }).join('');
     const pending = (rt.rec.pendingInvites || []).map(fid => `<li class="grp-member is-pending">${window.TSUI.avatarHtml({ name: (window.state.friends[fid] || {}).name || fid, seed: fid, size: 32 })}<span class="grp-member-name">${esc((window.state.friends[fid] || {}).name || fid)}<small>${esc(tr('groups.invitePending'))}</small></span></li>`).join('');
+    const used = seatsUsed(rt);
+    const full = used >= G().MAX_MEMBERS;
     panel.innerHTML = `
       <div class="grp-panel">
         <div class="grp-panel-head">${esc(tr('groups.membersCount', { n: rt.rec.members.length }))}</div>
         <ul class="grp-member-list">${rows}${pending}</ul>
-        ${rt.rec.members.length < G().MAX_MEMBERS ? `<button type="button" class="grp-panel-btn" data-grp-add>${esc(tr('groups.addMembers'))}</button>` : ''}
-        <button type="button" class="grp-panel-btn is-danger" data-grp-leave>${esc(tr('groups.leave'))}</button>
+        <div class="grp-panel-actions">
+          <button type="button" class="grp-panel-btn is-pri" data-grp-add ${full ? `disabled title="${esc(tr('groups.capReached', { max: G().MAX_MEMBERS }))}"` : ''}>${ico('userPlus', 16)}<span>${esc(tr('groups.addMembers'))}</span></button>
+          ${full ? `<p class="grp-panel-note">${esc(tr('groups.capReached', { max: G().MAX_MEMBERS }))}</p>` : ''}
+        </div>
+        <div class="grp-panel-danger">
+          <button type="button" class="grp-panel-btn is-danger" data-grp-leave>${ico('logOut', 16)}<span>${esc(tr('groups.leave'))}</span></button>
+        </div>
       </div>`;
+  }
+
+  // Üye profil kartı: arkadaş olmayan üye için ad grup kaydından gelir.
+  function showMemberCard(fid, anchor) {
+    if (!window.TSProfile || !fid) return;
+    if (fid === me()) window.TSProfile.showCard({ self: true }, anchor);
+    else window.TSProfile.showCard({ friendId: fid, name: current ? G().displayName(current, fid) : fid, status: current && groupOnline(current, fid) ? 'online' : null }, anchor);
+  }
+
+  // Üye + bekleyen davet sayısı (25 üye sınırı bekleyen davetleri de sayar).
+  function seatsUsed(rt) {
+    const s = new Set(rt.rec.members.map(m => m.fid));
+    (rt.rec.pendingInvites || []).forEach(f => s.add(f));
+    (Array.isArray(rt.rec.unconfirmed) ? rt.rec.unconfirmed : []).forEach(f => s.add(f));
+    return s.size;
+  }
+
+  // Arkadaş olmayan üyelerin profili (ad, avatar, çerçeve) P2P istenir; en çok 5 dk'da bir.
+  const profileAsked = new Map();
+  function askProfile(fid) {
+    if (!window.TSProfile || !window.TSProfile.request) return;
+    const now = Date.now();
+    if (now - (profileAsked.get(fid) || 0) < 5 * 60 * 1000) return;
+    profileAsked.set(fid, now);
+    setTimeout(() => window.TSProfile.request(fid), 200 + Math.random() * 800);
   }
 
   // ---------- görünüm ----------
@@ -251,115 +338,226 @@
     line.innerHTML = t ? `<span class="typing-dots"><i></i><i></i><i></i></span><span>${esc(t)}</span>` : '';
   }
 
-  // ---------- grup oluşturma ----------
-  function openCreate(anchor, preselect = []) {
-    const friends = Object.entries(window.state.friends || {}).filter(([, f]) => f && f.name && !f.temporary)
-      .sort((a, b) => String(a[1].name).localeCompare(String(b[1].name)));
-    const selected = new Set(preselect);
+  // ---------- kişi seçici (grup oluştur + gruba ekle: tek aile) ----------
+  // Engellenenler aday değildir; sessize alınmış arkadaşlar eklenebilir.
+  function friendCandidates(exclude) {
+    const friends = window.state.friends || {};
+    return Object.keys(friends)
+      .filter(fid => { const f = friends[fid]; return f && f.name && !f.temporary && !isBlocked(fid) && !(exclude && exclude.has(fid)); })
+      .map(fid => {
+        const f = friends[fid];
+        const status = window.TSStatus ? window.TSStatus.statusOf(fid) : (f.online ? 'online' : 'offline');
+        return { fid, name: String(f.name), avatar: f.avatar, status };
+      })
+      .sort((a, b) => ((a.status === 'offline') - (b.status === 'offline')) || a.name.localeCompare(b.name));
+  }
+
+  function goAddFriendPage() {
+    if (window.TSShell) window.TSShell.setView('friends');
+    if (window.TSFriends) window.TSFriends.setTab('add');
+  }
+
+  // opts: { mode:'create'|'add', anchor, placement, candidates, preselect, max, emptyKey, onSubmit(ids, name, ui) }
+  function openPicker(opts) {
+    const { mode, candidates } = opts;
+    const max = Math.max(0, opts.max);
+    const selected = new Set((opts.preselect || []).filter(fid => candidates.some(c => c.fid === fid)).slice(0, max));
     const wrap = document.createElement('div');
-    wrap.className = 'grp-create';
-    const max = G().MAX_MEMBERS - 1;
-    const render = () => {
-      const q = (wrap.querySelector('.grp-create-search')?.value || '').toLocaleLowerCase();
-      const list = friends.filter(([fid, f]) => !q || f.name.toLocaleLowerCase().includes(q) || fid.toLowerCase().includes(q));
-      wrap.querySelector('.grp-create-list').innerHTML = list.length ? list.map(([fid, f]) => `
-        <label class="grp-create-row">
-          ${window.TSUI.avatarHtml({ src: f.avatar, name: f.name, seed: fid, size: 32, status: window.TSStatus ? window.TSStatus.statusOf(fid) : null })}
-          <span class="grp-create-name">${esc(f.name)}</span>
-          <input type="checkbox" data-fid="${esc(fid)}" ${selected.has(fid) ? 'checked' : ''} />
-        </label>`).join('') : `<div class="grp-create-empty">${esc(tr('groups.noFriends'))}</div>`;
-      wrap.querySelector('.grp-create-count').textContent = tr('groups.selectedCount', { n: selected.size, max });
-      const btn = wrap.querySelector('.grp-create-go');
-      btn.disabled = selected.size === 0;
-      btn.textContent = selected.size === 1 ? tr('groups.createDm') : tr('groups.create');
+    wrap.className = 'grp-pick';
+    wrap.dataset.mode = mode;
+    const title = tr(mode === 'create' ? 'groups.createTitle' : 'groups.addTitle');
+    const help = tr(mode === 'create' ? 'groups.createHelp' : 'groups.addHelp');
+    const head = `<div class="grp-pick-head"><div class="grp-pick-title">${esc(title)}</div><p class="grp-pick-help">${esc(help)}</p></div>`;
+    const statusText = s => (window.TSUI.statusLabel ? window.TSUI.statusLabel(s) : s);
+
+    if (!candidates.length || max <= 0) {
+      const text = max <= 0 && candidates.length ? tr('groups.capReached', { max: G().MAX_MEMBERS }) : tr(opts.emptyKey);
+      wrap.innerHTML = `${head}
+        <div class="grp-pick-empty">
+          <span class="grp-pick-empty-ico">${ico(max <= 0 && candidates.length ? 'users' : 'userPlus', 28)}</span>
+          <p>${esc(text)}</p>
+          ${max > 0 || !candidates.length ? `<button type="button" class="btn-sec grp-pick-goadd" data-pick="goadd">${ico('userPlus', 16)}<span>${esc(tr('groups.goAddFriend'))}</span></button>` : ''}
+        </div>`;
+      const pop = window.TSUI.popover(wrap, opts.anchor, { placement: opts.placement, cls: 'grp-pick-pop' });
+      wrap.querySelector('[data-pick="goadd"]')?.addEventListener('click', () => { pop.close(); goAddFriendPage(); });
+      setTimeout(() => wrap.querySelector('[data-pick="goadd"]')?.focus(), 30);
+      return pop;
+    }
+
+    const withSearch = candidates.length > 6;
+    wrap.innerHTML = `${head}
+      ${withSearch ? `<label class="grp-pick-search">${ico('search', 16)}<input type="text" class="grp-pick-q" autocomplete="off" placeholder="${esc(tr('groups.searchFriends'))}" aria-label="${esc(tr('groups.searchFriends'))}" /></label>` : ''}
+      <div class="grp-pick-list" role="group" aria-label="${esc(title)}">
+        ${candidates.map(c => `
+          <label class="grp-pick-row" data-fid="${esc(c.fid)}" data-q="${esc((c.name + ' ' + c.fid).toLocaleLowerCase())}">
+            <input type="checkbox" class="grp-pick-cb" data-fid="${esc(c.fid)}" />
+            ${window.TSUI.avatarHtml({ src: c.avatar, name: c.name, seed: c.fid, size: 32, status: c.status })}
+            <span class="grp-pick-copy"><span class="grp-pick-name">${esc(c.name)}</span><small class="grp-pick-st s-${esc(c.status)}">${esc(statusText(c.status))}</small></span>
+            <span class="grp-pick-box" aria-hidden="true">${ico('check', 14)}</span>
+          </label>`).join('')}
+        <div class="grp-pick-nomatch hidden">${esc(tr('groups.noMatch'))}</div>
+      </div>
+      ${mode === 'create' ? `<input type="text" class="grp-pick-name-input" maxlength="60" placeholder="${esc(tr('groups.nameOptional'))}" aria-label="${esc(tr('groups.nameOptional'))}" />` : ''}
+      <div class="grp-pick-cap" aria-live="polite"></div>
+      <div class="grp-pick-foot">
+        <span class="grp-pick-count" aria-live="polite"></span>
+        <button type="button" class="btn-pri grp-pick-go" disabled></button>
+      </div>`;
+    const pop = window.TSUI.popover(wrap, opts.anchor, { placement: opts.placement, cls: 'grp-pick-pop' });
+    const btn = wrap.querySelector('.grp-pick-go');
+    let busy = false;
+
+    const sync = () => {
+      const n = selected.size;
+      wrap.querySelectorAll('.grp-pick-cb').forEach(cb => {
+        const on = selected.has(cb.dataset.fid);
+        cb.checked = on;
+        cb.disabled = !on && n >= max;
+        cb.closest('.grp-pick-row').classList.toggle('is-on', on);
+        cb.closest('.grp-pick-row').classList.toggle('is-locked', !on && n >= max);
+      });
+      wrap.querySelector('.grp-pick-count').textContent = n ? tr('groups.pickedCount', { n }) : tr('groups.pickedNone');
+      const cap = wrap.querySelector('.grp-pick-cap');
+      const left = max - n;
+      cap.textContent = left <= 0 ? tr('groups.capReached', { max: G().MAX_MEMBERS }) : (max < candidates.length ? tr('groups.capLeft', { n: left, max: G().MAX_MEMBERS }) : '');
+      cap.classList.toggle('is-full', left <= 0);
+      btn.disabled = busy || n === 0;
+      if (!busy) {
+        if (mode === 'create') btn.textContent = n === 1 && !(wrap.querySelector('.grp-pick-name-input')?.value || '').trim() ? tr('groups.createDm') : tr('groups.create');
+        else btn.textContent = n > 1 ? tr('groups.addN', { n }) : tr('groups.add');
+      }
     };
-    wrap.innerHTML = `
-      <div class="grp-create-title">${esc(tr('groups.selectFriends'))}</div>
-      <div class="grp-create-count"></div>
-      <input type="text" class="grp-create-search" placeholder="${esc(tr('groups.searchFriends'))}" />
-      <div class="grp-create-list"></div>
-      <input type="text" class="grp-create-name-input" maxlength="60" placeholder="${esc(tr('groups.nameOptional'))}" />
-      <button type="button" class="btn-pri grp-create-go"></button>`;
-    const pop = window.TSUI.popover(wrap, anchor, { placement: 'bottom', cls: 'grp-create-pop' });
-    wrap.querySelector('.grp-create-search').addEventListener('input', render);
+    const filter = () => {
+      const q = (wrap.querySelector('.grp-pick-q')?.value || '').trim().toLocaleLowerCase();
+      let shown = 0;
+      wrap.querySelectorAll('.grp-pick-row').forEach(row => {
+        const hit = !q || row.dataset.q.includes(q);
+        row.classList.toggle('hidden', !hit);
+        if (hit) shown++;
+      });
+      wrap.querySelector('.grp-pick-nomatch').classList.toggle('hidden', shown > 0);
+    };
+    const visibleBoxes = () => Array.from(wrap.querySelectorAll('.grp-pick-row:not(.hidden) .grp-pick-cb'));
+    const submit = async () => {
+      if (busy || !selected.size) return;
+      busy = true;
+      btn.disabled = true;
+      btn.textContent = tr(mode === 'create' ? 'groups.creating' : 'groups.adding');
+      try {
+        await opts.onSubmit(Array.from(selected), (wrap.querySelector('.grp-pick-name-input')?.value || '').trim(), pop);
+      } catch (e) {
+        busy = false;
+        sync();
+      }
+    };
+
     wrap.addEventListener('change', e => {
-      const cb = e.target.closest('input[type=checkbox][data-fid]');
+      const cb = e.target.closest('.grp-pick-cb');
       if (!cb) return;
       if (cb.checked && selected.size >= max) { cb.checked = false; return; }
       if (cb.checked) selected.add(cb.dataset.fid); else selected.delete(cb.dataset.fid);
-      render();
+      sync();
     });
-    wrap.querySelector('.grp-create-go').addEventListener('click', async () => {
-      const ids = Array.from(selected);
-      if (!ids.length) return;
-      if (ids.length === 1 && !wrap.querySelector('.grp-create-name-input').value.trim()) {
-        pop.close();
-        if (typeof window.openDM === 'function') window.openDM(ids[0]);
-        return;
-      }
-      const btn = wrap.querySelector('.grp-create-go');
-      btn.disabled = true;
-      btn.textContent = tr('groups.creating');
-      try {
-        const res = await G().createGroup(ids, wrap.querySelector('.grp-create-name-input').value);
-        pop.close();
-        if (res.pending.length) window.showToast(tr('groups.pendingInvites', { n: res.pending.length }), 'info');
-        if (window.TSShell) window.TSShell.setView('group', res.gid);
-      } catch (e) {
-        btn.disabled = false;
-        render();
-        window.showToast(tr('groups.createFailed'), 'danger');
-      }
+    wrap.querySelector('.grp-pick-q')?.addEventListener('input', filter);
+    wrap.querySelector('.grp-pick-name-input')?.addEventListener('input', sync);
+    btn.addEventListener('click', submit);
+    wrap.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); submit(); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const boxes = visibleBoxes();
+      if (!boxes.length) return;
+      e.preventDefault();
+      const i = boxes.indexOf(document.activeElement);
+      const next = e.key === 'ArrowDown' ? (i < 0 ? 0 : Math.min(boxes.length - 1, i + 1)) : (i <= 0 ? -1 : i - 1);
+      if (next < 0) (wrap.querySelector('.grp-pick-q') || boxes[0]).focus();
+      else boxes[next].focus();
     });
-    render();
-    setTimeout(() => wrap.querySelector('.grp-create-search')?.focus(), 30);
+    sync();
+    setTimeout(() => (wrap.querySelector('.grp-pick-q') || wrap.querySelector('.grp-pick-cb'))?.focus(), 30);
     return pop;
   }
 
+  // ---------- grup oluşturma ----------
+  function openCreate(anchor, preselect = []) {
+    const candidates = friendCandidates(null);
+    const anyFriend = Object.values(window.state.friends || {}).some(f => f && f.name && !f.temporary);
+    return openPicker({
+      mode: 'create', anchor, placement: 'bottom', candidates, preselect,
+      max: G().MAX_MEMBERS - 1,
+      emptyKey: anyFriend ? 'groups.emptyNoFriends' : 'groups.noFriends',
+      onSubmit: async (ids, name, pop) => {
+        if (ids.length === 1 && !name) {
+          pop.close();
+          if (typeof window.openDM === 'function') window.openDM(ids[0]);
+          return;
+        }
+        try {
+          const res = await G().createGroup(ids, name);
+          pop.close();
+          if (res.pending.length) window.showToast(tr('groups.pendingInvites', { n: res.pending.length }), 'info');
+          if (window.TSShell) window.TSShell.setView('group', res.gid);
+        } catch (e) {
+          window.showToast(tr('groups.createFailed'), 'danger');
+          throw e;
+        }
+      }
+    });
+  }
+
   function openAddMembers(anchor) {
-    const rt = current && G().get(current);
-    if (!rt) return;
+    const gid = current;
+    const rt = gid && G().get(gid);
+    if (!rt) return null;
     const inGroup = new Set(rt.rec.members.map(m => m.fid).concat(rt.rec.pendingInvites || []));
-    const friends = Object.entries(window.state.friends || {}).filter(([fid, f]) => f && f.name && !f.temporary && !inGroup.has(fid));
-    const wrap = document.createElement('div');
-    wrap.className = 'grp-create';
-    wrap.innerHTML = `
-      <div class="grp-create-title">${esc(tr('groups.addMembers'))}</div>
-      <div class="grp-create-list">${friends.length ? friends.map(([fid, f]) => `
-        <label class="grp-create-row">
-          ${window.TSUI.avatarHtml({ src: f.avatar, name: f.name, seed: fid, size: 32 })}
-          <span class="grp-create-name">${esc(f.name)}</span>
-          <input type="checkbox" data-fid="${esc(fid)}" />
-        </label>`).join('') : `<div class="grp-create-empty">${esc(tr('groups.noMoreFriends'))}</div>`}</div>
-      <button type="button" class="btn-pri grp-create-go">${esc(tr('groups.add'))}</button>`;
-    const pop = window.TSUI.popover(wrap, anchor, { placement: 'left', cls: 'grp-create-pop' });
-    wrap.querySelector('.grp-create-go').addEventListener('click', async () => {
-      const ids = Array.from(wrap.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.dataset.fid);
-      pop.close();
-      let pending = 0;
-      for (const fid of ids) { if ((await G().invite(current, fid)) === 'pending') pending++; }
-      if (pending) window.showToast(tr('groups.pendingInvites', { n: pending }), 'info');
-      renderMembers();
+    const candidates = friendCandidates(inGroup);
+    const anyOther = Object.keys(window.state.friends || {}).some(fid => { const f = window.state.friends[fid]; return f && f.name && !f.temporary && !isBlocked(fid); });
+    return openPicker({
+      mode: 'add', anchor, placement: 'left', candidates,
+      max: G().MAX_MEMBERS - seatsUsed(rt),
+      emptyKey: anyOther ? 'groups.emptyAllIn' : 'groups.emptyNoFriends',
+      onSubmit: async (ids, _name, pop) => {
+        const added = [];
+        const later = [];
+        for (const fid of ids) {
+          const res = await G().invite(gid, fid);
+          const name = G().displayName(gid, fid);
+          const online = window.state.friends[fid] && window.state.friends[fid].online;
+          if (res === 'pending' || (res === 'sent' && !online)) later.push(name);
+          else if (res === 'sent') added.push(name);
+        }
+        pop.close();
+        if (added.length) window.showToast(tr('groups.addedToast', { names: added.join(', ') }), 'ok');
+        if (later.length) window.showToast(tr('groups.addedPendingToast', { names: later.join(', ') }), 'info');
+        if (current === gid) renderMembers();
+      }
     });
   }
 
   // ---------- gelen arama kartı ----------
   let ringEl = null;
-  function ring(gid) {
+  // opts.by: "Herkesi çağır" diyen kişi (yoksa aramayı başlatan gösterilir).
+  function ring(gid, opts = {}) {
     const call = G().activeCall(gid);
     if (!call || (window.TSStatus && window.TSStatus.isDnd())) return;
+    if (G().myCall && G().myCall(gid)) return;
+    // Engellenen kişinin başlattığı / çağırdığı arama çalmaz (başlıkta "Katıl" yine görünür).
+    if (window.TSBlock && (window.TSBlock.isBlocked(call.startedBy) || (opts.by && window.TSBlock.isBlocked(opts.by)))) return;
+    // Aynı grup için kart zaten çalıyorsa yeniden başlatma (çift işaret / birleşen aramalar).
+    if (ringEl && ringEl.isConnected && ringEl.dataset.gid === gid && !opts.by) return;
     if (ringEl) ringEl.remove();
+    const who = opts.by || call.startedBy;
     ringEl = document.createElement('div');
     ringEl.className = 'grp-ring';
+    ringEl.dataset.gid = gid;
     ringEl.setAttribute('data-i18n-ignore', '');
     ringEl.innerHTML = `
-      <div class="grp-ring-av">${avatarFor(gid, call.startedBy, 48)}</div>
+      <div class="grp-ring-av">${avatarFor(gid, who, 48)}</div>
       <div class="grp-ring-copy">
-        <strong>${esc(G().displayName(gid, call.startedBy))}</strong>
+        <strong>${esc(G().displayName(gid, who))}</strong>
         <span>${esc(tr('groups.ringing', { group: G().groupTitle(gid) }))}</span>
       </div>
-      <button type="button" class="grp-ring-btn is-join" data-ring="join" title="${esc(tr('groups.join'))}">${PHONE_SVG}</button>
-      <button type="button" class="grp-ring-btn is-decline" data-ring="decline" title="${esc(tr('groups.decline'))}">×</button>`;
+      <button type="button" class="grp-ring-btn is-join" data-ring="join" title="${esc(tr('groups.join'))}" aria-label="${esc(tr('groups.join'))}">${ico('phone', 20) || PHONE_SVG}</button>
+      <button type="button" class="grp-ring-btn is-decline" data-ring="decline" title="${esc(tr('groups.decline'))}" aria-label="${esc(tr('groups.decline'))}">${ico('x', 20) || '×'}</button>`;
     document.body.appendChild(ringEl);
     if (typeof window.startRingLoop === 'function') window.startRingLoop('ring', 30000);
     else if (typeof window.playSound === 'function') window.playSound('on');
@@ -376,7 +574,8 @@
       if (window.stopRingLoop) window.stopRingLoop();
       if (b.dataset.ring === 'join') {
         if (window.TSShell) window.TSShell.setView('group', gid);
-        G().startOrJoinCall(gid);
+        // Arama bu arada bittiyse sessiz başlar: kimse yeniden çaldırılmaz.
+        G().startOrJoinCall(gid, { ring: false });
       }
     });
   }
@@ -416,13 +615,18 @@
     $('grp-call')?.addEventListener('click', e => {
       const b = e.target.closest('[data-grp-call]');
       if (!b || !current) return;
-      if (b.dataset.grpCall === 'leave') {
+      const act = b.dataset.grpCall;
+      if (act === 'leave') {
         if (window.stopRingLoop) window.stopRingLoop();
         G().leaveCall(current);
+      } else if (act === 'callring') {
+        const res = G().ringMissing(current);
+        if (res === 'sent') window.showToast(tr('groups.ringSent'), 'ok');
+        else if (res === 'wait') window.showToast(tr('groups.ringWait'), 'info');
       } else {
-        // Yeni arama başlatılıyorsa arayan tarafta kısa süre çalma sesi duyulur.
-        if (b.dataset.grpCall === 'start' && window.startRingLoop) window.startRingLoop('ringback', 9000);
-        G().startOrJoinCall(current);
+        // "Herkesi ara": arayan tarafta kısa süre çalma sesi; "Toplantı başlat" sessiz.
+        if (act === 'ringall' && window.startRingLoop) window.startRingLoop('ringback', 9000);
+        G().startOrJoinCall(current, { ring: act === 'ringall' || act === 'start' });
       }
     });
     $('grp-messages')?.addEventListener('click', e => {
@@ -443,11 +647,26 @@
       const who = e.target.closest('[data-grp-profile]');
       if (who && window.TSProfile) {
         const fid = who.dataset.grpProfile;
-        if (fid === me()) window.TSProfile.showCard({ self: true }, who);
-        else if (window.state.friends[fid]) window.TSProfile.showCard({ friendId: fid }, who);
+        showMemberCard(fid, who);
       }
     });
     $('grp-members-panel')?.addEventListener('click', async e => {
+      const addFriend = e.target.closest('[data-grp-addfriend]');
+      if (addFriend) {
+        addFriend.disabled = true;
+        if (typeof window.sendFriendRequestTo === 'function') await window.sendFriendRequestTo(addFriend.dataset.grpAddfriend);
+        renderMembers();
+        return;
+      }
+      const block = e.target.closest('[data-grp-block]');
+      if (block) {
+        const fid = block.dataset.grpBlock;
+        if (window.TSFriends) await window.TSFriends.confirmBlock(fid, G().displayName(current, fid));
+        renderMembers();
+        return;
+      }
+      const who = e.target.closest('[data-grp-profile]');
+      if (who) { showMemberCard(who.dataset.grpProfile, who); return; }
       const kick = e.target.closest('[data-kick]');
       if (kick) {
         const name = G().displayName(current, kick.dataset.kick);
@@ -490,11 +709,18 @@
     document.addEventListener('ts:group-presence', e => {
       if (e.detail && e.detail.gid === current) renderMembers();
     });
+    // Arkadaş olmayan üyenin profili geldi / engel listesi değişti → üye paneli tazelenir.
+    document.addEventListener('ts:profile', e => {
+      const fid = e.detail && e.detail.fid;
+      const rt = current && G() && G().get(current);
+      if (rt && fid && rt.rec.members.some(m => m.fid === fid)) renderMembers();
+    });
+    document.addEventListener('ts:blocklist', () => { if (current) renderMembers(); });
     window.addEventListener('focus', () => { if (current && isViewing(current)) G().markRead(current); });
     if (window.TSTyping) window.TSTyping.onRender('grp:', renderTyping);
   }
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  window.TSGroupUI = { show, isViewing, listItems, stackHtml, openCreate, ring, current: () => current, renderMessages };
+  window.TSGroupUI = { show, isViewing, listItems, stackHtml, openCreate, openAddMembers, ring, current: () => current, renderMessages };
 })();
