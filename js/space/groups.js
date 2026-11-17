@@ -952,6 +952,15 @@
     groups.forEach(rt => subscribe(rt));
   }
 
+  // Mesaj yedeğinden (js/msg-backup.js) depoya yazılmış bir grup kaydını açar.
+  // Başlamadıysak start() zaten depodan okur.
+  async function adopt(rec) {
+    if (!started || !rec || rec.removed || rec.kind === 'server' || groups.get(rec.gid)) return false;
+    await activate(rec);
+    emit('ts:group', { gid: rec.gid });
+    return true;
+  }
+
   document.addEventListener('ts:peerkeys', e => {
     const fid = e.detail && e.detail.fid;
     if (fid && started) retryPending(fid).catch(() => {});
@@ -971,7 +980,7 @@
   const totalUnread = () => Array.from(groups.values()).reduce((a, rt) => a + (rt.rec.unread || 0), 0);
 
   window.TSGroups = {
-    start, stop, onConnect, onMqtt, onPersonalEvent, onFriendOnline,
+    start, stop, onConnect, onMqtt, onPersonalEvent, onFriendOnline, adopt,
     createGroup, invite, kick, leave, rename, sendMessage, react, deleteMessage, sendTyping,
     startOrJoinCall, leaveCall, ringMissing, inMyCall, callRoom, activeCall: gid => { const rt = groups.get(gid); return rt ? activeCall(rt) : null; },
     myCall: gid => { const rt = groups.get(gid); return rt && rt.myCall && inMyCallSync(rt) ? { ...rt.myCall } : null; },

@@ -232,6 +232,8 @@
       // Uygulama bir davet bağlantısıyla açıldıysa katılma penceresini göster
       if (window.TSServerDialogs) window.TSServerDialogs.flushPendingLink();
     });
+    // Şifreli mesaj yedeği (js/msg-backup.js): anahtar, geri yükleme, gönderim.
+    if (window.TSBackup) window.TSBackup.start();
   }
 
   function exit() {
@@ -240,6 +242,7 @@
     window.TSUI.closePopover();
     if (window.TSGroups) window.TSGroups.stop();
     if (window.TSServers) window.TSServers.stop();
+    if (window.TSBackup) window.TSBackup.stop();
     document.body.classList.remove('shell-active', 'qc-open', 'shell-drawer-open');
     $('shell')?.classList.add('hidden');
   }

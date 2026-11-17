@@ -1433,6 +1433,15 @@
     servers.forEach(rt => subscribe(rt));
   }
 
+  // Mesaj yedeğinden (js/msg-backup.js) gelen üyelik kaydı: sunucu listede
+  // görünür, kontrol günlüğü ve mesajlar barındırıcılardan istenir.
+  async function adopt(rec) {
+    if (!started || !rec || rec.kind !== 'server' || servers.get(rec.gid)) return false;
+    await activate(rec);
+    emit('ts:servers', { sid: rec.gid });
+    return true;
+  }
+
   // ---------- görünüm yardımcıları ----------
   function memberName(rt, fid) {
     if (fid === me()) return window.state.myName || fid;
@@ -1468,7 +1477,7 @@
   const totalUnread = () => list().reduce((a, s) => a + s.mentions, 0);
 
   window.TSServers = {
-    start, stop, onConnect, onMqtt, onPersonalEvent,
+    start, stop, onConnect, onMqtt, onPersonalEvent, adopt,
     createServer, joinWithInvite, peekInvite, parseInvite, inviteLink, discover, setPublic,
     list, get: sid => servers.get(sid) || null, isOnline: sid => isOnline(servers.get(sid) || {}),
     isHost: sid => isHost(servers.get(sid)), onlineHosts: sid => { const rt = servers.get(sid); return rt ? onlineHosts(rt) : []; },

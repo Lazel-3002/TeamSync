@@ -395,7 +395,7 @@
     "auth.loginFailed": "Login failed: ",
     "auth.serverUnreachable": "Can't reach the server. Check your internet connection and try again in a moment.",
     "auth.codeLogin": "Sign in with code",
-    "auth.codePlaceholder": "Paste the account sign-in code from your other device (TS1-…)",
+    "auth.codePlaceholder": "Paste the account sign-in code from your other device (TS2-…)",
     "auth.codeSubmit": "Sign in",
     "auth.codeInvalid": "This code isn't valid. Make sure you copied all of it.",
     "auth.codeNotFound": "No account was found for this code.",

@@ -526,6 +526,8 @@ function createMultiBrokerClient(tag, makeClientId) {
 
   return {
     get connected() { return !ended && clients.some(c => c.connected); },
+    // Ayarlar > Bağlantılar: hangi broker'a şu an bağlı olunduğu.
+    brokers() { return SIGNALING_BROKERS.map((url, i) => ({ url, connected: !ended && !!clients[i].connected })); },
     on(ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return this; },
     publish(topic, message, opts, cb) {
       if (typeof opts === 'function') { cb = opts; opts = undefined; }
@@ -1325,7 +1327,11 @@ function saveDMs() {
   // hem bellekte hem localStorage'da (~10MB kota). Arkadaş başına son 100
   // mesaj tutulur; kota yine dolarsa en eski dosya/görsel içerikleri
   // düşürülür (metin mesajlarına dokunulmaz).
-  const DM_LIMIT = 100;
+  // Mesaj yedeği (js/msg-backup.js) geri yüklemesi için metin sınırı 1000'e
+  // çıktı (metin küçüktür); dosya/görsel İÇERİĞİ yine yalnızca arkadaş başına
+  // en yeni 100 medya mesajında tutulur, daha eskilerin içeriği düşülür.
+  const DM_LIMIT = 1000;
+  const DM_MEDIA_LIMIT = 100;
   if (!state.friendId) return;
   if (dmsLoadedFor !== state.friendId) {
     // Hesap kimliği yükleme kancası dışında bir yoldan değiştiyse: hesapsız
@@ -1341,7 +1347,15 @@ function saveDMs() {
     if (Array.isArray(state.dms[fId]) && state.dms[fId].length > DM_LIMIT) {
       state.dms[fId] = state.dms[fId].slice(-DM_LIMIT);
     }
+    let media = 0;
+    const list = state.dms[fId] || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      if (!m || m.type === 'text' || !m.content) continue;
+      if (++media > DM_MEDIA_LIMIT) { m.content = ''; m.expired = true; }
+    }
   });
+  if (window.TSBackup) window.TSBackup.noteDmChange();
   // Kota temizliği canlı mesajları bozmamalı. Büyük medya mevcut oturumda
   // görünmeye devam eder; gerekirse yalnızca localStorage'a yazılan kopyadan
   // eski dosya içeriği çıkarılır.
@@ -2701,6 +2715,10 @@ function connectGlobalBroker(session) {
           if (window.TSDirectCall) window.TSDirectCall.onEvent(data);
         } else if (data.type === 'req_profile' || data.type === 'res_profile') {
           if (window.TSProfile) window.TSProfile.onEvent(data);
+        } else if (data.type === 'acct_dev') {
+          // Aynı hesabın öbür cihazları (Ayarlar > Bağlantılar, js/net-settings.js):
+          // hesap kodundan türetilen anahtarla şifreli; çözülemeyen yok sayılır.
+          if (data.fromId === state.friendId && window.TSNetSettings) window.TSNetSettings.onAccountEvent(data);
         } else if (data.type === 'req_pmedia' || data.type === 'res_pmedia') {
           // Profil görselleri P2P (js/profile-media.js); sunucu hiç görmez.
           if (window.TSProfileMedia) window.TSProfileMedia.onEvent(data);
@@ -3421,6 +3439,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   function setAuthStatus(msg, isError = false) {
     if (authStatusText) {
+      // Statik data-i18n kalırsa dil uygulandığında (applyUserLanguage) hata
+      // metninin üzerine "Cihaz kimliği doğrulanıyor..." yazılıyordu.
+      authStatusText.removeAttribute('data-i18n');
       authStatusText.textContent = msg;
       authStatusText.style.color = isError ? '#f87171' : '';
     }
@@ -3570,7 +3591,30 @@ window.addEventListener('DOMContentLoaded', async () => {
       } catch (e) {}
       return [...device, ...legacy];
     },
-    migrateLegacy: () => migrateLegacyAccount()
+    migrateLegacy: () => migrateLegacyAccount(),
+    // Girişte doğrulanan slot (yoksa son etkin slot).
+    currentSlot: () => (Number.isInteger(state.deviceSlot) ? state.deviceSlot : getActiveSlot()),
+    isImportedSlot,
+    // Kendi başka cihazımdan gelen "bu cihazdan çıkış yap" komutu
+    // (js/net-settings.js acct_dev). Hesap bu cihaza kodla eklendiyse kod da
+    // unutulur ve listeden düşer; yoksa kod saklı kalır ve tek tıkla yeniden
+    // girilebilirdi. Bu cihazda açılmış hesap (yerel slot) yalnızca çıkış yapar.
+    async remoteSignOut() {
+      const slot = Number.isInteger(state.deviceSlot) ? state.deviceSlot : null;
+      // Önce yalnızca BU oturumu kapat: çıkış düğmesinin varsayılan (global)
+      // signOut'u, komutu gönderen cihazın oturumunu da düşürürdü.
+      if (supabaseClient) { try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (e) {} }
+      if (slot != null && isImportedSlot(slot)) {
+        rememberSlotUsed(slot);
+        saveDeviceAccounts(getDeviceAccounts().filter(a => a.slot !== slot));
+        if (window.electronAPI.forgetImportedAccount) { try { await window.electronAPI.forgetImportedAccount(slot); } catch (e) {} }
+        if (getActiveSlot() === slot) localStorage.removeItem(ACTIVE_SLOT_KEY);
+        if (isDefaultAccountRef({ type: 'device', slot })) localStorage.removeItem(DEFAULT_ACCOUNT_KEY);
+      }
+      document.getElementById('settings-modal')?.classList.add('hidden');
+      if (state.room) { try { disconnectApp(); } catch (e) {} }
+      document.getElementById('btn-logout')?.click();
+    }
   };
 
   // ESKİ TİP HESABI BULUTA TAŞIMA. Eski profiller yalnızca bu cihazdaki
@@ -3602,7 +3646,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Arama sırasında açılan oturumlar (boşta duran eski bir slot hesabı ya da
     // yarıda kalan kayıt) taşıma başarısız olursa kapatılır; yoksa bir sonraki
     // açılışta bu oturum yanlış slota yazılabiliyordu.
-    const abandonSession = async () => { try { await supabaseClient.auth.signOut(); } catch (e) {} };
+    // scope 'local': yalnızca bu cihazdaki oturum; aynı hesabın başka
+    // cihazlardaki oturumları düşürülmez (varsayılan 'global' hepsini iptal eder).
+    const abandonSession = async () => { try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (e) {} };
     try {
     for (let s = 0; s < 50 && slot < 0; s++) {
       if (used.has(s)) continue;
@@ -3735,6 +3781,20 @@ window.addEventListener('DOMContentLoaded', async () => {
         email: creds.email,
         password: creds.password
       });
+      // Yarıda kalmış giriş kodu yenileme (js/net-settings.js, main.js
+      // code-rotation): parola sunucuda değişmiş ama yeni sayaç kaydedilmemiş
+      // olabilir. Yeni parola tutarsa kayıt tamamlanır; eski tuttuysa iptal.
+      if (creds.pendingPassword && window.electronAPI.codeRotation) {
+        if (error && !isServerUnreachable(error)) {
+          const retry = await supabaseClient.auth.signInWithPassword({ email: creds.email, password: creds.pendingPassword });
+          if (!retry.error) {
+            ({ data, error } = retry);
+            try { await window.electronAPI.codeRotation(slot, 'commit'); } catch (e) {}
+          }
+        } else if (!error) {
+          try { await window.electronAPI.codeRotation(slot, 'abort'); } catch (e) {}
+        }
+      }
       if (error) {
         if (isServerUnreachable(error)) throw error;
         // Kodla eklenen hesap başka bir cihaza ait: burada YENİ hesap açmak
@@ -3744,7 +3804,9 @@ window.addEventListener('DOMContentLoaded', async () => {
           if (!known && window.electronAPI.forgetImportedAccount) {
             try { await window.electronAPI.forgetImportedAccount(slot); } catch (e) {}
           }
-          throw new Error(t('auth.codeNotFound'));
+          // Daha önce çalışmış bir kod artık tutmuyorsa büyük olasılıkla
+          // kaynak cihazda yenilendi (Ayarlar > Bağlantılar).
+          throw new Error(known ? t('net.codeExpired') : t('auth.codeNotFound'));
         }
         if (auto && !getDeviceAccounts().length) {
           let legacyCount = 0;
@@ -3905,8 +3967,24 @@ window.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     try {
-      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      let { data: { session }, error } = await supabaseClient.auth.getSession();
       if (error) throw error;
+      // Saklı oturum yalnızca yerelde okunur; sunucuda iptal edilmiş olabilir
+      // (giriş kodu yenilendi → signOut({scope:'others'}), ya da başka
+      // cihazdan çıkış yaptırıldı). Gerçek sunucuda B kapalıyken kod
+      // yenilenince B açılışta eski oturumla kabuğa giriyor, getUser 403
+      // dönüyor ve her istek anon kalıyordu. Sunucu oturumu tanımıyorsa yerel
+      // oturum atılır; deviceLogin saklı kodla dener (kodla eklenen hesapta
+      // net.codeExpired). Ağ hatasında oturum korunur (çevrimdışı açılış).
+      if (session) {
+        let check = null;
+        try { check = await supabaseClient.auth.getUser(); } catch (e) { check = { error: e }; }
+        if (check && check.error && !isServerUnreachable(check.error)) {
+          console.warn('Saklı oturum sunucuda geçersiz, yeniden giriş yapılacak:', check.error.message || check.error);
+          try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch (e) {}
+          session = null;
+        }
+      }
       // Sabitlenmiş ana hesap, saklı oturumdan önce gelir: başka bir hesapla
       // girip uygulamayı kapatınca bir sonraki açılış pini yok sayıyordu.
       const pinnedSlot = defaultAccount && defaultAccount.type === 'device' ? defaultAccount.slot : null;
@@ -4069,6 +4147,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     renderFriends();
     setupGlobalMQTT();
+    // Şifreli mesaj yedeği: bu cihazda bu hesap için ilk girişse geri yükler.
+    if (window.TSBackup) setTimeout(() => window.TSBackup.start(), 0);
   }
 
   // Start checkSession
@@ -4209,7 +4289,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Supabase Sign Out
     if (supabaseClient) {
       try {
-        await supabaseClient.auth.signOut();
+        // Yalnızca bu cihazın oturumu: varsayılan (global) signOut, aynı
+        // hesabın diğer cihazlarındaki oturumları da iptal ediyordu. Bütün
+        // cihazlardan çıkış Ayarlar > Bağlantılar'daki ayrı düğmede.
+        await supabaseClient.auth.signOut({ scope: 'local' });
       } catch (e) {
         console.error("Supabase signOut error:", e);
       }
@@ -6369,7 +6452,7 @@ async function handleDataMessage(peerId, msg, via = 'dc') {
     if (peerId !== state.founderId) return;
     if (msg.friendsOnlyMode !== undefined) state.friendsOnlyMode = msg.friendsOnlyMode;
     if (msg.gameMode !== undefined) state.gameMode = msg.gameMode;
-    if (typeof msg.autoHost === 'boolean') { state.autoHost = msg.autoHost; state.autoHostStreak = null; }
+    if (typeof msg.autoHost === 'boolean') { state.autoHost = msg.autoHost; state.autoHostStreak = null; notifyAutoHostChanged(); }
     if (msg.sfwChatBanEnabled !== undefined) state.sfwChatBanEnabled = !!msg.sfwChatBanEnabled;
     if (msg.sfwChatBanThreshold !== undefined) state.sfwChatBanThreshold = getSfwChatBanThreshold(msg.sfwChatBanThreshold);
     if (msg.sfwMode !== undefined) {
@@ -7207,11 +7290,49 @@ function isClassicRoomId(roomId) {
 // Varsayılan: grup (gc-), birebir (dc-) ve "Hemen toplantı" (ts-xxxxxxxx-xxxx-xxxx)
 // odalarında AÇIK; sunucu ses kanallarında (sv-) KAPALI; klasik ID+şifre
 // odalarında kurucunun bu cihazdaki son tercihi (varsayılan kapalı).
+// Kullanıcının kendi kurduğu odalar için varsayılanı (Ayarlar > Bağlantılar >
+// Kurucu ayarı): '0' = kapalı; yoksa açık. Yalnızca bu cihazda saklanır.
+const AUTOHOST_DEFAULT_KEY = 'teamsync_autohost_default';
+
 function defaultAutoHost(roomId) {
   const id = String(roomId || '');
   if (id.startsWith('sv-')) return false;
-  if (!isClassicRoomId(id)) return true;
+  if (!isClassicRoomId(id)) {
+    try { return localStorage.getItem(AUTOHOST_DEFAULT_KEY) !== '0'; } catch (e) { return true; }
+  }
   try { return localStorage.getItem(AUTOHOST_CLASSIC_KEY) === '1'; } catch (e) { return false; }
+}
+
+function getAutoHostDefault() {
+  try { return localStorage.getItem(AUTOHOST_DEFAULT_KEY) !== '0'; } catch (e) { return true; }
+}
+
+function setAutoHostDefault(on) {
+  try {
+    localStorage.setItem(AUTOHOST_DEFAULT_KEY, on ? '1' : '0');
+    localStorage.setItem(AUTOHOST_CLASSIC_KEY, on ? '1' : '0');
+  } catch (e) {}
+}
+
+// Canlı oda ayarı: kurucu panelindeki anahtar ve Ayarlar > Bağlantılar aynı
+// yoldan geçer (diğer eşlere founder_settings_update gider). Kurucu değilse false.
+function setRoomAutoHost(on) {
+  if (!state.room || !state.isRoomFounder) return false;
+  state.autoHost = !!on;
+  state.autoHostStreak = null;
+  if (isClassicRoomId(state.room)) {
+    try { localStorage.setItem(AUTOHOST_CLASSIC_KEY, state.autoHost ? '1' : '0'); } catch (err) {}
+  }
+  broadcast({ type: 'founder_settings_update', autoHost: state.autoHost });
+  showToast(state.autoHost ? t('founder.autoHostOn') : t('founder.autoHostOff'), 'info');
+  notifyAutoHostChanged();
+  return true;
+}
+
+function notifyAutoHostChanged() {
+  const el = document.getElementById('founder-auto-host');
+  if (el) el.checked = !!state.autoHost;
+  document.dispatchEvent(new CustomEvent('ts:autohost', { detail: { autoHost: !!state.autoHost } }));
 }
 
 function founderOrderBefore(a, b) {
@@ -8884,7 +9005,7 @@ const I18N = {
     'auth.loginFailed': 'Giriş yapılamadı: ',
     'auth.serverUnreachable': 'Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edip birazdan tekrar deneyin.',
     'auth.codeLogin': "Kodla Giriş Yap",
-    'auth.codePlaceholder': "Diğer cihazdaki hesap giriş kodunu yapıştır (TS1-…)",
+    'auth.codePlaceholder': "Diğer cihazdaki hesap giriş kodunu yapıştır (TS2-…)",
     'auth.codeSubmit': "Giriş Yap",
     'auth.codeInvalid': "Bu kod geçerli değil. Kodu eksiksiz kopyaladığından emin ol.",
     'auth.codeNotFound': "Bu koda ait bir hesap bulunamadı.",
@@ -9177,7 +9298,7 @@ const I18N = {
     'auth.loginFailed': 'Login failed: ',
     'auth.serverUnreachable': "Can't reach the server. Check your internet connection and try again in a moment.",
     'auth.codeLogin': "Sign in with code",
-    'auth.codePlaceholder': "Paste the account sign-in code from your other device (TS1-…)",
+    'auth.codePlaceholder': "Paste the account sign-in code from your other device (TS2-…)",
     'auth.codeSubmit': "Sign in",
     'auth.codeInvalid': "This code isn't valid. Make sure you copied all of it.",
     'auth.codeNotFound': "No account was found for this code.",
@@ -11103,6 +11224,7 @@ function setSettingsPanel(name) {
   if (name === 'profile') window.TSProfile?.renderEditor();
   if (name === 'activity') window.TSActivity?.renderSettings();
   if (name === 'account') renderAccountSettings();
+  if (name === 'network') window.TSNetSettings?.open();
 }
 
 // Ayarlar > Hesap ve Cihaz: cihazın ayrıntıları, bulut kaydı, bu cihazdaki
@@ -11245,9 +11367,41 @@ async function renderAccountSettings() {
   const toggle = document.getElementById('settings-login-code-toggle');
   if (toggle) { toggle.setAttribute('data-i18n', 'settings.show'); toggle.textContent = t('settings.show'); }
   if (!isLegacy && accounts) {
-    try { accountCodeCache = await api.getAccountCode(accounts.activeSlot()); } catch (e) { accountCodeCache = null; }
+    try { accountCodeCache = await api.getAccountCode(accounts.currentSlot()); } catch (e) { accountCodeCache = null; }
+  }
+  // Mesaj yedeği kartı (js/msg-backup.js).
+  if (window.TSBackup) window.TSBackup.renderCard();
+}
+
+// Giriş kodu: Hesap ve Cihaz ile Bağlantılar > Yeni cihaz bağlama aynı önbelleği
+// ve aynı göster/gizle mantığını kullanır (js/net-settings.js).
+async function loadAccountCode() {
+  accountCodeCache = null;
+  const api = window.electronAPI;
+  if (!api || !api.getAccountCode || !window.TSAccounts || state.accountKind !== 'cloud') return false;
+  try { accountCodeCache = await api.getAccountCode(window.TSAccounts.currentSlot()); } catch (e) { accountCodeCache = null; }
+  return !!accountCodeCache;
+}
+
+function setLoginCodeVisible(codeEl, button, show) {
+  if (!codeEl) return;
+  const visible = !!show && !!accountCodeCache;
+  codeEl.classList.toggle('is-masked', !visible);
+  codeEl.textContent = visible ? accountCodeCache : '•'.repeat(32);
+  if (button) {
+    const key = visible ? 'settings.hide' : 'settings.show';
+    button.setAttribute('data-i18n', key);
+    button.textContent = t(key);
   }
 }
+
+window.TSAccountCode = {
+  load: loadAccountCode,
+  has: () => !!accountCodeCache,
+  copy: () => copySettingsText(accountCodeCache),
+  setVisible: setLoginCodeVisible,
+  toggle: (codeEl, button) => setLoginCodeVisible(codeEl, button, !!codeEl && codeEl.classList.contains('is-masked'))
+};
 
 function copySettingsText(text) {
   if (!text) return;
@@ -11287,12 +11441,7 @@ function initAccountSettings() {
   document.getElementById('settings-login-code-toggle')?.addEventListener('click', (e) => {
     const codeEl = document.getElementById('settings-login-code');
     if (!codeEl || !accountCodeCache) return;
-    const show = codeEl.classList.contains('is-masked');
-    codeEl.classList.toggle('is-masked', !show);
-    codeEl.textContent = show ? accountCodeCache : '•'.repeat(32);
-    const key = show ? 'settings.hide' : 'settings.show';
-    e.currentTarget.setAttribute('data-i18n', key);
-    e.currentTarget.textContent = t(key);
+    window.TSAccountCode.toggle(codeEl, e.currentTarget);
   });
 }
 
@@ -12042,14 +12191,7 @@ function bindUI() {
     host.prepend(desc);
     host.prepend(row);
     document.getElementById('founder-auto-host').addEventListener('change', (e) => {
-      if (!state.isRoomFounder) { e.target.checked = !!state.autoHost; return; }
-      state.autoHost = !!e.target.checked;
-      state.autoHostStreak = null;
-      if (isClassicRoomId(state.room)) {
-        try { localStorage.setItem(AUTOHOST_CLASSIC_KEY, state.autoHost ? '1' : '0'); } catch (err) {}
-      }
-      broadcast({ type: 'founder_settings_update', autoHost: state.autoHost });
-      showToast(state.autoHost ? t('founder.autoHostOn') : t('founder.autoHostOff'), 'info');
+      if (!setRoomAutoHost(e.target.checked)) e.target.checked = !!state.autoHost;
     });
   })();
 
@@ -13848,6 +13990,10 @@ function dmContentHtml(m) {
   let contentHtml = escapeHtml(m.content || '');
   if (m.isCensored) {
     contentHtml = censoredTextHtml(m.content);
+  } else if (m.restored && m.type !== 'text') {
+    // Mesaj yedeğinden (js/msg-backup.js) gelen kayıt: dosya/görsel içeriği
+    // sunucuya hiç yüklenmediği için yalnızca adı ve zamanı bilinir.
+    contentHtml = `<span class="dm-restored-stub">${escapeHtml(t('backup.stubMedia', { name: m.fileName || t('backup.stubFile') }))}</span>`;
   } else if (m.expired) {
     // saveDMs kota budaması içeriği düşürmüş: kırık <img> yerine bilgi ver
     contentHtml = `<span style="color: #94a3b8; font-style: italic;">${escapeHtml(m.fileName || 'Dosya')} — eski dosya, yer açmak için kaldırıldı</span>`;
@@ -13996,9 +14142,9 @@ window.sendDMText = async (text) => {
   saveDMs();
   renderDMs();
 
-  // NOT: DM metinleri Supabase'e (eski 'mesaj' tablosu) YAZILMAZ. Karar:
-  // Supabase yalnızca cihaz girişi, profil satırı ve avatar kovası içindir;
-  // sohbet içeriği bulutta düz metin olarak tutulmaz (bkz. HANDOFF.md).
+  // NOT: DM metinleri Supabase'e (eski 'mesaj' tablosu) düz metin olarak
+  // YAZILMAZ. Yalnızca uçtan uca şifreli yedek (js/msg-backup.js, saveDMs
+  // kancası) gider; anahtarı sunucu görmez (bkz. HANDOFF.md).
 
   // MQTT send
   const dmPayload = {

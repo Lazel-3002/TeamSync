@@ -392,7 +392,7 @@
     "auth.loginFailed": "ログインに失敗しました: ",
     "auth.serverUnreachable": "サーバーに接続できません。インターネット接続を確認して、しばらくしてからもう一度お試しください。",
     "auth.codeLogin": "コードでログイン",
-    "auth.codePlaceholder": "別のデバイスのアカウントのログインコードを貼り付け（TS1-…）",
+    "auth.codePlaceholder": "別のデバイスのアカウントのログインコードを貼り付け（TS2-…）",
     "auth.codeSubmit": "ログイン",
     "auth.codeInvalid": "このコードは無効です。すべてコピーしたか確認してください。",
     "auth.codeNotFound": "このコードのアカウントが見つかりません。",

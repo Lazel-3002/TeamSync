@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/servers.css?v=1" />
   <link rel="stylesheet" href="css/teams.css?v=1" />
   <link rel="stylesheet" href="css/refresh.css?v=3" />
+  <link rel="stylesheet" href="css/net-settings.css?v=2" />
   <script>
     try {
       var _theme = localStorage.getItem('teamsync_theme') || 'aurora';
@@ -98,7 +99,7 @@
         <button id="btn-new-account" class="btn-pri" style="margin-top: 5px;">Yeni Hesap Oluştur</button>
         <button id="btn-code-login" class="btn-sec code-login-toggle" type="button" data-i18n="auth.codeLogin">Kodla Giriş Yap</button>
         <div id="code-login-box" class="code-login-box hidden">
-          <textarea id="code-login-input" rows="3" spellcheck="false" autocomplete="off" data-i18n-placeholder="auth.codePlaceholder" placeholder="Diğer cihazdaki hesap giriş kodunu yapıştır (TS1-…)"></textarea>
+          <textarea id="code-login-input" rows="3" spellcheck="false" autocomplete="off" data-i18n-placeholder="auth.codePlaceholder" placeholder="Diğer cihazdaki hesap giriş kodunu yapıştır (TS2-…)"></textarea>
           <div id="code-login-error" class="code-login-error hidden" role="alert"></div>
           <button id="code-login-submit" class="btn-pri" type="button" data-i18n="auth.codeSubmit">Giriş Yap</button>
         </div>
@@ -1869,6 +1870,9 @@
                   <button id="settings-migrate-legacy" class="settings-test-button" type="button" data-i18n="settings.migrateLegacy">Hesabı Sunucuya Taşı</button>
                 </div>
               </div>
+
+              <!-- js/msg-backup.js (TSBackup.renderCard): uçtan uca şifreli mesaj yedeği. -->
+              <div id="settings-backup-card" class="settings-card backup-card" data-i18n-ignore></div>
             </div>
 
             <div class="settings-panel" data-settings-content="voice">
@@ -1994,8 +1998,65 @@
 
             <div class="settings-panel" data-settings-content="network">
               <h2 data-i18n="settings.connections">Bağlantılar</h2>
-              <p class="settings-lead" data-i18n="settings.networkLead">Kısıtlı ağlarda bağlantı kurmak için özel TURN sunucusu kullan.</p>
+              <p class="settings-lead" data-i18n="net.lead">Bağlantını test et, hesabının açık olduğu cihazları yönet ve yeni bir bilgisayar bağla.</p>
+              <!-- js/net-settings.js (TSNetSettings) bölümleri doldurur. Gelişmiş
+                   bölümdeki DNS / TURN alanları değişmedi (ayar kaydı renderer.js). -->
+              <div class="net-intro" role="note">
+                <span class="net-intro-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                <div>
+                  <strong data-i18n="net.introTitle">TeamSync nasıl bağlanır?</strong>
+                  <p data-i18n="net.intro1">Sesin ve görüntün bir merkezden geçmez: mümkün olduğunda doğrudan senin bilgisayarından arkadaşının bilgisayarına gider.</p>
+                  <p data-i18n="net.intro2">Ağ buna izin vermezse ses ve görüntü, yine şifreli olarak, bir aracı sunucu (TURN) üzerinden aktarılır.</p>
+                  <p data-i18n="net.intro3">Sinyal sunucuları yalnızca tanıştırır: iki bilgisayarın birbirini bulmasını sağlar, mesajları ve arama davetlerini taşır. Ses ve görüntü bu sunuculardan geçmez.</p>
+                </div>
+              </div>
 
+              <section class="net-section" aria-labelledby="net-status-title">
+                <div class="net-section-head">
+                  <h3 id="net-status-title" class="net-section-title" data-i18n="net.statusTitle">Bağlantı durumu ve testi</h3>
+                  <button id="net-test-btn" class="settings-test-button net-test-btn" type="button" data-i18n="net.testRun">Bağlantıyı test et</button>
+                </div>
+                <div class="settings-card net-card">
+                  <ul id="net-checks" class="net-checks" aria-live="polite" data-i18n-ignore></ul>
+                  <p id="net-test-summary" class="settings-help net-test-summary" role="status" aria-live="polite" data-i18n-ignore></p>
+                </div>
+                <div class="settings-card net-card">
+                  <div class="net-card-head">
+                    <strong data-i18n="net.callTitle">Aramadaki kişiler</strong>
+                  </div>
+                  <div id="net-peers" class="net-peers" aria-live="polite" data-i18n-ignore></div>
+                </div>
+              </section>
+
+              <section class="net-section" aria-labelledby="net-devices-title">
+                <h3 id="net-devices-title" class="net-section-title" data-i18n="net.devicesTitle">Hesabımın açık olduğu cihazlar</h3>
+                <div class="settings-card net-card" id="net-devices" data-i18n-ignore></div>
+              </section>
+
+              <section class="net-section" aria-labelledby="net-newdev-title">
+                <h3 id="net-newdev-title" class="net-section-title" data-i18n="net.newDevTitle">Yeni cihaz bağlama</h3>
+                <div class="settings-card net-card" id="net-newdev" data-i18n-ignore></div>
+              </section>
+
+              <section class="net-section" aria-labelledby="net-founder-title">
+                <h3 id="net-founder-title" class="net-section-title" data-i18n="net.founderTitle">Kurucu ayarı</h3>
+                <div class="settings-card net-card" id="net-founder" data-i18n-ignore></div>
+              </section>
+
+              <section class="net-section net-advanced-section" aria-labelledby="net-advanced-title">
+                <h3 id="net-advanced-title" class="net-section-title" data-i18n="net.advancedTitle">Gelişmiş</h3>
+                <button id="net-advanced-toggle" class="settings-broadcast-row settings-advanced-toggle" type="button" aria-expanded="false" aria-controls="net-advanced">
+                  <span>
+                    <strong data-i18n="net.advancedToggle">Şifreli DNS ve aracı sunucu (TURN)</strong>
+                    <small data-i18n="net.advancedToggleDesc">Çoğu kişinin değiştirmesi gerekmez. Test sarı ya da kırmızı çıkarsa buraya bak.</small>
+                  </span>
+                  <span class="settings-advanced-pill">
+                    <span class="settings-advanced-show" data-i18n="settings.advancedToggleShow">Gelişmiş ayarlar</span>
+                    <span class="settings-advanced-hide" data-i18n="settings.advancedToggleHide">Gizle</span>
+                    <svg class="settings-advanced-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6 9 12 15 18 9"/></svg>
+                  </span>
+                </button>
+              <div id="net-advanced" class="net-advanced hidden">
               <!-- DNS sağlayıcısı: WARP/VPN gibi araçlar yerel DNS'i bozunca
                    TURN sunucu adları çözülemiyor ve bağlantı tamamen düşüyor.
                    Şifreli DNS (DoH) bu yolu tamamen atlar. -->
@@ -2026,6 +2087,8 @@
                 </div>
                 <p class="settings-help" data-i18n="settings.turnHelp">Bir kişinin TURN bilgisi girmesi yeterlidir; odadaki diğer katılımcılarla otomatik paylaşılır.</p>
               </div>
+              </div>
+              </section>
             </div>
 
             <!-- Kısayollar: ana anahtar + satır bazlı aç/kapat ve yeniden atama.
@@ -2771,6 +2834,8 @@
   <script src="js/teams/direct-call.js"></script>
   <script src="js/teams/calls.js"></script>
   <script src="js/teams/shell-teams.js"></script>
+  <script src="js/net-settings.js"></script>
+  <script src="js/msg-backup.js"></script>
   <script src="js/media-library.js"></script>
   <script src="js/media-collect.js"></script>
   <script src="js/dm-resize.js"></script>

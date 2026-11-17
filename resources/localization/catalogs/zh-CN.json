@@ -392,7 +392,7 @@
     "auth.loginFailed": "登录失败：",
     "auth.serverUnreachable": "无法连接到服务器。请检查网络连接，稍后再试。",
     "auth.codeLogin": "使用代码登录",
-    "auth.codePlaceholder": "粘贴另一台设备上的账户登录代码（TS1-…）",
+    "auth.codePlaceholder": "粘贴另一台设备上的账户登录代码（TS2-…）",
     "auth.codeSubmit": "登录",
     "auth.codeInvalid": "此代码无效。请确认已完整复制。",
     "auth.codeNotFound": "未找到与此代码对应的账户。",

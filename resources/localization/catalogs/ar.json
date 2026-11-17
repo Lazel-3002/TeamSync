@@ -392,7 +392,7 @@
     "auth.loginFailed": "فشل تسجيل الدخول: ",
     "auth.serverUnreachable": "تعذّر الوصول إلى الخادم. تحقّق من اتصالك بالإنترنت وحاول مرة أخرى بعد قليل.",
     "auth.codeLogin": "تسجيل الدخول بالرمز",
-    "auth.codePlaceholder": "الصق رمز تسجيل الدخول من جهازك الآخر (TS1-…)",
+    "auth.codePlaceholder": "الصق رمز تسجيل الدخول من جهازك الآخر (TS2-…)",
     "auth.codeSubmit": "تسجيل الدخول",
     "auth.codeInvalid": "هذا الرمز غير صالح. تأكد من نسخه كاملًا.",
     "auth.codeNotFound": "لم يتم العثور على حساب لهذا الرمز.",

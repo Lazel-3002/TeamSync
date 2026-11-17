@@ -1093,7 +1093,10 @@ function loadOrCreateDeviceSecret() {
 // listesinde onları da sıradan slotlar gibi kullanır.
 const IMPORTED_SLOT_BASE = 1000;
 const importedAccountsFile = path.join(baseUserData, 'imported-accounts.bin');
-const ACCOUNT_CODE_RE = /^TS1-([0-9a-f]{40})-(\d{1,3})-([A-Za-z0-9_-]{43})$/;
+// TS2 = TS1 + "-<43 karakter base64url mesaj yedeği anahtarı K>" (js/msg-backup.js).
+// K sunucuya hiç gitmez; kodla yeni cihaza taşınır. TS1 kodları hâlâ geçerlidir
+// (K'sız eklenir; K sonra açık bir cihazdan acct_dev ile istenir).
+const ACCOUNT_CODE_RE = /^TS([12])-([0-9a-f]{40})-(\d{1,3})-([A-Za-z0-9_-]{43})(?:-([A-Za-z0-9_-]{43}))?$/;
 
 function deriveDeviceId(secret) {
   return nodeCrypto.createHash('sha256').update('teamsync-device-id:' + secret).digest('hex').slice(0, 40);
@@ -1104,13 +1107,66 @@ function credentialsFor(deviceId, slot, password) {
   return { email: emailLocal + '@device.teamsync.app', password, deviceId, slot };
 }
 
-function localCredentials(slot) {
-  const secret = loadOrCreateDeviceSecret();
-  const pwSource = slot === 0
+// GİRİŞ KODUNU YENİLEME (Ayarlar > Bağlantılar). Kod süresizdir; yenilemek
+// için slot başına bir sayaç tutulur (DPAPI ile şifreli, cihaz kimliği gibi).
+// Sayaç 0 iken türetim ilk sürümle birebir aynıdır (geriye uyum). Güvenli sıra:
+// begin (yeni sayaç "pending" olarak diske yazılır) → renderer Supabase
+// parolasını değiştirir → commit (pending, cur olur) ya da abort. Arada çökme
+// olursa deviceLogin önce cur, olmazsa pending parolayla dener; kullanıcı kendi
+// hesabından asla kilitlenmez.
+const codeRotationFile = path.join(baseUserData, 'account-rotation.bin');
+
+function loadCodeRotation() {
+  try {
+    if (!fs.existsSync(codeRotationFile)) return {};
+    const raw = fs.readFileSync(codeRotationFile);
+    const text = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+    const data = JSON.parse(text);
+    return data && typeof data === 'object' ? data : {};
+  } catch (e) {
+    console.error('Kod yenileme kaydı okunamadı:', e.message);
+    return {};
+  }
+}
+
+function saveCodeRotation(map) {
+  const text = JSON.stringify(map);
+  const payload = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : Buffer.from(text, 'utf8');
+  fs.writeFileSync(codeRotationFile, payload);
+}
+
+function rotationOf(slot) {
+  const r = loadCodeRotation()[String(slot)] || {};
+  const cur = Number.isInteger(r.cur) && r.cur > 0 ? r.cur : 0;
+  const pending = Number.isInteger(r.pending) && r.pending > cur ? r.pending : null;
+  return { cur, pending };
+}
+
+function localPassword(secret, slot, n) {
+  const base = slot === 0
     ? 'teamsync-device-pw:' + secret
     : 'teamsync-device-pw:' + slot + ':' + secret;
-  const password = nodeCrypto.createHash('sha256').update(pwSource).digest('base64');
-  return credentialsFor(deriveDeviceId(secret), slot, password);
+  const pwSource = n > 0 ? base + ':r' + n : base;
+  return nodeCrypto.createHash('sha256').update(pwSource).digest('base64');
+}
+
+function localCredentials(slot) {
+  const secret = loadOrCreateDeviceSecret();
+  const { cur } = rotationOf(slot);
+  return credentialsFor(deriveDeviceId(secret), slot, localPassword(secret, slot, cur));
+}
+
+// Hesap kodundan türetilen "kendi cihazlarım" kanal anahtarı: aynı hesabın
+// bütün cihazlarında (kod aynı olduğu için) aynıdır, başka kimse üretemez.
+// Ham kod renderer'a bu yoldan verilmez; yalnızca tek yönlü türetilmiş anahtar.
+function accountCodeFor(slot) {
+  if (slot >= IMPORTED_SLOT_BASE) {
+    const parsed = parseAccountCode(loadImportedAccounts()[String(slot)]);
+    return parsed ? parsed.code : null;
+  }
+  const creds = localCredentials(slot);
+  const pw = Buffer.from(creds.password, 'base64').toString('base64url');
+  return `TS1-${creds.deviceId}-${slot}-${pw}`;
 }
 
 function loadImportedAccounts() {
@@ -1132,13 +1188,73 @@ function saveImportedAccounts(map) {
   fs.writeFileSync(importedAccountsFile, payload);
 }
 
+// code: her zaman TS1 biçimi (kanal anahtarı ve kayıt bunun üzerinden; K
+// değişse de aynı kalır). backupKey: TS2 kodunda taşınan 32 bayt K (hex).
 function parseAccountCode(code) {
   const m = ACCOUNT_CODE_RE.exec(String(code || '').replace(/\s+/g, ''));
   if (!m) return null;
-  const slot = parseInt(m[2], 10);
+  const ver = m[1];
+  if ((ver === '2') !== !!m[5]) return null;
+  const slot = parseInt(m[3], 10);
   if (slot >= IMPORTED_SLOT_BASE) return null;
-  const password = Buffer.from(m[3], 'base64url').toString('base64');
-  return { code: m[0], deviceId: m[1], slot, password };
+  const password = Buffer.from(m[4], 'base64url').toString('base64');
+  let backupKey = null;
+  if (m[5]) {
+    const k = Buffer.from(m[5], 'base64url');
+    if (k.length !== 32) return null;
+    backupKey = k.toString('hex');
+  }
+  return { code: `TS1-${m[2]}-${m[3]}-${m[4]}`, deviceId: m[2], slot, password, backupKey };
+}
+
+// ─── Mesaj yedeği anahtarı (K) ───────────────────────────────────────────────
+// Sunucu hesabı başına rastgele 256 bit; DPAPI ile şifreli dosyada. Anahtar,
+// hesabın kalıcı kimliğiyle eşlenir: kaynak cihaz kimliği + slot (= sunucudaki
+// e-posta, dolayısıyla tek bir user id). Kod yenilemede değişmez; eski
+// yedekler okunur kalır. Sunucu K'yı ya da onu türetebileceği hiçbir şeyi görmez.
+const backupKeysFile = path.join(baseUserData, 'backup-keys.bin');
+
+function loadBackupKeys() {
+  try {
+    if (!fs.existsSync(backupKeysFile)) return {};
+    const raw = fs.readFileSync(backupKeysFile);
+    const text = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+    const data = JSON.parse(text);
+    return data && typeof data === 'object' ? data : {};
+  } catch (e) {
+    console.error('Yedek anahtarları okunamadı:', e.message);
+    return {};
+  }
+}
+
+function saveBackupKeys(map) {
+  const text = JSON.stringify(map);
+  const payload = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : Buffer.from(text, 'utf8');
+  fs.writeFileSync(backupKeysFile, payload);
+}
+
+function accountRefOf(deviceId, slot) { return `${deviceId}:${slot}`; }
+
+function accountRefFor(slot) {
+  if (slot >= IMPORTED_SLOT_BASE) {
+    const parsed = parseAccountCode(loadImportedAccounts()[String(slot)]);
+    return parsed ? accountRefOf(parsed.deviceId, parsed.slot) : null;
+  }
+  return accountRefOf(deriveDeviceId(loadOrCreateDeviceSecret()), slot);
+}
+
+const BACKUP_KEY_RE = /^[0-9a-f]{64}$/;
+function backupKeyFor(slot) {
+  const ref = accountRefFor(slot);
+  const k = ref ? loadBackupKeys()[ref] : null;
+  return typeof k === 'string' && BACKUP_KEY_RE.test(k) ? k : null;
+}
+
+function displayCodeFor(slot) {
+  const code = accountCodeFor(slot);
+  if (!code) return null;
+  const k = backupKeyFor(slot);
+  return k ? `TS2${code.slice(3)}-${Buffer.from(k, 'hex').toString('base64url')}` : code;
 }
 
 ipcMain.handle('get-device-credentials', (event, slot) => {
@@ -1149,7 +1265,68 @@ ipcMain.handle('get-device-credentials', (event, slot) => {
     if (!parsed) return null;
     return { ...credentialsFor(parsed.deviceId, parsed.slot, parsed.password), slot: s, imported: true };
   }
-  return localCredentials(s);
+  const creds = localCredentials(s);
+  // Yarıda kalmış kod yenileme: deviceLogin cur başarısız olursa bunu dener.
+  const { pending } = rotationOf(s);
+  if (pending) creds.pendingPassword = localPassword(loadOrCreateDeviceSecret(), s, pending);
+  return creds;
+});
+
+// Kod yenileme adımları (yalnızca bu cihazda açılmış hesaplar; kodla eklenen
+// hesabın parolası kaynak cihazın sırrından türer, burada yenilenemez).
+ipcMain.handle('code-rotation', (event, slot, step) => {
+  if (!isMainWindowSender(event) || !Number.isInteger(slot) || slot < 0 || slot >= IMPORTED_SLOT_BASE) return null;
+  const map = loadCodeRotation();
+  const key = String(slot);
+  const r = rotationOf(slot);
+  try {
+    if (step === 'begin') {
+      const next = Math.max(r.cur, r.pending || 0) + 1;
+      map[key] = { cur: r.cur, pending: next };
+      saveCodeRotation(map);
+      return { password: localPassword(loadOrCreateDeviceSecret(), slot, next) };
+    }
+    if (step === 'commit') {
+      if (!r.pending) return { ok: false };
+      map[key] = { cur: r.pending };
+      saveCodeRotation(map);
+      return { ok: true };
+    }
+    if (step === 'abort') {
+      if (r.pending) { map[key] = { cur: r.cur }; saveCodeRotation(map); }
+      return { ok: true };
+    }
+  } catch (e) {
+    console.error('Kod yenileme kaydı yazılamadı:', e.message);
+    return null;
+  }
+  return null;
+});
+
+ipcMain.handle('get-account-channel-key', (event, slot) => {
+  if (!isMainWindowSender(event) || !Number.isInteger(slot) || slot < 0) return null;
+  const code = accountCodeFor(slot);
+  if (!code) return null;
+  return nodeCrypto.createHmac('sha256', 'teamsync-own-devices-v1').update(code).digest('hex');
+});
+
+// Ayarlar > Bağlantılar "DNS" satırı: seçili DoH sağlayıcısıyla (Chromium'un
+// uygulamanın kullandığı çözücüsü) gerçek bir ad çözümlemesi, önbelleksiz.
+ipcMain.handle('net-dns-check', async (event) => {
+  if (!isMainWindowSender(event)) return null;
+  const provider = getDnsProvider();
+  const t0 = Date.now();
+  try {
+    const { net } = require('electron');
+    const res = await Promise.race([
+      net.resolveHost('broker.emqx.io', { cacheUsage: 'disallowed' }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+    ]);
+    const n = res && Array.isArray(res.endpoints) ? res.endpoints.length : 0;
+    return { provider, ok: n > 0, ms: Date.now() - t0, error: n ? null : 'empty' };
+  } catch (e) {
+    return { provider, ok: false, ms: Date.now() - t0, error: String(e && e.message || e).slice(0, 120) };
+  }
 });
 
 ipcMain.handle('get-device-id', (event) => {
@@ -1189,13 +1366,37 @@ ipcMain.handle('get-device-info', (event) => {
 ipcMain.handle('get-account-code', (event, slot) => {
   if (!isMainWindowSender(event)) return null;
   const s = Number.isInteger(slot) && slot > 0 ? slot : 0;
-  if (s >= IMPORTED_SLOT_BASE) {
-    const parsed = parseAccountCode(loadImportedAccounts()[String(s)]);
-    return parsed ? parsed.code : null;
+  return displayCodeFor(s);
+});
+
+// Mesaj yedeği anahtarı (js/msg-backup.js). op: 'get' → hex | null;
+// 'create' → yoksa üretir, varsa mevcut olanı döner; 'set' → başka cihazdan
+// (acct_dev) gelen K'yı yazar (replace:true ise mevcut olanın üzerine).
+ipcMain.handle('backup-key', (event, slot, op, value, replace) => {
+  if (!isMainWindowSender(event) || !Number.isInteger(slot) || slot < 0) return null;
+  const ref = accountRefFor(slot);
+  if (!ref) return null;
+  try {
+    const map = loadBackupKeys();
+    const cur = typeof map[ref] === 'string' && BACKUP_KEY_RE.test(map[ref]) ? map[ref] : null;
+    if (op === 'get') return cur;
+    if (op === 'create') {
+      if (cur) return cur;
+      map[ref] = nodeCrypto.randomBytes(32).toString('hex');
+      saveBackupKeys(map);
+      return map[ref];
+    }
+    if (op === 'set') {
+      if (typeof value !== 'string' || !BACKUP_KEY_RE.test(value)) return null;
+      if (cur && !replace) return cur;
+      map[ref] = value;
+      saveBackupKeys(map);
+      return value;
+    }
+  } catch (e) {
+    console.error('Yedek anahtarı yazılamadı:', e.message);
   }
-  const creds = localCredentials(s);
-  const pw = Buffer.from(creds.password, 'base64').toString('base64url');
-  return `TS1-${creds.deviceId}-${s}-${pw}`;
+  return null;
 });
 
 // Dönüş: { ok, slot, local } — kod bu cihazın kendi hesabıysa yerel slot,
@@ -1207,22 +1408,41 @@ ipcMain.handle('import-account-code', (event, code) => {
   if (parsed.deviceId === deriveDeviceId(loadOrCreateDeviceSecret())) {
     return { ok: true, slot: parsed.slot, local: true };
   }
+  // TS2: kodun taşıdığı yedek anahtarı (kaynak cihazdaki güncel K) yazılır.
+  const storeKey = () => {
+    if (!parsed.backupKey) return;
+    try {
+      const keys = loadBackupKeys();
+      keys[accountRefOf(parsed.deviceId, parsed.slot)] = parsed.backupKey;
+      saveBackupKeys(keys);
+    } catch (e) { console.error('Yedek anahtarı yazılamadı:', e.message); }
+  };
   const map = loadImportedAccounts();
   const existing = Object.keys(map).find(k => map[k] === parsed.code);
-  if (existing) return { ok: true, slot: parseInt(existing, 10), local: false };
+  if (existing) { storeKey(); return { ok: true, slot: parseInt(existing, 10), local: false, backupKey: !!parsed.backupKey }; }
   let slot = IMPORTED_SLOT_BASE;
   while (map[String(slot)]) slot++;
   map[String(slot)] = parsed.code;
   try { saveImportedAccounts(map); } catch (e) { return { ok: false, error: 'storage' }; }
-  return { ok: true, slot, local: false };
+  storeKey();
+  return { ok: true, slot, local: false, backupKey: !!parsed.backupKey };
 });
 
 ipcMain.handle('forget-imported-account', (event, slot) => {
   if (!isMainWindowSender(event) || !Number.isInteger(slot) || slot < IMPORTED_SLOT_BASE) return false;
   const map = loadImportedAccounts();
   if (!map[String(slot)]) return false;
+  const parsed = parseAccountCode(map[String(slot)]);
   delete map[String(slot)];
   try { saveImportedAccounts(map); } catch (e) { return false; }
+  // Bu cihazdan çıkış yaptırılan hesabın yedek anahtarı da burada kalmasın.
+  if (parsed) {
+    try {
+      const keys = loadBackupKeys();
+      const ref = accountRefOf(parsed.deviceId, parsed.slot);
+      if (keys[ref]) { delete keys[ref]; saveBackupKeys(keys); }
+    } catch (e) {}
+  }
   return true;
 });
 

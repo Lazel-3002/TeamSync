@@ -395,7 +395,7 @@
     "auth.loginFailed": "Giriş yapılamadı: ",
     "auth.serverUnreachable": "Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edip birazdan tekrar deneyin.",
     "auth.codeLogin": "Kodla Giriş Yap",
-    "auth.codePlaceholder": "Diğer cihazdaki hesap giriş kodunu yapıştır (TS1-…)",
+    "auth.codePlaceholder": "Diğer cihazdaki hesap giriş kodunu yapıştır (TS2-…)",
     "auth.codeSubmit": "Giriş Yap",
     "auth.codeInvalid": "Bu kod geçerli değil. Kodu eksiksiz kopyaladığından emin ol.",
     "auth.codeNotFound": "Bu koda ait bir hesap bulunamadı.",

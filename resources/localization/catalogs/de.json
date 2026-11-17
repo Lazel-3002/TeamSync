@@ -392,7 +392,7 @@
     "auth.loginFailed": "Anmeldung fehlgeschlagen: ",
     "auth.serverUnreachable": "Der Server ist nicht erreichbar. Prüfe deine Internetverbindung und versuche es gleich noch einmal.",
     "auth.codeLogin": "Mit Code anmelden",
-    "auth.codePlaceholder": "Anmeldecode des Kontos vom anderen Gerät einfügen (TS1-…)",
+    "auth.codePlaceholder": "Anmeldecode des Kontos vom anderen Gerät einfügen (TS2-…)",
     "auth.codeSubmit": "Anmelden",
     "auth.codeInvalid": "Dieser Code ist ungültig. Achte darauf, ihn vollständig zu kopieren.",
     "auth.codeNotFound": "Zu diesem Code wurde kein Konto gefunden.",

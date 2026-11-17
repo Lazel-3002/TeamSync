@@ -392,7 +392,7 @@
     "auth.loginFailed": "Échec de la connexion : ",
     "auth.serverUnreachable": "Impossible de joindre le serveur. Vérifiez votre connexion Internet et réessayez dans un instant.",
     "auth.codeLogin": "Se connecter avec un code",
-    "auth.codePlaceholder": "Colle le code de connexion de ton autre appareil (TS1-…)",
+    "auth.codePlaceholder": "Colle le code de connexion de ton autre appareil (TS2-…)",
     "auth.codeSubmit": "Se connecter",
     "auth.codeInvalid": "Ce code n'est pas valide. Vérifie que tu l'as copié en entier.",
     "auth.codeNotFound": "Aucun compte trouvé pour ce code.",

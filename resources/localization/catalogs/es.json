@@ -392,7 +392,7 @@
     "auth.loginFailed": "Error al iniciar sesión: ",
     "auth.serverUnreachable": "No se puede conectar con el servidor. Comprueba tu conexión a internet y vuelve a intentarlo en un momento.",
     "auth.codeLogin": "Iniciar sesión con código",
-    "auth.codePlaceholder": "Pega el código de inicio de sesión de tu otro dispositivo (TS1-…)",
+    "auth.codePlaceholder": "Pega el código de inicio de sesión de tu otro dispositivo (TS2-…)",
     "auth.codeSubmit": "Iniciar sesión",
     "auth.codeInvalid": "Este código no es válido. Asegúrate de copiarlo completo.",
     "auth.codeNotFound": "No se encontró ninguna cuenta para este código.",

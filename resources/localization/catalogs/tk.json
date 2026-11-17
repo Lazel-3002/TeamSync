@@ -392,7 +392,7 @@
     "auth.loginFailed": "Giriş başa barmady: ",
     "auth.serverUnreachable": "Serwere birigip bolmady. Internet baglanyşygyňyzy barlaň we biraz wagtdan soň gaýtadan synanyşyň.",
     "auth.codeLogin": "Kod bilen gir",
-    "auth.codePlaceholder": "Beýleki enjamdaky hasabyň giriş koduny goýuň (TS1-…)",
+    "auth.codePlaceholder": "Beýleki enjamdaky hasabyň giriş koduny goýuň (TS2-…)",
     "auth.codeSubmit": "Gir",
     "auth.codeInvalid": "Bu kod nädogry. Ony doly göçürendigiňize göz ýetiriň.",
     "auth.codeNotFound": "Bu koda degişli hasap tapylmady.",

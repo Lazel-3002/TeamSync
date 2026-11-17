@@ -392,7 +392,7 @@
     "auth.loginFailed": "Falha no login: ",
     "auth.serverUnreachable": "Não foi possível conectar ao servidor. Verifique sua conexão com a internet e tente novamente em instantes.",
     "auth.codeLogin": "Entrar com código",
-    "auth.codePlaceholder": "Cole o código de acesso da conta do outro dispositivo (TS1-…)",
+    "auth.codePlaceholder": "Cole o código de acesso da conta do outro dispositivo (TS2-…)",
     "auth.codeSubmit": "Entrar",
     "auth.codeInvalid": "Este código não é válido. Verifique se você copiou tudo.",
     "auth.codeNotFound": "Nenhuma conta foi encontrada para este código.",

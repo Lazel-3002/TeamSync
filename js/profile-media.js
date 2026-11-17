@@ -494,7 +494,16 @@
     w.tries++;
     w.lastAt = Date.now();
     w.chunks.clear(); w.got = 0; w.partials = 0;
-    publishTo(w.fid, { type: 'req_pmedia', fromId: me(), dv: st().myId || '', h }, 1);
+    if (!publishTo(w.fid, { type: 'req_pmedia', fromId: me(), dv: st().myId || '', h }, 1)) {
+      // Kişisel konu henüz bağlı değil (ör. girişten hemen sonra): istek hiç
+      // gitmedi. Deneme sayılmaz; 15 sn zaman aşımı + 30 sn geri çekilme
+      // yerine kısa süre sonra yeniden denenir (gerçek sunucuda kodla giren
+      // yeni cihazda kendi resmi ~45 sn gecikiyordu).
+      w.tries--;
+      finishFetch(h, null);
+      w.timer = setTimeout(() => { if (wants.get(h) === w && !w.active) schedule(h); }, 2000);
+      return;
+    }
     armTimer(h);
   }
 

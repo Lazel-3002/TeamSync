@@ -34,6 +34,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDeviceInfo: () => ipcRenderer.invoke('get-device-info'),
   getAccountCode: (slot) => ipcRenderer.invoke('get-account-code', slot),
   importAccountCode: (code) => ipcRenderer.invoke('import-account-code', code),
+  // Ayarlar > Bağlantılar (js/net-settings.js)
+  codeRotation: (slot, step) => ipcRenderer.invoke('code-rotation', slot, step),
+  getAccountChannelKey: (slot) => ipcRenderer.invoke('get-account-channel-key', slot),
+  // Mesaj yedeği anahtarı (js/msg-backup.js): op = 'get' | 'create' | 'set'
+  backupKey: (slot, op, value, replace) => ipcRenderer.invoke('backup-key', slot, op, value, !!replace),
+  netDnsCheck: () => ipcRenderer.invoke('net-dns-check'),
   forgetImportedAccount: (slot) => ipcRenderer.invoke('forget-imported-account', slot),
   getEnv: () => ipcRenderer.invoke('get-env'),
   windowMin: () => ipcRenderer.send('window-min'),

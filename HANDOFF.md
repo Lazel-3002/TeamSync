@@ -299,3 +299,81 @@ high quality". Discord-era features (servers, groups, profiles) all remain.
 - **Icons**: no emoji in app UI; use `TSUI.icon(name, size)` (js/ts-ui.js,
   `uiIcon` in renderer.js). `TSUI.popover` toggles: a second click on the same
   anchor closes it (returns `{ closed: true }`); pass `noToggle` to opt out.
+- **Ayarlar > Bağlantılar** (`js/net-settings.js` → `window.TSNetSettings`,
+  `css/net-settings.css`, strings `net.*` in shell-strings.js): (1) status +
+  "Bağlantıyı test et" (≤15 s, parallel: temp MQTT client round-trip per
+  broker, STUN gathering → NAT/symmetric + `detectWarp`, TURN relay gathering
+  with `getIceServers()` + `iceTransportPolicy:'relay'`, DNS via new IPC
+  `net-dns-check` = `net.resolveHost` through the DoH resolver), per-peer
+  getStats list (type/RTT/loss, 2 s, stops when the page closes); (2) own
+  devices = `device_accounts` rows + live "online" over the personal topic;
+  (3) login code (`window.TSAccountCode`, same cache as Hesap ve Cihaz) +
+  **code rotation**; (4) founder `autoHost` default (`teamsync_autohost_default`,
+  also writes the classic key) + live switch via `setRoomAutoHost()` (founder
+  panel uses the same function; `ts:autohost` event keeps both in sync). Each
+  line has a "Bu ne demek?" explanation. Advanced = old DNS/TURN cards.
+- **Own-device protocol** `acct_dev` on `teamsync/user/<me>/events`:
+  `{ type, fromId, d: base64(iv|AES-GCM) }`, key = IPC
+  `get-account-channel-key` (HMAC of the account code; AAD = friendId), inner
+  `{ k:'hello', q?, nm, os, dv, ts, n }` / `{ k:'signout', to:<deviceId|'*'> }`
+  (±120 s, nonce dedupe). Target runs `TSAccounts.remoteSignOut()`: local
+  Supabase signOut, forgets an imported code slot, then `#btn-logout`.
+- **Code rotation** (main.js `code-rotation` IPC, `account-rotation.bin` DPAPI):
+  begin (pending counter saved) → `auth.updateUser({password})` → commit/abort;
+  `get-device-credentials` returns `pendingPassword` and `deviceLogin` tries it
+  if the current one fails (never locks the owner out). Only the origin device
+  can rotate. Test: `test/e2e/connections-page.test.js`.
+- **E2EE message backup** (`js/msg-backup.js` → `window.TSBackup`; card
+  "Mesaj yedeği" in Ayarlar > Hesap ve Cihaz, `#settings-backup-card`; strings
+  `backup.*`, `net.newMovesBackup/newStaysBackup`; CSS in `css/net-settings.css`).
+  - **Key K**: random 256-bit per server account, main.js `backup-keys.bin`
+    (DPAPI), keyed by the account's permanent ref `<origin deviceId>:<origin slot>`
+    (= its Supabase e-mail = one user id; known before sign-in, unlike the uid).
+    IPC `backup-key(slot, 'get'|'create'|'set', hex, replace)`. The Supabase
+    password is NOT key material. Code rotation does not touch K. Renderer
+    derives `enc` (AES-GCM) and `mac` (HMAC) via HKDF(salt `teamsync-backup-v1`).
+  - **Login code**: `TS2-<deviceId>-<slot>-<pw43>-<K43>` (base64url K). TS1 still
+    accepted (imports without K). `get-account-code` shows TS2 once K exists;
+    imported codes are stored in canonical TS1 form so the `acct_dev` channel key
+    (HMAC of the TS1 code) is unchanged. `forget-imported-account` also forgets K.
+  - **K over acct_dev**: device without K sends `{k:'bkreq'}` every 20 s; an own
+    device holding a verified K answers `{k:'bkkey', to:<deviceId>, key}`. The
+    receiver checks it against the server `keycheck` row before storing.
+    No K and the server has a keycheck → status `needKey` ("…diğer bilgisayarı aç
+    ya da yeni giriş kodunu kullan"); K is only created when the server has no
+    keycheck row for the user.
+  - **Table** `public.msg_backup` (migrations `msg_backup_e2ee`,
+    `msg_backup_tighten_grants`): `user_id` (default auth.uid(), FK cascade),
+    `id` (HMAC 32 hex or `keycheck`), `conv` (HMAC), `ts` (rounded to the minute),
+    `v`, `nonce` (12 B), `ct` (1..65536 B), generated `size`, `deleted`; PK
+    (user_id, id); RLS own-rows only for `authenticated`; no anon grants; no
+    TRUNCATE. AAD = `tsb1|<id>`. Client quota 20 MB (prune oldest non-record
+    rows to 18 MB), plaintext cap 60 000 B.
+  - **What**: DM text (+reactions, count, mergedIds); non-text DMs only
+    `{type, fileName, ts}`; group records (incl. group key) + signed events
+    `msg/msg.del/react/rename/member.*` (a `msg.del` turns the target row into a
+    `deleted` tombstone); server membership records only. `sealRow` throws on any
+    `data:`/`blob:` string or file-like base64; `assertBodySafe` re-checks the
+    upload body. Never: images/files, server channel messages, room chat.
+  - **When**: `saveDMs` → `TSBackup.noteDmChange()`, `ts:group` (added events),
+    `ts:servers`; 3 s debounce, batches of 40, backoff 5 s→5 min. The persisted
+    queue is the IndexedDB `ts-backup-<KNK>` "sent" map (id → fingerprint): any
+    local item missing/changed there is uploaded on the next scan (full scan at
+    start). Left groups/servers → their rows are deleted.
+  - **Restore**: once per device per account (`teamsync_backup_<KNK>.restoredAt`)
+    after K is available (TS2 import or bkkey), plus "Yedekten geri yükle".
+    Pages of 500 by id, decrypt, dedupe by id (local wins, count/reactions
+    merged), DMs sorted, new group/server records → `TSSpaceStore.putSpace` +
+    `TSGroups.adopt` / `TSServers.adopt`, events → `addEvents` (original
+    signatures kept). Pill `#backup-progress` + final toast with counts.
+  - `DM_LIMIT` is now 1000 messages per friend; only the newest 100 media
+    messages keep their content (older → `expired`). Restored media stubs have
+    `restored:true` and render via `backup.stubMedia`.
+  - Known limit: on a second device the group identity keys differ (non-
+    extractable, per device), so messages *sent* to a group from the restored
+    device are not accepted by other members, and after a group key rotation
+    the new key is wrapped for the first device's `ek` only. Reading history
+    and receiving (until a rotation) works. Fix = sync identity keys between
+    own devices (separate task).
+  - Test: `test/e2e/message-backup.test.js` (fake in-memory Supabase client via
+    `TSBackup.setClient`; TS2 restore, TS1 + acct_dev key, rotation keeps K).
