@@ -22,22 +22,22 @@
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.18.1",
     "@jitsi/robotjs": "^0.6.22",
-    "@sapphi-red/web-noise-suppressor": "0.3.5",
-    "@supabase/supabase-js": "^2.110.0",
-    "acorn": "^8.17.0",
     "cross-fetch": "^4.1.0",
-    "crypto-js": "^4.2.0",
     "electron-updater": "^6.8.9",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
     "uiohook-napi": "^1.5.5"
   },
   "devDependencies": {
+    "@sapphi-red/web-noise-suppressor": "0.3.5",
+    "@supabase/supabase-js": "^2.110.0",
     "@vitejs/plugin-react": "^6.0.3",
+    "acorn": "^8.17.0",
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",
+    "crypto-js": "^4.2.0",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "vite": "^8.2.1"
   },
   "build": {
@@ -51,9 +51,19 @@
       "**/*",
       "!dist",
       "!.env",
-      "!tools/dev/yapaydenetleyici.js",
-      "!problemler.md",
-      "!yapaydenetliyici.md"
+      "!*.md",
+      "!graphify-out",
+      "!test",
+      "!tools",
+      "!docs",
+      "!src",
+      "!supabase",
+      "!diagnostics",
+      "!vendor/cloudflared",
+      "!vite.config.js",
+      "!.graphifyignore",
+      "!.github",
+      "!mobile"
     ],
     "win": {
       "icon": "assets/icon.png",
@@ -88,6 +98,21 @@
           "teamsync"
         ]
       }
+    ],
+    "electronLanguages": [
+      "tr",
+      "en-US",
+      "en-GB",
+      "de",
+      "es",
+      "es-419",
+      "fr",
+      "pt-BR",
+      "pt-PT",
+      "ru",
+      "ar",
+      "ja",
+      "zh-CN"
     ]
   }
 }

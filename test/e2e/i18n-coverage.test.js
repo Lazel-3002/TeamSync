@@ -6,9 +6,11 @@ module.exports = async function run() {
   try {
     const initialLanguage = await evalJS(peer.client, `(() => {
       localStorage.removeItem('teamsync_language');
-      return getUserLanguage();
+      return { got: getUserLanguage(), system: getSystemLanguage(), supported: SUPPORTED_LANGUAGES };
     })()`);
-    assert.strictEqual(initialLanguage, 'en');
+    // Kayıt yokken sistem dili kullanılır (Türkçe Windows → tr); desteklenmiyorsa en.
+    assert.strictEqual(initialLanguage.got, initialLanguage.system);
+    assert.ok(initialLanguage.supported.includes(initialLanguage.got));
 
     const result = await evalJS(peer.client, `(() => {
       applyUserLanguage('en');

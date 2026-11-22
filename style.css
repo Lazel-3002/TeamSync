@@ -9188,6 +9188,82 @@ input:checked + .slider:before {
   border-color: color-mix(in srgb, var(--acc) 35%, transparent);
 }
 
+/* ===== Animasyonlar ve ışık efektleri: KAPALI (varsayılan) =====
+   Sade görünüm durağan süsleri (gradyan, gölge) kaldırır; bu katman da
+   hareketli süsleri kaldırır: sürekli yanıp sönen/dönen ışıklar, pencere açılış
+   animasyonları, üzerine gelince yukarı kalkan veya parlayan öğeler.
+   Bilerek DOKUNULMAYANLAR (bilgi taşıyan hareketler): konuşma göstergesi
+   (.st.speaking), kayıt/canlı yayın, yükleniyor dönen simgeleri, yazıyor
+   noktaları, gelen arama halkası, uzaktan kontrol uyarısı, kısayol dinleme ve
+   oyunların (UNO, Vampir Köylü, Çark, Anket) kendi animasyonları.
+   Basılınca küçülme (:active) de kalır; o tıklandığını hissettirir. */
+:root[data-motion-fx="0"] :is(
+  #update-btn.update-ready,
+  .leave-icon-badge,
+  .modal,
+  .mcard,
+  .settings-shell,
+  .settings-panel.active,
+  .settings-broadcast-advanced,
+  .dm-attach-menu,
+  .media-picker-shell,
+  .media-detail-shell,
+  #auth-login-form,
+  #auth-register-form,
+  .auth-fp,
+  .ctrl-note,
+  .img-lightbox,
+  .grp-ring,
+  .rail-call.rail-app .rail-icon svg,
+  .rail-update-dot
+),
+:root[data-motion-fx="0"] .pc .ts-frame-rainbow::before,
+:root[data-motion-fx="0"] .pc .ts-frame-neon::before {
+  animation: none !important;
+}
+
+:root[data-motion-fx="0"] :is(
+  .login-card button,
+  .icon-btn,
+  .action-card,
+  .action-card .ac-icon,
+  .uact button,
+  .cform button,
+  .vcard,
+  #focus-controls button,
+  .btn,
+  .btn-pri,
+  .settings-theme-option,
+  .settings-theme-color-swatch,
+  .settings-theme-preset-swatch,
+  .settings-theme-preset-star,
+  .settings-theme-preset-del,
+  .settings-theme-save-btn,
+  .media-dropzone,
+  .media-library-card,
+  .media-library-action,
+  .media-library-delete,
+  .media-picker-card,
+  .language-option,
+  .src,
+  .wb-swatch,
+  .dl-btn .dl-arrow,
+  .text-dl,
+  .account-row,
+  .activity-shortcut,
+  #activities-modal .card-act-btn,
+  .ilb-btn,
+  .ilb-btn .dl-arrow,
+  .fp-search-case
+):is(:hover, .dragging):not(:active),
+:root[data-motion-fx="0"] :is(.action-card:hover .ac-icon, .dl-btn:hover .dl-arrow, .ilb-btn:hover .dl-arrow) {
+  transform: none !important;
+}
+
+:root[data-motion-fx="0"] :is(.settings-theme-save-btn, .activity-shortcut, .dc-ring-btn):hover {
+  filter: none !important;
+}
+
 /* ===========================================================================
    SOHBET GÖRSEL ÖNİZLEME (LIGHTBOX)
    Oda sohbetindeki (.img-wrap > .chat-img) ve DM'lerdeki (.dm-msg img)

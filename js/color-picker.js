@@ -43,7 +43,7 @@
 
   function t(key) {
     let lang = 'en';
-    try { lang = localStorage.getItem('teamsync_language') || 'en'; } catch { /* yoksay */ }
+    try { lang = typeof getUserLanguage === 'function' ? getUserLanguage() : (localStorage.getItem('teamsync_language') || 'en'); } catch { /* yoksay */ }
     return (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key];
   }
 

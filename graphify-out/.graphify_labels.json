@@ -109,5 +109,19 @@
   "107": "startPttHook",
   "108": "getBroadcastAddresses",
   "109": "quick-poll-redesign.test.js",
-  "110": "media-collect-resize.test.js"
+  "110": "media-collect-resize.test.js",
+  "111": "electronLanguages",
+  "112": "package.json",
+  "113": "MainActivity.java",
+  "114": "TeamSync Mobil (Android)",
+  "115": "ExampleInstrumentedTest.java",
+  "116": "vite.config.js",
+  "117": "ExampleUnitTest.java",
+  "118": "gradlew",
+  "119": "build.gradle",
+  "120": "capacitor.build.gradle",
+  "121": "build.gradle",
+  "122": "capacitor.settings.gradle",
+  "123": "settings.gradle",
+  "124": "variables.gradle"
 }

@@ -8949,6 +8949,10 @@ const USER_LANGUAGE_KEY = 'teamsync_language';
 const USER_TIME_FORMAT_KEY = 'teamsync_time_format';
 const USER_THEME_KEY = 'teamsync_theme';
 const USER_SIMPLE_UI_KEY = 'teamsync_simple_ui';
+// Hareketli süsler (yanıp sönen ışıklar, açılış animasyonları, üzerine gelince
+// kalkan kartlar). İlk açılışta yapay/abartılı görünmesin diye varsayılan KAPALI;
+// yalnızca kullanıcı ayarlardan açarsa '1' yazılır.
+const USER_MOTION_FX_KEY = 'teamsync_motion_fx';
 const USER_QUALITY_KEY = 'teamsync_media_quality';
 const USER_MIC_DEVICE_KEY = 'teamsync_mic_device_id';
 const USER_NOISE_SUPPRESSION_KEY = 'teamsync_noise_suppression';
@@ -9177,6 +9181,11 @@ const I18N = {
     'settings.generalLead': "TeamSync'in görünümünü ve performansını yönet.",
     'settings.simpleUi': 'Sade görünüm',
     'settings.simpleUiDesc': 'Gradyanları, renk karışımlarını ve parlama efektlerini kaldırarak yalnızca seçili renk paletini kullanır.',
+    'settings.motionFx': "Animasyonlar ve ışık efektleri",
+    'settings.motionFxDesc': "Yanıp sönen ışıkları, açılış animasyonlarını ve üzerine gelince hareket eden kartları açar. Konuşma göstergesi, yükleniyor simgeleri ve oyunlar bu ayardan etkilenmez.",
+    'login.yourName': "Adın",
+    'login.next': "İleri",
+    'login.backToAccounts': "Hesap Seçimine Dön",
     'settings.appearance': 'GÖRÜNÜM',
     'settings.backgroundTheme': 'Arka plan teması',
     'settings.backgroundThemeDesc': 'Kendine en rahat gelen görünümü seç. Tercihin yalnızca bu cihazda saklanır.',
@@ -9470,6 +9479,11 @@ const I18N = {
     'settings.generalLead': 'Manage the appearance and performance of TeamSync.',
     'settings.simpleUi': 'Simple appearance',
     'settings.simpleUiDesc': 'Uses only the selected color palette by removing gradients, mixed colors, and glow effects.',
+    'settings.motionFx': "Animations and light effects",
+    'settings.motionFxDesc': "Turns on blinking lights, opening animations and cards that move on hover. The speaking indicator, loading icons and games are not affected.",
+    'login.yourName': "Your name",
+    'login.next': "Next",
+    'login.backToAccounts': "Back to account selection",
     'settings.appearance': 'APPEARANCE',
     'settings.backgroundTheme': 'Background theme',
     'settings.backgroundThemeDesc': 'Choose the look that feels most comfortable. Your preference is stored only on this device.',
@@ -10423,6 +10437,19 @@ function getSimpleUiEnabled() {
   return localStorage.getItem(USER_SIMPLE_UI_KEY) !== '0';
 }
 
+function getMotionFxEnabled() {
+  return localStorage.getItem(USER_MOTION_FX_KEY) === '1';
+}
+
+function applyMotionFx(enabled, persist = false) {
+  const active = enabled === true;
+  document.documentElement.dataset.motionFx = active ? '1' : '0';
+  const input = document.getElementById('user-settings-motion-fx');
+  if (input) input.checked = active;
+  if (persist) localStorage.setItem(USER_MOTION_FX_KEY, active ? '1' : '0');
+  return active;
+}
+
 function applySimpleUi(enabled, persist = false) {
   const active = enabled !== false;
   document.documentElement.dataset.simpleUi = active ? '1' : '0';
@@ -10448,6 +10475,7 @@ function revertUnsavedSettingsPreview() {
   clearSettingsPreview();
 
   applySimpleUi(getSimpleUiEnabled());
+  applyMotionFx(getMotionFxEnabled());
   const savedTheme = applyUserTheme(getUserTheme());
   if (savedTheme === 'custom') applyCustomThemeColors(getCustomThemeColors());
 
@@ -10928,7 +10956,24 @@ function applyUserTheme(theme, persist = false) {
 
 function getSavedLanguage() {
   const saved = localStorage.getItem(USER_LANGUAGE_KEY);
-  return SUPPORTED_LANGUAGES.includes(saved) ? saved : 'en';
+  return SUPPORTED_LANGUAGES.includes(saved) ? saved : getSystemLanguage();
+}
+
+// Kayıtlı tercih yoksa (ilk açılış) sistem dilini kullan: Türkçe Windows'ta
+// uygulama Türkçe açılsın. Önce tam eşleşme (pt-BR), sonra ana dil (pt-PT → pt-BR,
+// es-MX → es); desteklenmiyorsa İngilizce.
+function getSystemLanguage() {
+  try {
+    const wanted = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]).filter(Boolean);
+    for (const tag of wanted) {
+      const exact = SUPPORTED_LANGUAGES.find(lang => lang.toLowerCase() === String(tag).toLowerCase());
+      if (exact) return exact;
+      const base = String(tag).toLowerCase().split('-')[0];
+      const byBase = SUPPORTED_LANGUAGES.find(lang => lang.toLowerCase().split('-')[0] === base);
+      if (byBase) return byBase;
+    }
+  } catch (_) {}
+  return 'en';
 }
 
 // Ayarlar'da seçilen dil Kaydet'e basılana kadar yalnızca önizlemedir; t() ve
@@ -11520,6 +11565,7 @@ function openUserSettings(panel = 'general') {
   const languageRadio = document.querySelector(`input[name="settings-language"][value="${language}"]`);
   if (languageRadio) languageRadio.checked = true;
   applySimpleUi(getSimpleUiEnabled());
+  applyMotionFx(getMotionFxEnabled());
   syncThemeSelection();
   syncAudioDeviceSelects();
   syncSettingsTimeFormatSelection();
@@ -11578,6 +11624,7 @@ async function saveUserSettings() {
   const shareSystemAudio = document.getElementById('user-share-system-audio').checked;
   const theme = document.querySelector('input[name="settings-theme"]:checked')?.value || getUserTheme();
   const simpleUi = document.getElementById('user-settings-simple-ui')?.checked !== false;
+  const motionFx = document.getElementById('user-settings-motion-fx')?.checked === true;
 
   localStorage.setItem('teamsync_turn_url', turnUrl);
   localStorage.setItem('teamsync_turn_user', turnUser);
@@ -11589,6 +11636,7 @@ async function saveUserSettings() {
   localStorage.setItem(USER_STREAM_PREVIEWS_KEY, showStreamPreviews ? '1' : '0');
   localStorage.setItem(USER_SHARE_SYSTEM_AUDIO_KEY, shareSystemAudio ? '1' : '0');
   applySimpleUi(simpleUi, true);
+  applyMotionFx(motionFx, true);
   applyUserTheme(theme, true);
   applyMicrophoneVolume(document.getElementById('user-mic-volume').value, true);
   applySpeakerVolume(document.getElementById('user-speaker-volume').value, true);
@@ -11623,8 +11671,8 @@ async function saveUserSettings() {
 
   clearSettingsPreview();
   // Seçilen dil, DEĞİŞMEMİŞ GÖRÜNSE BİLE açıkça kaydedilir. getSavedLanguage()
-  // kayıt yokken 'en' döndürüyor; bu yüzden hiç dil seçmemiş bir kullanıcı
-  // Ayarlar'dan İngilizce'yi seçip Kaydet'e bastığında karşılaştırma eşit çıkıyor
+  // kayıt yokken sistem dilini döndürüyor; bu yüzden hiç dil seçmemiş bir kullanıcı
+  // Ayarlar'dan o dili seçip Kaydet'e bastığında karşılaştırma eşit çıkıyor
   // ve tercih localStorage'a HİÇ yazılmıyordu: seçim, varsayılanın değiştiği ilk
   // gün (başka bir cihaz/sürüm, farklı sistem dili) sessizce kayboluyordu.
   // Belgeyi yeniden çevirmek ise pahalı; o yalnızca dil gerçekten değiştiyse yapılır.
@@ -11689,6 +11737,7 @@ function initUserSettings() {
   renderLanguageOptions();
   initCustomThemeEditor();
   applySimpleUi(getSimpleUiEnabled());
+  applyMotionFx(getMotionFxEnabled());
   applyUserTheme(getUserTheme());
   applyUserLanguage(getUserLanguage(), false);
   const quality = localStorage.getItem(USER_QUALITY_KEY);
@@ -11762,6 +11811,10 @@ function initUserSettings() {
   document.getElementById('user-settings-simple-ui')?.addEventListener('change', event => {
     markSettingsDirty();
     applySimpleUi(event.target.checked);
+  });
+  document.getElementById('user-settings-motion-fx')?.addEventListener('change', event => {
+    markSettingsDirty();
+    applyMotionFx(event.target.checked);
   });
 
   const hwEl = document.getElementById('user-settings-hwaccel');

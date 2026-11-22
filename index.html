@@ -16,11 +16,14 @@
   <link rel="stylesheet" href="css/teams.css?v=1" />
   <link rel="stylesheet" href="css/refresh.css?v=3" />
   <link rel="stylesheet" href="css/net-settings.css?v=2" />
+  <link rel="stylesheet" href="css/room-qr.css?v=1" />
   <script>
     try {
       var _theme = localStorage.getItem('teamsync_theme') || 'aurora';
       document.documentElement.dataset.theme = _theme;
       document.documentElement.dataset.simpleUi = localStorage.getItem('teamsync_simple_ui') === '0' ? '0' : '1';
+      // Hareketli süsler varsayılan kapalı; yalnızca ayarlardan açılırsa '1'.
+      document.documentElement.dataset.motionFx = localStorage.getItem('teamsync_motion_fx') === '1' ? '1' : '0';
       // Custom tema, --custom-bg/--custom-accent/--custom-button CSS
       // değişkenlerine bağlı; bunlar sadece JS init'inde (initCustomThemeEditor)
       // geç ayarlanıyordu, o yüzden ilk karede CSS'teki mor fallback renkler
@@ -45,6 +48,7 @@
       }
     } catch (_) {
       document.documentElement.dataset.simpleUi = '1';
+      document.documentElement.dataset.motionFx = '0';
     }
   </script>
   
@@ -108,10 +112,10 @@
 
       <!-- Adım 1: İsim -->
       <div id="step-name" class="hidden">
-        <label>Adın</label>
+        <label data-i18n="login.yourName">Adın</label>
         <input id="name" type="text" placeholder="TeamSync" maxlength="20" />
-        <button id="btn-next-name">İleri</button>
-        <button id="btn-back-accounts" class="btn-sec btn-sm hidden" style="margin-top: 10px; width: 100%; padding: 8px;">Hesap Seçimine Dön</button>
+        <button id="btn-next-name" data-i18n="login.next">İleri</button>
+        <button id="btn-back-accounts" class="btn-sec btn-sm hidden" data-i18n="login.backToAccounts" style="margin-top: 10px; width: 100%; padding: 8px;">Hesap Seçimine Dön</button>
       </div>
 
       <!-- Adım 2: Seçim & Arkadaşlık -->
@@ -1670,6 +1674,13 @@
                 </div>
                 <label class="switch"><input type="checkbox" id="user-settings-simple-ui" checked><span class="slider round"></span></label>
               </div>
+              <div class="settings-card settings-row settings-simple-row">
+                <div>
+                  <strong data-i18n="settings.motionFx">Animasyonlar ve ışık efektleri</strong>
+                  <p data-i18n="settings.motionFxDesc">Yanıp sönen ışıkları, açılış animasyonlarını ve üzerine gelince hareket eden kartları açar. Konuşma göstergesi, yükleniyor simgeleri ve oyunlar bu ayardan etkilenmez.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="user-settings-motion-fx"><span class="slider round"></span></label>
+              </div>
               <section class="settings-theme-section" aria-labelledby="settings-theme-title">
                 <div class="settings-theme-heading">
                   <div>
@@ -2806,6 +2817,7 @@
   <script src="vendor/supabase.min.js"></script>
   <script src="vendor/mqtt.min.js"></script>
   <script src="vendor/crypto-js.min.js"></script>
+  <script src="vendor/qrcode-generator.js"></script>
   <script src="js/state.js"></script>
   <script src="js/rnnoise-noise-suppression.js"></script>
   <script src="resources/localization/catalogs.bundle.js"></script>
@@ -2838,6 +2850,7 @@
   <script src="js/teams/call-log.js"></script>
   <script src="js/teams/direct-call.js"></script>
   <script src="js/teams/calls.js"></script>
+  <script src="js/room-qr.js"></script>
   <script src="js/teams/shell-teams.js"></script>
   <script src="js/net-settings.js"></script>
   <script src="js/msg-backup.js"></script>
