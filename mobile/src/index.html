@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#1e1828" />
+  <title>TeamSync</title>
+  <link rel="icon" href="./icon.png" />
+  <link rel="apple-touch-icon" href="./icon.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./style.css" />
+  <script src="./vendor/mqtt.min.js"></script>
+  <script src="./rnnoise-noise-suppression.js"></script>
+</head>
+<body>
+  <main id="join" class="screen">
+    <header class="brand">
+      <img src="./icon.png" alt="" width="40" height="40" />
+      <div>
+        <h1>TeamSync</h1>
+        <p class="muted" id="version"></p>
+      </div>
+    </header>
+
+    <!-- Güncelleme (yalnızca Android uygulamasında) -->
+    <section id="update-banner" class="banner hidden" aria-live="polite">
+      <div>
+        <strong id="update-title">Yeni sürüm var</strong>
+        <p class="muted" id="update-text"></p>
+      </div>
+      <button type="button" class="btn primary small" id="btn-update">Güncelle</button>
+    </section>
+
+    <!-- Android tarayıcıdan açıldıysa: uygulamaya geçiş -->
+    <section id="app-banner" class="banner hidden">
+      <div>
+        <strong>TeamSync uygulaması</strong>
+        <p class="muted">Ekran kilitliyken de konuşmak için uygulamada aç.</p>
+      </div>
+      <a class="btn small" id="btn-open-app" href="#">Uygulamada aç</a>
+    </section>
+
+    <form id="join-form" class="stack" autocomplete="off">
+      <label class="field">
+        <span>Adın</span>
+        <input id="name" maxlength="20" required />
+      </label>
+      <label class="field">
+        <span>Oda kimliği</span>
+        <input id="room" required placeholder="ts-…" autocapitalize="off" spellcheck="false" />
+        <small class="muted">PC'de görüşmedeyken "Telefonda aç" düğmesindeki QR kodu telefonun kamerasıyla okut; kimlik kendiliğinden gelir.</small>
+      </label>
+
+      <label class="toggle">
+        <input type="checkbox" id="noise" checked />
+        <span>
+          <strong>Gürültü engelleme</strong>
+          <small class="muted">Klavye, fan ve sokak sesini bastırır (bilgisayardakiyle aynı).</small>
+        </span>
+      </label>
+
+      <details class="advanced">
+        <summary>Mobil veri için TURN (isteğe bağlı)</summary>
+        <p class="muted">PC'de TURN ayarlıysa telefon onu odadan otomatik alır. Ayrı bir sunucu kullanmak istersen gir.</p>
+        <label class="field"><span>Adres</span><input id="turn-url" placeholder="turn:sunucu:3478" autocapitalize="off" spellcheck="false" /></label>
+        <label class="field"><span>Kullanıcı</span><input id="turn-user" autocapitalize="off" spellcheck="false" /></label>
+        <label class="field"><span>Şifre</span><input id="turn-pass" type="password" /></label>
+      </details>
+
+      <button type="submit" class="btn primary" id="btn-join">Odaya katıl</button>
+      <p class="error" id="join-error" role="alert"></p>
+    </form>
+
+    <p class="muted note" id="note">Şimdilik yalnızca sesli odaya katılma var. Hesap, arkadaşlar ve mesajlar sonraki sürümlerde gelecek.</p>
+  </main>
+
+  <main id="room-screen" class="screen hidden">
+    <header class="room-head">
+      <h2 id="room-title">Sesli oda</h2>
+      <p class="muted status"><span id="status-dot" class="dot"></span><span id="status-text">Bağlanıyor…</span> · <span id="timer">0:00</span></p>
+      <button type="button" class="id-chip" id="btn-copy-room" title="Oda kimliğini kopyala">
+        <code id="room-id"></code>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </header>
+
+    <ul id="peers" class="peers" aria-live="polite"></ul>
+    <div id="empty" class="empty">
+      <strong>Odada henüz kimse yok</strong>
+      <p class="muted">PC'den biri katılınca burada görünür. Oda kimliğini paylaşmak için yukarıdaki kimliğe dokun.</p>
+    </div>
+
+    <details class="advanced diag">
+      <summary>Bağlantı ayrıntıları</summary>
+      <ul id="diag" class="plain"></ul>
+    </details>
+
+    <nav class="controls">
+      <button class="ctl" id="btn-mic" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16"/></svg>
+        <span id="mic-label">Mikrofon açık</span>
+      </button>
+      <button class="ctl" id="btn-route" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="waves" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+        <span id="route-label">Ahize</span>
+      </button>
+      <button class="ctl danger" id="btn-leave">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15c5-4 13-4 18 0l-2.5 3-3.5-1.5V14a10 10 0 0 0-6 0v2.5L5.5 18z"/></svg>
+        <span>Ayrıl</span>
+      </button>
+    </nav>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

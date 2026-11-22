@@ -1,0 +1,8 @@
+node_modules/
+dist/
+# Masaüstünden kopyalanan ortak dosyalar (vite.config.js her build'de yeniler)
+public/
+# İmza anahtarı asla depoya girmez
+*.jks
+*.keystore
+keystore.properties

@@ -15,6 +15,7 @@
   const ICON = {
     video: '<rect x="2" y="6" width="14" height="12" rx="3"/><path d="M16 10.5 22 7v10l-6-3.5"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+    phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
     copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
@@ -408,6 +409,15 @@
         copy.setAttribute('data-i18n-title', 'call.copyRoomId');
         copy.title = tr('call.copyRoomId');
         idChip.appendChild(copy);
+        const phone = document.createElement('button');
+        phone.type = 'button';
+        phone.id = 'btn-room-qr';
+        phone.className = 'call-id-copy';
+        phone.setAttribute('data-i18n-title', 'call.openOnPhone');
+        phone.title = tr('call.openOnPhone');
+        phone.innerHTML = svg(ICON.phone, 14);
+        phone.addEventListener('click', () => { if (window.TSRoomQR) window.TSRoomQR.open(window.state && window.state.room); });
+        idChip.appendChild(phone);
       }
       lead.appendChild(idChip);
     }
@@ -530,6 +540,7 @@
       if (!b) return;
       if (b.dataset.stage === 'invite') $('btn-show-server-invites')?.click();
       else if (b.dataset.stage === 'copy') $('btn-copy-id')?.click();
+      else if (b.dataset.stage === 'phone' && window.TSRoomQR) window.TSRoomQR.open(window.state && window.state.room);
     });
   }
 
@@ -599,6 +610,7 @@
       <div class="call-stage-actions">
         <button type="button" class="ts-pill-btn is-primary" data-stage="invite">${svg(ICON.addUser, 16)}<span>${esc(tr('call.inviteSomeone'))}</span></button>
         <button type="button" class="ts-pill-btn" data-stage="copy">${svg(ICON.copy, 16)}<span>${esc(tr('call.copyRoomId'))}</span></button>
+        <button type="button" class="ts-pill-btn" data-stage="phone">${svg(ICON.phone, 16)}<span>${esc(tr('call.openOnPhone'))}</span></button>
       </div>`}`;
   }
 

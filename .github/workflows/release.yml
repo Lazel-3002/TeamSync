@@ -8,6 +8,11 @@
 #   2) git push
 # Version yükseltilmeden yapılan push'lar hiçbir şey yayınlamaz (güvenli).
 # Etiket (vX.Y.Z) elle atılmaz, aşağıda otomatik oluşturulur.
+#
+# Telefon sürümü AYRI numaralanır ve ayrı iş akışıyla çıkar (mobile-release.yml,
+# etiket mobil-vX.Y.Z, başlık "X.Y.Z Mobil"). Masaüstü release'leri "--latest" ile
+# işaretlenir: electron-updater GitHub'daki "latest" release'in latest.yml'ini
+# okur; mobil release latest olsaydı kurulu PC'ler güncelleme bulamazdı.
 name: Release
 
 on:
@@ -95,7 +100,7 @@ jobs:
             [ -f "$f" ] || { echo "Eksik dosya: $f"; exit 1; }
           done
           gh release create "v$VERSION" "${FILES[@]}" \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --title "$VERSION" --notes ""
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "$VERSION PC" --notes "" --latest
 
       # Workflow'un yeşil olması indirmenin çalıştığını göstermiyordu; burada
       # gerçekten indirilebildiğini doğrula.

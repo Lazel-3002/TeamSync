@@ -1,0 +1,10 @@
+{
+  "appId": "com.teamsync.mobile",
+  "appName": "TeamSync",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
+}

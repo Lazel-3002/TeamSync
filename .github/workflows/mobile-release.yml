@@ -1,0 +1,122 @@
+# Telefon (Android) sürümü yayını — masaüstünden BAĞIMSIZ numaralanır.
+#
+#   PC     : package.json          → etiket vX.Y.Z,       başlık "X.Y.Z PC"
+#   Mobil  : mobile/package.json   → etiket mobil-vX.Y.Z, başlık "X.Y.Z Mobil"
+#
+# Yeni mobil sürüm çıkarmak için: mobile/package.json'da "version"ı yükselt
+# (1.0.1 → 1.0.2) ve main'e push et. Sürüm değişmeden yapılan push'lar bir şey
+# yayınlamaz. Android versionCode da aynı numaradan türetilir (android/app/build.gradle).
+#
+# Mobil release'ler "--latest=false" ile açılır: masaüstündeki electron-updater
+# GitHub'ın "latest" release'ine bakıyor; mobil sürüm latest olsaydı kurulu
+# PC'ler latest.yml'i bulamaz, güncelleme alamazdı.
+#
+# İmza: APK'nın her sürümde AYNI anahtarla imzalanması şart (yoksa telefonda
+# güncelleme yerine "uygulama yüklenmedi" hatası çıkar). Anahtar depoda değil,
+# GitHub secret'larında:
+#   TS_KEYSTORE_B64      — keystore dosyasının base64'ü
+#   TS_KEYSTORE_PASSWORD, TS_KEY_ALIAS, TS_KEY_PASSWORD
+name: Mobil Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'vendor/mqtt.min.js'
+      - '.github/workflows/mobile-release.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bu mobil sürüm zaten yayınlanmış mı?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if gh release view "mobil-v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "mobil-v$VERSION zaten var, yayın atlanıyor."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.exists == 'false'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        if: steps.check.outputs.exists == 'false'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: İmza anahtarını hazırla
+        if: steps.check.outputs.exists == 'false'
+        env:
+          TS_KEYSTORE_B64: ${{ secrets.TS_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$TS_KEYSTORE_B64" ]; then
+            echo "::error::TS_KEYSTORE_B64 secret'ı yok. İmzasız APK yayınlanmaz (güncellemeler bozulur)."
+            exit 1
+          fi
+          echo "$TS_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/teamsync-mobil.jks"
+          echo "TS_KEYSTORE_PATH=$RUNNER_TEMP/teamsync-mobil.jks" >> "$GITHUB_ENV"
+
+      - name: Derle
+        if: steps.check.outputs.exists == 'false'
+        env:
+          TS_KEYSTORE_PASSWORD: ${{ secrets.TS_KEYSTORE_PASSWORD }}
+          TS_KEY_ALIAS: ${{ secrets.TS_KEY_ALIAS }}
+          TS_KEY_PASSWORD: ${{ secrets.TS_KEY_PASSWORD }}
+        run: |
+          npm ci
+          npx vite build
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          VERSION="${{ steps.check.outputs.version }}"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/TeamSync-Mobil-$VERSION.apk"
+
+      - name: Mobil release olarak yayınla
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          gh release create "mobil-v$VERSION" "$RUNNER_TEMP/TeamSync-Mobil-$VERSION.apk" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$VERSION Mobil" --latest=false \
+            --notes "TeamSync telefon (Android) sürümü $VERSION. Kurulum: APK'yı telefona indir, aç; 'bilinmeyen kaynaklar' izni istenirse ver."
+
+      - name: İndirme bağlantısını doğrula
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/mobil-v$VERSION/TeamSync-Mobil-$VERSION.apk"
+          for i in 1 2 3 4 5 6; do
+            CODE=$(curl -s -o /dev/null -I -L -w '%{http_code}' "$URL")
+            [ "$CODE" = "200" ] && break
+            sleep 20
+          done
+          echo "$URL -> $CODE"
+          [ "$CODE" = "200" ]

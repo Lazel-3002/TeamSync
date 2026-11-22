@@ -1,0 +1,47 @@
+/* "Telefonda aç" QR penceresi (js/room-qr.js). Tema değişkenleriyle çizilir;
+   QR'ın kendisi her temada beyaz zemin üzerinde siyah kalır (kameralar
+   ters renkli kodu her zaman okuyamaz). */
+.room-qr-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, #000 55%, transparent);
+}
+.room-qr-card {
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--bg-card, #2b2238);
+  color: var(--txt-main, #f2eef7);
+  border: 1px solid color-mix(in srgb, var(--txt-main, #fff) 12%, transparent);
+}
+.room-qr-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.room-qr-head h3 { margin: 0; font-size: 17px; }
+.room-qr-x {
+  width: 32px; height: 32px; border-radius: 8px; border: 0;
+  display: grid; place-items: center;
+  background: transparent; color: var(--txt-mut, #b7b2c4); cursor: pointer;
+}
+.room-qr-x:hover { background: var(--bg-hover, rgba(255,255,255,.06)); color: var(--txt-main, #fff); }
+.room-qr-code {
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+}
+.room-qr-code svg { display: block; width: 100%; height: auto; }
+.room-qr-desc { margin: 0; font-size: 13px; line-height: 1.5; color: var(--txt-mut, #b7b2c4); }
+.room-qr-link { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.room-qr-link code {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; color: var(--txt-mut, #b7b2c4);
+}

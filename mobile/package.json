@@ -1,0 +1,23 @@
+{
+  "name": "teamsync-mobile",
+  "version": "1.0.1",
+  "private": true,
+  "description": "TeamSync telefon sürümü (Android). Sürüm numarası masaüstünden ayrıdır: PC 1.0.x, Mobil 1.0.x.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "sync": "vite build && cap sync android",
+    "apk:debug": "vite build && cap sync android && cd android && gradlew assembleDebug",
+    "apk:release": "vite build && cap sync android && cd android && gradlew assembleRelease",
+    "build:web": "vite build --outDir ../../docs/app --emptyOutDir"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2",
+    "vite": "8.3.8"
+  }
+}

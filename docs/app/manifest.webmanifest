@@ -1,0 +1,17 @@
+{
+  "name": "TeamSync",
+  "short_name": "TeamSync",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1e1828",
+  "theme_color": "#1e1828",
+  "lang": "tr",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
