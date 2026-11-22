@@ -86,8 +86,9 @@ Files: `js/space/crypto.js` (TSCrypto), `js/space/store.js` (TSSpaceStore),
 (TSGroupUI), `js/ui/emoji.js` (TSEmoji), `js/ui/typing.js` (TSTyping),
 `js/dm-extras.js` (TSDMX), `css/groups.css`, `resources/emoji/shortcodes.js`
 (emojibase-data 16, MIT, + Turkish aliases like `:kalp:` `:agla:` `:ates:`).
-- **Identity**: per-account ECDSA P-256 (`ik`) + ECDH P-256 (`ek`), private
-  keys non-extractable in IndexedDB `ts-identity`. Public keys travel in
+- **Identity**: (superseded by the Phase 6 account identity) per-device ECDSA
+  P-256 (`ik`) + ECDH P-256 (`ek`), private keys non-extractable in IndexedDB
+  `ts-identity`. Public keys travel in
   `res_profile.keys`; stored TOFU in localStorage `teamsync_peer_keys_<me>`
   (`TSCrypto.rememberPeer/peerKeys`), toast on key change.
 - **Group = signed event log stored by every member** in IndexedDB
@@ -369,11 +370,110 @@ high quality". Discord-era features (servers, groups, profiles) all remain.
   - `DM_LIMIT` is now 1000 messages per friend; only the newest 100 media
     messages keep their content (older → `expired`). Restored media stubs have
     `restored:true` and render via `backup.stubMedia`.
-  - Known limit: on a second device the group identity keys differ (non-
-    extractable, per device), so messages *sent* to a group from the restored
-    device are not accepted by other members, and after a group key rotation
-    the new key is wrapped for the first device's `ek` only. Reading history
-    and receiving (until a rotation) works. Fix = sync identity keys between
-    own devices (separate task).
+  - (Fixed by the account identity below: the second device now writes to
+    groups and receives rotated group keys.)
   - Test: `test/e2e/message-backup.test.js` (fake in-memory Supabase client via
     `TSBackup.setClient`; TS2 restore, TS1 + acct_dev key, rotation keeps K).
+
+## Phase 6 — account identity + end-to-end encrypted personal events
+**Finding:** the old CryptoJS "E2EE" wrapper at the top of renderer.js never
+ran — `vendor/mqtt.min.js` exports `connect` as a getter, the assignment is
+silently ignored, so ALL MQTT traffic (every version) was plain JSON. Old
+clients only understand plain JSON, so "legacy" = plain JSON. Do not "fix" the
+wrapper (it would break old clients and its key is public anyway).
+- **Account identity** (`js/space/crypto.js`): one ECDSA P-256 (`ik`, sign) +
+  ECDH P-256 (`ek`) per ACCOUNT (= friendId), same on all own devices.
+  Generated extractable ONLY on the origin device (legacy account, or cloud
+  slot that is not imported) → PKCS#8 stored by main.js IPC `account-identity`
+  (`account-identity.bin`, DPAPI, keyed by fid; ops get/set(no overwrite)/
+  delete) → imported as NON-extractable CryptoKeys. Imported (code) devices
+  never generate: they wait for (a) the backup row `{k:'id'}` (K-encrypted;
+  restore installs it before groups are adopted; `fetchIdentityRow` if restore
+  already happened) or (b) acct_dev `{k:'idreq'}` → `{k:'idkey', to, id}`
+  (every 20 s while `TSE2E.needsIdentity()`). `installAccountIdentity` checks
+  that the private keys match the public keys (JWK x/y) and never overwrites a
+  different identity ('conflict'). Old per-device key (IDB `ts-identity`) stays
+  as `device` for migration and old-version groups. API: `ensureIdentity()`
+  (primary = account || device), `sign(obj, ik?)`, `unwrap` tries both,
+  `identityFor(pub)`, `holds(pub)`, `accountKeysSync/deviceKeysSync`,
+  `migrationProofSync()` (`mig = {ik: oldDeviceIk, sig}` over
+  `{t:'ts-acct-migrate-v1', fid, ik, ek}`), `_test.deviceOnly(bool)` /
+  `_test.reload()` (only with TEAMSYNC_E2E_OFFLINE; simulates an old client).
+  Account removal deletes the identity (`renderer.js` account delete +
+  `remoteSignOut`).
+- **Peer pins (TOFU)** `teamsync_peer_keys_<me>`: `{ik, ek, acct, old[], rx,
+  pend}`. First key wins. `acct` = account key (from presence `ak`, friend
+  request/accept `ak`, `res_profile.akv:1`). Device→account change is silent
+  only with a valid proof (`res_profile.mk` or a group `member.rekey`);
+  any other change → `pend` + toast + DM header strip + Kişiler badge; the new
+  key is NOT used until "Yeni anahtarı kabul et" (`TSE2E.accept`). Pins are
+  backed up as `{k:'pk'}` rows.
+- **v2 envelope** (`js/space/dm-e2ee.js`, `TSE2E.attach(state.globalMqtt)`):
+  every JSON publish to ANOTHER fid's `teamsync/user/<fid>/events` goes through
+  an ordered queue. If `canEncryptTo(fid)` (my account identity + friend's
+  acct pin): `TS2E:{v:1,f,t,ts,n(iv),sk,rk,c}`; key = HKDF-SHA256(ECDH(my
+  account ek priv, friend ek), salt `teamsync-dm-v2`, info
+  `ts-dm-v2|from|to|ekFrom|ekTo`) per direction; AES-GCM, AAD
+  `TS2E|1|f|t|ts|n|sk|rk`; the event type is inside the ciphertext (brokers
+  see only from/to/time/size). No signature (static-static ECDH already
+  authenticates; deniable). Receive (`TSE2E.receive`, ordered): |now−ts| ≤ 30
+  min, (sender, iv) seen-cache 61 min persisted in `teamsync_e2e_seen_<me>`,
+  inner `fromId/id` must equal `f`; unknown sender key → held ≤3 min + profile
+  request. Decrypted events get a NON-enumerable `data.__e2e` (signatures and
+  JSON never see it).
+- **Compatibility / downgrade**: no acct pin → plain JSON (old way), DMs get
+  `plain:true` → "şifresiz gönderildi/geldi" + open-lock header "Şifreli değil
+  — {name} eski bir sürüm kullanıyor". Once a valid v2 arrived from a friend
+  (`rx`), plain events from that fid are DROPPED (`stats().downgrade`), except
+  `friend_request`, `friend_accepted`, `acct_dev` (EXEMPT, never encrypted). A
+  code-added device without identity does not send plain to acct friends
+  (outbox keeps DMs; flushed on `ts:identity`). `res_profile` answers a plain
+  `req_profile` in plain (`__plain:1`, stripped by the wrapper) so a friend
+  without my pin can learn it.
+- **Groups** (`js/space/groups.js`): member `old: [{ik,ek}]`; events verify
+  against `[ik, ...old]`. Migration = `member.rekey` record signed by the OLD
+  key (`body: {fid, ik, ek, prev, nsig}`; nsig = new ik over
+  `{t:'ts-rekey-v1', gid, fid, ik, ek, prev}`), requires `prev === current ik`.
+  NOT stored in the event log (old clients would loop on count mismatch):
+  kept in `rec.rekeys`, sent on `/ev` as `{k:'rk'}`, in the author's heartbeat
+  (`hb.rk`, plus `hb.v:2`), in `sres.rk`, and in invites/`grp_key` (`rk`).
+  Applying it also migrates the friend pin (`notePeerMigration`).
+  `myKeyChoice`: origin device keeps signing with the old device key while any
+  member has not sent `hb.v:2` (`rec.v2`), else the account key. Invites /
+  `grp_key` carry `sig` (old clients) + `sig2` (other key); to an old-version
+  recipient members are presented with their pre-migration keys (`old[0]`).
+  Owner rotation also sends `grp_key` (wrapped to my account ek, signed by the
+  account key, `own:1`) to MY OWN topic → other own devices; `acct_dev
+  {k:'gkreq', g:[[gid,epoch]]}` lets a device that missed it ask (any own
+  device answers for groups where it has a newer epoch).
+- **Servers** (`js/space/servers.js`): no rekey yet. Signing/pairwise keys use
+  whichever of my keys the server state knows (`myIk/myEk`): pre-upgrade
+  memberships keep working on the origin device with the device key; servers
+  joined/created after the upgrade use the account key (second device works).
+- **UI**: DM header badge `.dmh-e2e` (is-on/is-off/is-changed), bubble
+  `.dmx-plain`, warning strip `#dm-keywarn`, friend row `.friend-key-tag`,
+  profile card `.pc-safety` (12 digits = SHA-256 of both accounts' keys,
+  `TSE2E.safetyCode`). Strings `e2e.*`, `net.intro4`, `net.newMovesKeys*`.
+- Tests: `test/e2e/dm-e2ee.test.js` (ports 9621-9623, raw MQTT observer via
+  the vendor mqtt bundle + Node WebSocket), `test/e2e/group-multidevice.test.js`
+  (9631-9633).
+
+## Call sounds (uncommitted, after Phase 6)
+- `js/call-sounds.js` (`TSCallSounds`), UI in Ayarlar > Ses > "Arama sesleri"
+  (`#settings-call-sounds`, rendered by JS, re-rendered on language change).
+  `renderer.js` `startRingLoop/stopRingLoop` delegate to it, so every ring site
+  uses the setting: `js/teams/direct-call.js` (incoming ring + outgoing
+  ringback), `js/ui/group-view.js` (group ring card + "Herkesi ara").
+  DND checks stay at those call sites.
+- Sounds: Normal (old tones), Yumuşak, Klasik zil, Dijital (all WebAudio),
+  Kendi sesim, and Sessiz (incoming only). Choice + volume in localStorage
+  `teamsync_call_sound_in|out|vol` (per device, default normal / 80 %).
+- Own sound: IndexedDB `ts-call-sounds` / store `files`, keys `in`/`out`, raw
+  bytes + name/size/duration. Per device, never uploaded, not in the message
+  backup. Checks: extension + magic bytes (mp3/ogg/wav/m4a/aac/webm), ≤ 2 MB,
+  decoded ≤ 30 s (longer files are rejected, not trimmed). Plays as a looped
+  AudioBuffer; missing/corrupt at ring time → Normal (logged once).
+  Own AudioContext with `setSinkId(selected speaker)`. Stop = gain to 0 +
+  disconnect (instant). `window.__tsRingDebug()` reports what is playing.
+- Test: `test/e2e/call-sounds.test.js` (ports 9651-9652; `CS_SHOT_DIR=…`
+  saves screenshots).

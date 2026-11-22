@@ -166,3 +166,5 @@
   .net-peer-metric { grid-column: 2 / -1; }
   .net-peer .net-peer-metric + .net-peer-metric { grid-column: 2 / -1; }
 }
+.net-moves p.net-moves-keys { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; }
+.net-moves p.net-moves-keys .ts-ico { flex: 0 0 auto; margin-top: 2px; color: var(--acc-ink); }

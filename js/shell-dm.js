@@ -376,6 +376,48 @@
     return { st: 'offline', text: when ? tr('presence.lastSeen', { when }) : tr('presence.offline') };
   }
 
+  // Uçtan uca şifreleme rozeti (js/space/dm-e2ee.js): kilit = v2, açık kilit =
+  // eski sarmal, uyarı = güvenlik anahtarı değişti (kabul bekliyor).
+  function e2eBadge(fid, name) {
+    if (!window.TSE2E) return '';
+    const s = window.TSE2E.status(fid);
+    if (s.mode === 'changed') return `<span class="dmh-e2e is-changed" data-e2e="changed" title="${esc(tr('e2e.keyChanged', { name }))}">${window.TSUI.icon('alert', 12)}<span>${esc(tr('e2e.badgeChanged'))}</span></span>`;
+    if (s.mode === 'e2ee') return `<span class="dmh-e2e is-on" data-e2e="on" title="${esc(tr('e2e.onTip'))}">${window.TSUI.icon('lock', 12)}<span>${esc(tr('e2e.on'))}</span></span>`;
+    return `<span class="dmh-e2e is-off" data-e2e="off" title="${esc(tr('e2e.offTip', { name }))}">${window.TSUI.icon('unlock', 12)}<span>${esc(tr('e2e.off', { name }))}</span></span>`;
+  }
+
+  // "{name} adlı kişinin güvenlik anahtarı değişti" şeridi + Kabul et.
+  function renderKeyWarning(fid) {
+    const host = $('dm-main-host');
+    if (!host) return;
+    let bar = $('dm-keywarn');
+    const s = window.TSE2E ? window.TSE2E.status(fid) : null;
+    if (!s || s.mode !== 'changed') { if (bar) bar.remove(); return; }
+    const f = (window.state.friends || {})[fid] || {};
+    const name = (typeof window.getNickname === 'function' && window.getNickname(fid)) || f.name || fid;
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'dm-keywarn';
+      bar.className = 'dm-keywarn';
+      bar.setAttribute('role', 'alert');
+      host.insertBefore(bar, host.firstChild);
+    }
+    bar.dataset.fid = fid;
+    bar.innerHTML = `${window.TSUI.icon('alert', 18)}
+      <div class="dm-keywarn-copy"><strong>${esc(tr('e2e.keyChanged', { name }))}</strong><p>${esc(tr('e2e.keyChangedDesc', { name }))}</p></div>
+      <div class="dm-keywarn-acts">
+        <button type="button" class="settings-test-button" data-keywarn="code">${window.TSUI.icon('shield', 14)}<span>${esc(tr('e2e.showCode'))}</span></button>
+        <button type="button" class="btn-pri" data-keywarn="accept">${window.TSUI.icon('check', 14)}<span>${esc(tr('e2e.accept'))}</span></button>
+      </div>`;
+    bar.querySelector('[data-keywarn="accept"]').onclick = async () => {
+      const ok = await window.showConfirm(tr('e2e.acceptTitle'), tr('e2e.acceptConfirm', { name }), { danger: false, confirmText: tr('e2e.accept') });
+      if (ok && window.TSE2E.accept(fid)) renderHeader(fid);
+    };
+    bar.querySelector('[data-keywarn="code"]').onclick = () => {
+      if (!panelOpen()) $('dmh-profile-toggle')?.click();
+    };
+  }
+
   function renderHeader(fid) {
     const f = (window.state.friends || {})[fid] || {};
     const st = window.TSStatus ? window.TSStatus.statusOf(fid) : 'offline';
@@ -388,10 +430,11 @@
       who.innerHTML = `
         ${window.TSUI.avatarHtml({ src: f.avatar, name: f.name, seed: fid, size: 32, status: st })}
         <span class="dmh-copy">
-          <span class="dmh-name">${esc(nick || f.name || fid)}</span>
+          <span class="dmh-name">${esc(nick || f.name || fid)}${e2eBadge(fid, nick || f.name || fid)}</span>
           <span class="dmh-sub dmh-presence s-${esc(pres.st)}">${esc(pres.text)}${extra ? ` · ${esc(extra)}` : ''}</span>
         </span>`;
     }
+    renderKeyWarning(fid);
     const input = $('dm-input');
     if (input) input.placeholder = tr('composer.placeholder');
     const panel = $('dm-profile-panel');
@@ -472,7 +515,11 @@
       }
       const tools = m.id ? `<div class="msg-tools"><button type="button" class="msg-tool" data-react-open="${esc(m.id)}" title="${esc(tr('emoji.addReaction'))}">${REACT_SVG}</button></div>` : '';
       const media = m.type === 'image' || m.type === 'video' ? 'is-media' : (m.type === 'file' ? 'is-file' : '');
-      out += `<div class="dmx-msg dm-msg ${m.sender === 'me' ? 'sent' : 'recv'} ${media} ${m.pending ? 'is-pending' : ''}" ${m.id ? `data-mid="${esc(m.id)}"` : ''}>${cont && ts ? `<time class="dmx-hover-time">${esc(fmtTime(ts))}</time>` : ''}${tools}<div class="dmx-content">${html}</div></div>`;
+      // Eski sarmalla (uçtan uca şifresiz) gitmiş/gelmiş mesaj işareti.
+      const plain = m.plain
+        ? `<span class="dmx-plain" title="${esc(tr('e2e.plainTip', { name: f.name || fid }))}">${window.TSUI.icon('unlock', 11)}<span>${esc(tr(m.sender === 'me' ? 'e2e.plainSent' : 'e2e.plainReceived'))}</span></span>`
+        : '';
+      out += `<div class="dmx-msg dm-msg ${m.sender === 'me' ? 'sent' : 'recv'} ${media} ${m.pending ? 'is-pending' : ''} ${m.plain ? 'is-plain' : ''}" ${m.id ? `data-mid="${esc(m.id)}"` : ''}>${cont && ts ? `<time class="dmx-hover-time">${esc(fmtTime(ts))}</time>` : ''}${tools}<div class="dmx-content">${html}</div>${plain}</div>`;
       prev = m;
     });
     closeGroup();
@@ -549,6 +596,9 @@
     };
     document.addEventListener('ts:presence', refresh);
     document.addEventListener('ts:profile', refresh);
+    // Anahtar sabitleme/değişikliği ve kendi hesap kimliğim: kilit rozeti, uyarı.
+    document.addEventListener('ts:peerkeys', refresh);
+    document.addEventListener('ts:identity', () => refresh({}));
     document.addEventListener('ts:call', syncCallButtons);
   }
 

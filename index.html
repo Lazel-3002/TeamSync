@@ -67,7 +67,7 @@
   <div id="login" class="login-wrap">
     <div style="position:absolute; left:14px; bottom:12px; z-index:5; display:flex; flex-direction:column; align-items:flex-start; gap:6px;">
       <button id="update-btn" class="hidden" title="Uygulamayı güncelle">Güncellemeleri Denetle</button>
-      <div id="app-version" style="font-size:12px; color:var(--txt-mut); opacity:0.55; user-select:none;">v1.0.5 · Gece Meclisi</div>
+      <div id="app-version" style="font-size:12px; color:var(--txt-mut); opacity:0.55; user-select:none;">v1.0.18</div>
     </div>
     <div class="login-card">
       <h1 style="display:flex; align-items:center; justify-content:center; gap:8px;">
@@ -1946,6 +1946,8 @@
                 </div>
                 <label class="switch"><input type="checkbox" id="user-settings-noise-suppression"><span class="slider round"></span></label>
               </div>
+              <!-- js/call-sounds.js (TSCallSounds.render): gelen/giden arama sesi, kendi ses dosyan (yalnızca bu cihazda). -->
+              <div id="settings-call-sounds" class="settings-card cs-card" data-i18n-ignore></div>
             </div>
 
             <div class="settings-panel" data-settings-content="broadcast">
@@ -2008,6 +2010,7 @@
                   <p data-i18n="net.intro1">Sesin ve görüntün bir merkezden geçmez: mümkün olduğunda doğrudan senin bilgisayarından arkadaşının bilgisayarına gider.</p>
                   <p data-i18n="net.intro2">Ağ buna izin vermezse ses ve görüntü, yine şifreli olarak, bir aracı sunucu (TURN) üzerinden aktarılır.</p>
                   <p data-i18n="net.intro3">Sinyal sunucuları yalnızca tanıştırır: iki bilgisayarın birbirini bulmasını sağlar, mesajları ve arama davetlerini taşır. Ses ve görüntü bu sunuculardan geçmez.</p>
+                  <p data-i18n="net.intro4">Özel mesajlar, dosyalar, tepkiler ve arama davetleri uçtan uca şifreli gider: sinyal sunucuları kimin kime ne zaman yazdığını görür, ama içeriği okuyamaz. Arkadaşın eski bir sürüm kullanıyorsa mesajlar şifresiz gider ve sohbette açık kilitle işaretlenir.</p>
                 </div>
               </div>
 
@@ -2810,6 +2813,7 @@
   <script src="resources/localization/teams-strings.js"></script>
   <script src="renderer.js"></script>
   <script src="js/ts-ui.js"></script>
+  <script src="js/call-sounds.js"></script>
   <script src="js/status.js"></script>
   <script src="js/activity.js"></script>
   <script src="js/profile-media.js"></script>
@@ -2823,6 +2827,7 @@
   <script src="js/ui/typing.js"></script>
   <script src="js/dm-extras.js"></script>
   <script src="js/space/crypto.js"></script>
+  <script src="js/space/dm-e2ee.js"></script>
   <script src="js/space/store.js"></script>
   <script src="js/space/groups.js"></script>
   <script src="js/space/server-state.js"></script>

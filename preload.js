@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAccountChannelKey: (slot) => ipcRenderer.invoke('get-account-channel-key', slot),
   // Mesaj yedeği anahtarı (js/msg-backup.js): op = 'get' | 'create' | 'set'
   backupKey: (slot, op, value, replace) => ipcRenderer.invoke('backup-key', slot, op, value, !!replace),
+  // Hesap kimliği (ECDSA + ECDH özel anahtarları, DPAPI; js/space/crypto.js).
+  accountIdentity: (fid, op, value) => ipcRenderer.invoke('account-identity', fid, op, value),
   netDnsCheck: () => ipcRenderer.invoke('net-dns-check'),
   forgetImportedAccount: (slot) => ipcRenderer.invoke('forget-imported-account', slot),
   getEnv: () => ipcRenderer.invoke('get-env'),

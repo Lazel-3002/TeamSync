@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "main.js": {
-    "mtime": 1794905041.2198184,
-    "ast_hash": "a9b6e478f7ce176147bcdc82e7872113",
+    "mtime": 1794934697.982028,
+    "ast_hash": "4e901050bc16aba9704d940b25a36b88",
     "semantic_hash": ""
   },
   "package.json": {
@@ -40,13 +40,13 @@
     "semantic_hash": ""
   },
   "preload.js": {
-    "mtime": 1794905044.2117004,
-    "ast_hash": "2c01839d7f4f95f87ca8e64f7466503d",
+    "mtime": 1794934697.9116182,
+    "ast_hash": "012346050e56fdcc47b1851b657e5119",
     "semantic_hash": ""
   },
   "renderer.js": {
-    "mtime": 1794907241.942149,
-    "ast_hash": "3f6d0028a9d8fd8da84772ef844c2019",
+    "mtime": 1794936111.047116,
+    "ast_hash": "859a0b48b647cce2793b36751be37cc4",
     "semantic_hash": ""
   },
   "src/App.jsx": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1794906374.311036,
-    "ast_hash": "afcd8801690f03ff48be445bac8a6d7e",
+    "mtime": 1794935440.7034466,
+    "ast_hash": "24da98f6eead9694a692d3dd7aef22ba",
     "semantic_hash": ""
   },
   "src/index.html": {
@@ -575,8 +575,8 @@
     "semantic_hash": ""
   },
   "js/profile.js": {
-    "mtime": 1794859354.1629224,
-    "ast_hash": "fdaf8678557d89e46693cff8e5c79cfd",
+    "mtime": 1794935084.0339086,
+    "ast_hash": "de5464c872d2dc77f35b3623817c29b1",
     "semantic_hash": ""
   },
   "js/shell-core.js": {
@@ -585,8 +585,8 @@
     "semantic_hash": ""
   },
   "js/shell-dm.js": {
-    "mtime": 1794822139.8717833,
-    "ast_hash": "1f1353c2c1acde5067ecca7b00990443",
+    "mtime": 1794935049.9718916,
+    "ast_hash": "bd7ab2bed21111d0e901527b807f6d58",
     "semantic_hash": ""
   },
   "js/shell-friends.js": {
@@ -610,8 +610,8 @@
     "semantic_hash": ""
   },
   "resources/localization/shell-strings.js": {
-    "mtime": 1794905808.1607783,
-    "ast_hash": "85122b007ec00a378c0ebd6887d2d5f3",
+    "mtime": 1794935455.753511,
+    "ast_hash": "d981da509a98a21d092fda393eaf01d2",
     "semantic_hash": ""
   },
   "supabase/profile_media.sql": {
@@ -650,13 +650,13 @@
     "semantic_hash": ""
   },
   "js/space/crypto.js": {
-    "mtime": 1790745784.224568,
-    "ast_hash": "06ae944789c6007c57f538e8af9e496f",
+    "mtime": 1794936467.6497061,
+    "ast_hash": "929bcbbf6a9f22b8d4b9a42fd827cb3c",
     "semantic_hash": ""
   },
   "js/space/groups.js": {
-    "mtime": 1794905497.9688485,
-    "ast_hash": "1fe3d467d3cfe8ade7e2cd566f622625",
+    "mtime": 1794935275.3832734,
+    "ast_hash": "71c67bd30cc4b3688d21bfa5c348f5bd",
     "semantic_hash": ""
   },
   "js/space/server-state.js": {
@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "js/space/servers.js": {
-    "mtime": 1794905498.1179454,
-    "ast_hash": "c2fa48575bb6ce3026962cc1eb3d435e",
+    "mtime": 1794935387.626892,
+    "ast_hash": "91e9e04951e0a86b18c4a3369b7e0713",
     "semantic_hash": ""
   },
   "js/space/store.js": {
@@ -725,8 +725,8 @@
     "semantic_hash": ""
   },
   "HANDOFF.md": {
-    "mtime": 1794906233.6540604,
-    "ast_hash": "80212df5ee18f450ed5be326ab6bfa73",
+    "mtime": 1794936467.3610268,
+    "ast_hash": "a072209ea98fd2c6d2f45fdb626946ae",
     "semantic_hash": ""
   },
   "resources/emoji/LICENSE-emojibase.txt": {
@@ -820,8 +820,8 @@
     "semantic_hash": ""
   },
   "js/net-settings.js": {
-    "mtime": 1794905512.6058335,
-    "ast_hash": "01d065647f7c9600cbf0496016d3e887",
+    "mtime": 1794935407.7494512,
+    "ast_hash": "74f3dcfef2913c926d381e4206a763a1",
     "semantic_hash": ""
   },
   "test/e2e/connections-page.test.js": {
@@ -830,13 +830,28 @@
     "semantic_hash": ""
   },
   "js/msg-backup.js": {
-    "mtime": 1794906715.9243832,
-    "ast_hash": "822ffa81c24d44b427daee12443be37a",
+    "mtime": 1794935352.516709,
+    "ast_hash": "ef32d279ad9db80bca91c84733d58d47",
     "semantic_hash": ""
   },
   "test/e2e/message-backup.test.js": {
     "mtime": 1794905867.1703064,
     "ast_hash": "d6dd237fde694e3e0ec6df927415c18e",
+    "semantic_hash": ""
+  },
+  "js/space/dm-e2ee.js": {
+    "mtime": 1794936121.9993722,
+    "ast_hash": "b07cd530932bfa9ae34fbe9a7e4e3fdb",
+    "semantic_hash": ""
+  },
+  "test/e2e/dm-e2ee.test.js": {
+    "mtime": 1794936141.719674,
+    "ast_hash": "9b8abfc8dd95304cf0908ce811754f6c",
+    "semantic_hash": ""
+  },
+  "test/e2e/group-multidevice.test.js": {
+    "mtime": 1794936316.5976129,
+    "ast_hash": "02fa3c2682cd70a940b4671731d16442",
     "semantic_hash": ""
   }
 }

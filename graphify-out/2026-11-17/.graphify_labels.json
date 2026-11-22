@@ -27,7 +27,7 @@
   "25": "RNNoise Noise Suppression",
   "26": "Smeargle Sprite Generator",
   "27": "Package Metadata",
-  "28": "E2E Test: Lucky Wheel",
+  "28": "dm-e2ee.js",
   "29": "E2E Test: Quick Poll",
   "30": "initCustomThemeEditor",
   "31": "E2E Test: Friend List",
@@ -78,6 +78,7 @@
   "76": "App State Module",
   "77": "App Entry Point",
   "78": "Vite Config",
+  "79": "color-picker.js",
   "80": "seed_machine_draft.py",
   "81": "settings-language.test.js",
   "82": "TeamSync localization terminology",
@@ -93,6 +94,8 @@
   "92": "i18n-coverage.test.js",
   "93": "TeamSync localization terminology",
   "94": "renderVirtualCursor",
+  "95": "dm-e2ee.test.js",
+  "96": "lucky-wheel-redesign.test.js",
   "97": "shortcodes.js",
   "98": "direct-call.js",
   "99": "media-collect-resize.test.js",
@@ -101,6 +104,8 @@
   "102": "quick-poll-redesign.test.js",
   "103": "shell-navigation.test.js",
   "104": "teams-strings.js",
+  "105": "account-code-ui.test.js",
   "106": "media-library.test.js",
-  "107": "startPttHook"
+  "107": "startPttHook",
+  "108": "getBroadcastAddresses"
 }

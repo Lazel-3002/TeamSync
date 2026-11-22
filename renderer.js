@@ -2,7 +2,12 @@ const params = (() => {
   return window.__params || { name: '', room: '', password: '' };
 })();
 
-// E2EE MQTT INTERCEPTION
+// ESKİ "E2EE" SARMALI (CryptoJS, anahtar = konunun 3. parçası). DİKKAT: bu kod
+// hiç ÇALIŞMIYOR — vendor/mqtt.min.js `connect`'i yalnızca okunabilir (getter)
+// dışa aktarır; aşağıdaki atama sessizce yok sayılır ve tüm MQTT trafiği
+// (sürümler arası) DÜZ JSON gider. Çalışsaydı da gizlilik sağlamazdı (anahtar
+// herkese açık kimlik). Eski sürümler düz JSON beklediği için "düzeltilmez";
+// kişisel olaylar artık js/space/dm-e2ee.js (v2 zarf, "TS2E:") ile şifrelenir.
 if (window.mqtt && window.CryptoJS) {
   const originalMqttConnect = window.mqtt.connect;
   window.mqtt.connect = function(url, options) {
@@ -1471,7 +1476,7 @@ function renderFriends() {
             <div class="friend-status fs-dot s-${status} ${isOnline}" id="${safeDomId('status-', fId)}"></div>
           </div>
           <div class="friend-copy">
-            <b class="friend-name">${escapeHtml(f.name)}</b>${f.isMuted ? `<span class="friend-muted-tag" title="${escapeHtml(t('friends.mutedBadge'))}">${window.TSUI && window.TSUI.icon ? window.TSUI.icon('bellOff', 12) : ''}<span>${escapeHtml(t('friends.mutedBadge'))}</span></span>` : ''}
+            <b class="friend-name">${escapeHtml(f.name)}</b>${window.TSE2E && window.TSE2E.status(fId).mode === 'changed' ? `<span class="friend-key-tag" title="${escapeHtml(t('e2e.keyChanged', { name: f.name || fId }))}">${window.TSUI && window.TSUI.icon ? window.TSUI.icon('alert', 12) : ''}<span>${escapeHtml(t('e2e.badgeChanged'))}</span></span>` : ''}${f.isMuted ?`<span class="friend-muted-tag" title="${escapeHtml(t('friends.mutedBadge'))}">${window.TSUI && window.TSUI.icon ? window.TSUI.icon('bellOff', 12) : ''}<span>${escapeHtml(t('friends.mutedBadge'))}</span></span>` : ''}
             ${subHtml}
             ${inRoom ? `<div class="friend-presence"><svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="12"></circle></svg><span>${escapeHtml(t('friends.inVoice'))}</span></div>` : ''}
           </div>
@@ -1704,7 +1709,9 @@ window.acceptInvite = (idx) => {
     state.globalMqtt.publish(`teamsync/user/${req.id}/events`, JSON.stringify({
       type: 'friend_accepted',
       id: state.friendId,
-      name: state.myName
+      name: state.myName,
+      // Hesap anahtarlarım (ilk görülen sabitlenir — js/space/dm-e2ee.js)
+      ...(window.TSE2E ? window.TSE2E.presenceFields() : {})
     }), { qos: 1 });
     state.globalMqtt.subscribe(`teamsync/user/${req.id}/presence`);
   }
@@ -2311,7 +2318,8 @@ async function deliverFriendRequest(targetId) {
     state.globalMqtt.publish(`teamsync/user/${targetId}/events`, JSON.stringify({
       type: 'friend_request',
       id: state.friendId,
-      name: state.myName
+      name: state.myName,
+      ...(window.TSE2E ? window.TSE2E.presenceFields() : {})
     }), { qos: 1 });
   } else if (res !== 'ok') {
     return 'toast.waitingForConnection';
@@ -2438,7 +2446,10 @@ function publishPresence() {
       avatarHash: state.myAvatarHash || null,
       // avatar: eski sürümler için eski Supabase kova adresi (resim değişene
       // dek); avr: yeni istemciler için P2P tanımlayıcısı (js/profile-media.js).
-      ...(window.TSProfileMedia ? window.TSProfileMedia.presenceFields() : {})
+      ...(window.TSProfileMedia ? window.TSProfileMedia.presenceFields() : {}),
+      // ak: hesap kimliğinin AÇIK anahtarları (uçtan uca şifreli DM için;
+      // js/space/dm-e2ee.js). Eski sürümler alanı yok sayar.
+      ...(window.TSE2E ? window.TSE2E.presenceFields() : {})
     };
     // Durum/özel durum/oyun/profil sürümü (js/status.js). Görünmezken null:
     // hiç yayın yapılmaz, arkadaşlar çevrimdışı görür.
@@ -2492,6 +2503,8 @@ function setupGlobalMQTT() {
 function connectGlobalBroker(session) {
   if (session !== globalMqttSessionId) return; // çıkış/hesap değişimi: bayat oturum
   const client = createMultiBrokerClient('arkadaşlık', () => 'glob-' + state.friendId + '-' + state.myId);
+  // Başkasının kişisel konusuna giden olaylar uçtan uca şifrelenir (v2 zarf).
+  if (window.TSE2E) window.TSE2E.attach(client);
   state.globalMqtt = client;
 
   client.on('connect', () => {
@@ -2530,7 +2543,9 @@ function connectGlobalBroker(session) {
     // Removed global MQTT ping logic for serverless operation
   });
   
-  client.on('message', (topic, message) => {
+  // via: v2 zarfını açan gönderen kimliği (uçtan uca şifreli geldi) ya da null.
+  // pre: js/space/dm-e2ee.js'in sıraya koyup çözdüğü/denetlediği olay nesnesi.
+  const handleGlobalMessage = (topic, message, via, pre) => {
     if (state.globalMqtt !== client) return; // eski hesabın istemcisi, yok say
     // Arkadaş grupları ve sunucular: şifreli konular (js/space/groups.js,
     // js/space/servers.js); her motor yalnızca kendi konularını tanır.
@@ -2544,8 +2559,13 @@ function connectGlobalBroker(session) {
       if (window.TSServers) window.TSServers.onMqtt(topic, message).catch(() => {});
       return;
     }
+    // Kendi kişisel konum: her olay sırayla v2 çözme / düşürme denetiminden geçer.
+    if (!pre && window.TSE2E && topic === `teamsync/user/${state.friendId}/events`) {
+      window.TSE2E.receive(message.toString(), (data, from) => handleGlobalMessage(topic, null, from, data));
+      return;
+    }
     try {
-      const data = JSON.parse(message.toString());
+      const data = pre || JSON.parse(message.toString());
       if (topic.endsWith('/presence')) {
         if (state.friends[data.id]) {
           const wasOnline = state.friends[data.id].online;
@@ -2565,6 +2585,7 @@ function connectGlobalBroker(session) {
 
           state.friends[data.id].online = true;
           state.friends[data.id].lastSeen = Date.now();
+          if (data.ak && window.TSE2E) window.TSE2E.onAdvert(data.id, data.ak);
           state.friends[data.id].room = data.room;
           state.friends[data.id].avatarHash = data.avatarHash;
 
@@ -2604,6 +2625,12 @@ function connectGlobalBroker(session) {
           }
         }
       } else if (topic.endsWith('/events')) {
+        if (!data || typeof data !== 'object') return;
+        // __e2e yalnızca yerelde, v2 zarfı açıldıysa konur (karşı taraf koyamaz).
+        // Sayılamaz (enumerable:false): imza doğrulamalarına (canonical/spread)
+        // ve JSON'a hiç girmez.
+        delete data.__e2e;
+        if (via) Object.defineProperty(data, '__e2e', { value: via, enumerable: false });
         let senderId = data.id || data.fromId;
         // Engellenen kişi (js/shell-friends.js TSBlock): HİÇBİR işleyici çalışmadan
         // düşürülür — DM/dosya/yazıyor/tepki/onay, arkadaşlık isteği, katılma isteği,
@@ -2645,6 +2672,8 @@ function connectGlobalBroker(session) {
           // bir kabul, onaya düşen normal bir istek olarak gösterilir.
           const requested = window.TSFriends && typeof window.TSFriends.wasRequested === 'function'
             ? window.TSFriends.wasRequested(data.id) : false;
+          // Hesap anahtarı: yalnızca henüz sabitlenmiş anahtar yoksa (TOFU) alınır.
+          if (data.ak && window.TSE2E && window.TSCrypto && !window.TSCrypto.peerKeys(data.id)) window.TSE2E.onAdvert(data.id, data.ak);
           if (data.type === 'friend_accepted' && requested) {
             completeOutgoingFriendship(data.id, reqName);
             friendRequestRpc('clear_friend_request', { p_to: data.id });
@@ -2759,7 +2788,8 @@ function connectGlobalBroker(session) {
         }
       }
     } catch(e) {}
-  });
+  };
+  client.on('message', (topic, message) => handleGlobalMessage(topic, message, null, null));
 }
 
 setInterval(() => {
@@ -3503,6 +3533,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     saveDeviceAccounts(remaining);
     if (isImportedSlot(slot) && window.electronAPI.forgetImportedAccount) {
       try { await window.electronAPI.forgetImportedAccount(slot); } catch (e) {}
+      // Kodla eklenen hesabın kimlik anahtarları da bu cihazda kalmasın.
+      if (account.id && window.electronAPI.accountIdentity && account.id !== state.friendId) {
+        try { await window.electronAPI.accountIdentity(account.id, 'delete'); } catch (e) {}
+      }
     }
     if (getActiveSlot() === slot) {
       if (remaining.length) {
@@ -3608,6 +3642,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         rememberSlotUsed(slot);
         saveDeviceAccounts(getDeviceAccounts().filter(a => a.slot !== slot));
         if (window.electronAPI.forgetImportedAccount) { try { await window.electronAPI.forgetImportedAccount(slot); } catch (e) {} }
+        if (state.friendId && window.electronAPI.accountIdentity) { try { await window.electronAPI.accountIdentity(state.friendId, 'delete'); } catch (e) {} }
+        if (window.TSCrypto && window.TSCrypto.forgetIdentity) window.TSCrypto.forgetIdentity();
         if (getActiveSlot() === slot) localStorage.removeItem(ACTIVE_SLOT_KEY);
         if (isDefaultAccountRef({ type: 'device', slot })) localStorage.removeItem(DEFAULT_ACCOUNT_KEY);
       }
@@ -4819,13 +4855,17 @@ function playRingOnce(kind) {
   }
 }
 
+// Zil sesi seçimi (Ayarlar > Ses > Arama sesleri) js/call-sounds.js'te:
+// TSCallSounds varsa tüm zil çağrıları ona gider, yoksa eski sentezli ses çalar.
 let ringLoopTimer = null;
 function stopRingLoop() {
   if (ringLoopTimer) { clearInterval(ringLoopTimer); ringLoopTimer = null; }
+  if (window.TSCallSounds) window.TSCallSounds.stop();
 }
 // maxMs sonrası kendiliğinden durur; tekrar çağrılırsa öncekini değiştirir.
 function startRingLoop(kind, maxMs = 30000) {
   stopRingLoop();
+  if (window.TSCallSounds) { window.TSCallSounds.start(kind, maxMs); return; }
   try { playRingOnce(kind); } catch (e) { console.error('Ring error:', e); }
   const period = kind === 'ringback' ? 3000 : 2200;
   const started = Date.now();
@@ -11029,7 +11069,7 @@ function applyUserLanguage(language, persist = true) {
   window.TeamSyncMediaLibrary?.refresh();
   // Kabuk listeleri (sohbet listesi, Kişiler) metinlerini çizerken t() ile
   // yazar; dil değişince yeniden çizilmezse eski dilde kalıyorlardı.
-  try { window.TSDM?.renderList?.(); window.TSFriends?.render?.(); } catch (e) { console.warn('[i18n] kabuk yeniden çizilemedi', e); }
+  try { window.TSDM?.renderList?.(); window.TSFriends?.render?.(); window.TSCallSounds?.render?.(); } catch (e) { console.warn('[i18n] kabuk yeniden çizilemedi', e); }
 }
 
 // Oda içindeki cihaz listeleri (#mic-select / #speaker-select) odaya girilirken
@@ -14138,7 +14178,9 @@ window.sendDMText = async (text) => {
   // mid: alıcının QoS-1 çift teslimleri ayıklayabilmesi için mesaj kimliği
   // (eski istemciler alanı yok sayar).
   const mid = crypto.randomUUID();
-  pushDmMessage(friendId, { id: mid, sender: 'me', type: 'text', content: textToSend, isCensored: isCensored, timestamp: Date.now() });
+  // Arkadaşın hesap anahtarı yoksa (eski sürüm) eski sarmalla gider: işaretlenir.
+  const plainSend = !(window.TSE2E && window.TSE2E.canEncryptTo(friendId));
+  pushDmMessage(friendId, { id: mid, sender: 'me', type: 'text', content: textToSend, isCensored: isCensored, timestamp: Date.now(), ...(plainSend ? { plain: true } : {}) });
   saveDMs();
   renderDMs();
 
@@ -14207,7 +14249,8 @@ window.sendDMFile = async (file) => {
   const msgType = isImage ? 'image' : (isVideo ? 'video' : 'file');
 
   if (!state.dms[friendId]) state.dms[friendId] = [];
-  state.dms[friendId].push({ id: crypto.randomUUID(), sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now() });
+  const plainFile = !(window.TSE2E && window.TSE2E.canEncryptTo(friendId));
+  state.dms[friendId].push({ id: crypto.randomUUID(), sender: 'me', type: msgType, content: base64Data, fileName: file.name, timestamp: Date.now(), ...(plainFile ? { plain: true } : {}) });
   saveDMs();
   renderDMs();
 
@@ -14280,7 +14323,7 @@ window.receiveDM = async (fromId, data) => {
     if (mid && window.TSDMX) window.TSDMX.sendAck(fromId, mid); // tekrar gelse de onayla
     if (window.TSTyping) window.TSTyping.remoteStopped(`dm:${fromId}`, fromId);
     if (mid && state.dms[fromId].some(m => m.id === mid || (m.mergedIds && m.mergedIds.includes(mid)))) return; // QoS 1 çift teslim
-    pushDmMessage(fromId, { id: mid || undefined, sender: 'them', type: data.msgType, content: safeContent, isCensored: isCensored, timestamp: Date.now() });
+    pushDmMessage(fromId, { id: mid || undefined, sender: 'them', type: data.msgType, content: safeContent, isCensored: isCensored, timestamp: Date.now(), ...(data.__e2e ? {} : { plain: true }) });
     saveDMs();
     const viewing = window.TSDM ? window.TSDM.isViewing(fromId) : state.activeDM === fromId;
     if (state.activeDM === fromId) renderDMs();
@@ -14305,7 +14348,8 @@ window.receiveDM = async (fromId, data) => {
       totalChunks: data.totalChunks,
       chunks: [],
       receivedChunks: 0,
-      lastChunkAt: Date.now()
+      lastChunkAt: Date.now(),
+      plain: !data.__e2e
     };
   }
   else if (data.type === 'dm_file_chunk') {
@@ -14314,13 +14358,14 @@ window.receiveDM = async (fromId, data) => {
       && data.chunkIndex >= 0 && data.chunkIndex < fileData.totalChunks
       && typeof data.data === 'string' && data.data.length > 0 && data.data.length <= 90_000) {
       fileData.lastChunkAt = Date.now();
+      if (!data.__e2e) fileData.plain = true;
       if (!fileData.chunks[data.chunkIndex]) {
         fileData.chunks[data.chunkIndex] = data.data;
         fileData.receivedChunks++;
       }
       if (fileData.receivedChunks === fileData.totalChunks) {
         const fullBase64 = fileData.chunks.join('');
-        state.dms[fromId].push({ sender: 'them', type: fileData.msgType, content: fullBase64, fileName: fileData.fileName, timestamp: Date.now() });
+        state.dms[fromId].push({ sender: 'them', type: fileData.msgType, content: fullBase64, fileName: fileData.fileName, timestamp: Date.now(), ...(fileData.plain ? { plain: true } : {}) });
         saveDMs();
         delete state.incomingDMFiles[data.fileId];
         

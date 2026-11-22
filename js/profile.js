@@ -236,7 +236,10 @@
     setTimeout(() => request(fid, rev), Math.random() * 1500);
   }
 
-  async function answer(toFid) {
+  // viaE2E: istek v2 zarfla mı geldi? Gelmediyse istek sahibi benim hesap
+  // anahtarımı bilmiyor olabilir — yanıt (anahtarlarımı taşıdığı için) eski
+  // sarmalla gider, aksi hâlde açamaz ve beni hiç öğrenemezdi.
+  async function answer(toFid, viaE2E) {
     if (!toFid || !/^[A-Za-z0-9_-]{3,128}$/.test(toFid)) return;
     if (window.TSStatus && window.TSStatus.isInvisible()) return;
     if (window.TSBlock && window.TSBlock.isBlocked(toFid)) return; // engellenen profilimi göremez
@@ -252,6 +255,15 @@
     try { if (window.TSCrypto) { await window.TSCrypto.ensureIdentity(); keys = window.TSCrypto.publicKeysSync(); } } catch (e) {}
     const payload = { type: 'res_profile', fromId: window.state.friendId, rev: p.rev || 0, profile: wirePayload(p) };
     if (keys) payload.keys = keys;
+    // akv:1 → bu anahtarlar HESAP kimliği (v2 DM); mk → eski cihaz anahtarının
+    // yeni hesap anahtarlarını onayladığı göç imzası (js/space/crypto.js).
+    const acct = window.TSCrypto && window.TSCrypto.accountKeysSync && window.TSCrypto.accountKeysSync();
+    if (keys && acct && acct.ik === keys.ik) {
+      payload.akv = 1;
+      const mk = window.TSCrypto.migrationProofSync();
+      if (mk) payload.mk = mk;
+    }
+    if (!viaE2E) payload.__plain = 1;
     // Arkadaş olmayan grup üyeleri presence görmez: avatar burada. `av` yalnızca
     // eski sürümler için eski kova adresi; yeni istemciler profile.pm.av'yi kullanır.
     const av = window.TSProfileMedia ? window.TSProfileMedia.legacyAvatar() : legacyMedia(window.state.myAvatar);
@@ -262,7 +274,7 @@
   function onEvent(data) {
     if (!data || typeof data !== 'object') return;
     if (data.type === 'req_profile') {
-      answer(data.fromId);
+      answer(data.fromId, !!data.__e2e);
     } else if (data.type === 'res_profile') {
       const fid = data.fromId;
       if (typeof fid !== 'string' || !/^[A-Za-z0-9_-]{3,128}$/.test(fid)) return;
@@ -272,7 +284,10 @@
       const sharesGroup = !!(window.TSGroups && window.TSGroups.list && window.TSGroups.list().some(g => g.members.some(m => m.fid === fid)));
       if (!pending[fid] && !(window.state.friends && window.state.friends[fid]) && !cache[fid] && !sharesGroup) return;
       const r = Number.isInteger(data.rev) ? data.rev : 0;
-      if (data.keys && window.TSCrypto && window.state.friends && window.state.friends[fid]) window.TSCrypto.rememberPeer(fid, data.keys);
+      if (data.keys && window.TSCrypto && window.state.friends && window.state.friends[fid]) {
+        const mk = data.mk && typeof data.mk === 'object' ? { ik: data.mk.ik, sig: data.mk.sig } : null;
+        window.TSCrypto.rememberPeer(fid, { ik: data.keys.ik, ek: data.keys.ek }, { acct: data.akv === 1, proof: mk });
+      }
       const prof = sanitizeProfile(data.profile);
       delete prof.legacy;
       const foreign = v => isMediaRef(v) && window.TSProfileMedia.parse(v).fid !== fid;
@@ -401,6 +416,17 @@
       : '';
     const bio = p.bio ? `<div class="pc-section"><div class="pc-label">${esc(tr('profile.aboutMe'))}</div><div class="pc-bio">${esc(p.bio)}</div></div>` : '';
     const loading = m.loading ? `<div class="pc-loading">${esc(tr('profile.loading'))}</div>` : '';
+    // Güvenlik kodu (js/space/dm-e2ee.js): iki hesabın açık anahtarlarından 12 hane.
+    let safety = '';
+    if (m.kind === 'friend' && m.isFriend && m.fid && m.fid !== window.state.friendId && window.TSE2E) {
+      const s = window.TSE2E.status(m.fid);
+      if (s.mode === 'plain') {
+        safety = `<div class="pc-section pc-safety is-off"><div class="pc-label">${window.TSUI.icon('unlock', 12)}<span>${esc(tr('e2e.safetyTitle'))}</span></div><p class="pc-safety-hint">${esc(tr('e2e.off', { name: m.name }))}</p></div>`;
+      } else {
+        const code = window.TSE2E.safetyCodeSync(m.fid) || '···· ···· ····';
+        safety = `<div class="pc-section pc-safety ${s.mode === 'changed' ? 'is-changed' : 'is-on'}" data-safety-fid="${esc(m.fid)}"><div class="pc-label">${window.TSUI.icon(s.mode === 'changed' ? 'alert' : 'lock', 12)}<span>${esc(tr('e2e.safetyTitle'))}</span></div><div class="pc-safety-code">${esc(code)}</div><p class="pc-safety-hint">${esc(tr(s.mode === 'changed' ? 'e2e.keyChanged' : 'e2e.safetyHint', { name: m.name }))}</p></div>`;
+      }
+    }
     return `
       <div class="pc ${opts.cls || ''}" style="${accent}" data-i18n-ignore>
         <div class="pc-banner ${mediaSrc(p.bannerUrl) ? 'has-img' : ''}" style="${bannerStyle(p, m.fid || m.name)}"></div>
@@ -415,6 +441,7 @@
           ${voice}
           ${activityHtml(m.activity, opts.compact)}
           ${bio}
+          ${safety}
           ${loading}
           ${opts.actionsHtml || ''}
         </div>

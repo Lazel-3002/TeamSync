@@ -174,3 +174,21 @@
   .view-dm .dmx-msg { margin: 0 -12px 0 -66px; padding: 2px 12px 2px 66px; }
   .view-dm .dm-input-area { margin: 0 8px 12px; }
 }
+
+/* Uçtan uca şifreleme (js/space/dm-e2ee.js): başlık rozeti, şifresiz işareti, anahtar değişti şeridi */
+.dmh-e2e { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; vertical-align: 2px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
+.dmh-e2e .ts-ico { flex: 0 0 auto; }
+.dmh-e2e.is-on { color: color-mix(in srgb, var(--status-online) 75%, var(--txt-main)); }
+.dmh-e2e.is-off { color: var(--txt-mut); }
+.dmh-e2e.is-changed { color: color-mix(in srgb, var(--warn) 75%, var(--txt-main)); }
+.dmx-plain { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font-size: 11px; color: var(--txt-mut); }
+.dmx-plain .ts-ico { flex: 0 0 auto; color: color-mix(in srgb, var(--warn) 70%, var(--txt-mut)); }
+.dmx-msg.sent .dmx-plain { align-self: flex-end; }
+.dm-keywarn { display: flex; align-items: flex-start; gap: 12px; margin: 10px 16px 0; padding: 12px 14px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 10%, var(--sh-main, var(--bg-dark))); color: var(--txt-main); flex-wrap: wrap; }
+.dm-keywarn > .ts-ico { flex: 0 0 auto; color: var(--warn); margin-top: 2px; }
+.dm-keywarn-copy { flex: 1 1 260px; min-width: 0; }
+.dm-keywarn-copy strong { display: block; font-size: 14px; }
+.dm-keywarn-copy p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--txt-mut); }
+.dm-keywarn-acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dm-keywarn-acts button { display: inline-flex; align-items: center; gap: 6px; }
+.friend-key-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--warn) 75%, var(--txt-main)); vertical-align: 1px; }

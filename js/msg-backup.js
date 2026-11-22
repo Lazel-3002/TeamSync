@@ -17,6 +17,9 @@
 // data:/blob: ile başlayan her metni reddeder). Arkadaş grubu kayıtları (grup
 // anahtarı dahil) + imzalı metin olayları. Sunucu (sv-) üyelik kayıtları.
 // Sunucu kanal mesajları yedeklenmez (barındırıcılar zaten verir).
+// Ayrıca: hesap kimliği ({k:'id'}: uçtan uca şifreleme özel anahtarları — yeni
+// cihaz TS2 koduyla otomatik alır) ve arkadaşların sabitlenmiş açık anahtarları
+// ({k:'pk'}). Bunlar da yalnızca K ile şifreli satırlardır.
 (function () {
   'use strict';
 
@@ -307,6 +310,8 @@
     if (!my.prefs.restoredAt) {
       if (my.hadRemote) await restore({ auto: true });
       else { my.prefs.restoredAt = Date.now(); savePrefs(my); }
+    } else if (my.hadRemote && window.TSE2E && window.TSE2E.needsIdentity()) {
+      await fetchIdentityRow(my).catch(() => false);
     }
     if (rt !== my) return;
     if (my.prefs.enabled === false) { setStatus(my, 'off'); return; }
@@ -373,7 +378,36 @@
       out.fn = String(m.fileName).slice(0, 255);   // içerik (data: URL) ASLA
     }
     if (m.reactions && typeof m.reactions === 'object' && Object.keys(m.reactions).length) out.rx = m.reactions;
+    if (m.plain) out.pl = 1;   // uçtan uca şifresiz gitmiş/gelmiş (eski sürüm arkadaş)
     return out;
+  }
+
+  // Hesap kimliği (özel anahtarlar, K ile şifreli satırda — yeni cihaz TS2
+  // koduyla otomatik alır) ve arkadaşların sabitlenmiş açık anahtarları.
+  async function collectKeys(my, want) {
+    const C = window.TSCrypto;
+    if (!C || st().friendId !== my.fid) return;
+    const id = await C.exportAccountIdentity().catch(() => null);
+    if (id && id.fid === my.fid) want.set(await hid(my, 'id|' + my.fid), { conv: await hid(my, 'keys'), ts: Date.now(), kind: 'id', env: { k: 'id', id } });
+    const peers = C.peersSnapshot();
+    for (const fid of Object.keys(peers)) {
+      if (!validFid(fid)) continue;
+      want.set(await hid(my, 'pk|' + fid), { conv: await hid(my, 'keys'), ts: Date.now(), kind: 'pk', env: { k: 'pk', f: fid, ...peers[fid] } });
+    }
+  }
+
+  // Geri yükleme daha önce yapılmış (ör. bu sürümden önce) ama hesap kimliği
+  // gelmemiş cihaz: yalnızca kimlik satırını indirir.
+  async function fetchIdentityRow(my) {
+    const C = window.TSCrypto;
+    if (!C || C.accountKeysSync() || !db() || !my.uid || !my.keys) return false;
+    const id = await hid(my, 'id|' + my.fid);
+    const res = await withTimeout(db().from(TABLE).select('id,nonce,ct').eq('user_id', my.uid).eq('id', id).limit(1), 15000, TIMEOUT);
+    if (!res || res.error || !Array.isArray(res.data) || !res.data.length) return false;
+    let env;
+    try { env = await openRow(my.keys, res.data[0]); } catch (e) { return false; }
+    if (env.k !== 'id' || !env.id) return false;
+    return (await C.installAccountIdentity(env.id)) === 'ok';
   }
 
   async function collectDMs(my, want) {
@@ -520,9 +554,10 @@
     try {
       const want = new Map();
       if (my.dirty.dm || full) await collectDMs(my, want);
+      if (my.dirty.keys || full) await collectKeys(my, want);
       my.spacesScanned = false;
       if (my.dirty.spaces || full || my.addedEvents.length) await collectSpaces(my, want, full);
-      my.dirty = { dm: false, spaces: false, full: false };
+      my.dirty = { dm: false, spaces: false, full: false, keys: false };
       const todo = [];
       for (const [id, w] of want) {
         const fp = fpOf(w.env) + (w.del ? '|d' : '');
@@ -588,7 +623,7 @@
     let bytes = list.reduce((a, r) => a + (Number(r.size) || 0), 0);
     if (bytes > QUOTA) {
       const recIds = new Set();
-      my.sent.forEach((v, id) => { if (v.kind === 'rec') recIds.add(id); });
+      my.sent.forEach((v, id) => { if (v.kind === 'rec' || v.kind === 'id' || v.kind === 'pk') recIds.add(id); });
       const victims = [];
       list.filter(r => r.id !== 'keycheck' && !recIds.has(r.id))
         .sort((a, b) => String(a.ts).localeCompare(String(b.ts)))
@@ -621,6 +656,7 @@
       m.restored = true;
     }
     if (env.rx && typeof env.rx === 'object') m.reactions = env.rx;
+    if (env.pl) m.plain = true;
     return m;
   }
 
@@ -642,6 +678,8 @@
       const recs = [];
       const evs = new Map();
       const sentAdds = [];
+      const pkEnvs = [];
+      let idEnv = null;
       let last = '';
       for (;;) {
         const res = await withTimeout(c.from(TABLE).select('id,conv,ts,v,nonce,ct,deleted').eq('user_id', my.uid).gt('id', last).order('id', { ascending: true }).limit(PAGE), 30000, TIMEOUT);
@@ -662,6 +700,12 @@
           } else if (env.k === 'ge' && env.ev && typeof env.ev.gid === 'string' && typeof env.ev.id === 'string') {
             (evs.get(env.ev.gid) || evs.set(env.ev.gid, []).get(env.ev.gid)).push(env.ev);
             sentAdds.push([row.id, { fp: fpOf(env), size, kind: 'ge', conv: row.conv }]);
+          } else if (env.k === 'id' && env.id && typeof env.id === 'object') {
+            idEnv = env.id;
+            sentAdds.push([row.id, { fp: fpOf(env), size, kind: 'id', conv: row.conv }]);
+          } else if (env.k === 'pk' && validFid(env.f)) {
+            pkEnvs.push(env);
+            sentAdds.push([row.id, { fp: fpOf(env), size, kind: 'pk', conv: row.conv }]);
           }
         }
         my.restoreRows = counts.rows;
@@ -671,8 +715,19 @@
         last = page[page.length - 1].id;
       }
 
-      // 1) Özel mesajlar: id ile tekilleştir; yerelde olan yereldeki gibi kalır.
+      // 0) Hesap kimliği ve arkadaşların sabitlenmiş anahtarları (gruplar
+      // açılmadan önce: bu cihaz grup olaylarını hesap anahtarıyla imzalasın).
       const s = st();
+      if (window.TSCrypto && s.friendId === my.fid) {
+        if (idEnv) {
+          const r = await window.TSCrypto.installAccountIdentity(idEnv).catch(() => 'invalid');
+          counts.identity = r;
+          if (r === 'conflict') console.warn('Mesaj yedeği: yedekteki hesap kimliği bu cihazdakiyle çelişiyor');
+        }
+        pkEnvs.forEach(env => { try { window.TSCrypto.importPeer(env.f, env); } catch (e) {} });
+      }
+
+      // 1) Özel mesajlar: id ile tekilleştir; yerelde olan yereldeki gibi kalır.
       if (dmEnvs.length && s.friendId === my.fid) {
         s.dms = s.dms || {};
         const touched = new Set();
@@ -904,6 +959,15 @@
     my.dirty.spaces = true;
     schedule(my);
   });
+  // Hesap kimliği / arkadaş anahtarı değişti: anahtar satırları yenilensin.
+  const keysDirty = () => {
+    const my = rt;
+    if (!my || !my.keys || my.restoring) return;
+    my.dirty.keys = true;
+    schedule(my);
+  };
+  document.addEventListener('ts:identity', keysDirty);
+  document.addEventListener('ts:peerkeys', keysDirty);
   document.addEventListener('ts:servers', () => {
     const my = rt;
     if (!my || !my.keys || my.restoring) return;

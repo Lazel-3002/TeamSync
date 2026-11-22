@@ -119,13 +119,22 @@
     // Yeni katılan: kontrol günlüğü gelmeden önce, davet yanıtındaki barındırıcı anahtarı
     return (m && m.ek) || (rt.bootKeys && rt.bootKeys[fid]) || null;
   }
+  // Bu sunucunun durumunda kayıtlı olduğum anahtarlar (eski cihaz anahtarı ya
+  // da hesap anahtarı — js/space/crypto.js). Hangisi kayıtlıysa ve bu cihazda
+  // varsa onunla imzalanır/türetilir; diğer üyeler yalnızca onu tanır.
+  // (Sunucularda anahtar göçü kaydı henüz yok: göç etmemiş üyelik eski cihaz
+  // anahtarıyla, yeni katılınan sunucular hesap anahtarıyla sürer.)
+  function myIk(rt) { const m = rt && rt.st && rt.st.members[me()]; return m && C().holds(m.ik) ? m.ik : null; }
+  function myEk(rt) { const m = rt && rt.st && rt.st.members[me()]; return m && C().holds(m.ek) ? m.ek : null; }
+
   function pairKey(rt, fid) {
     const ek = peerEk(rt, fid);
     if (!ek) return Promise.reject(new Error('no-peer-key'));
-    const cacheKey = `${rt.rec.gid}|${fid}|${ek}`;
+    const mine = myEk(rt);
+    const cacheKey = `${rt.rec.gid}|${fid}|${ek}|${mine || ''}`;
     if (!pairCache.has(cacheKey)) {
       pairCache.set(cacheKey, (async () => {
-        const id = await C().ensureIdentity();
+        const id = mine ? await C().identityFor(mine) : await C().ensureIdentity();
         const pub = await subtle.importKey('spki', C().unb64(ek), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
         const bits = await subtle.deriveBits({ name: 'ECDH', public: pub }, id.dh.privateKey, 256);
         const base = await subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']);
@@ -515,7 +524,7 @@
     await C().ensureIdentity();
     const ev = { id: crypto.randomUUID(), gid: sid, author: me(), type, body, ts: Date.now() };
     if (ch) ev.ch = ch;
-    const sig = await C().sign(ev);
+    const sig = await C().sign(ev, myIk(rt));
     const r = { ...ev, sig };
     if (isHost(rt)) {
       const res = await hostAccept(rt, r, 'self');
@@ -617,7 +626,7 @@
       }
     }
     const acc = { h: me(), at: now };
-    acc.hs = await C().sign({ id: r.id, a: r.sig, h: acc.h, at: acc.at });
+    acc.hs = await C().sign({ id: r.id, a: r.sig, h: acc.h, at: acc.at }, myIk(rt));
     const rec = { ...r, acc };
     await ingest(rt, [rec], 'local');
     if (rec.ch && restricted(rt.st, rec.ch)) await deliverPrivate(rt, rec);
@@ -906,7 +915,7 @@
     if (!c || !m || !m.ek) return;
     const wrapped = await C().wrapFor(m.ek, JSON.stringify({ key: rt.rec.key, epoch: rt.rec.epoch }), rt.rec.gid, 'srv-key');
     const payload = { type: 'srv_key', fromId: me(), sid: rt.rec.gid, epoch: rt.rec.epoch, wrapped, ts: Date.now() };
-    payload.sig = await C().sign(payload);
+    payload.sig = await C().sign(payload, myIk(rt));
     c.publish(`teamsync/user/${fid}/events`, JSON.stringify(payload), { qos: 1 });
   }
 
@@ -918,7 +927,7 @@
     if (now - rt.keyReqAt < (urgent ? 5000 : 120000)) return;
     rt.keyReqAt = now;
     const payload = { type: 'srv_kreq', fromId: me(), sid: rt.rec.gid, epoch: rt.rec.epoch, ts: now };
-    payload.sig = await C().sign(payload);
+    payload.sig = await C().sign(payload, myIk(rt));
     rt.st.hosts.filter(h => h !== me()).forEach(h => c.publish(`teamsync/user/${h}/events`, JSON.stringify(payload), { qos: 1 }));
   }
 
@@ -942,7 +951,7 @@
         const c = client();
         if (!c) return;
         const gone = { type: 'srv_gone', fromId: me(), sid: data.sid, fid: data.fromId, reason: rt.st.former[data.fromId].reason, ts: Date.now() };
-        gone.sig = await C().sign(gone);
+        gone.sig = await C().sign(gone, myIk(rt));
         c.publish(`teamsync/user/${data.fromId}/events`, JSON.stringify(gone), { qos: 1 });
       }
     } else if (data.type === 'srv_key') {
@@ -1011,7 +1020,7 @@
       }
       if (!already || already.ek !== ev.body.ek) { reply({ k: 'err', reason: 'member' }); return; }
       const wrapped = await C().wrapFor(ev.body.ek, JSON.stringify({ key: rt.rec.key, epoch: rt.rec.epoch }), rt.rec.gid, 'srv-join');
-      reply({ k: 'ok', ...serverCard(rt), epoch: rt.rec.epoch, wrapped, host: me(), hek: (await C().ensureIdentity()).ek });
+      reply({ k: 'ok', ...serverCard(rt), epoch: rt.rec.epoch, wrapped, host: me(), hek: myEk(rt) || (await C().ensureIdentity()).ek });
     }
   }
 
@@ -1117,13 +1126,13 @@
       }
       return;
     }
-    const id = await C().ensureIdentity();
+    const id = myIk(rt) ? await C().identityFor(myIk(rt)) : await C().ensureIdentity();
     const card = serverCard(rt);
     const beacon = {
       v: 1, name: card.name, desc: card.desc, icon: card.icon.length <= 16000 ? card.icon : '',
       members: card.members, online: card.online, code: pubInv.code, at: Date.now(), h: me(), ik: id.ik
     };
-    beacon.sig = await C().sign(beacon);
+    beacon.sig = await C().sign(beacon, id.ik);
     c.publish(topic, JSON.stringify(beacon), { qos: 1, retain: true });
     rt.rec.dirPublished = true;
     saveRec(rt).catch(() => {});

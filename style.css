@@ -9495,6 +9495,37 @@ body.no-hw-accel .ilb-nav {
 .settings-ptt-key-row .shortcut-reset { display: inline-grid; place-items: center; padding: 0; }
 .settings-ptt-key-row.is-disabled > div:first-child { opacity: .55; }
 .settings-ptt-key-msg { margin-top: 6px !important; font-size: 12px; font-weight: 600; color: var(--warn) !important; }
+
+/* Ayarlar > Ses > Arama sesleri (js/call-sounds.js) */
+#settings-modal .cs-card { display: flex; flex-direction: column; gap: 0; }
+#settings-modal .cs-card .cs-lead { margin: 6px 0 4px; }
+.cs-row { padding: 14px 0; border-bottom: var(--border); }
+.cs-row-main { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.cs-row-copy { flex: 1 1 220px; min-width: 0; }
+.cs-row-copy strong { display: block; margin-bottom: 4px; font-size: 14px; color: var(--txt-main); }
+#settings-modal .cs-row-copy p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--txt-mut); }
+.cs-controls { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
+#settings-modal .cs-select { width: 190px; max-width: 100%; min-height: 38px; padding: 0 10px; font: inherit; font-size: 13px; }
+.cs-card .settings-test-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 14px; white-space: nowrap; }
+.cs-card .cs-play { min-width: 96px; }
+.cs-card .cs-play.is-playing { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 55%, transparent); }
+.cs-card .settings-test-button:disabled { opacity: .45; cursor: default; }
+.cs-file { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border: var(--border); border-radius: 8px; background: color-mix(in srgb, var(--bg-hover) 45%, transparent); flex-wrap: wrap; }
+.cs-file.hidden { display: none; }
+.cs-file-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border-radius: 6px; color: var(--acc); background: color-mix(in srgb, var(--acc) 14%, transparent); }
+.cs-file-copy { display: flex; flex-direction: column; gap: 2px; flex: 1 1 110px; min-width: 0; }
+.cs-file-actions { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.cs-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--txt-main); }
+.cs-file-name.is-empty { white-space: normal; font-weight: 500; font-size: 12px; color: var(--txt-mut); }
+.cs-file-info { font-size: 11px; color: var(--txt-mut); font-variant-numeric: tabular-nums; }
+.cs-remove { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--txt-mut); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.cs-remove:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.cs-row.is-busy .cs-file { opacity: .6; pointer-events: none; }
+#settings-modal .cs-msg { margin: 8px 0 0; font-size: 12px; font-weight: 600; color: var(--danger); }
+.cs-msg.hidden { display: none; }
+.cs-vol { padding-top: 16px; }
+.cs-vol .settings-range-heading label { color: var(--txt-main); }
+.cs-vol .settings-range-heading output { color: var(--txt-mut); }
 @keyframes shortcutListening {
   0%, 100% { opacity: 1; }
   50% { opacity: .55; }

@@ -545,6 +545,12 @@
     } else if (body.k === 'bkreq' || body.k === 'bkkey') {
       // Mesaj yedeği anahtarı isteği / yanıtı (js/msg-backup.js).
       if (window.TSBackup) window.TSBackup.onOwnDevice(body, me.deviceId);
+    } else if (body.k === 'idreq' || body.k === 'idkey') {
+      // Hesap kimliği (uçtan uca şifreleme anahtarları) isteği / yanıtı (js/space/dm-e2ee.js).
+      if (window.TSE2E && window.TSE2E.onOwnDevice) window.TSE2E.onOwnDevice(body, me.deviceId);
+    } else if (body.k === 'gkreq') {
+      // Kendi diğer cihazım grup anahtar dönemlerini soruyor (js/space/groups.js).
+      if (window.TSGroups && window.TSGroups.onOwnDeviceEpochs) window.TSGroups.onOwnDeviceEpochs(body.g);
     }
   }
 
@@ -692,7 +698,7 @@
       <div class="settings-callout is-warn" role="note">${ico('alert', 18)}<p>${esc(tr('net.newWarn'))}</p></div>
       <p class="settings-help">${esc(tr('net.newSlots', { n: acc ? acc.count() : 0, max: acc ? acc.max : 3 }))}</p>
       <div class="net-moves">
-        <div><strong>${ico('check', 14)}<span>${esc(tr('net.newMovesTitle'))}</span></strong><p>${esc(tr('net.newMoves'))}</p><p>${esc(tr('net.newMovesAvatar'))}</p>${backupOn ? `<p class="net-moves-backup" data-backup="on">${ico('shield', 13)}<span>${esc(tr('net.newMovesBackup'))}</span></p>` : ''}</div>
+        <div><strong>${ico('check', 14)}<span>${esc(tr('net.newMovesTitle'))}</span></strong><p>${esc(tr('net.newMoves'))}</p><p>${esc(tr('net.newMovesAvatar'))}</p><p class="net-moves-keys">${ico('lock', 13)}<span>${esc(tr(backupOn ? 'net.newMovesKeysBackup' : 'net.newMovesKeys'))}</span></p>${backupOn ?`<p class="net-moves-backup" data-backup="on">${ico('shield', 13)}<span>${esc(tr('net.newMovesBackup'))}</span></p>` : ''}</div>
         <div><strong>${ico('monitor', 14)}<span>${esc(tr('net.newStaysTitle'))}</span></strong><p>${esc(tr(backupOn ? 'net.newStaysBackup' : 'net.newStays'))}</p></div>
       </div>
       <div class="net-rotate">

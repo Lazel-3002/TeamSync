@@ -1399,6 +1399,72 @@ ipcMain.handle('backup-key', (event, slot, op, value, replace) => {
   return null;
 });
 
+// ─── Hesap kimliği (uçtan uca şifreli DM + grup imzaları) ────────────────────
+// Hesap başına TEK kimlik: ECDSA P-256 (imza) + ECDH P-256 (anahtar anlaşması).
+// Özel anahtarlar (PKCS#8) yalnızca burada, DPAPI ile şifreli dosyada durur;
+// renderer açılışta alır, DIŞA AKTARILAMAZ CryptoKey olarak içe aktarır ve ham
+// baytı bırakır. Kendi diğer cihazlara yalnızca şifreli mesaj yedeği (K ile) ya
+// da şifreli acct_dev kanalıyla gider. Anahtar: arkadaşlık kimliği (fid) —
+// eski tip hesaplar ve sunucu hesapları için aynı kalır.
+const accountIdentityFile = path.join(baseUserData, 'account-identity.bin');
+const AID_FID_RE = /^[A-Za-z0-9_-]{3,128}$/;
+const AID_B64_RE = /^[A-Za-z0-9+/=]{80,400}$/;
+
+function loadAccountIdentities() {
+  try {
+    if (!fs.existsSync(accountIdentityFile)) return {};
+    const raw = fs.readFileSync(accountIdentityFile);
+    const text = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+    const data = JSON.parse(text);
+    return data && typeof data === 'object' ? data : {};
+  } catch (e) {
+    console.error('Hesap kimlikleri okunamadı:', e.message);
+    return {};
+  }
+}
+
+function saveAccountIdentities(map) {
+  const text = JSON.stringify(map);
+  const payload = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : Buffer.from(text, 'utf8');
+  fs.writeFileSync(accountIdentityFile, payload);
+}
+
+function validAccountIdentity(v, fid) {
+  if (!v || typeof v !== 'object' || v.v !== 1 || v.fid !== fid) return false;
+  if (!['sk', 'dk', 'ik', 'ek'].every(k => typeof v[k] === 'string' && AID_B64_RE.test(v[k]))) return false;
+  if (v.mig != null) {
+    if (typeof v.mig !== 'object' || typeof v.mig.ik !== 'string' || !AID_B64_RE.test(v.mig.ik) || typeof v.mig.sig !== 'string' || !/^[A-Za-z0-9+/=]{40,200}$/.test(v.mig.sig)) return false;
+  }
+  return true;
+}
+
+// op: 'get' → kayıt | null; 'set' → yoksa yazar (varsa mevcut olanı döner);
+// 'delete' → siler (hesap bu cihazdan çıkarıldığında).
+ipcMain.handle('account-identity', (event, fid, op, value) => {
+  if (!isMainWindowSender(event) || typeof fid !== 'string' || !AID_FID_RE.test(fid)) return null;
+  try {
+    const map = loadAccountIdentities();
+    const cur = validAccountIdentity(map[fid], fid) ? map[fid] : null;
+    if (op === 'get') return cur;
+    if (op === 'set') {
+      if (cur) return cur;
+      if (!validAccountIdentity(value, fid)) return null;
+      const rec = { v: 1, fid, sk: value.sk, dk: value.dk, ik: value.ik, ek: value.ek, at: Date.now() };
+      if (value.mig) rec.mig = { ik: value.mig.ik, sig: value.mig.sig };
+      map[fid] = rec;
+      saveAccountIdentities(map);
+      return rec;
+    }
+    if (op === 'delete') {
+      if (map[fid]) { delete map[fid]; saveAccountIdentities(map); }
+      return true;
+    }
+  } catch (e) {
+    console.error('Hesap kimliği yazılamadı:', e.message);
+  }
+  return null;
+});
+
 // Dönüş: { ok, slot, local } — kod bu cihazın kendi hesabıysa yerel slot,
 // daha önce eklenmişse aynı slot döner; aksi halde yeni slot ayrılır.
 ipcMain.handle('import-account-code', (event, code) => {
